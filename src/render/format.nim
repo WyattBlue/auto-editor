@@ -160,8 +160,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       audioStreams.add(aOutStream)
       audioEncoders.add(aEncCtx)
 
-      bar.startIndeterminate("Creating audio")
-
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
       let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize,
           args.audioNormalize, cache)
@@ -194,8 +192,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
         audioStreams.add(aOutStream)
         audioEncoders.add(aEncCtx)
-
-        bar.startIndeterminate("Creating audio")
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
         let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl,

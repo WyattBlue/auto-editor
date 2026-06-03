@@ -1,4 +1,4 @@
-import std/[json, math, memfiles, os, strformat, strutils, sequtils, tables]
+import std/[json, math, strformat, strutils, sequtils, tables]
 
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
 import ../util/[dnorm16, rational]
@@ -102,33 +102,8 @@ type
     layout*: ref AVChannelLayout
     rate*: cint
 
-  AudioBuffer = ref object
-    memFile*: MemFile
-    tempFilePath*: string
-    data*: ptr UncheckedArray[int16]
-    size*: int
-    samples*: int
-    channels*: cint
-
-proc newAudioBuffer(index: int32, samples: int, channels: cint): AudioBuffer =
-  result = new(AudioBuffer)
-  result.samples = samples
-  result.channels = channels
-  result.size = samples * channels * sizeof(int16)
-  result.tempFilePath = tempDir / &"{index}.map"
-  result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite, newFileSize = result.size)
-  result.data = cast[ptr UncheckedArray[int16]](result.memFile.mem)
-  # Note: Memory-mapped files are zero-initialized by the OS
-
-proc `[]`*(buffer: AudioBuffer, index: int): int16 {.inline.} =
-  buffer.data[index]
-
-proc `[]=`*(buffer: AudioBuffer, index: int, value: int16) {.inline.} =
-  buffer.data[index] = value
-
-func len(buffer: AudioBuffer): int {.inline.} =
-  ## Get total number of samples (all channels)
-  buffer.size div sizeof(int16)
+func clamp16(v: int32): int16 {.inline.} =
+  int16(max(-32768'i32, min(32767'i32, v)))
 
 func channels(self: Getter): cint =
   self.layout.nb_channels
@@ -608,15 +583,62 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
 
-  # Create memory-mapped buffer
-  let bufferIndex = if mixLayers: -1.int32 else: layerIndices[0].int32
-  var audioBuffer = newAudioBuffer(bufferIndex, totalSamples, targetChannels)
+  # Re-runnable streaming producer: yields the assembled, mixed, fade-applied
+  # timeline as interleaved int16 chunks of up to `frameSize` sample-frames, in
+  # time order, zero-padded out to `totalSamples`. Memory stays bounded by the
+  # largest in-flight clip plus any cross-layer overlap — never the whole
+  # timeline (`mixLayers` is implicit: clips from every active layer are summed).
+  proc newTimelineProducer(): iterator(): seq[int16] =
+    return iterator(): seq[int16] =
+      var activeLayers: seq[int] = @[]
+      for li in layerIndices:
+        if li < tl.a.len and tl.a[li].len > 0:
+          activeLayers.add li
+      var cursors = newSeq[int](tl.a.len)
 
-  for layerIndex in layerIndices:
-    if layerIndex < tl.a.len:
-      for clip in tl.a[layerIndex]:
+      var acc: seq[int32] = @[]   # interleaved accumulator over [bufStart, ...)
+      var bufStart = 0            # output sample-frame index mapped to acc[0]
+
+      template startOf(li: int): int =
+        int(tl.a[li][cursors[li]].start * sr.int64 * tb.den div tb.num)
+
+      # Emit finalized sample-frames below `boundary` as `frameSize` chunks
+      # (the whole remainder when `final`), then drop them from `acc`.
+      template flushUpTo(boundaryArg: int, final: bool) =
+        let boundary = min(boundaryArg, totalSamples)
+        if (boundary - bufStart) * targetChannels > acc.len:
+          acc.setLen((boundary - bufStart) * targetChannels)
+        var emitFrames = 0
+        if final:
+          emitFrames = max(0, boundary - bufStart)
+        else:
+          while bufStart + emitFrames + frameSize <= boundary:
+            emitFrames += frameSize
+        var off = 0
+        while off < emitFrames:
+          let cf = min(frameSize, emitFrames - off)
+          var chunk = newSeq[int16](cf * targetChannels)
+          for k in 0 ..< cf * targetChannels:
+            chunk[k] = clamp16(acc[off * targetChannels + k])
+          off += cf
+          yield chunk
+        if emitFrames > 0:
+          acc = (if emitFrames * targetChannels < acc.len: acc[emitFrames * targetChannels .. ^1] else: @[])
+          bufStart += emitFrames
+
+      while true:
+        # Pick the not-yet-processed clip with the smallest start across layers.
+        var bestLi = -1
+        for li in activeLayers:
+          if cursors[li] < tl.a[li].len and (bestLi == -1 or startOf(li) < startOf(bestLi)):
+            bestLi = li
+        if bestLi == -1:
+          break
+
+        let clip = tl.a[bestLi][cursors[bestLi]]
+        inc cursors[bestLi]
+
         let key = (clip.src[], clip.stream)
-
         let effectGroup = tl.effects[clip.effects]
         var speed = 1.0
         for effect in effectGroup:
@@ -639,6 +661,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
             let sourceChannels = getter.channels
             let numSamples = processedData.len div sourceChannels
             let n = min(durSamples, numSamples)
+            let neededFrames = startSample + n - bufStart
+            if neededFrames * targetChannels > acc.len:
+              acc.setLen(neededFrames * targetChannels)
             for i in 0 ..< n:
               let outputSampleIndex = startSample + i
               if outputSampleIndex < totalSamples:
@@ -652,275 +677,249 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                   else: 1.0'f32
                 )
                 let gain = min(1.0'f32, min(fadeIn, fadeOut))
-                let baseIndex = outputSampleIndex * targetChannels
+                let baseIndex = (outputSampleIndex - bufStart) * targetChannels
                 for ch in 0 ..< min(targetChannels, sourceChannels):
-                  let flatIndex = baseIndex + ch
                   let sourceIndex = i * sourceChannels + ch
-                  if flatIndex < audioBuffer.len and sourceIndex < processedData.len:
-                    let newSample = int32(round(processedData[sourceIndex].float32 * gain))
-                    if mixLayers:
-                      let mixed = audioBuffer[flatIndex].int32 + newSample
-                      audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
-                    else:
-                      audioBuffer[flatIndex] = int16(newSample)
+                  if sourceIndex < processedData.len:
+                    acc[baseIndex + ch] += int32(round(processedData[sourceIndex].float32 * gain))
 
-  if norm.kind == nkPeak:
-    # Calculate peak normalization adjustment (first pass analysis)
-    var maxPeakLevel: float32 = -99.0
+        # Everything below the next clip's start can receive no further writes.
+        var hasRemaining = false
+        var safeBoundary = totalSamples
+        for li in activeLayers:
+          if cursors[li] < tl.a[li].len:
+            hasRemaining = true
+            safeBoundary = min(safeBoundary, startOf(li))
+        if hasRemaining:
+          flushUpTo(safeBoundary, final = false)
 
-    # Analyze the entire audio buffer to find global peak
-    for i in 0..<audioBuffer.len:
-      let sample = audioBuffer[i]
-      let amplitude = abs(sample.float32 / 32768.0)
-      if amplitude > 0.0:
-        let peakLevel = 20.0 * log10(amplitude)
-        if peakLevel > maxPeakLevel:
-          maxPeakLevel = peakLevel
+      flushUpTo(totalSamples, final = true)
 
-    let peakAdjustment = norm.t - maxPeakLevel
-    debug &"current peak level: {maxPeakLevel}"
-    debug &"peak adjustment: {peakAdjustment:.3f}dB"
-
-    # Apply volume adjustment directly to the .map buffer
-    if peakAdjustment != 0.0:
-      let gainLinear = pow(10.0, peakAdjustment / 20.0)
-      for i in 0..<audioBuffer.len:
-        let adjusted = audioBuffer[i].float32 * gainLinear
-        audioBuffer[i] = int16(max(-32768.0, min(32767.0, adjusted)))
-
-  elif norm.kind == nkEbu:
-    # Create a temporary buffer for the normalized audio
-    var normalizedBuffer = newSeq[int16](audioBuffer.len)
-
-    let capture = beginLoudnormCapture()
-    let firstPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:print_format=json"
-
-    let layoutDesc = $tl.layout
-    let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout={layoutDesc}:time_base=1/{sr}"
-    var analysisGraph = newGraph()
-    let analysisSrc = analysisGraph.add("abuffer", bufferArgs)
-    let analysisFilter = analysisGraph.add("loudnorm", firstPass)
-    let analysisSink = analysisGraph.add("abuffersink")
-    analysisGraph.linkNodes(@[analysisSrc, analysisFilter, analysisSink]).configure()
-
-    # Create input frame for analysis
-    var analysisFrame = av_frame_alloc()
-    if analysisFrame == nil:
-      error "Could not allocate input frame for loudnorm analysis"
-
-    analysisFrame.nb_samples = totalSamples.cint
-    analysisFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    discard av_channel_layout_copy(addr analysisFrame.ch_layout, addr tl.layout[])
-    analysisFrame.sample_rate = sr.cint
-    analysisFrame.pts = 0
-
-    if av_frame_get_buffer(analysisFrame, 0) < 0:
-      error "Could not allocate input frame buffer for loudnorm analysis"
-
-    # Copy all data from audioBuffer to frame (convert int16 interleaved to planar float)
-    for ch in 0 ..< targetChannels:
-      let channelData = cast[ptr UncheckedArray[cfloat]](analysisFrame.data[ch])
-      for i in 0..<totalSamples:
-        let srcIndex = i * targetChannels + ch
-        if srcIndex < audioBuffer.len:
-          # Convert int16 to float [-1.0, 1.0]
-          channelData[i] = audioBuffer[srcIndex].cfloat / 32768.0
-        else:
-          channelData[i] = 0.0
-
-    analysisGraph.push(analysisFrame)
-    av_frame_free(addr analysisFrame)
-
-    analysisGraph.flush()
-
-    # Pull all output frames from analysis (and discard them - we only need the stats)
-    while analysisGraph.pullTransient() != nil:
-      discard
-
-    analysisGraph.cleanup()
-    endLoudnormCapture(capture)
-
-    var measuredI = norm.i
-    var measuredLRA = norm.lra
-    var measuredTP = norm.tp
-    var measuredThresh = -70.0'f32
-
-    let capturedJson = capture.getCaptured()
-    let jsonStart = capturedJson.find('{')
-    let jsonEnd = capturedJson.rfind('}')
-    if capturedJson.len > 0 and jsonStart >= 0 and jsonEnd > jsonStart:
-      let jsonStr = capturedJson[jsonStart..jsonEnd]
-      try:
-        let jsonData = parseJson(jsonStr)
-        measuredI = parseLoudnormValue(jsonData, "input_i")
-        measuredLRA = parseLoudnormValue(jsonData, "input_lra")
-        measuredTP = parseLoudnormValue(jsonData, "input_tp")
-        measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
-        debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
-      except JsonParsingError, KeyError, ValueError:
-        error "Error processing loudnorm output"
-    else:
-      error "Error processing loudnorm output"
-
-    let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
-
-    debug &"EBU norm: {secondPass}"
-    var loudnormGraph = newGraph()
-    let bufferSrc = loudnormGraph.add("abuffer", bufferArgs)
-    let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
-
-    let aformatArgs = &"sample_rates={sr}"
-    let aformat = loudnormGraph.add("aformat", aformatArgs)
-    let bufferSink = loudnormGraph.add("abuffersink")
-    loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat, bufferSink]).configure()
-
-    # Create one large input frame with all audio data for normalization pass
-    var inputFrame = av_frame_alloc()
-    if inputFrame == nil:
-      error "Could not allocate input frame for loudnorm"
-
-    inputFrame.nb_samples = totalSamples.cint
-    inputFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr tl.layout[])
-    inputFrame.sample_rate = sr.cint
-    inputFrame.pts = 0
-
-    if av_frame_get_buffer(inputFrame, 0) < 0:
-      error "Could not allocate input frame buffer for loudnorm"
-
-    # Copy all data from audioBuffer to frame (convert int16 interleaved to planar float)
-    for ch in 0 ..< targetChannels:
-      let channelData = cast[ptr UncheckedArray[cfloat]](inputFrame.data[ch])
-      for i in 0..<totalSamples:
-        let srcIndex = i * targetChannels + ch
-        if srcIndex < audioBuffer.len:
-          # Convert int16 to float [-1.0, 1.0]
-          channelData[i] = audioBuffer[srcIndex].cfloat / 32768.0
-        else:
-          channelData[i] = 0.0
-
-    loudnormGraph.push(inputFrame)
-    av_frame_free(addr inputFrame)
-
-    loudnormGraph.flush()
-
-    # Pull all output frames
-    var outputSamplesWritten = 0
-    while true:
-      let outputFrame = loudnormGraph.pullTransient()
-      if outputFrame == nil:
-        break
-
-      # Copy filtered data back to normalizedBuffer
-      let frameSamples = outputFrame.nb_samples.int
-      let frameChannels = min(outputFrame.ch_layout.nb_channels.int, targetChannels)
-
-      # Handle different output formats from loudnorm filter
-      if outputFrame.format == AV_SAMPLE_FMT_DBL.cint:
-        # Interleaved double - loudnorm outputs this format
-        let audioData = cast[ptr UncheckedArray[cdouble]](outputFrame.data[0])
-        for i in 0..<frameSamples:
-          let destIndex = (outputSamplesWritten + i) * targetChannels
-          if destIndex + frameChannels <= normalizedBuffer.len:
-            for ch in 0..<frameChannels:
-              let doubleSample = audioData[i * frameChannels + ch]
-              let clampedSample = max(-1.0, min(1.0, doubleSample))
-              normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
-      elif outputFrame.format == AV_SAMPLE_FMT_FLT.cint:
-        # Interleaved float
-        let audioData = cast[ptr UncheckedArray[cfloat]](outputFrame.data[0])
-        for i in 0..<frameSamples:
-          let destIndex = (outputSamplesWritten + i) * targetChannels
-          if destIndex + frameChannels <= normalizedBuffer.len:
-            for ch in 0..<frameChannels:
-              let floatSample = audioData[i * frameChannels + ch]
-              let clampedSample = max(-1.0, min(1.0, floatSample))
-              normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
-      elif outputFrame.format == AV_SAMPLE_FMT_FLTP.cint:
-        # Planar float
-        for i in 0..<frameSamples:
-          let destIndex = (outputSamplesWritten + i) * targetChannels
-          if destIndex + frameChannels <= normalizedBuffer.len:
-            for ch in 0..<frameChannels:
-              if outputFrame.data[ch] != nil:
-                let channelData = cast[ptr UncheckedArray[cfloat]](outputFrame.data[ch])
-                let floatSample = channelData[i]
-                let clampedSample = max(-1.0, min(1.0, floatSample))
-                normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
-      elif outputFrame.format == AV_SAMPLE_FMT_S16P.cint:
-        # Planar 16-bit
-        for i in 0..<frameSamples:
-          let destIndex = (outputSamplesWritten + i) * targetChannels
-          if destIndex + frameChannels <= normalizedBuffer.len:
-            for ch in 0..<frameChannels:
-              if outputFrame.data[ch] != nil:
-                let channelData = cast[ptr UncheckedArray[int16]](outputFrame.data[ch])
-                normalizedBuffer[destIndex + ch] = channelData[i]
-      else:
-        error &"Unexpected output format from loudnorm: {outputFrame.format}"
-
-      outputSamplesWritten += frameSamples
-
-    # Copy normalized data back to audioBuffer
-    # Take only what fits in audioBuffer (which is sized for totalSamples)
-    let samplesToCopy = min(outputSamplesWritten, totalSamples)
-
-    for i in 0..<(samplesToCopy * targetChannels):
-      if i < audioBuffer.len and i < normalizedBuffer.len:
-        audioBuffer[i] = normalizedBuffer[i]
-
-    loudnormGraph.cleanup()
-
-  # Yield audio frames in chunks
+  var resampler = newAudioResampler(fmt, tl.layout, sr)
   var samplesYielded = 0
   var frameIndex = 0'i64
 
-  var resampler = newAudioResampler(fmt, tl.layout, sr)
-  var frame = av_frame_alloc()
-  if frame == nil:
-    error "Could not allocate audio frame"
+  # Wrap an interleaved int16 chunk as an S16P frame, resample to the output
+  # format, and return the resulting (frame, index) pairs. Advances pts state.
+  proc emitChunk(chunk: seq[int16]): seq[(ptr AVFrame, int64)] =
+    let chunkFrames = chunk.len div targetChannels
+    if chunkFrames == 0:
+      return @[]
+    var frame = av_frame_alloc()
+    if frame == nil:
+      error "Could not allocate audio frame"
+    defer: av_frame_free(addr frame)
+    frame.nb_samples = chunkFrames.cint
+    frame.format = AV_SAMPLE_FMT_S16P.cint
+    discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
+    frame.sample_rate = sr
+    frame.pts = samplesYielded.int64
+    frame.time_base = AVRational(num: 1, den: sr)
+    if av_frame_get_buffer(frame, 0) < 0:
+      error "Could not allocate audio frame buffer"
+    for ch in 0 ..< targetChannels:
+      let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+      for i in 0 ..< chunkFrames:
+        channelData[i] = chunk[i * targetChannels + ch]
+    for newFrame in resampler.resample(frame):
+      result.add (newFrame, frameIndex)
+      frameIndex += 1
+    samplesYielded += chunkFrames
+
+  # Wrap an interleaved int16 chunk as a planar-float (FLTP) frame for loudnorm.
+  var fltpPts = 0'i64
+  proc chunkToFltpFrame(chunk: seq[int16]): ptr AVFrame =
+    let nFrames = chunk.len div targetChannels
+    var frame = av_frame_alloc()
+    if frame == nil:
+      error "Could not allocate loudnorm input frame"
+    frame.nb_samples = nFrames.cint
+    frame.format = AV_SAMPLE_FMT_FLTP.cint
+    discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
+    frame.sample_rate = sr.cint
+    frame.pts = fltpPts
+    fltpPts += nFrames
+    if av_frame_get_buffer(frame, 0) < 0:
+      error "Could not allocate loudnorm input frame buffer"
+    for ch in 0 ..< targetChannels:
+      let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
+      for i in 0 ..< nFrames:
+        channelData[i] = chunk[i * targetChannels + ch].cfloat / 32768.0
+    return frame
+
+  # Convert a loudnorm output frame (one of several sample formats) to an
+  # interleaved int16 chunk.
+  proc loudnormOutToChunk(outF: ptr AVFrame): seq[int16] =
+    let frameSamples = outF.nb_samples.int
+    let frameChannels = min(outF.ch_layout.nb_channels.int, targetChannels)
+    result = newSeq[int16](frameSamples * targetChannels)
+    if outF.format == AV_SAMPLE_FMT_DBL.cint:
+      let audioData = cast[ptr UncheckedArray[cdouble]](outF.data[0])
+      for i in 0 ..< frameSamples:
+        for ch in 0 ..< frameChannels:
+          let s = max(-1.0, min(1.0, audioData[i * frameChannels + ch]))
+          result[i * targetChannels + ch] = int16(s * 32767.0)
+    elif outF.format == AV_SAMPLE_FMT_FLT.cint:
+      let audioData = cast[ptr UncheckedArray[cfloat]](outF.data[0])
+      for i in 0 ..< frameSamples:
+        for ch in 0 ..< frameChannels:
+          let s = max(-1.0'f32, min(1.0'f32, audioData[i * frameChannels + ch]))
+          result[i * targetChannels + ch] = int16(s * 32767.0)
+    elif outF.format == AV_SAMPLE_FMT_FLTP.cint:
+      for i in 0 ..< frameSamples:
+        for ch in 0 ..< frameChannels:
+          if outF.data[ch] != nil:
+            let channelData = cast[ptr UncheckedArray[cfloat]](outF.data[ch])
+            let s = max(-1.0'f32, min(1.0'f32, channelData[i]))
+            result[i * targetChannels + ch] = int16(s * 32767.0)
+    elif outF.format == AV_SAMPLE_FMT_S16P.cint:
+      for i in 0 ..< frameSamples:
+        for ch in 0 ..< frameChannels:
+          if outF.data[ch] != nil:
+            let channelData = cast[ptr UncheckedArray[int16]](outF.data[ch])
+            result[i * targetChannels + ch] = channelData[i]
+    else:
+      error &"Unexpected output format from loudnorm: {outF.format}"
+
+  # EBU's loudnorm may emit a slightly different sample count than the timeline;
+  # cap the apply pass to `totalSamples` so output duration is preserved.
+  var ebuEmitted = 0
+  proc emitCapped(chunk: seq[int16]): seq[(ptr AVFrame, int64)] =
+    if ebuEmitted >= totalSamples:
+      return @[]
+    var c = chunk
+    let avail = totalSamples - ebuEmitted
+    if c.len div targetChannels > avail:
+      c.setLen(avail * targetChannels)
+    ebuEmitted += c.len div targetChannels
+    return emitChunk(c)
 
   return iterator(): (ptr AVFrame, int64) =
-    while samplesYielded < totalSamples:
-      let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
-
-      av_frame_unref(frame)
-      frame.nb_samples = currentFrameSize.cint
-      frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-      discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
-      frame.sample_rate = sr
-      frame.pts = samplesYielded.int64
-      frame.time_base = AVRational(num: 1, den: sr)
-
-      if av_frame_get_buffer(frame, 0) < 0:
-        error "Could not allocate audio frame buffer"
-
-      # Copy audio data from memory-mapped buffer to frame (convert to planar format)
-      for ch in 0 ..< targetChannels:
-        let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-        for i in 0..<currentFrameSize:
-          let srcSampleIndex = samplesYielded + i
-          if srcSampleIndex < totalSamples:
-            # Calculate index in memory-mapped interleaved array
-            let flatIndex = srcSampleIndex * targetChannels + ch
-            if flatIndex < audioBuffer.len:
-              channelData[i] = audioBuffer[flatIndex]
-            else:
-              channelData[i] = 0
-          else:
-            channelData[i] = 0
-
-      for newFrame in resampler.resample(frame):
-        yield (newFrame, frameIndex)
-        frameIndex += 1
-      samplesYielded += currentFrameSize
-
-    # Ensure cleanup happens when iterator is done
     defer:
-      av_frame_free(addr frame)
       for getter in samples.values:
         getter.close()
-      audioBuffer.memFile.close()
+
+    case norm.kind
+    of nkNull:
+      let produce = newTimelineProducer()
+      for chunk in produce():
+        for fr in emitChunk(chunk):
+          yield fr
+
+    of nkPeak:
+      # Pass 1: stream the timeline to find the global peak.
+      var maxPeakLevel = -99.0'f32
+      block:
+        let produce = newTimelineProducer()
+        for chunk in produce():
+          for s in chunk:
+            let amplitude = abs(s.float32 / 32768.0)
+            if amplitude > 0.0:
+              let peakLevel = 20.0 * log10(amplitude)
+              if peakLevel > maxPeakLevel:
+                maxPeakLevel = peakLevel
+      let peakAdjustment = norm.t - maxPeakLevel
+      debug &"current peak level: {maxPeakLevel}"
+      debug &"peak adjustment: {peakAdjustment:.3f}dB"
+      let gainLinear = pow(10.0, peakAdjustment / 20.0)
+
+      # Pass 2: stream the timeline again, applying the gain.
+      let produce2 = newTimelineProducer()
+      for chunk in produce2():
+        var c = chunk
+        if peakAdjustment != 0.0:
+          for k in 0 ..< c.len:
+            c[k] = int16(max(-32768.0, min(32767.0, c[k].float32 * gainLinear)))
+        for fr in emitChunk(c):
+          yield fr
+
+    of nkEbu:
+      let layoutDesc = $tl.layout
+      let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout={layoutDesc}:time_base=1/{sr}"
+
+      # First pass: stream chunks through loudnorm to measure loudness.
+      let capture = beginLoudnormCapture()
+      let firstPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:print_format=json"
+      var analysisGraph = newGraph()
+      let analysisSrc = analysisGraph.add("abuffer", bufferArgs)
+      let analysisFilter = analysisGraph.add("loudnorm", firstPass)
+      let analysisSink = analysisGraph.add("abuffersink")
+      analysisGraph.linkNodes(@[analysisSrc, analysisFilter, analysisSink]).configure()
+
+      fltpPts = 0
+      block:
+        let produce = newTimelineProducer()
+        for chunk in produce():
+          var f = chunkToFltpFrame(chunk)
+          analysisGraph.push(f)
+          av_frame_free(addr f)
+          while analysisGraph.pullTransient() != nil:
+            discard
+      analysisGraph.flush()
+      while analysisGraph.pullTransient() != nil:
+        discard
+      analysisGraph.cleanup()
+      endLoudnormCapture(capture)
+
+      var measuredI = norm.i
+      var measuredLRA = norm.lra
+      var measuredTP = norm.tp
+      var measuredThresh = -70.0'f32
+      let capturedJson = capture.getCaptured()
+      let jsonStart = capturedJson.find('{')
+      let jsonEnd = capturedJson.rfind('}')
+      if capturedJson.len > 0 and jsonStart >= 0 and jsonEnd > jsonStart:
+        let jsonStr = capturedJson[jsonStart..jsonEnd]
+        try:
+          let jsonData = parseJson(jsonStr)
+          measuredI = parseLoudnormValue(jsonData, "input_i")
+          measuredLRA = parseLoudnormValue(jsonData, "input_lra")
+          measuredTP = parseLoudnormValue(jsonData, "input_tp")
+          measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
+          debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
+        except JsonParsingError, KeyError, ValueError:
+          error "Error processing loudnorm output"
+      else:
+        error "Error processing loudnorm output"
+
+      # Second pass: stream chunks through loudnorm applying the measured gain.
+      let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
+      debug &"EBU norm: {secondPass}"
+      var loudnormGraph = newGraph()
+      let bufferSrc = loudnormGraph.add("abuffer", bufferArgs)
+      let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
+      let aformat = loudnormGraph.add("aformat", &"sample_rates={sr}")
+      let bufferSink = loudnormGraph.add("abuffersink")
+      loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat, bufferSink]).configure()
+
+      fltpPts = 0
+      block:
+        let produce = newTimelineProducer()
+        for chunk in produce():
+          var f = chunkToFltpFrame(chunk)
+          loudnormGraph.push(f)
+          av_frame_free(addr f)
+          while true:
+            let outF = loudnormGraph.pullTransient()
+            if outF == nil:
+              break
+            for fr in emitCapped(loudnormOutToChunk(outF)):
+              yield fr
+      loudnormGraph.flush()
+      while true:
+        let outF = loudnormGraph.pullTransient()
+        if outF == nil:
+          break
+        for fr in emitCapped(loudnormOutToChunk(outF)):
+          yield fr
+      loudnormGraph.cleanup()
+
+      # Pad with silence if loudnorm produced fewer samples than the timeline.
+      if ebuEmitted < totalSamples:
+        let pad = newSeq[int16]((totalSamples - ebuEmitted) * targetChannels)
+        ebuEmitted = totalSamples
+        for fr in emitChunk(pad):
+          yield fr
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
