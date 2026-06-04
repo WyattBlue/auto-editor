@@ -9,6 +9,21 @@ type VideoFrame = object
   index: int
   src: ptr string
   effects: Actions
+  local: int  # frame offset within the clip, for animated effects
+  dur: int    # clip length in frames
+
+func clipT(local, animLen: int): float32 =
+  ## Normalized time over an animation of `animLen` frames, reaching 1.0 on the
+  ## last frame and holding there once the animation completes.
+  let l = min(local, max(animLen - 1, 0))
+  float32(l) / float32(max(animLen - 1, 1))
+
+func envAnimLen(unit: DurUnit, mag: float32, clipDur: int, fps: float): int =
+  ## Resolve an ease duration to a frame count for the current clip.
+  case unit
+  of duClip: clipDur
+  of duSec: max(1, int(round(mag.float * fps)))
+  of duFrames: max(1, int(round(mag.float)))
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
@@ -457,7 +472,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 speed *= effect.val
 
             let i = int(round(float(sourceFramePos) * speed))
-            objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup)
+            objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
+              local: int(index - obj.start), dur: int(obj.dur))
 
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
@@ -563,24 +579,41 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       # Apply video effects in order
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
+        let local = objList[0].local
+        let clipDur = objList[0].dur
+        let fps = tl.tb.float
+        # Easing envelope, set by `ease` actions and applied to the animated
+        # actions that follow. Defaults to linear over the whole clip.
+        var curCurve = easeLinear
+        var curUnit = duClip
+        var curMag = 0.0'f32
+        template prog(): float32 =
+          applyEase(curCurve, clipT(local, envAnimLen(curUnit, curMag, clipDur, fps)))
         for effect in objList[0].effects:
           case effect.kind:
           of actSpeed, actVarispeed, actVolume, actDeesser: discard
+          of actEase:
+            curCurve = effect.easeCurve
+            curUnit = effect.easeDurUnit
+            curMag = effect.easeDur
           of actRotate:
-            let code = uint16(effect.nval)
-            if code == 0:
+            let startDeg = rotDeg(effect.rStart)
+            let rate = effect.rRate
+            if rate == 0.0'f32 and effect.rStart == Unorm16(0):
               continue
-            # nval holds the angle as 1/65536-of-a-turn buckets, half-open [0, 360).
-            let radians = code.float32 / 65536.0'f32 * 2.0'f32 * 3.14159265358979'f32
+            # ffmpeg evaluates the angle per frame: a = (start + rate*t)*PI/180,
+            # where t is clip-local seconds. graphTb = 1/fps, so a pts of the
+            # clip-local frame index makes t advance correctly.
+            frame.pts = local.int64
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"rotate|{radians}|{bg}|{bufferArgs}"
+            let key = &"rotate|{startDeg}|{rate}|{bg}|{bufferArgs}"
             if fxKey != key:
               if fxGraph != nil:
                 fxGraph.cleanup()
               fxGraph = newGraph()
               let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add("rotate", &"a={radians}:c={bg}")
+              let filt = fxGraph.add("rotate", &"a=({startDeg}+({rate})*t)*PI/180:c={bg}")
               let bufferSink = fxGraph.add("buffersink")
               fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
               fxKey = key
@@ -588,26 +621,27 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actZoom:
-            if effect.val == 1.0:
+            let z = effect.rampAt(prog())
+            if z == 1.0:
               continue
             let origW = frame.width
             let origH = frame.height
-            let scaledW = max(cint(float(origW) * effect.val), 2)
-            let scaledH = max(cint(float(origH) * effect.val), 2)
+            let scaledW = max(cint(float(origW) * z), 2)
+            let scaledH = max(cint(float(origH) * z), 2)
             let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
             if scaledFrame != frame:
               av_frame_free(addr frame)
               frame = scaledFrame
             let frameFmtName = $AVPixelFormat(frame.format)
             let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let zoomMode = if effect.val > 1.0: "crop" else: "pad"
+            let zoomMode = if z > 1.0: "crop" else: "pad"
             let key = &"zoom|{zoomMode}|{origW}x{origH}|{bg}|{zoomBufArgs}"
             if fxKey != key:
               if fxGraph != nil:
                 fxGraph.cleanup()
               fxGraph = newGraph()
               let bufferSrc = fxGraph.add("buffer", zoomBufArgs)
-              let mid = if effect.val > 1.0:
+              let mid = if z > 1.0:
                   fxGraph.add("crop", &"{origW}:{origH}")
                 else:
                   fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
@@ -638,7 +672,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actBlur:
-            let sigma = effect.val
+            let sigma = effect.rampAt(prog())
             if sigma <= 0.0:
               continue
             let frameFmtName = $AVPixelFormat(frame.format)
@@ -657,9 +691,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actBrightness:
-            if effect.sval == toSnorm16(0.0):
+            let b = effect.brightnessAt(prog())
+            if b == 0.0'f32:
               continue
-            let shift = effect.sval * 255.0'f32
+            let shift = b * 255.0'f32
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"brightness|{shift}|{bufferArgs}"
@@ -707,12 +742,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actOpacity:
-            let o = effect.nval
-            if o == high(Unorm16):
+            let o = effect.opacityAt(prog())
+            if o >= 1.0'f32:
               continue
-            let bgR = (high(Unorm16) - o) * float(tl.bg.red)
-            let bgG = (high(Unorm16) - o) * float(tl.bg.green)
-            let bgB = (high(Unorm16) - o) * float(tl.bg.blue)
+            let bgR = (1.0'f32 - o) * float32(tl.bg.red)
+            let bgG = (1.0'f32 - o) * float32(tl.bg.green)
+            let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"opacity|{o}|{bg}|{bufferArgs}"

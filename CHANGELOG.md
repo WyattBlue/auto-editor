@@ -4,7 +4,8 @@
  -
 
 ## Features
- - Add the `rotate` action, which rotates the picture clockwise by a given number of degrees, filling the exposed corners with the background color.
+ - Add the `rotate` action, which rotates the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` is a fixed angle; `rotate:deg/rate` spins continuously at `rate` degrees per second (driven by ffmpeg's per-frame time expression).
+ - Add animated effects: `zoom`, `opacity`, `blur`, and `brightness` accept a ramp (`from..to`) that interpolates across the section. An `ease` action sets the interpolation curve (`linear`/`in`/`out`/`inout`) and an optional duration (e.g. `2sec`) for the animated actions that follow it.
  - Add AMD AMF hardware encoders (`h264_amf`, `hevc_amf`, `av1_amf`) for x86_64 Windows and Linux builds.
  - Show an indeterminate progress bar when the duration is unknown, instead of a misleading percentage.
 
