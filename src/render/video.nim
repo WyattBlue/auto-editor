@@ -278,6 +278,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var scaleGraph: Graph = nil
   var fxGraph: Graph = nil
   var fxKey = ""
+  var rotGraph: Graph = nil  # static source rotation, applied before the fit
+  var rotKey = ""
   var needsScaling = false
 
   if args.scale != 1.0:
@@ -559,6 +561,30 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             framesSaved += framesAvoided
             seekFrame = none(int)
 
+        # Apply static rotation
+        if didDecode:
+          var rotStatic = 0.0'f32
+          for effect in objList[0].effects:
+            if effect.kind == actRotate and effect.rRate == 0.0'f32:
+              rotStatic = rotDeg(effect.rStart)
+              break
+          if rotStatic != 0.0'f32:
+            let rad = rotStatic * 3.14159265358979'f32 / 180.0'f32
+            let fmtName = $AVPixelFormat(frame.format)
+            let rbufArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={fmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let rk = &"srcrot|{rad}|{bg}|{rbufArgs}"
+            if rotKey != rk:
+              if rotGraph != nil: rotGraph.cleanup()
+              rotGraph = newGraph()
+              let bsrc = rotGraph.add("buffer", rbufArgs)
+              let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
+              let bsink = rotGraph.add("buffersink")
+              rotGraph.linkNodes(@[bsrc, filt, bsink]).configure()
+              rotKey = rk
+            rotGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = rotGraph.pull()
+
         # Scale only the final decoded frame to tl.res. Intermediate frames
         # decoded just to advance frameIndex are fed back into flushDecode
         # unscaled, so the resize costs one sws_scale instead of one per frame.
@@ -577,7 +603,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr frame)
         frame = scaleGraph.pull()
 
-      # Apply video effects in order
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
         let local = objList[0].local
         let clipDur = objList[0].dur
@@ -586,17 +611,16 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # easing curve + duration (defaults to linear over the whole clip).
         template prog(e: Action): float32 =
           applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
+
         for effect in objList[0].effects:
           case effect.kind:
           of actSpeed, actVarispeed, actVolume, actDeesser: discard
           of actRotate:
-            let startDeg = rotDeg(effect.rStart)
             let rate = effect.rRate
-            if rate == 0.0'f32 and effect.rStart == Unorm16(0):
+            if rate == 0.0'f32:
               continue
-            # ffmpeg evaluates the angle per frame: a = (start + rate*t)*PI/180,
-            # where t is clip-local seconds. graphTb = 1/fps, so a pts of the
-            # clip-local frame index makes t advance correctly.
+
+            let startDeg = rotDeg(effect.rStart)
             frame.pts = local.int64
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
@@ -814,6 +838,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       scaleGraph.cleanup()
     if fxGraph != nil:
       fxGraph.cleanup()
+    if rotGraph != nil:
+      rotGraph.cleanup()
     sws_free_context(addr reformatCtx)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)

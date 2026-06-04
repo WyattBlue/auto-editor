@@ -105,7 +105,7 @@ jobs:
       - name: Test
         run: nimble test
       - name: e2e Test
-        run: python3 -m pip install av && python3 tests/test.py
+        run: python3 -m pip install av numpy && python3 tests/test.py
 
   windows:
     needs: fan
@@ -160,7 +160,7 @@ jobs:
         with:
           name: auto-editor-windows
       - name: e2e Test
-        run: python -m pip install av && python tests/test.py
+        run: python -m pip install av numpy && python tests/test.py
 
   windows-arm:
     needs: fan
@@ -217,7 +217,7 @@ jobs:
         with:
           name: auto-editor-windows-arm
       - name: e2e Test
-        run: python -m pip install av && python tests/test.py --no-failfast
+        run: python -m pip install av numpy && python tests/test.py --no-failfast
 
   wasm:
     needs: fan
