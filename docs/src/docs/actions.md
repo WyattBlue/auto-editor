@@ -127,20 +127,31 @@ auto-editor video.mp4 --when-silent zoom:0.5
 
 ### rotate
 
-Rotate the video section clockwise by an angle in degrees, about the center. The
-frame keeps the timeline resolution, and the corners exposed by the rotation are
-filled with the background color.
-- **Value range:** 0.0 to 360.0 (other values wrap, so `rotate:-30` equals `rotate:330`)
+Rotate the picture clockwise about its center. The frame keeps the timeline
+resolution, and the corners exposed by the rotation are filled with the
+background color. Two forms:
+
+- `rotate:deg` — a **fixed** angle.
+- `rotate:deg/rate` — a constant-speed **spin**, starting at `deg` and turning
+  `rate` degrees per second (negative `rate` spins counter-clockwise).
 
 ```bash
-# Rotate active sections 30 degrees clockwise
+# Fixed 30 degrees clockwise
 auto-editor video.mp4 --when-normal rotate:30
 
 # Turn the picture upside-down
 auto-editor video.mp4 --when-normal rotate:180
+
+# Spin continuously at 120 degrees/second (one full turn every 3 seconds)
+auto-editor video.mp4 --when-normal rotate:0/120
+
+# Start at 90 degrees and spin counter-clockwise at 45 degrees/second
+auto-editor video.mp4 --when-normal rotate:90/-45
 ```
 
-**How it works:** Uses FFmpeg's `rotate` filter.
+**How it works:** Uses FFmpeg's `rotate` filter, with the angle driven by a
+per-frame time expression for the spin. Unlike the ramp effects below, `rotate`
+is not affected by `ease`.
 
 ## Multiple Actions (Chaining)
 
@@ -156,6 +167,54 @@ auto-editor video.mp4 --when-normal varispeed:1.25,speed:1.25
 
 # Triple action: speed, varispeed, and volume
 auto-editor video.mp4 --when-silent speed:2,varispeed:1.5,volume:0.8
+```
+
+## Animations
+
+The animatable video effects — `zoom`, `opacity`, `blur`, and `brightness` —
+accept a **ramp** instead of a single value, written `from..to`. The value is
+interpolated across the section, so the effect changes over time. (For rotation,
+use the constant-speed `rotate:deg/rate` form described above.)
+
+```bash
+# Slowly zoom in from 1x to 1.5x across the section (Ken Burns)
+auto-editor video.mp4 --when-normal zoom:1..1.5
+
+# Fade in (opacity 0 to 1)
+auto-editor video.mp4 --when-normal opacity:0..1
+```
+
+The ramp reaches `to` on the section's last frame.
+
+### Easing and duration
+
+By default a ramp is linear and spans the whole section. To change the curve or
+make the animation take a fixed amount of time, add an `ease` action. It applies
+to every animated action that follows it in the same group.
+
+`ease:curve[:duration]`
+- **curve** — `linear`, `in`, `out`, or `inout`
+- **duration** — optional; e.g. `2sec` or a bare frame count. Once it elapses,
+  the value holds at its end. Omitted, the animation spans the whole section.
+
+```bash
+# Ease-in-out zoom across the whole section
+auto-editor video.mp4 --when-normal ease:inout,zoom:1..1.5
+
+# Ease in over the first 2 seconds, then hold
+auto-editor video.mp4 --when-normal ease:in:2sec,opacity:0..1
+
+# One ease envelope drives several animated effects
+auto-editor video.mp4 --when-normal ease:out,zoom:1..1.3,brightness:0..0.3
+```
+
+As a shorthand you can attach the curve directly to an action with `:ease=`; it
+desugars to a separate `ease` action placed just before it. These two are
+equivalent:
+
+```bash
+auto-editor video.mp4 --when-normal zoom:1..1.5:ease=inout
+auto-editor video.mp4 --when-normal ease:inout,zoom:1..1.5
 ```
 
 ## Setting Actions for a Time Range

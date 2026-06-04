@@ -1,7 +1,7 @@
 import unittest
 import std/[os, tempfiles]
 
-import ../src/[av, conductor, edit, ffmpeg, media, timeline, wavutil]
+import ../src/[action, av, conductor, edit, ffmpeg, media, timeline, wavutil]
 import ../src/util/[color, fun, lang, rational]
 import ../src/exports/[kdenlive, fcp11]
 import ../src/vendor/tinyre/tinyre
@@ -93,6 +93,61 @@ test "exports":
       "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere",
       "Hello \\ World", "11"))
+
+test "actions":
+  proc acts(s: string): seq[Action] =
+    for a in parseActions(s): result.add a
+
+  # Static actions round-trip through `$` (rotate is circular-quantized).
+  check $parseActions("zoom:2") == "zoom:2.0"
+  check $parseActions("opacity:0.5") == "opacity:0.5"
+  check $parseActions("brightness:-0.5") == "brightness:-0.5"
+
+  # Ramp syntax interpolates from..to across the section.
+  check $parseActions("zoom:1..2") == "zoom:1.0..2.0"
+  check $parseActions("opacity:0..1") == "opacity:0.0..1.0"
+
+  # rotate: fixed angle, or "start/rate" for a constant-speed spin (deg/sec).
+  check $parseActions("rotate:0/120") == "rotate:0.0/120.0"
+  check $parseActions("rotate:90/-45") == "rotate:90.0/-45.0"
+  block:
+    let r = acts("rotate:0/120")[0]
+    check r.kind == actRotate
+    check abs(r.rRate - 120.0'f32) < 0.001'f32
+    check abs(rotDeg(r.rStart)) < 0.01'f32                  # starts at 0 deg
+    let s = acts("rotate:30")[0]
+    check s.rRate == 0.0'f32                                # fixed angle
+    check abs(rotDeg(s.rStart) - 30.0'f32) < 0.01'f32
+
+  # Attached easing desugars into a separate `ease` action placed first; the
+  # `..` stays on the animated action.
+  let de = acts("zoom:1..2:ease=inout")
+  check de.len == 2
+  check de[0].kind == actEase
+  check de[0].easeCurve == easeInOut
+  check de[0].easeDurUnit == duClip
+  check de[1].kind == actZoom
+
+  # Standalone ease with a duration.
+  let ed = acts("ease:in:2sec")
+  check ed.len == 1
+  check ed[0].easeCurve == easeIn
+  check ed[0].easeDurUnit == duSec
+  check abs(ed[0].easeDur - 2.0'f32) < 0.001'f32
+  check $parseActions("ease:out:30") == "ease:out:30.0"  # bare = frames
+
+  # Interpolators take eased progress p in [0, 1].
+  let z = acts("zoom:1..2")[0]
+  check abs(z.rampAt(0.0'f32) - 1.0'f32) < 0.001'f32
+  check abs(z.rampAt(0.5'f32) - 1.5'f32) < 0.001'f32
+  check abs(z.rampAt(1.0'f32) - 2.0'f32) < 0.001'f32
+  check abs(acts("brightness:-1..1")[0].brightnessAt(0.5'f32)) < 0.01'f32
+
+  # Easing curves.
+  check applyEase(easeLinear, 0.5'f32) == 0.5'f32
+  check applyEase(easeIn, 0.5'f32) < 0.5'f32
+  check applyEase(easeOut, 0.5'f32) > 0.5'f32
+  check abs(applyEase(easeInOut, 0.5'f32) - 0.5'f32) < 0.001'f32
 
 test "editNeeds":
   check editNeeds("audio") == (false, true)
