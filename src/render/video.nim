@@ -582,20 +582,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let local = objList[0].local
         let clipDur = objList[0].dur
         let fps = tl.tb.float
-        # Easing envelope, set by `ease` actions and applied to the animated
-        # actions that follow. Defaults to linear over the whole clip.
-        var curCurve = easeLinear
-        var curUnit = duClip
-        var curMag = 0.0'f32
-        template prog(): float32 =
-          applyEase(curCurve, clipT(local, envAnimLen(curUnit, curMag, clipDur, fps)))
+        # Eased progress in [0, 1] for an animated action, using its own packed
+        # easing curve + duration (defaults to linear over the whole clip).
+        template prog(e: Action): float32 =
+          applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
         for effect in objList[0].effects:
           case effect.kind:
           of actSpeed, actVarispeed, actVolume, actDeesser: discard
-          of actEase:
-            curCurve = effect.easeCurve
-            curUnit = effect.easeDurUnit
-            curMag = effect.easeDur
           of actRotate:
             let startDeg = rotDeg(effect.rStart)
             let rate = effect.rRate
@@ -621,7 +614,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actZoom:
-            let z = effect.rampAt(prog())
+            let z = sampleKf(effect.kf, prog(effect))
             if z == 1.0:
               continue
             let origW = frame.width
@@ -672,7 +665,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actBlur:
-            let sigma = effect.rampAt(prog())
+            let sigma = sampleKf(effect.kf, prog(effect))
             if sigma <= 0.0:
               continue
             let frameFmtName = $AVPixelFormat(frame.format)
@@ -691,7 +684,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actBrightness:
-            let b = effect.brightnessAt(prog())
+            let b = sampleKf(effect.kf, prog(effect))
             if b == 0.0'f32:
               continue
             let shift = b * 255.0'f32
@@ -742,7 +735,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fxGraph.pull()
           of actOpacity:
-            let o = effect.opacityAt(prog())
+            let o = sampleKf(effect.kf, prog(effect))
             if o >= 1.0'f32:
               continue
             let bgR = (1.0'f32 - o) * float32(tl.bg.red)

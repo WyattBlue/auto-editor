@@ -34,8 +34,8 @@ proc renderTable(): string =
   for a in actionDefs:
     let args = if a.argSpec != "": "`" & a.argSpec & "`" else: "—"
     let rng = if a.range.isSome: $a.range.get else: "—"
-    result.add &"| {a.name} | {args} | `{rng}` | `{a.atype}` | {a.help.summary} |\n"
-  result.add "\n"
+    result.add &"| {a.name} | {args} | `{rng}` | `{a.flags}` | {a.help.summary} |\n"
+  result.add "\nType: `A` audio, `V` video, `*` animatable.\n\n"
 
 var output = ""
 for a in actionDefs:

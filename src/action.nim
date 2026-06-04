@@ -4,8 +4,7 @@ import ./util/dnorm16
 type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
-    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actEase
+    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -15,31 +14,26 @@ type
     duSec,     # seconds
     duFrames   # timeline frames
 
-  # Represents a full-sized action. Animatable scalar effects carry a `from`/`to`
-  # pair (when from == to the action is static). The easing curve and duration
-  # live in a separate `actEase` envelope that applies to the animated actions
-  # following it within the same effect group.
+  # Represents a full-sized action. Animatable scalar effects hold a list of
+  # keyframes (one value = static, several = a ramp interpolated across the
+  # section) plus an optional easing curve + duration packed inline.
   Action* = object
     case kind*: ActionKind
     of actInvert, actHflip, actVflip:
       discard
-    of actEase:
-      easeCurve*: Easing
-      easeDurUnit*: DurUnit
-      easeDur*: float32      # magnitude in easeDurUnit (ignored for duClip)
-    of actOpacity:
-      nFrom*, nTo*: Unorm16
     of actRotate:
       rStart*: Unorm16       # circular [0, 360) start angle
       rRate*: float32        # spin rate in degrees/second (0 = static)
-    of actBrightness:
-      sFrom*, sTo*: Snorm16
     of actLens:
       k1*, k2*: Snorm16
     of actSpeed, actVarispeed, actVolume:
       val*: float32
-    of actZoom, actBlur:
-      fFrom*, fTo*: float32
+    of actZoom, actBlur, actOpacity, actBrightness:
+      kf*: seq[float32]      # keyframes in native units; len >= 1
+      hasEase*: bool
+      easeCurve*: Easing
+      easeDurUnit*: DurUnit
+      easeDur*: float32      # magnitude in easeDurUnit (ignored for duClip)
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
     of actLuv:
@@ -53,8 +47,12 @@ type
 
   ActionParseError* = object of CatchableError
 
-  ActionType* = enum  # which media stream(s) the action affects
-    atAudio, atVideo, atBoth
+  ActionFlag* = enum   # capabilities of an action
+    afAudio,           # affects the audio stream
+    afVideo,           # affects the video stream
+    afAnimatable       # value can be a keyframe ramp (`a..b..c`) with easing
+
+  ActionFlags* = set[ActionFlag]
 
   RangeDoc* = object
     lo*, hi*: float
@@ -63,10 +61,12 @@ type
 
   ActionDef* = object
     name*: string
-    atype*: ActionType
+    flags*: ActionFlags
     argSpec*: string  # storage type ("float32") or positional spec ("k1[:k2]")
     range*: Option[RangeDoc]
     help*: string
+
+const easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
 
 func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[RangeDoc] =
   some(RangeDoc(lo: lo, hi: hi, loIncl: loIncl, hiIncl: hiIncl, each: each))
@@ -77,61 +77,65 @@ func `$`*(r: RangeDoc): string =
     (if r.loIncl: "[" else: "(") & $r.lo & ", " & $r.hi &
     (if r.hiIncl: "]" else: ")")
 
-func `$`*(t: ActionType): string =
-  case t
-  of atAudio: "A"
-  of atVideo: "V"
-  of atBoth: "AV"
+func `$`*(f: ActionFlags): string =
+  if afAudio in f: result &= "A"
+  if afVideo in f: result &= "V"
+  if afAnimatable in f: result &= "*"
 
 const actionDefs*: seq[ActionDef] = @[
-  ActionDef(name: "nil", atype: atBoth,
+  ActionDef(name: "nil", flags: {afAudio, afVideo},
     help: "Do nothing. Keep the section unchanged at normal speed and pitch."),
-  ActionDef(name: "cut", atype: atBoth,
+  ActionDef(name: "cut", flags: {afAudio, afVideo},
     help: "Remove the section completely from the output."),
-  ActionDef(name: "speed", atype: atBoth, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
+  ActionDef(name: "speed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
     help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed. Implemented with ffmpeg's `atempo` filter."),
-  ActionDef(name: "varispeed", atype: atBoth, argSpec: "float32", range: rng(0.2, 100.0),
+  ActionDef(name: "varispeed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.2, 100.0),
     help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Implemented with ffmpeg's `asetrate` + `aresample` filters."),
-  ActionDef(name: "volume", atype: atAudio, argSpec: "float32",
+  ActionDef(name: "volume", flags: {afAudio}, argSpec: "float32",
     help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB)."),
-  ActionDef(name: "deesser", atype: atAudio, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
+  ActionDef(name: "deesser", flags: {afAudio}, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
     help: """
 Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
 Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the reduction (default 0.5), and `freq` sets the split frequency (default 0.5)."""),
-  ActionDef(name: "invert", atype: atVideo,
+  ActionDef(name: "invert", flags: {afVideo},
     help: "Invert every pixel in the section, producing a photo-negative."),
-  ActionDef(name: "hflip", atype: atVideo,
+  ActionDef(name: "hflip", flags: {afVideo},
     help: "Flip the section horizontally, mirroring it left to right."),
-  ActionDef(name: "vflip", atype: atVideo,
+  ActionDef(name: "vflip", flags: {afVideo},
     help: "Flip the section vertically, mirroring it top to bottom."),
-  ActionDef(name: "zoom", atype: atVideo, argSpec: "float32", range: rng(0.0, 100.0, loIncl = false),
-    help: "Scale the picture about its center by val. 1.0 = no zoom, 2.0 = zoom in 2x, 0.5 = zoom out 2x. Animatable: accepts a `from..to` ramp."),
-  ActionDef(name: "opacity", atype: atVideo, argSpec: "unorm16", range: rng(0.0, 1.0),
-    help: "Blend the section against the background. 1.0 = fully opaque, 0.0 = fully transparent. Animatable: accepts a `from..to` ramp."),
-  ActionDef(name: "blur", atype: atVideo, argSpec: "float32", range: rng(0.0, 1024.0),
-    help: "Gaussian-blur the picture by sigma = val. 0.0 = no blur; larger values blur more. Animatable: accepts a `from..to` ramp."),
-  ActionDef(name: "brightness", atype: atVideo, argSpec: "snorm16", range: rng(-1.0, 1.0),
-    help: "Shift brightness by adding an equal offset to the R, G, and B channels. 0.0 = unchanged, positive brightens, negative darkens. Implemented via ffmpeg's `lutrgb` filter. Animatable: accepts a `from..to` ramp."),
-  ActionDef(name: "brighthue", atype: atVideo, argSpec: "snorm16", range: rng(-1.0, 1.0),
+  ActionDef(name: "zoom", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 100.0, loIncl = false),
+    help: "Scale the picture about its center by val. 1.0 = no zoom, 2.0 = zoom in 2x, 0.5 = zoom out 2x. Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
+  ActionDef(name: "opacity", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 1.0),
+    help: "Blend the section against the background. 1.0 = fully opaque, 0.0 = fully transparent. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
+  ActionDef(name: "blur", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 1024.0),
+    help: "Gaussian-blur the picture by sigma = val. 0.0 = no blur; larger values blur more. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
+  ActionDef(name: "brightness", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(-1.0, 1.0),
+    help: "Shift brightness by adding an equal offset to the R, G, and B channels. 0.0 = unchanged, positive brightens, negative darkens. Implemented via ffmpeg's `lutrgb` filter. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
+  ActionDef(name: "brighthue", flags: {afVideo}, argSpec: "snorm16", range: rng(-1.0, 1.0),
     help: "Shift luma by offsetting the Y channel. 0.0 = unchanged, positive brightens, negative darkens."),
-  ActionDef(name: "contrast", atype: atVideo, argSpec: "float32", range: rng(-2.0, 2.0),
+  ActionDef(name: "contrast", flags: {afVideo}, argSpec: "float32", range: rng(-2.0, 2.0),
     help: "Scale contrast around mid-gray. 1.0 = unchanged, higher values increase contrast, lower values reduce it. Implemented via ffmpeg's `lutyuv` filter."),
-  ActionDef(name: "saturation", atype: atVideo, argSpec: "float32", range: rng(0.0, 3.0),
+  ActionDef(name: "saturation", flags: {afVideo}, argSpec: "float32", range: rng(0.0, 3.0),
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
-  ActionDef(name: "rotate", atype: atVideo, argSpec: "deg[/rate]",
+  ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg[/rate]",
     help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`. Implemented via ffmpeg's `rotate` filter."),
-  ActionDef(name: "lens", atype: atVideo, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
+  ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
-  ActionDef(name: "ease", atype: atBoth, argSpec: "curve[:duration]",
+  ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
     help: """
-Set the interpolation envelope for the animated actions that follow it in the same group. `curve` is one of `linear`, `in`, `out`, or `inout`.
-The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Animated values are written as a ramp, e.g. `zoom:1..2`."""),
+Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
+The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`."""),
 ]
 
-# Effects whose value can be a ramp ("from..to") driven by an `ease` envelope.
-const animScalar* = ["zoom", "opacity", "blur", "brightness"]
+# Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
+const animScalar* = block:
+  var names: seq[string]
+  for a in actionDefs:
+    if afAnimatable in a.flags:
+      names.add a.name
+  names
 
 const aNil* = Actions(0)
 const aCut* = Actions(1)
@@ -190,17 +194,21 @@ func rotCode(deg: float32): uint16 =
   let frac = turns - floor(turns)
   uint16(int(round(frac * 65536.0'f32)) and 0xFFFF)
 
-proc parseRamp(spec: string): (float32, float32) {.raises: [ActionParseError].} =
-  ## "30" -> (30, 30); "0..360" -> (0, 360), interpolated across the section.
-  let idx = spec.find("..")
-  try:
-    if idx >= 0:
-      (parseFloat(spec[0 ..< idx]).float32, parseFloat(spec[idx + 2 .. ^1]).float32)
-    else:
-      let v = parseFloat(spec).float32
-      (v, v)
-  except ValueError:
-    raise newException(ActionParseError, "Invalid float value")
+proc parseKeyframes(spec: string): seq[float32] {.raises: [ActionParseError].} =
+  ## "2" -> @[2]; "1..0.5..1" -> @[1, 0.5, 1] (keyframes spread across the section).
+  for part in spec.split(".."):
+    try:
+      result.add parseFloat(part).float32
+    except ValueError:
+      raise newException(ActionParseError, "Invalid float value")
+
+func sampleKf*(kf: seq[float32], p: float32): float32 =
+  ## Piecewise-linear sample of keyframes at progress p in [0, 1].
+  if kf.len <= 1:
+    return (if kf.len == 1: kf[0] else: 0.0'f32)
+  let x = clamp(p, 0.0'f32, 1.0'f32) * float32(kf.len - 1)
+  let seg = min(int(x), kf.len - 2)
+  kf[seg] + (kf[seg + 1] - kf[seg]) * (x - float32(seg))
 
 proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   let name = if spec.startsWith("ease="): spec[5 .. ^1] else: spec
@@ -220,14 +228,6 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actVflip)
 
   let parts = val.split(":")
-
-  # ease envelope: ease:curve[:duration]
-  if parts[0] == "ease" and parts.len in {2, 3}:
-    let curve = parseEasing(parts[1])
-    if parts.len == 3:
-      let (mag, unit) = parseDuration(parts[2])
-      return Action(kind: actEase, easeCurve: curve, easeDurUnit: unit, easeDur: mag)
-    return Action(kind: actEase, easeCurve: curve, easeDurUnit: duClip, easeDur: 0.0'f32)
 
   # deesser takes positional args: intensity[:max[:freq]]
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
@@ -276,26 +276,50 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     except ValueError:
       raise newException(ActionParseError, "Invalid float value")
 
-  # Animatable scalar effects accept a constant or a ramp ("from..to"):
-  #   zoom:2   zoom:1..2
-  if parts[0] in animScalar and parts.len == 2:
-    let (fromV, toV) = parseRamp(parts[1])
+  # Animatable scalar effects: a value or keyframe ramp, with optional easing:
+  #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
+  if parts[0] in animScalar and parts.len >= 2:
+    let kf = parseKeyframes(parts[1])
     case parts[0]
     of "zoom":
-      if fromV <= 0.0 or toV <= 0.0:
-        raise newException(ActionParseError, "zoom value must be greater than 0.0")
-      return Action(kind: actZoom, fFrom: fromV, fTo: toV)
-    of "blur":
-      return Action(kind: actBlur, fFrom: fromV, fTo: toV)
+      for v in kf:
+        if v <= 0.0:
+          raise newException(ActionParseError, "zoom value must be greater than 0.0")
     of "opacity":
-      if fromV < 0.0 or fromV > 1.0 or toV < 0.0 or toV > 1.0:
-        raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
-      return Action(kind: actOpacity, nFrom: toUnorm16(fromV), nTo: toUnorm16(toV))
+      for v in kf:
+        if v < 0.0 or v > 1.0:
+          raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
     of "brightness":
-      if fromV < -1.0 or fromV > 1.0 or toV < -1.0 or toV > 1.0:
-        raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
-      return Action(kind: actBrightness, sFrom: toSnorm16(fromV), sTo: toSnorm16(toV))
-    else: discard
+      for v in kf:
+        if v < -1.0 or v > 1.0:
+          raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
+    else: discard  # blur: any value
+
+    var hasE = false
+    var curve = easeLinear
+    var unit = duClip
+    var dur = 0.0'f32
+    if parts.len >= 3:
+      if not parts[2].startsWith("ease=") or parts.len > 4:
+        raise newException(ActionParseError, "Unknown action: " & val)
+      hasE = true
+      curve = parseEasing(parts[2])
+      if parts.len == 4:
+        (dur, unit) = parseDuration(parts[3])
+
+    case parts[0]
+    of "zoom":
+      return Action(kind: actZoom, kf: kf, hasEase: hasE, easeCurve: curve,
+        easeDurUnit: unit, easeDur: dur)
+    of "blur":
+      return Action(kind: actBlur, kf: kf, hasEase: hasE, easeCurve: curve,
+        easeDurUnit: unit, easeDur: dur)
+    of "opacity":
+      return Action(kind: actOpacity, kf: kf, hasEase: hasE, easeCurve: curve,
+        easeDurUnit: unit, easeDur: dur)
+    else:
+      return Action(kind: actBrightness, kf: kf, hasEase: hasE, easeCurve: curve,
+        easeDurUnit: unit, easeDur: dur)
 
   if parts.len == 2:
     let effectType = parts[0]
@@ -326,21 +350,24 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
 
   raise newException(ActionParseError, "Unknown action: " & val)
 
-# The renderer supplies `p`, the eased progress in [0, 1] (the envelope's curve
-# has already been applied), and these map it onto each effect's value range.
-func rampAt*(a: Action, p: float32): float32 =
-  ## Interpolated value for actZoom / actBlur.
-  a.fFrom + (a.fTo - a.fFrom) * p
+func easeSuffix(a: Action): string =
+  ## The trailing ":ease=..." for an animated action, or "" if it has none.
+  if not a.hasEase: return ""
+  result = ":ease=" & easeName(a.easeCurve)
+  case a.easeDurUnit
+  of duClip: discard
+  of duSec: result &= ":" & $a.easeDur & "sec"
+  of duFrames: result &= ":" & $a.easeDur
 
-func opacityAt*(a: Action, p: float32): float32 =
-  ## Interpolated opacity in [0, 1].
-  let f0 = a.nFrom.toFloat32
-  f0 + (a.nTo.toFloat32 - f0) * p
-
-func brightnessAt*(a: Action, p: float32): float32 =
-  ## Interpolated brightness in [-1, 1].
-  let f0 = a.sFrom.toFloat32
-  f0 + (a.sTo.toFloat32 - f0) * p
+func kfStr(a: Action): string =
+  ## Keyframes as "a..b..c", formatted in each effect's native value type.
+  var parts: seq[string]
+  for v in a.kf:
+    case a.kind
+    of actOpacity: parts.add $toUnorm16(v)
+    of actBrightness: parts.add $toSnorm16(v)
+    else: parts.add $v
+  parts.join("..")
 
 when not defined(nimscript):
   func `$`*(act: Action): string =
@@ -356,27 +383,14 @@ when not defined(nimscript):
       let m = act.maxd
       let f = act.freq
       "deesser:" & $i & ":" & $m & ":" & $f
-    of actEase:
-      case act.easeDurUnit
-      of duClip: "ease:" & easeName(act.easeCurve)
-      of duSec: "ease:" & easeName(act.easeCurve) & ":" & $act.easeDur & "sec"
-      of duFrames: "ease:" & easeName(act.easeCurve) & ":" & $act.easeDur
-    of actZoom:
-      if act.fFrom == act.fTo: "zoom:" & $act.fFrom
-      else: "zoom:" & $act.fFrom & ".." & $act.fTo
-    of actOpacity:
-      if act.nFrom == act.nTo: "opacity:" & $act.nFrom
-      else: "opacity:" & $act.nFrom & ".." & $act.nTo
-    of actBlur:
-      if act.fFrom == act.fTo: "blur:" & $act.fFrom
-      else: "blur:" & $act.fFrom & ".." & $act.fTo
+    of actZoom: "zoom:" & kfStr(act) & easeSuffix(act)
+    of actOpacity: "opacity:" & kfStr(act) & easeSuffix(act)
+    of actBlur: "blur:" & kfStr(act) & easeSuffix(act)
+    of actBrightness: "brightness:" & kfStr(act) & easeSuffix(act)
     of actRotate:
       let startDeg = rotDeg(act.rStart)
       if act.rRate == 0.0'f32: "rotate:" & $startDeg
       else: "rotate:" & $startDeg & "/" & $act.rRate
-    of actBrightness:
-      if act.sFrom == act.sTo: "brightness:" & $act.sFrom
-      else: "brightness:" & $act.sFrom & ".." & $act.sTo
     of actLuv:
       var parts: seq[string]
       if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $act.brighthue
@@ -385,15 +399,18 @@ when not defined(nimscript):
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
     of actLens: "lens:" & $act.k1 & ":" & $act.k2
 
-  func actionByteSize(kind: ActionKind): int =
-    case kind
+  func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
+
+  func actionByteSize(a: Action): int =
+    ## header(1) [+ ease(6)] + count(1) + count*valueSize for animated kinds.
+    case a.kind
     of actInvert, actHflip, actVflip: 1
-    of actSpeed, actVarispeed, actVolume, actLens, actOpacity, actBrightness: 5
+    of actSpeed, actVarispeed, actVolume, actLens: 5
     of actRotate: 7
     of actDeesser: 7
-    of actEase: 7        # curve(1) + durUnit(1) + durMag(float32)
-    of actZoom, actBlur: 9
     of actLuv: 11
+    of actZoom, actBlur: 2 + easeBytes(a) + a.kf.len * 4
+    of actOpacity, actBrightness: 2 + easeBytes(a) + a.kf.len * 2
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -405,7 +422,7 @@ when not defined(nimscript):
       let base = cast[ptr UncheckedArray[uint8]](int(a) + sizeof(uint16))
       var i = 0
       while i < n:
-        let kind = cast[ActionKind](base[i])
+        let kind = ActionKind((base[i] and 0x7f'u8).int)
         case kind
         of actInvert, actHflip, actVflip:
           yield Action(kind: kind)
@@ -415,30 +432,37 @@ when not defined(nimscript):
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
           i += 5
-        of actEase:
-          var d: float32
-          copyMem(addr d, addr base[i + 3], sizeof(float32))
-          yield Action(kind: actEase, easeCurve: Easing(base[i + 1].int),
-            easeDurUnit: DurUnit(base[i + 2].int), easeDur: d)
-          i += 7
-        of actZoom, actBlur:
-          var f0, f1: float32
-          copyMem(addr f0, addr base[i + 1], sizeof(float32))
-          copyMem(addr f1, addr base[i + 5], sizeof(float32))
-          yield Action(kind: kind, fFrom: f0, fTo: f1)
-          i += 9
-        of actOpacity:
-          var n0, n1: Unorm16
-          copyMem(addr n0, addr base[i + 1], sizeof(Unorm16))
-          copyMem(addr n1, addr base[i + 3], sizeof(Unorm16))
-          yield Action(kind: actOpacity, nFrom: n0, nTo: n1)
-          i += 5
-        of actBrightness:
-          var s0, s1: Snorm16
-          copyMem(addr s0, addr base[i + 1], sizeof(Snorm16))
-          copyMem(addr s1, addr base[i + 3], sizeof(Snorm16))
-          yield Action(kind: actBrightness, sFrom: s0, sTo: s1)
-          i += 5
+        of actZoom, actBlur, actOpacity, actBrightness:
+          let hasEase = (base[i] and easeFlag) != 0'u8
+          var pos = i + 1
+          var act = Action(kind: kind)
+          act.hasEase = hasEase
+          if hasEase:
+            act.easeCurve = Easing(base[pos].int)
+            act.easeDurUnit = DurUnit(base[pos + 1].int)
+            copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
+            pos += 6
+          let count = base[pos].int
+          pos += 1
+          act.kf = newSeq[float32](count)
+          for c in 0 ..< count:
+            if kind in {actZoom, actBlur}:
+              var v: float32
+              copyMem(addr v, addr base[pos], sizeof(float32))
+              act.kf[c] = v
+              pos += 4
+            elif kind == actOpacity:
+              var u: Unorm16
+              copyMem(addr u, addr base[pos], sizeof(Unorm16))
+              act.kf[c] = u.toFloat32
+              pos += 2
+            else:
+              var s: Snorm16
+              copyMem(addr s, addr base[pos], sizeof(Snorm16))
+              act.kf[c] = s.toFloat32
+              pos += 2
+          yield act
+          i = pos
         of actRotate:
           var st: Unorm16
           var rate: float32
@@ -487,7 +511,7 @@ when not defined(nimscript):
   proc newActions*(list: openArray[Action]): Actions =
     if list.len == 0: return aNil
     var total = 0
-    for a in list: total += actionByteSize(a.kind)
+    for a in list: total += actionByteSize(a)
     if total > 65535:
       raise newException(ActionParseError, "atf-8 buffer overflow: too many actions")
     let p = alloc(sizeof(uint16) + total)
@@ -503,30 +527,31 @@ when not defined(nimscript):
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
-      of actEase:
-        base[i + 1] = uint8(ord(a.easeCurve))
-        base[i + 2] = uint8(ord(a.easeDurUnit))
-        var d = a.easeDur
-        copyMem(addr base[i + 3], addr d, sizeof(float32))
-        i += 7
-      of actZoom, actBlur:
-        var f0 = a.fFrom
-        var f1 = a.fTo
-        copyMem(addr base[i + 1], addr f0, sizeof(float32))
-        copyMem(addr base[i + 5], addr f1, sizeof(float32))
-        i += 9
-      of actOpacity:
-        var n0 = a.nFrom
-        var n1 = a.nTo
-        copyMem(addr base[i + 1], addr n0, sizeof(Unorm16))
-        copyMem(addr base[i + 3], addr n1, sizeof(Unorm16))
-        i += 5
-      of actBrightness:
-        var s0 = a.sFrom
-        var s1 = a.sTo
-        copyMem(addr base[i + 1], addr s0, sizeof(Snorm16))
-        copyMem(addr base[i + 3], addr s1, sizeof(Snorm16))
-        i += 5
+      of actZoom, actBlur, actOpacity, actBrightness:
+        if a.hasEase: base[i] = base[i] or easeFlag
+        var pos = i + 1
+        if a.hasEase:
+          base[pos] = uint8(ord(a.easeCurve))
+          base[pos + 1] = uint8(ord(a.easeDurUnit))
+          var d = a.easeDur
+          copyMem(addr base[pos + 2], addr d, sizeof(float32))
+          pos += 6
+        base[pos] = uint8(a.kf.len)
+        pos += 1
+        for v in a.kf:
+          if a.kind in {actZoom, actBlur}:
+            var vv = v
+            copyMem(addr base[pos], addr vv, sizeof(float32))
+            pos += 4
+          elif a.kind == actOpacity:
+            var u = toUnorm16(v)
+            copyMem(addr base[pos], addr u, sizeof(Unorm16))
+            pos += 2
+          else:
+            var s = toSnorm16(v)
+            copyMem(addr base[pos], addr s, sizeof(Snorm16))
+            pos += 2
+        i = pos
       of actRotate:
         var st = a.rStart
         var rate = a.rRate
@@ -559,6 +584,12 @@ when not defined(nimscript):
 
   proc parseActions*(val: string): Actions =
     var list: seq[Action]
+    # An `ease:` token sets a pending envelope that is stamped onto the animated
+    # actions that follow it (until another `ease` overrides it).
+    var pendActive = false
+    var pendCurve = easeLinear
+    var pendUnit = duClip
+    var pendDur = 0.0'f32
     for part in val.strip().split(","):
       let trimmedPart = part.strip()
       if trimmedPart == "nil":
@@ -566,26 +597,24 @@ when not defined(nimscript):
       if trimmedPart == "cut":
         return aCut
 
-      # Desugar easing attached to an animatable action into a separate `ease`
-      # envelope placed just before it:
-      #   rotate:0..360:ease=inout       -> ease:inout , rotate:0..360
-      #   rotate:0..360:ease=inout:2sec  -> ease:inout:2sec , rotate:0..360
       let segs = trimmedPart.split(":")
-      var easeIdx = -1
-      for k in 1 .. segs.high:
-        if segs[k].startsWith("ease="):
-          easeIdx = k
-          break
-      if easeIdx >= 0 and segs[0] in animScalar:
-        var ease = Action(kind: actEase, easeCurve: parseEasing(segs[easeIdx]),
-          easeDurUnit: duClip, easeDur: 0.0'f32)
-        if easeIdx < segs.high:
-          (ease.easeDur, ease.easeDurUnit) = parseDuration(segs[easeIdx + 1])
-        list.add ease
-        list.add parseAction(segs[0 ..< easeIdx].join(":"))
+      if segs[0] == "ease" and segs.len in {2, 3}:
+        pendActive = true
+        pendCurve = parseEasing(segs[1])
+        if segs.len == 3:
+          (pendDur, pendUnit) = parseDuration(segs[2])
+        else:
+          pendUnit = duClip
+          pendDur = 0.0'f32
         continue
 
-      let action = parseAction(trimmedPart)
+      var action = parseAction(trimmedPart)
+      if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness} and
+          not action.hasEase:
+        action.hasEase = true
+        action.easeCurve = pendCurve
+        action.easeDurUnit = pendUnit
+        action.easeDur = pendDur
       if action.kind == actLuv:
         # Adjacent-fusion: collapse this actLuv into the previous one if it's
         # also actLuv. Per field, the non-identity value wins; later wins on
