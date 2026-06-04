@@ -103,9 +103,11 @@ test "actions":
   check $parseActions("opacity:0.5") == "opacity:0.5"
   check $parseActions("brightness:-0.5") == "brightness:-0.5"
 
-  # Ramp syntax interpolates from..to across the section.
+  # Ramps and multi-keyframe ramps interpolate across the section.
   check $parseActions("zoom:1..2") == "zoom:1.0..2.0"
   check $parseActions("opacity:0..1") == "opacity:0.0..1.0"
+  check $parseActions("zoom:1..0.5..1") == "zoom:1.0..0.5..1.0"
+  check $parseActions("opacity:0..1..0") == "opacity:0.0..1.0..0.0"
 
   # rotate: fixed angle, or "start/rate" for a constant-speed spin (deg/sec).
   check $parseActions("rotate:0/120") == "rotate:0.0/120.0"
@@ -119,29 +121,34 @@ test "actions":
     check s.rRate == 0.0'f32                                # fixed angle
     check abs(rotDeg(s.rStart) - 30.0'f32) < 0.01'f32
 
-  # Attached easing desugars into a separate `ease` action placed first; the
-  # `..` stays on the animated action.
-  let de = acts("zoom:1..2:ease=inout")
-  check de.len == 2
-  check de[0].kind == actEase
-  check de[0].easeCurve == easeInOut
-  check de[0].easeDurUnit == duClip
-  check de[1].kind == actZoom
+  # Easing packs into the action itself (no separate ease entry).
+  block:
+    let z = acts("zoom:1..2:ease=inout")
+    check z.len == 1
+    check z[0].kind == actZoom
+    check z[0].hasEase
+    check z[0].easeCurve == easeInOut
+    check z[0].easeDurUnit == duClip
+    check z[0].kf == @[1.0'f32, 2.0'f32]
 
-  # Standalone ease with a duration.
-  let ed = acts("ease:in:2sec")
-  check ed.len == 1
-  check ed[0].easeCurve == easeIn
-  check ed[0].easeDurUnit == duSec
-  check abs(ed[0].easeDur - 2.0'f32) < 0.001'f32
-  check $parseActions("ease:out:30") == "ease:out:30.0"  # bare = frames
+  # `ease:` is an envelope: it stamps the following animated actions.
+  block:
+    let g = acts("ease:in:2sec,zoom:1..2,brightness:0..0.3")
+    check g.len == 2
+    for a in g:
+      check a.hasEase
+      check a.easeCurve == easeIn
+      check a.easeDurUnit == duSec
+      check abs(a.easeDur - 2.0'f32) < 0.001'f32
+  # Attached easing overrides the envelope.
+  check acts("ease:in,zoom:1..2:ease=out")[0].easeCurve == easeOut
 
-  # Interpolators take eased progress p in [0, 1].
-  let z = acts("zoom:1..2")[0]
-  check abs(z.rampAt(0.0'f32) - 1.0'f32) < 0.001'f32
-  check abs(z.rampAt(0.5'f32) - 1.5'f32) < 0.001'f32
-  check abs(z.rampAt(1.0'f32) - 2.0'f32) < 0.001'f32
-  check abs(acts("brightness:-1..1")[0].brightnessAt(0.5'f32)) < 0.01'f32
+  # Keyframe interpolation (sampleKf) at the endpoints and midpoint.
+  let kf = acts("zoom:1..0.5..1")[0].kf
+  check abs(sampleKf(kf, 0.0'f32) - 1.0'f32) < 0.001'f32
+  check abs(sampleKf(kf, 0.5'f32) - 0.5'f32) < 0.001'f32
+  check abs(sampleKf(kf, 1.0'f32) - 1.0'f32) < 0.001'f32
+  check abs(sampleKf(kf, 0.25'f32) - 0.75'f32) < 0.001'f32  # halfway into seg 0
 
   # Easing curves.
   check applyEase(easeLinear, 0.5'f32) == 0.5'f32

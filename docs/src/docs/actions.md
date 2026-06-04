@@ -186,35 +186,45 @@ auto-editor video.mp4 --when-normal opacity:0..1
 
 The ramp reaches `to` on the section's last frame.
 
+### Keyframes
+
+A ramp can have more than two points — list them with `..` and the value is
+interpolated piecewise between them, evenly spread across the section:
+
+```bash
+# Zoom in then back out
+auto-editor video.mp4 --when-normal zoom:1..1.5..1
+
+# Fade in, hold, fade out
+auto-editor video.mp4 --when-normal opacity:0..1..1..0
+```
+
 ### Easing and duration
 
-By default a ramp is linear and spans the whole section. To change the curve or
-make the animation take a fixed amount of time, add an `ease` action. It applies
-to every animated action that follows it in the same group.
+By default a ramp is linear and spans the whole section. Attach an easing curve
+with `:ease=`:
 
-`ease:curve[:duration]`
+```bash
+auto-editor video.mp4 --when-normal zoom:1..1.5:ease=inout
+```
+
+`:ease=curve[:duration]`
 - **curve** — `linear`, `in`, `out`, or `inout`
 - **duration** — optional; e.g. `2sec` or a bare frame count. Once it elapses,
   the value holds at its end. Omitted, the animation spans the whole section.
 
 ```bash
-# Ease-in-out zoom across the whole section
-auto-editor video.mp4 --when-normal ease:inout,zoom:1..1.5
-
 # Ease in over the first 2 seconds, then hold
-auto-editor video.mp4 --when-normal ease:in:2sec,opacity:0..1
-
-# One ease envelope drives several animated effects
-auto-editor video.mp4 --when-normal ease:out,zoom:1..1.3,brightness:0..0.3
+auto-editor video.mp4 --when-normal opacity:0..1:ease=in:2sec
 ```
 
-As a shorthand you can attach the curve directly to an action with `:ease=`; it
-desugars to a separate `ease` action placed just before it. These two are
-equivalent:
+You can also write the curve as a standalone `ease:` token. It applies to every
+animated action that follows it (until another `ease` overrides it), which is
+handy for giving several effects the same curve:
 
 ```bash
-auto-editor video.mp4 --when-normal zoom:1..1.5:ease=inout
-auto-editor video.mp4 --when-normal ease:inout,zoom:1..1.5
+# Both zoom and brightness ease out
+auto-editor video.mp4 --when-normal ease:out,zoom:1..1.3,brightness:0..0.3
 ```
 
 ## Setting Actions for a Time Range
