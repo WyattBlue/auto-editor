@@ -554,6 +554,24 @@ class Runner:
         assert cn.videos[0].res == (700, 380)
         assert cn.audios[0].samplerate == 48000
 
+    def test_rotate_fill(self) -> None:
+        out = self.main(
+            ["example.mp4"], ["-w:1", "rotate:90", "-res", "720,1280"], "rot90.mp4"
+        )
+        with av.open(out) as container:
+            stream = container.streams.video[0]
+            checked = 0
+            for i, frame in enumerate(container.decode(stream)):
+                if i < 5:
+                    continue  # skip the very first frames
+                rgb = frame.to_ndarray(format="rgb24")
+                dark = (rgb.max(axis=2) < 16).mean()  # fraction of near-black px
+                assert dark < 0.02, f"frame {i}: {dark * 100:.1f}% near-black"
+                checked += 1
+                if checked >= 3:
+                    break
+            assert checked > 0
+
     def test_premiere_multi(self):
         p_xml = self.main([f"resources/multi-track.mov"], ["-exp"], "multi.xml")
 

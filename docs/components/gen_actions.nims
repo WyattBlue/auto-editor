@@ -28,14 +28,15 @@ proc renderAction(a: ActionDef): string =
     result.add help.toMarkdown & "\n\n"
 
 proc renderTable(): string =
-  result.add "<h2 style=\"text-decoration:underline;\">Quick reference</h2>\n\n"
+  result.add "<h2 id=\"quick-reference\" style=\"text-decoration:underline;\">Quick reference</h2>\n"
+  result.add "<p>Type: A=audio, V=video, *=animatable.</p>\n\n"
   result.add "| Action | Arguments | Range | Type | Summary |\n"
   result.add "| --- | --- | --- | --- | --- |\n"
   for a in actionDefs:
     let args = if a.argSpec != "": "`" & a.argSpec & "`" else: "—"
     let rng = if a.range.isSome: $a.range.get else: "—"
     result.add &"| {a.name} | {args} | `{rng}` | `{a.flags}` | {a.help.summary} |\n"
-  result.add "\nType: `A` audio, `V` video, `*` animatable.\n\n"
+  result.add "\n\n"
 
 var output = ""
 for a in actionDefs:

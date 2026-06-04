@@ -88,9 +88,13 @@ const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "cut", flags: {afAudio, afVideo},
     help: "Remove the section completely from the output."),
   ActionDef(name: "speed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
-    help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed. Implemented with ffmpeg's `atempo` filter."),
+    help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed."),
   ActionDef(name: "varispeed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.2, 100.0),
-    help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Implemented with ffmpeg's `asetrate` + `aresample` filters."),
+    help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher."),
+  ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
+    help: """
+Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
+The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`."""),
   ActionDef(name: "volume", flags: {afAudio}, argSpec: "float32",
     help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB)."),
   ActionDef(name: "deesser", flags: {afAudio}, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
@@ -118,15 +122,11 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
   ActionDef(name: "saturation", flags: {afVideo}, argSpec: "float32", range: rng(0.0, 3.0),
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg[/rate]",
-    help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`. Implemented via ffmpeg's `rotate` filter."),
+    help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
-  ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
-    help: """
-Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
-The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`."""),
 ]
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
