@@ -173,6 +173,53 @@ auto-editor video.mp4 --when-normal drawbox:0:0:1920:200:#000000
 **How it works:** Uses FFmpeg's `drawbox` filter with `t=fill`, so the
 rectangle is filled rather than outlined. Only RGB colors are supported.
 
+### pos
+
+Place this clip as an overlay when it is composited over a lower video track,
+`pos:x:y[:scale]`:
+
+- **x**, **y** — the overlay's top-left corner, in canvas pixels.
+- **scale** — optional size multiplier of the source's native size (default
+  `1.0`).
+
+`pos` has no effect on the base (bottom) track. It is mainly used inside a v3
+timeline's effects array (see [The v3 format](./v3)) or attached automatically by
+the `add` action below.
+
+### add
+
+Overlay an image or video on top of the matched sections, `add:path` or
+`add:path:x:y:scale`:
+
+- **path** — a media file (e.g. a PNG logo or a video). Still images are held
+  for the whole section.
+- **x**, **y**, **scale** — optional placement, applied via a `pos` action
+  (above). When omitted, the overlay is scaled to fit the canvas (preserving
+  aspect ratio) and centered, like a full-frame layer.
+
+```bash
+# Overlay a logo scaled to fit and centered over every kept (normal) section
+auto-editor video.mp4 --when-normal add:./logo.png
+
+# Put a logo at (600, 300)
+auto-editor video.mp4 --when-normal add:./logo.png:600:300:1.0
+
+# Shrink an overlay video to a quarter size in the corner
+auto-editor video.mp4 --when-normal add:./pip.mp4:900:60:0.25
+
+# Overlay only over a specific time range (frames where 1s..2s plays)
+auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
+```
+
+Unlike the other actions, `add` is **virtual**: it is not a per-frame effect but
+adds an overlay layer to the timeline (the same compositing used by stacked v3
+tracks; see [The v3 format](./v3)). It is colon-separated (one comma-field), so
+it chains with other actions: `--when-normal add:./logo.png,zoom:2`. The overlay
+only appears where the section it is attached to is kept — so `--when-silent
+add:...` requires keeping those sections too, e.g.
+`--when-silent nil,add:./logo.png`. With `--set-action`, the range is kept
+automatically. Overlay transparency (a PNG alpha channel) is preserved.
+
 ## Multiple Actions (Chaining)
 
 You can combine multiple actions using commas. Actions are applied in the order specified.

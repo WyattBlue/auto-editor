@@ -62,6 +62,28 @@ proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
 
   return graph
 
+proc link*(graph: Graph; src, dst: ptr AVFilterContext; srcPad: cuint = 0;
+    dstPad: cuint = 0): Graph {.discardable.} =
+  ## Link a single output pad of `src` to an input pad of `dst`. Unlike
+  ## linkNodes, this allows multi-input filters (e.g. overlay's pad 0/1).
+  if graph.configured:
+    error "Cannot link nodes after graph is configured"
+  let ret = avfilter_link(src, srcPad, dst, dstPad)
+  if ret < 0:
+    error &"Could not link filter pads ({srcPad} -> {dstPad}): {ret}"
+  return graph
+
+proc pushIdx*(graph: Graph; idx: int; frame: ptr AVFrame) =
+  ## Push a frame into the buffer source at node index `idx` (for graphs with
+  ## more than one source, like overlay).
+  if not graph.configured:
+    error "Graph must be configured before pushing frames"
+  if frame == nil:
+    error "Frame shouldn't be nil here"
+  let ret = av_buffersrc_write_frame(graph.nodes[idx], frame)
+  if ret < 0:
+    error &"Error pushing frame to graph source {idx}: {ret}"
+
 proc configure*(graph: Graph) =
   if graph.configured:
     return
@@ -124,3 +146,12 @@ proc flush*(graph: Graph) =
   let ret = av_buffersrc_write_frame(graph.nodes[0], nil)
   if ret < 0:
     error &"Error flushing graph: {ret}"
+
+proc flushIdx*(graph: Graph; idx: int) =
+  ## Signal end-of-stream on the buffer source at node index `idx`. Needed for
+  ## framesync filters (e.g. overlay) so they emit once every input has a frame.
+  if not graph.configured:
+    error "Graph must be configured before flushing"
+  let ret = av_buffersrc_write_frame(graph.nodes[idx], nil)
+  if ret < 0:
+    error &"Error flushing graph source {idx}: {ret}"

@@ -64,7 +64,7 @@ if not defined(dynamic):
   # Core FFmpeg libraries
   switch("passL", "-lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil")
   # Codec libraries
-  switch("passL", "-lmp3lame -lopus -lx264 -ldav1d")
+  switch("passL", "-lmp3lame -lopus -lx264 -ldav1d -lz")
   if enableVpx:
     switch("passL", "-lvpx")
   if enableSvtav1:

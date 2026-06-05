@@ -4,7 +4,7 @@ when not defined(emscripten):
 from std/math import round
 
 import ./[av, action, edit, ffmpeg, log, media, timeline]
-import util/[color, bar, fun, rules, rational]
+import util/[color, bar, fun, lang, rules, rational]
 
 import imports/[fcp7, json]
 import exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
@@ -158,6 +158,35 @@ func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules, isUrl = false):
     return $avcodec_get_name(codecId)
   return $avcodec_get_name(rule.defaultVid)
 
+proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
+  ## Inject `add:` overlays as new video layers. Each spec overlays its image on
+  ## every base-layer (v[0]) clip whose section matches the spec's selector
+  ## (0 = silent, 1 = normal), spanning the same timeline range. Placement (when
+  ## given) is carried by a `pos` action in the overlay clip's effects group.
+  if args.adds.len == 0 or tl.v.len == 0:
+    return
+
+  for spec in args.adds:
+    let srcPtr = interner.intern(spec.path)
+    # Placement (when given) is carried by a `pos` action; reuse or append it.
+    let group = (if spec.hasPos:
+        newActions([Action(kind: actPos, px: spec.x, py: spec.y, pscale: spec.scale)])
+      else: aNil)
+    var idx = tl.effects.find(group)
+    if idx == -1:
+      tl.effects.add group
+      idx = tl.effects.len - 1
+    let eIdx = uint32(idx)
+    var track: seq[Clip]
+    for clip in tl.v[0]:
+      if clip.effects.int == spec.selector:
+        track.add Clip(src: srcPtr, start: clip.start, dur: clip.dur,
+          offset: 0, effects: eIdx, stream: 0)
+    if track.len == 0:
+      continue
+    tl.langs.insert(toLang("und"), tl.v.len)  # keep video langs before audio
+    tl.v.add track
+
 proc editMedia*(args: var mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
 
@@ -238,9 +267,27 @@ proc editMedia*(args: var mainArgs) =
           if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
           conLen
 
-        for actionRange in args.setAction:
+        for sIdx in 0 ..< args.setAction.len:
+          let actionRange = args.setAction[sIdx]
           let span = (actionRange[1], actionRange[2])
-          applyToRange(actionIndex, span, tbf, getActionIndex(actionRange[0]), getConLen())
+          var hasAdd = false
+          for a in args.adds:
+            if a.setActionRef == sIdx:
+              hasAdd = true
+              break
+          # An add-linked range gets a unique effects index (bypassing dedup) so
+          # the overlay matches only this range, then the add inherits it.
+          var aIdx: int
+          if hasAdd:
+            actionMap.add actionRange[0]
+            aIdx = actionMap.len - 1
+          else:
+            aIdx = getActionIndex(actionRange[0])
+          applyToRange(actionIndex, span, tbf, aIdx, getConLen())
+          if i == 0:
+            for a in args.adds.mitems:
+              if a.setActionRef == sIdx:
+                a.selector = aIdx
 
         let inputMi = initMediaInfo(container.formatContext, args.inputs[i])
 
@@ -251,6 +298,7 @@ proc editMedia*(args: var mainArgs) =
         else:
           appendLinearTimeline(tlV3, addr args.inputs[i], inputMi, actionIndex)
 
+      applyAdds(tlV3, args, interner)
       tlV3.applyArgs(args)
 
   var exportKind, tlName, fcpVersion: string

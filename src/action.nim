@@ -5,7 +5,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
     actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actDrawbox
+    actDrawbox, actPos
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -44,6 +44,9 @@ type
     of actDrawbox:
       dbX*, dbY*, dbW*, dbH*: int32   # rectangle in pixels (x, y, width, height)
       dbColor*: RGBColor              # outline color (RGB only)
+    of actPos:
+      px*, py*: int32        # overlay top-left in canvas pixels
+      pscale*: float32       # overlay size multiplier (1.0 = native)
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -129,6 +132,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`."),
   ActionDef(name: "drawbox", flags: {afVideo}, argSpec: "x:y:w:h:color",
     help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
+  ActionDef(name: "pos", flags: {afVideo}, argSpec: "x:y[:scale]",
+    help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
@@ -303,6 +308,17 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
       dbW: coords[2], dbH: coords[3], dbColor: col)
 
+  # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
+  if parts[0] == "pos" and parts.len in {3, 4}:
+    try:
+      let scale = (if parts.len == 4: parseFloat(parts[3]).float32 else: 1.0'f32)
+      if scale <= 0.0'f32:
+        raise newException(ActionParseError, "pos scale must be greater than 0.0")
+      return Action(kind: actPos, px: int32(parseInt(parts[1])),
+        py: int32(parseInt(parts[2])), pscale: scale)
+    except ValueError:
+      raise newException(ActionParseError, "Invalid pos value")
+
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
   if parts[0] in animScalar and parts.len >= 2:
@@ -428,6 +444,7 @@ when not defined(nimscript):
     of actDrawbox:
       "drawbox:" & $act.dbX & ":" & $act.dbY & ":" & $act.dbW & ":" &
         $act.dbH & ":" & act.dbColor.toString
+    of actPos: "pos:" & $act.px & ":" & $act.py & ":" & $act.pscale
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -440,6 +457,7 @@ when not defined(nimscript):
     of actDeesser: 7
     of actLuv: 11
     of actDrawbox: 20
+    of actPos: 13
     of actZoom, actBlur: 2 + easeBytes(a) + a.kf.len * 4
     of actOpacity, actBrightness: 2 + easeBytes(a) + a.kf.len * 2
 
@@ -533,6 +551,14 @@ when not defined(nimscript):
           yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h,
             dbColor: col)
           i += 20
+        of actPos:
+          var x, y: int32
+          var sc: float32
+          copyMem(addr x, addr base[i + 1], sizeof(int32))
+          copyMem(addr y, addr base[i + 5], sizeof(int32))
+          copyMem(addr sc, addr base[i + 9], sizeof(float32))
+          yield Action(kind: actPos, px: x, py: y, pscale: sc)
+          i += 13
 
   func actionLen*(a: Actions): int =  # O(n)
     for _ in a: inc result
@@ -635,6 +661,14 @@ when not defined(nimscript):
         base[i + 18] = a.dbColor.green
         base[i + 19] = a.dbColor.blue
         i += 20
+      of actPos:
+        var x = a.px
+        var y = a.py
+        var sc = a.pscale
+        copyMem(addr base[i + 1], addr x, sizeof(int32))
+        copyMem(addr base[i + 5], addr y, sizeof(int32))
+        copyMem(addr base[i + 9], addr sc, sizeof(float32))
+        i += 13
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
