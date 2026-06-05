@@ -276,31 +276,36 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
   ## after an `add:` token apply to that overlay layer, not the base; actions
   ## before the first `add:` stay base-layer effects. Each `add:` is one
   ## comma-field (colon-separated). Forms: `add:path` (fit-and-center) or
-  ## `add:path:x:y:scale` (placed via a `pos` action). The last three colon fields
-  ## are x, y, scale; the path is the rest joined with ':' (so Windows paths with
-  ## a colon work).
+  ## `add:path:x:y:scale` (placed via a `pos` action). Placement is detected by
+  ## the trailing three fields parsing as `x` (int), `y` (int), `scale` (float);
+  ## everything before them is the path. This keeps Windows paths working (the
+  ## drive-letter colon in `C:\dir\img.png` is part of the path), with or without
+  ## placement.
   var keep: seq[string]
   var curAdd = -1   # index in args.adds that trailing actions attach to; -1 = base
   for field in val.split(","):
     let f = field.strip()
     if f.startsWith("add:"):
-      let segs = f.split(":")
+      let rest = f[4 .. ^1]
+      let segs = rest.split(":")
       var spec = AddSpec(selector: selector, setActionRef: setActionRef, scale: 1.0'f32)
-      if segs.len >= 5:
-        spec.hasPos = true
-        spec.path = segs[1 ..< segs.len - 3].join(":")
+      # Need at least one path field plus x:y:scale to be a placement.
+      var hasPlacement = false
+      if segs.len >= 4:
         try:
           spec.x = int32(parseInt(segs[^3].strip()))
           spec.y = int32(parseInt(segs[^2].strip()))
           spec.scale = parseFloat(segs[^1].strip()).float32
+          hasPlacement = true
         except ValueError:
-          error "add: x and y must be integers and scale a number"
+          hasPlacement = false   # trailing fields aren't numeric => part of path
+      if hasPlacement:
+        spec.hasPos = true
+        spec.path = segs[0 ..< segs.len - 3].join(":")
         if spec.scale <= 0.0'f32:
           error "add: scale must be greater than 0.0"
-      elif segs.len == 2:
-        spec.path = segs[1]
       else:
-        error "add: expected add:path or add:path:x:y:scale"
+        spec.path = rest
       if spec.path.len == 0:
         error "add: missing path"
       args.adds.add spec
