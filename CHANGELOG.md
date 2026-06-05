@@ -5,8 +5,8 @@
 
 ## Features
  - Composite multiple video layers into one output: a v3 JSON timeline with stacked `v` tracks is now rendered bottom-to-top, with each overlay clip placed by a `pos` action in its effects. Still images (PNG/JPG/...) are supported as overlay sources (logos, watermarks), and overlay alpha is preserved.
- - Add the following actions: `drawbox`, `pos` (overlay placement, `pos:x:y[:scale]`), `rotate` with syntax `rotate:deg/rate`
- - Add the `add` virtual action, `add:path` or `add:path:x:y:scale`
+ - Add the following actions: `drawbox`, `pos` (overlay placement, `pos:x:y[:scale]`), `rotate:deg` (fixed-angle, expands the canvas for aspect flips), and `spin:deg/rate` (continuous rotation, never clipped, transparent corners on overlays)
+ - Add the `add` virtual action, `add:path` or `add:path:x:y:scale`. Actions chained after an `add` apply to the new overlay layer (e.g. `add:./logo.png,spin:0/-30` spins the logo)
  - Add animated effects: `zoom`, `opacity`, `blur`, and `brightness` accept keyframe ramps (`a..b..c`) that interpolate across the section, with optional easing via `:ease=curve[:duration]` (curve `linear`/`in`/`out`/`inout`, duration e.g. `2sec`). A standalone `ease:` token applies a curve to the animated actions that follow it.
  - Add AMD AMF hardware encoders (`h264_amf`, `hevc_amf`, `av1_amf`) for x86_64 Windows and Linux builds.
  - Show an indeterminate progress bar when duration of analysis is unknown.

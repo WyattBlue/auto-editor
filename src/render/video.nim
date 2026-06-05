@@ -1,5 +1,5 @@
 import std/[options, sets, strformat, tables]
-from std/math import round
+from std/math import round, hypot, ceil
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, dnorm16, rational]
@@ -343,29 +343,34 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       break
 
   let src = myCache.cns[firstSrc]
-  let color_range = src.video[0].codecpar.color_range
-  let colorspace = src.video[0].codecpar.color_space
-  let color_prim = src.video[0].codecpar.color_primaries
-  let color_trc = src.video[0].codecpar.color_trc
+  # Don't inherit color tags / SAR from a still image. PNGs are tagged full-range
+  # (which makes the H.264 encoder emit deprecated yuvj420p), so when the only
+  # reference is a still (e.g. an audio-only `add` over a synthesized canvas),
+  # keep the encoder's limited-range yuv420p defaults instead.
+  if not isStill.getOrDefault(firstSrc, false):
+    let color_range = src.video[0].codecpar.color_range
+    let colorspace = src.video[0].codecpar.color_space
+    let color_prim = src.video[0].codecpar.color_primaries
+    let color_trc = src.video[0].codecpar.color_trc
 
-  if color_range in [1, 2]:
-    encoderCtx.color_range = color_range
-  if colorspace in [0, 1] or (colorspace >= 3 and colorspace < 16):
-    encoderCtx.colorspace = colorspace
-  if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
-    encoderCtx.color_primaries = color_prim
-  if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
-    encoderCtx.color_trc = color_trc
+    if color_range in [1, 2]:
+      encoderCtx.color_range = color_range
+    if colorspace in [0, 1] or (colorspace >= 3 and colorspace < 16):
+      encoderCtx.colorspace = colorspace
+    if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
+      encoderCtx.color_primaries = color_prim
+    if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
+      encoderCtx.color_trc = color_trc
+
+    let sar = src.video[0].codecpar.sample_aspect_ratio
+    if sar != 0:
+      encoderCtx.sample_aspect_ratio = sar
 
   if args.videoBitrate >= 0:
     encoderCtx.bit_rate = args.videoBitrate
     debug(&"video bitrate: {encoderCtx.bit_rate}")
   else:
     debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
-
-  let sar = src.video[0].codecpar.sample_aspect_ratio
-  if sar != 0:
-    encoderCtx.sample_aspect_ratio = sar
 
   for src, cn in myCache.cns:
     if len(cn.video) > 0:
@@ -496,9 +501,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       else:
         hi = mid - 1
 
-  proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int): ptr AVFrame =
+  proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int,
+      isOverlay = false): ptr AVFrame =
     ## Apply one clip's effect chain to a frame, returning the (possibly new)
-    ## frame. Shared by the single-layer path and per-clip compositing.
+    ## frame. Shared by the single-layer path and per-clip compositing. `isOverlay`
+    ## is true for higher composited layers, which want transparent (not bg) fill
+    ## from `spin`.
     var frame = frame0
     let fps = tl.tb.float
     # Eased progress in [0, 1] for an animated action, using its own packed
@@ -508,29 +516,49 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     for effect in effects:
       case effect.kind:
-      of actSpeed, actVarispeed, actVolume, actDeesser, actPos: discard
-      of actRotate:
-        let rate = effect.rRate
-        if rate == 0.0'f32:
-          continue
-
-        let startDeg = rotDeg(effect.rStart)
+      # actRotate (static) is applied at decode time (it expands the canvas);
+      # nothing to do here.
+      of actSpeed, actVarispeed, actVolume, actDeesser, actPos, actRotate: discard
+      of actSpin:
+        let rate = effect.sRate
+        let startDeg = rotDeg(effect.sStart)
+        let w = frame.width
+        let h = frame.height
+        # Spin within a constant square sized to the diagonal, so no angle clips
+        # the picture. Overlays fill the exposed corners transparently (only the
+        # picture shows over the base); the base layer fills them with bg.
+        let side = cint(int(ceil(hypot(w.float, h.float))) + 1) and not 1.cint
         frame.pts = local.int64
         let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"rotate|{startDeg}|{rate}|{bg}|{bufferArgs}"
+        let bufferArgs = &"video_size={w}x{h}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let aExpr = &"a=({startDeg}+({rate})*t)*PI/180:ow={side}:oh={side}"
+        let key = &"spin|{isOverlay}|{startDeg}|{rate}|{side}|{bg}|{bufferArgs}"
         if fxKey != key:
           if fxGraph != nil:
             fxGraph.cleanup()
           fxGraph = newGraph()
           let bufferSrc = fxGraph.add("buffer", bufferArgs)
-          let filt = fxGraph.add("rotate", &"a=({startDeg}+({rate})*t)*PI/180:c={bg}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          var nodes: seq[ptr AVFilterContext] = @[bufferSrc]
+          if isOverlay:
+            # Convert to rgba first so the rotate fill (and exposed corners) can
+            # be transparent.
+            nodes.add fxGraph.add("format", "pix_fmts=rgba")
+            nodes.add fxGraph.add("rotate", aExpr & ":c=black@0")
+          else:
+            nodes.add fxGraph.add("rotate", aExpr & &":c={bg}")
+          nodes.add fxGraph.add("buffersink")
+          fxGraph.linkNodes(nodes).configure()
           fxKey = key
         fxGraph.push(frame)
         av_frame_free(addr frame)
         frame = fxGraph.pull()
+        if not isOverlay:
+          # Base layer must stay canvas-sized: shrink the contained square back
+          # to the original frame size, centered with bg padding.
+          let fitted = scaleWithPad(frame, w, h, tl.bg)
+          if fitted != frame:
+            av_frame_free(addr frame)
+            frame = fitted
       of actZoom:
         let z = sampleKf(effect.kf, prog(effect))
         if z == 1.0:
@@ -806,7 +834,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       var rotStatic = 0.0'f32
       for effect in obj.effects:
-        if effect.kind == actRotate and effect.rRate == 0.0'f32:
+        if effect.kind == actRotate:
           rotStatic = rotDeg(effect.rStart)
           break
       if rotStatic != 0.0'f32:
@@ -949,7 +977,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             if top != nil: av_frame_free(addr top)
             continue
           # Effects run at native size; overlayFrame scales (in full chroma).
-          top = applyEffects(top, o.effects, o.local, o.dur)
+          top = applyEffects(top, o.effects, o.local, o.dur, isOverlay = true)
           # No explicit `pos`: fit the overlay to the canvas and center it, like
           # the base layer (scaleWithPad), but let the padding stay transparent
           # so only the image shows over the base.
@@ -1066,7 +1094,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if didDecode:
           var rotStatic = 0.0'f32
           for effect in objList[0].effects:
-            if effect.kind == actRotate and effect.rRate == 0.0'f32:
+            if effect.kind == actRotate:
               rotStatic = rotDeg(effect.rStart)
               break
           if rotStatic != 0.0'f32:

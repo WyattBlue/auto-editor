@@ -135,17 +135,24 @@ test "actions":
   check $parseActions("zoom:1..0.5..1") == "zoom:1.0..0.5..1.0"
   check $parseActions("opacity:0..1..0") == "opacity:0.0..1.0..0.0"
 
-  # rotate: fixed angle, or "start/rate" for a constant-speed spin (deg/sec).
-  check $parseActions("rotate:0/120") == "rotate:0.0/120.0"
-  check $parseActions("rotate:90/-45") == "rotate:90.0/-45.0"
+  # rotate: a fixed angle (static, expands the canvas).
+  check $parseActions("rotate:90") == "rotate:90.0"
   block:
-    let r = acts("rotate:0/120")[0]
-    check r.kind == actRotate
-    check abs(r.rRate - 120.0'f32) < 0.001'f32
-    check abs(rotDeg(r.rStart)) < 0.01'f32                  # starts at 0 deg
     let s = acts("rotate:30")[0]
-    check s.rRate == 0.0'f32                                # fixed angle
+    check s.kind == actRotate
     check abs(rotDeg(s.rStart) - 30.0'f32) < 0.01'f32
+  # rotate no longer accepts a spin rate; use spin for that.
+  expect ActionParseError: discard parseActions("rotate:0/120")
+
+  # spin: "start/rate" for a constant-speed spin (deg/sec).
+  check $parseActions("spin:0/120") == "spin:0.0/120.0"
+  check $parseActions("spin:90/-45") == "spin:90.0/-45.0"
+  block:
+    let r = acts("spin:0/120")[0]
+    check r.kind == actSpin
+    check abs(r.sRate - 120.0'f32) < 0.001'f32
+    check abs(rotDeg(r.sStart)) < 0.01'f32                  # starts at 0 deg
+  expect ActionParseError: discard parseActions("spin:45")   # needs deg/rate
 
   # drawbox: x:y:w:h:color, round-tripping through `$` with a hex color.
   check $parseActions("drawbox:100:100:400:200:red") ==

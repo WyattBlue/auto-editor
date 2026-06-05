@@ -127,31 +127,50 @@ auto-editor video.mp4 --when-silent zoom:0.5
 
 ### rotate
 
-Rotate the picture clockwise about its center. The frame keeps the timeline
-resolution, and the corners exposed by the rotation are filled with the
-background color. Two forms:
-
-- `rotate:deg` — a **fixed** angle.
-- `rotate:deg/rate` — a constant-speed **spin**, starting at `deg` and turning
-  `rate` degrees per second (negative `rate` spins counter-clockwise).
+Rotate the picture clockwise about its center by a **fixed** `deg` angle,
+`rotate:deg`. The picture is **expanded** so nothing is clipped (a 90° rotation
+turns a landscape picture upright), and the corners exposed by the rotation are
+filled with the background color. The rotated picture is then fit into the output
+`--resolution` as usual, so pair `rotate:90` with a matching `--resolution` for a
+true portrait output. For a continuous rotation, use [`spin`](#spin) instead.
 
 ```bash
-# Fixed 30 degrees clockwise
-auto-editor video.mp4 --when-normal rotate:30
-
 # Turn the picture upside-down
 auto-editor video.mp4 --when-normal rotate:180
 
-# Spin continuously at 120 degrees/second (one full turn every 3 seconds)
-auto-editor video.mp4 --when-normal rotate:0/120
-
-# Start at 90 degrees and spin counter-clockwise at 45 degrees/second
-auto-editor video.mp4 --when-normal rotate:90/-45
+# Turn a 1920x1080 landscape video into a 1080x1920 portrait one
+auto-editor video.mp4 --when-normal rotate:90 --resolution 1080,1920
 ```
 
-**How it works:** Uses FFmpeg's `rotate` filter, with the angle driven by a
-per-frame time expression for the spin. Unlike the ramp effects below, `rotate`
-is not affected by `ease`.
+**How it works:** Uses FFmpeg's `rotate` filter with `ow=rotw:oh=roth`. Unlike
+the ramp effects below, `rotate` is not affected by `ease`.
+
+### spin
+
+Spin the picture continuously, `spin:deg/rate`: start at `deg` and turn at `rate`
+degrees per second (negative `rate` spins counter-clockwise).
+
+```bash
+# Spin at 120 degrees/second (one full turn every 3 seconds)
+auto-editor video.mp4 --when-normal spin:0/120
+
+# Start at 90 degrees and spin counter-clockwise at 45 degrees/second
+auto-editor video.mp4 --when-normal spin:90/-45
+```
+
+The picture spins inside a constant square big enough to contain every rotation,
+so it is **never clipped** at any angle. When `spin` is applied to an overlay
+layer (see [`add`](#add)) the exposed corners are left **transparent**, so only
+the picture shows over the layers below; otherwise they are filled with the
+background color.
+
+```bash
+# Spin a logo overlay over the video
+auto-editor video.mp4 --when-normal add:./logo.png,spin:0/-30
+```
+
+**How it works:** Uses FFmpeg's `rotate` filter with the angle driven by a
+per-frame time expression. Like `rotate`, it is not affected by `ease`.
 
 ### drawbox
 
@@ -214,9 +233,16 @@ auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
 Unlike the other actions, `add` is **virtual**: it is not a per-frame effect but
 adds an overlay layer to the timeline (the same compositing used by stacked v3
 tracks; see [The v3 format](./v3)). It is colon-separated (one comma-field), so
-it chains with other actions: `--when-normal add:./logo.png,zoom:2`. The overlay
-only appears where the section it is attached to is kept — so `--when-silent
-add:...` requires keeping those sections too, e.g.
+it chains with other actions.
+
+**Actions chained after an `add` apply to that new overlay layer, not the
+original.** So in `--when-normal add:./logo.png,spin:0/-30` the `spin` rotates the
+logo, while `--when-normal zoom:2,add:./logo.png` zooms the base video and then
+overlays the logo on top. A later `add` starts a new overlay, and following
+actions attach to it.
+
+The overlay only appears where the section it is attached to is kept — so
+`--when-silent add:...` requires keeping those sections too, e.g.
 `--when-silent nil,add:./logo.png`. With `--set-action`, the range is kept
 automatically. Overlay transparency (a PNG alpha channel) is preserved.
 
