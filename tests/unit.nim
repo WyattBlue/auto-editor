@@ -121,6 +121,20 @@ test "actions":
     check s.rRate == 0.0'f32                                # fixed angle
     check abs(rotDeg(s.rStart) - 30.0'f32) < 0.01'f32
 
+  # drawbox: x:y:w:h:color, round-tripping through `$` with a hex color.
+  check $parseActions("drawbox:100:100:400:200:red") ==
+    "drawbox:100:100:400:200:#ff0000"
+  check $parseActions("drawbox:0:0:1920:1080:#123456") ==
+    "drawbox:0:0:1920:1080:#123456"
+  block:
+    let d = acts("drawbox:10:20:30:40:#00ff00")[0]
+    check d.kind == actDrawbox
+    check (d.dbX, d.dbY, d.dbW, d.dbH) == (10'i32, 20'i32, 30'i32, 40'i32)
+    check d.dbColor == RGBColor(red: 0, green: 255, blue: 0)
+  expect ActionParseError: discard parseActions("drawbox:1:2:3:4")
+  expect ActionParseError: discard parseActions("drawbox:1:2:0:4:red")
+  expect ActionParseError: discard parseActions("drawbox:1:2:3:4:notacolor")
+
   # Easing packs into the action itself (no separate ease entry).
   block:
     let z = acts("zoom:1..2:ease=inout")

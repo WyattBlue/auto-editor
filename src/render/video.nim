@@ -803,6 +803,24 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
+          of actDrawbox:
+            let col = effect.dbColor.toString
+            let frameFmtName = $AVPixelFormat(frame.format)
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let key = &"drawbox|{effect.dbX}|{effect.dbY}|{effect.dbW}|{effect.dbH}|{col}|{bufferArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let filt = fxGraph.add("drawbox",
+                &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}:color={col}:t=fill")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = fxGraph.pull()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
