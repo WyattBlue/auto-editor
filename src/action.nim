@@ -5,7 +5,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
     actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actDrawbox, actPos
+    actDrawbox, actPos, actSpin
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -23,8 +23,10 @@ type
     of actInvert, actHflip, actVflip:
       discard
     of actRotate:
-      rStart*: Unorm16       # circular [0, 360) start angle
-      rRate*: float32        # spin rate in degrees/second (0 = static)
+      rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
+    of actSpin:
+      sStart*: Unorm16       # circular [0, 360) start angle
+      sRate*: float32        # spin rate in degrees/second (continuous)
     of actLens:
       k1*, k2*: Snorm16
     of actSpeed, actVarispeed, actVolume:
@@ -128,8 +130,10 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Scale contrast around mid-gray. 1.0 = unchanged, higher values increase contrast, lower values reduce it. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "saturation", flags: {afVideo}, argSpec: "float32", range: rng(0.0, 3.0),
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
-  ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg[/rate]",
-    help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`."),
+  ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg",
+    help: "Rotate the picture clockwise about its center by a fixed `deg` angle, expanding the frame so nothing is clipped and filling the exposed corners with the background color. Good for aspect flips, e.g. `rotate:90`. For a continuous spin, use `spin` instead."),
+  ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
+    help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo}, argSpec: "x:y:w:h:color",
     help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
   ActionDef(name: "pos", flags: {afVideo}, argSpec: "x:y[:scale]",
@@ -272,18 +276,27 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
     return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
 
-  # rotate: a fixed angle "rotate:deg", or "rotate:deg/rate" for a continuous
-  # spin starting at `deg` and turning `rate` degrees/second.
+  # rotate: a fixed angle "rotate:deg" (static, expands the canvas).
   if parts[0] == "rotate" and parts.len == 2:
+    if '/' in parts[1]:
+      raise newException(ActionParseError,
+        "rotate takes a fixed angle (rotate:deg); use spin:deg/rate for a continuous spin")
+    try:
+      return Action(kind: actRotate, rStart: Unorm16(rotCode(parseFloat(parts[1]).float32)))
+    except ValueError:
+      raise newException(ActionParseError, "Invalid float value")
+
+  # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
+  # `rate` degrees/second.
+  if parts[0] == "spin" and parts.len == 2:
     let spec = parts[1]
     let slash = spec.find('/')
+    if slash < 0:
+      raise newException(ActionParseError, "spin requires spin:deg/rate")
     try:
-      if slash < 0:
-        return Action(kind: actRotate, rStart: Unorm16(rotCode(parseFloat(spec).float32)),
-          rRate: 0.0'f32)
-      return Action(kind: actRotate,
-        rStart: Unorm16(rotCode(parseFloat(spec[0 ..< slash]).float32)),
-        rRate: parseFloat(spec[slash + 1 .. ^1]).float32)
+      return Action(kind: actSpin,
+        sStart: Unorm16(rotCode(parseFloat(spec[0 ..< slash]).float32)),
+        sRate: parseFloat(spec[slash + 1 .. ^1]).float32)
     except ValueError:
       raise newException(ActionParseError, "Invalid float value")
 
@@ -430,10 +443,8 @@ when not defined(nimscript):
     of actOpacity: "opacity:" & kfStr(act) & easeSuffix(act)
     of actBlur: "blur:" & kfStr(act) & easeSuffix(act)
     of actBrightness: "brightness:" & kfStr(act) & easeSuffix(act)
-    of actRotate:
-      let startDeg = rotDeg(act.rStart)
-      if act.rRate == 0.0'f32: "rotate:" & $startDeg
-      else: "rotate:" & $startDeg & "/" & $act.rRate
+    of actRotate: "rotate:" & $rotDeg(act.rStart)
+    of actSpin: "spin:" & $rotDeg(act.sStart) & "/" & $act.sRate
     of actLuv:
       var parts: seq[string]
       if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $act.brighthue
@@ -453,7 +464,8 @@ when not defined(nimscript):
     case a.kind
     of actInvert, actHflip, actVflip: 1
     of actSpeed, actVarispeed, actVolume, actLens: 5
-    of actRotate: 7
+    of actRotate: 3
+    of actSpin: 7
     of actDeesser: 7
     of actLuv: 11
     of actDrawbox: 20
@@ -514,10 +526,15 @@ when not defined(nimscript):
           i = pos
         of actRotate:
           var st: Unorm16
+          copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
+          yield Action(kind: actRotate, rStart: st)
+          i += 3
+        of actSpin:
+          var st: Unorm16
           var rate: float32
           copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
           copyMem(addr rate, addr base[i + 3], sizeof(float32))
-          yield Action(kind: actRotate, rStart: st, rRate: rate)
+          yield Action(kind: actSpin, sStart: st, sRate: rate)
           i += 7
         of actDeesser:
           var iu, mu, fu: Unorm16
@@ -622,7 +639,11 @@ when not defined(nimscript):
         i = pos
       of actRotate:
         var st = a.rStart
-        var rate = a.rRate
+        copyMem(addr base[i + 1], addr st, sizeof(Unorm16))
+        i += 3
+      of actSpin:
+        var st = a.sStart
+        var rate = a.sRate
         copyMem(addr base[i + 1], addr st, sizeof(Unorm16))
         copyMem(addr base[i + 3], addr rate, sizeof(float32))
         i += 7

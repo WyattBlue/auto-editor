@@ -54,6 +54,8 @@ type AddSpec* = object
   hasPos*: bool        # whether x/y/scale were given (else origin, native size)
   x*, y*: int32
   scale*: float32
+  effects*: string     # actions chained after `add:` — applied to this overlay
+                       # layer (not the base), as a comma-separated atf-8 string
 
 type mainArgs* = object
   inputs*: seq[string]

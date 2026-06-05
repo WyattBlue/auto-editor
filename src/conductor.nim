@@ -191,10 +191,18 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
 
   for spec in args.adds:
     let srcPtr = interner.intern(spec.path)
-    # Placement (when given) is carried by a `pos` action; reuse or append it.
-    let group = (if spec.hasPos:
-        newActions([Action(kind: actPos, px: spec.x, py: spec.y, pscale: spec.scale)])
-      else: aNil)
+    # The overlay's effects group: an optional `pos` placement action followed by
+    # any actions chained after `add:` (which apply to this layer, not the base).
+    var acts: seq[Action]
+    if spec.hasPos:
+      acts.add Action(kind: actPos, px: spec.x, py: spec.y, pscale: spec.scale)
+    if spec.effects.len > 0:
+      try:
+        for a in parseActions(spec.effects):
+          acts.add a
+      except ActionParseError as e:
+        error e.msg
+    let group = (if acts.len > 0: newActions(acts) else: aNil)
     var idx = tl.effects.find(group)
     if idx == -1:
       tl.effects.add group

@@ -271,13 +271,16 @@ proc parseActions(val: string): Actions =
 
 proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): string =
   ## Pull `add:` tokens out of an action value and record them on `args.adds`;
-  ## return the remaining action string (atf-8 effects). `add` is a virtual
-  ## action, so it is removed before the rest is parsed. It is a single
-  ## comma-field (colon-separated), so other actions can still be chained with
-  ## commas. Forms: `add:path` (origin, native size) or `add:path:x:y:scale`
-  ## (placed via a `pos` action). The last three colon fields are x, y, scale;
-  ## the path is the rest joined with ':' (so Windows paths with a colon work).
+  ## return the remaining action string (atf-8 effects) for the base layer.
+  ## `add` is a virtual action, removed before the rest is parsed. Actions chained
+  ## after an `add:` token apply to that overlay layer, not the base; actions
+  ## before the first `add:` stay base-layer effects. Each `add:` is one
+  ## comma-field (colon-separated). Forms: `add:path` (fit-and-center) or
+  ## `add:path:x:y:scale` (placed via a `pos` action). The last three colon fields
+  ## are x, y, scale; the path is the rest joined with ':' (so Windows paths with
+  ## a colon work).
   var keep: seq[string]
+  var curAdd = -1   # index in args.adds that trailing actions attach to; -1 = base
   for field in val.split(","):
     let f = field.strip()
     if f.startsWith("add:"):
@@ -301,8 +304,14 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
       if spec.path.len == 0:
         error "add: missing path"
       args.adds.add spec
-    else:
+      curAdd = args.adds.len - 1
+    elif curAdd == -1:
       keep.add field
+    else:
+      # Chain onto the overlay layer of the most recent `add:`.
+      if args.adds[curAdd].effects.len > 0:
+        args.adds[curAdd].effects.add ","
+      args.adds[curAdd].effects.add f
   keep.join(",")
 
 proc parseSpeed(val, opt: string): float64 =
