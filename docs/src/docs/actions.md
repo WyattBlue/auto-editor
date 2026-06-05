@@ -153,6 +153,26 @@ auto-editor video.mp4 --when-normal rotate:90/-45
 per-frame time expression for the spin. Unlike the ramp effects below, `rotate`
 is not affected by `ease`.
 
+### drawbox
+
+Draw a filled rectangle onto the picture. Takes five positional args,
+`drawbox:x:y:w:h:color`:
+
+- **x**, **y** — the top-left corner, in pixels.
+- **w**, **h** — the width and height, in pixels (both must be positive).
+- **color** — an RGB color, either a name (`red`) or a hex value (`#ff0000`).
+
+```bash
+# Cover the top-left corner with a 400x200 red box
+auto-editor video.mp4 --when-normal drawbox:100:100:400:200:red
+
+# A black bar across part of the frame (e.g. to redact something)
+auto-editor video.mp4 --when-normal drawbox:0:0:1920:200:#000000
+```
+
+**How it works:** Uses FFmpeg's `drawbox` filter with `t=fill`, so the
+rectangle is filled rather than outlined. Only RGB colors are supported.
+
 ## Multiple Actions (Chaining)
 
 You can combine multiple actions using commas. Actions are applied in the order specified.

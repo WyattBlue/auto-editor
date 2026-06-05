@@ -4,10 +4,10 @@
  -
 
 ## Features
- - Add the `rotate` action, which rotates the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` is a fixed angle; `rotate:deg/rate` spins continuously at `rate` degrees per second (driven by ffmpeg's per-frame time expression).
+ - Add the following actions: `drawbox`, `rotate` with syntax `rotate:deg/rate`
  - Add animated effects: `zoom`, `opacity`, `blur`, and `brightness` accept keyframe ramps (`a..b..c`) that interpolate across the section, with optional easing via `:ease=curve[:duration]` (curve `linear`/`in`/`out`/`inout`, duration e.g. `2sec`). A standalone `ease:` token applies a curve to the animated actions that follow it.
  - Add AMD AMF hardware encoders (`h264_amf`, `hevc_amf`, `av1_amf`) for x86_64 Windows and Linux builds.
- - Show an indeterminate progress bar when the duration is unknown, instead of a misleading percentage.
+ - Show an indeterminate progress bar when duration of analysis is unknown.
 
 ## Performance
  - Skip demuxing unused streams during audio analysis and rendering, which is significantly faster when working with high-bitrate video files.

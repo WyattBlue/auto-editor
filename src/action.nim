@@ -1,10 +1,11 @@
 import std/[math, strutils, options]
-import ./util/dnorm16
+import ./util/[dnorm16, color]
 
 type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
-    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate
+    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
+    actDrawbox
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -40,6 +41,9 @@ type
       contrast*: float32
       saturation*: float32
       brighthue*: Snorm16
+    of actDrawbox:
+      dbX*, dbY*, dbW*, dbH*: int32   # rectangle in pixels (x, y, width, height)
+      dbColor*: RGBColor              # outline color (RGB only)
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -123,6 +127,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg[/rate]",
     help: "Rotate the picture clockwise about its center, filling the exposed corners with the background color. `rotate:deg` holds a fixed angle. `rotate:deg/rate` spins continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `rotate:0/120`."),
+  ActionDef(name: "drawbox", flags: {afVideo}, argSpec: "x:y:w:h:color",
+    help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
@@ -276,6 +282,27 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     except ValueError:
       raise newException(ActionParseError, "Invalid float value")
 
+  # drawbox takes positional args: x:y:w:h:color (color is RGB only).
+  if parts[0] == "drawbox":
+    if parts.len != 6:
+      raise newException(ActionParseError, "drawbox requires x:y:w:h:color")
+    var coords: array[4, int32]
+    for idx in 0 ..< 4:
+      try:
+        coords[idx] = int32(parseInt(parts[idx + 1]))
+      except ValueError:
+        raise newException(ActionParseError, "Invalid integer value")
+    if coords[2] <= 0 or coords[3] <= 0:
+      raise newException(ActionParseError, "drawbox width and height must be positive")
+    let col = (
+      try:
+        parseColor(parts[5])
+      except ValueError:
+        raise newException(ActionParseError, "Invalid color: " & parts[5])
+    )
+    return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
+      dbW: coords[2], dbH: coords[3], dbColor: col)
+
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
   if parts[0] in animScalar and parts.len >= 2:
@@ -398,6 +425,9 @@ when not defined(nimscript):
       if act.saturation != luvSaturationId: parts.add "saturation:" & $act.saturation
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
     of actLens: "lens:" & $act.k1 & ":" & $act.k2
+    of actDrawbox:
+      "drawbox:" & $act.dbX & ":" & $act.dbY & ":" & $act.dbW & ":" &
+        $act.dbH & ":" & act.dbColor.toString
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -409,6 +439,7 @@ when not defined(nimscript):
     of actRotate: 7
     of actDeesser: 7
     of actLuv: 11
+    of actDrawbox: 20
     of actZoom, actBlur: 2 + easeBytes(a) + a.kf.len * 4
     of actOpacity, actBrightness: 2 + easeBytes(a) + a.kf.len * 2
 
@@ -491,6 +522,17 @@ when not defined(nimscript):
           copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
           yield Action(kind: actLens, k1: k1v, k2: k2v)
           i += 5
+        of actDrawbox:
+          var x, y, w, h: int32
+          copyMem(addr x, addr base[i + 1], sizeof(int32))
+          copyMem(addr y, addr base[i + 5], sizeof(int32))
+          copyMem(addr w, addr base[i + 9], sizeof(int32))
+          copyMem(addr h, addr base[i + 13], sizeof(int32))
+          let col = RGBColor(red: base[i + 17], green: base[i + 18],
+            blue: base[i + 19])
+          yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h,
+            dbColor: col)
+          i += 20
 
   func actionLen*(a: Actions): int =  # O(n)
     for _ in a: inc result
@@ -580,6 +622,19 @@ when not defined(nimscript):
         copyMem(addr base[i + 1], addr k1v, sizeof(Snorm16))
         copyMem(addr base[i + 3], addr k2v, sizeof(Snorm16))
         i += 5
+      of actDrawbox:
+        var x = a.dbX
+        var y = a.dbY
+        var w = a.dbW
+        var h = a.dbH
+        copyMem(addr base[i + 1], addr x, sizeof(int32))
+        copyMem(addr base[i + 5], addr y, sizeof(int32))
+        copyMem(addr base[i + 9], addr w, sizeof(int32))
+        copyMem(addr base[i + 13], addr h, sizeof(int32))
+        base[i + 17] = a.dbColor.red
+        base[i + 18] = a.dbColor.green
+        base[i + 19] = a.dbColor.blue
+        i += 20
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
