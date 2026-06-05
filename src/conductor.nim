@@ -163,8 +163,31 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
   ## every base-layer (v[0]) clip whose section matches the spec's selector
   ## (0 = silent, 1 = normal), spanning the same timeline range. Placement (when
   ## given) is carried by a `pos` action in the overlay clip's effects group.
-  if args.adds.len == 0 or tl.v.len == 0:
+  if args.adds.len == 0:
     return
+
+  # Audio-only timeline: synthesize a background base video track so the
+  # overlays have a canvas — but only if some kept section matches an add's
+  # selector. With no "active" portion (e.g. `--edit all` + `-w:1 add`), there
+  # is nothing to draw on, so no video stream is produced.
+  if tl.v.len == 0:
+    if tl.a.len == 0:
+      return
+    var matches = false
+    for spec in args.adds:
+      for clip in tl.a[0]:
+        if clip.effects.int == spec.selector:
+          matches = true
+          break
+      if matches: break
+    if not matches:
+      return
+    var base: seq[Clip]
+    for clip in tl.a[0]:
+      base.add Clip(src: nil, start: clip.start, dur: clip.dur, offset: 0,
+        effects: clip.effects, stream: 0)
+    tl.langs.insert(toLang("und"), 0)  # video lang precedes audio langs
+    tl.v.add base
 
   for spec in args.adds:
     let srcPtr = interner.intern(spec.path)
@@ -254,14 +277,6 @@ proc editMedia*(args: var mainArgs) =
         var actionMap: seq[Actions] = @[args.whenSilent, args.whenNormal]
         var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
 
-        proc getActionIndex(actions: Actions): int =
-          let index = actionMap.find(actions)
-          if index == -1:
-            actionMap.add(actions)
-            return actionMap.len - 1
-          else:
-            return index
-
         var conLen = 0
         proc getConLen(): int =
           if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
@@ -270,19 +285,14 @@ proc editMedia*(args: var mainArgs) =
         for sIdx in 0 ..< args.setAction.len:
           let actionRange = args.setAction[sIdx]
           let span = (actionRange[1], actionRange[2])
-          var hasAdd = false
-          for a in args.adds:
-            if a.setActionRef == sIdx:
-              hasAdd = true
-              break
-          # An add-linked range gets a unique effects index (bypassing dedup) so
-          # the overlay matches only this range, then the add inherits it.
-          var aIdx: int
-          if hasAdd:
-            actionMap.add actionRange[0]
-            aIdx = actionMap.len - 1
-          else:
-            aIdx = getActionIndex(actionRange[0])
+          # A set-action range is an explicit override, conceptually distinct
+          # from the `-w:0`/`-w:1` (silent/normal) sections. Give it a unique
+          # effects index (never deduping into indices 0/1) so an `add` selector
+          # matches only what it should: `-w:1 add` overlays genuine active
+          # sections, not a `--set-action`/`--add-in` range, and a set-action's
+          # own `add` matches just that range.
+          actionMap.add actionRange[0]
+          let aIdx = actionMap.len - 1
           applyToRange(actionIndex, span, tbf, aIdx, getConLen())
           if i == 0:
             for a in args.adds.mitems:

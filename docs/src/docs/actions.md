@@ -220,6 +220,14 @@ add:...` requires keeping those sections too, e.g.
 `--when-silent nil,add:./logo.png`. With `--set-action`, the range is kept
 automatically. Overlay transparency (a PNG alpha channel) is preserved.
 
+For an **audio-only** input, `add` synthesizes a background video canvas (the
+`--background` color, at `--resolution`) so the output gains a video stream —
+handy for turning an audio file plus an image into a video. The video is only
+created when there is an active section for the overlay to sit on: e.g.
+`auto-editor song.mp3 -bg white -w:1 add:./cover.png` makes a video, but if the
+edit leaves no active sections (so the `-w:1` overlay matches nothing) the
+output stays audio-only.
+
 ## Multiple Actions (Chaining)
 
 You can combine multiple actions using commas. Actions are applied in the order specified.

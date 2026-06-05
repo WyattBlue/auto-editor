@@ -284,11 +284,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     firstSrc = tl.v[0][0].src
 
   for src in tl.uniqueSources:
-    if firstSrc == nil:
-      firstSrc = src
-
     if src notin myCache.cns:
       myCache.cns[src] = av.open(src[])
+
+    # Audio-only sources (e.g. the .mp3 behind a synthesized video canvas) have
+    # no video stream to decode.
+    if myCache.cns[src].video.len == 0:
+      continue
+    if firstSrc == nil:
+      firstSrc = src
 
     let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
@@ -329,6 +333,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+
+  # For encoder config (colorspace/SAR/pix_fmt) prefer a real, non-still video
+  # source. An audio-only `add` timeline may have only still images over a
+  # synthesized background, in which case yuv420p defaults are used.
+  for s in tl.uniqueSources:
+    if myCache.cns[s].video.len > 0 and not isStill.getOrDefault(s, false):
+      firstSrc = s
+      break
 
   let src = myCache.cns[firstSrc]
   let color_range = src.video[0].codecpar.color_range
@@ -379,7 +391,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         else:
           debug &"Source {src[]}: no index entries, using estimated interval: {kfIndex.avgInterval} frames"
 
-      if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
+      if src == firstSrc and not isStill.getOrDefault(src, false) and
+          encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
   var needValidFmt = true
@@ -708,6 +721,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## Decode one clip's frame at its native resolution (after any static
     ## rotation), maintaining per-source seek state. Still images decode once
     ## and return clones. Caller owns the returned frame.
+    if obj.src == nil:  # synthesized background base (audio-only `add`)
+      return (av_frame_clone(nullFrame), true)
     if isStill.getOrDefault(obj.src, false):
       if obj.src notin stillCache:
         let imgStream = myCache.cns[obj.src].video[0]
@@ -887,9 +902,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           if index >= obj.start and index < (obj.start + obj.dur):
             # Convert timeline position from target framerate to source framerate
             let timelinePos = obj.offset + index - obj.start
-            let srcStream = myCache.cns[obj.src].video[0]
-            let srcTb = srcStream.avg_frame_rate
-            let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
             let effectGroup = tl.effects[obj.effects]
             var speed = 1.0
             # Overlay placement comes from a `pos` action in the clip's effects
@@ -906,6 +918,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 oy = effect.py
                 oscale = effect.pscale
 
+            # A synthesized background base (nil src) has no source frame.
+            let sourceFramePos =
+              if obj.src == nil: 0
+              else:
+                let srcTb = myCache.cns[obj.src].video[0].avg_frame_rate
+                int(round(float(timelinePos) * srcTb.float / tl.tb.float))
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
               local: int(index - obj.start), dur: int(obj.dur),
