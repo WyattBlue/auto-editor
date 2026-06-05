@@ -572,6 +572,82 @@ class Runner:
                     break
             assert checked > 0
 
+    def make_png(
+        self, name: str, w: int, h: int, color: tuple[int, int, int]
+    ) -> str:
+        """Write a solid-color PNG into the temp dir and return its path."""
+        import numpy as np
+
+        path = os.path.join(self.temp_dir, name)
+        arr = np.empty((h, w, 3), dtype=np.uint8)
+        arr[:, :] = color
+        frame = av.VideoFrame.from_ndarray(arr, format="rgb24")
+        with av.open(path, "w") as cont:
+            stream = cont.add_stream("png")
+            stream.width, stream.height, stream.pix_fmt = w, h, "rgb24"
+            cont.mux(stream.encode(frame))
+            cont.mux(stream.encode())
+        return path
+
+    def test_drawbox(self) -> None:
+        out = self.main(
+            ["example.mp4"], ["-w:1", "drawbox:100:100:400:200:red"], "box.mp4"
+        )
+        with av.open(out) as container:
+            for i, frame in enumerate(container.decode(container.streams.video[0])):
+                if i < 5:
+                    continue
+                r, g, b = frame.to_ndarray(format="rgb24")[200, 300]  # inside box
+                assert r > 200 and g < 80 and b < 80, f"box px {(r, g, b)}"
+                break
+
+    def test_add_overlay(self) -> None:
+        png = self.make_png("ov.png", 200, 200, (255, 0, 0))
+        out = self.main(
+            ["example.mp4"], ["-w:1", f"add:{png}:600:300:1.0"], "add.mp4"
+        )
+        cn = fileinfo(out)
+        assert len(cn.videos) == 1
+        with av.open(out) as container:
+            for i, frame in enumerate(container.decode(container.streams.video[0])):
+                if i < 5:
+                    continue
+                rgb = frame.to_ndarray(format="rgb24")
+                r, g, b = rgb[360, 700]  # inside the 200x200 overlay at (600,300)
+                assert r > 200 and g < 80 and b < 80, f"overlay px {(r, g, b)}"
+                r2, g2, b2 = rgb[40, 40]  # base video, away from the overlay
+                assert not (r2 > 200 and g2 < 80 and b2 < 80), f"base px {(r2, g2, b2)}"
+                break
+
+    def test_add_audio_only(self) -> None:
+        # An audio file + `add` synthesizes a background video canvas.
+        png = self.make_png("cover.png", 200, 200, (255, 0, 0))
+        out = self.main(
+            ["resources/mono.mp3"], ["-b", "white", "-w:1", f"add:{png}"], "cover.mkv"
+        )
+        cn = fileinfo(out)
+        assert len(cn.videos) == 1
+        assert len(cn.audios) == 1
+        assert cn.videos[0].res == (1920, 1080)
+        with av.open(out) as container:
+            frame = next(container.decode(container.streams.video[0]))
+            rgb = frame.to_ndarray(format="rgb24")
+            r, g, b = rgb[10, 10]  # corner is the white background
+            assert r > 240 and g > 240 and b > 240, f"bg px {(r, g, b)}"
+
+    def test_add_audio_only_no_active(self) -> None:
+        # No active section for the `-w:1` overlay (the only kept range is a
+        # set-action override), so no video stream is produced.
+        png = self.make_png("cover2.png", 100, 100, (0, 255, 0))
+        out = self.main(
+            ["resources/mono.mp3"],
+            ["--edit", "all", "--set-action", "nil,0,1sec", "-w:1", f"add:{png}"],
+            "noov.mkv",
+        )
+        cn = fileinfo(out)
+        assert len(cn.videos) == 0
+        assert len(cn.audios) == 1
+
     def test_premiere_multi(self):
         p_xml = self.main([f"resources/multi-track.mov"], ["-exp"], "multi.xml")
 

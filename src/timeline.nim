@@ -50,12 +50,16 @@ func len*(self: v3): int64 =
       result = max(result, clips[^1].start + clips[^1].dur)
 
 func uniqueSources*(self: v3): HashSet[ptr string] =
+  # A nil src is a synthesized background clip (audio-only `add`); it has no
+  # file to open, so it never belongs in the source set.
   for vlayer in self.v:
     for video in vlayer:
-      result.incl(video.src)
+      if video.src != nil:
+        result.incl(video.src)
   for alayer in self.a:
     for audio in alayer:
-      result.incl(audio.src)
+      if audio.src != nil:
+        result.incl(audio.src)
 
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
