@@ -11,6 +11,10 @@ type VideoFrame = object
   effects: Actions
   local: int  # frame offset within the clip, for animated effects
   dur: int    # clip length in frames
+  x: int32    # overlay placement (canvas pixels); 0 for the base layer
+  y: int32
+  scale: float32  # overlay size multiplier; 1.0 for the base layer
+  fit: bool   # no explicit `pos`: fit-and-center to the canvas like the base
 
 func clipT(local, animLen: int): float32 =
   ## Normalized time over an animation of `animLen` frames, reaching 1.0 on the
@@ -257,11 +261,28 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var decoders = initTable[ptr string, ptr AVCodecContext]()
   var tous = initTable[ptr string, int]()
   var keyframeIndices = initTable[ptr string, KeyframeIndex]()
+  # Still-image sources (overlay logos/watermarks) decode a single frame that is
+  # held for the clip's whole duration; stillCache memoizes that frame per src.
+  var isStill = initTable[ptr string, bool]()
+  var stillCache = initTable[ptr string, ptr AVFrame]()
+  # Within a single timeline frame, two layers can reference the same source at
+  # the same source-frame index (e.g. a clip composited over itself). The shared
+  # per-source decoder can only be at one position, so memoize the raw decoded
+  # frame per (src, index) for the duration of one timeline frame; cleared at the
+  # top of each iteration.
+  var decodedCache = initTable[(ptr string, int), ptr AVFrame]()
 
   var pix_fmt = AV_PIX_FMT_YUV420P # Reasonable default
   let targetFps = tl.tb # Always constant
 
+  # Reference source for encoder config (color/pix_fmt/SAR): the base video
+  # layer's first clip. Don't derive this from uniqueSources iteration order,
+  # which is pointer-hash order over `ptr string` keys and so varies run-to-run
+  # (e.g. an `add:` overlay image could win over the actual video).
   var firstSrc: ptr string = nil
+  if tl.v.len > 0 and tl.v[0].len > 0:
+    firstSrc = tl.v[0][0].src
+
   for src in tl.uniqueSources:
     if firstSrc == nil:
       firstSrc = src
@@ -272,6 +293,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
     decoders[src] = decoderCtx
+
+    # An image source is a single still: known image codec, or a stream that
+    # reports exactly one frame (single-frame webp, png_pipe, etc.).
+    let vstream = myCache.cns[src].video[0]
+    const imageCodecIds = [ID_PNG, AVCodecID(7), AVCodecID(78), AVCodecID(80)]
+      # png, mjpeg, bmp, tiff
+    isStill[src] = vstream.codecpar.codec_id in imageCodecIds or
+      vstream.nb_frames == 1
 
   var targetWidth = tl.res[0]
   var targetHeight = tl.res[1]
@@ -454,10 +483,404 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       else:
         hi = mid - 1
 
+  proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int): ptr AVFrame =
+    ## Apply one clip's effect chain to a frame, returning the (possibly new)
+    ## frame. Shared by the single-layer path and per-clip compositing.
+    var frame = frame0
+    let fps = tl.tb.float
+    # Eased progress in [0, 1] for an animated action, using its own packed
+    # easing curve + duration (defaults to linear over the whole clip).
+    template prog(e: Action): float32 =
+      applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
+
+    for effect in effects:
+      case effect.kind:
+      of actSpeed, actVarispeed, actVolume, actDeesser, actPos: discard
+      of actRotate:
+        let rate = effect.rRate
+        if rate == 0.0'f32:
+          continue
+
+        let startDeg = rotDeg(effect.rStart)
+        frame.pts = local.int64
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"rotate|{startDeg}|{rate}|{bg}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let filt = fxGraph.add("rotate", &"a=({startDeg}+({rate})*t)*PI/180:c={bg}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actZoom:
+        let z = sampleKf(effect.kf, prog(effect))
+        if z == 1.0:
+          continue
+        let origW = frame.width
+        let origH = frame.height
+        let scaledW = max(cint(float(origW) * z), 2)
+        let scaledH = max(cint(float(origH) * z), 2)
+        let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
+        if scaledFrame != frame:
+          av_frame_free(addr frame)
+          frame = scaledFrame
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let zoomMode = if z > 1.0: "crop" else: "pad"
+        let key = &"zoom|{zoomMode}|{origW}x{origH}|{bg}|{zoomBufArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", zoomBufArgs)
+          let mid = if z > 1.0:
+              fxGraph.add("crop", &"{origW}:{origH}")
+            else:
+              fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actHflip, actVflip, actInvert:
+        let filterName = case effect.kind
+          of actHflip: "hflip"
+          of actVflip: "vflip"
+          else: "negate"
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = filterName & "|" & bufferArgs
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let filt = fxGraph.add(filterName)
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actBlur:
+        let sigma = sampleKf(effect.kf, prog(effect))
+        if sigma <= 0.0:
+          continue
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"blur|{sigma}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let filt = fxGraph.add("gblur", &"sigma={sigma}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actBrightness:
+        let b = sampleKf(effect.kf, prog(effect))
+        if b == 0.0'f32:
+          continue
+        let shift = b * 255.0'f32
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"brightness|{shift}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
+          let lut = fxGraph.add("lutrgb",
+            &"r=val+{shift}:g=val+{shift}:b=val+{shift}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actLuv:
+        if (effect.brighthue == luvBrighthueId and
+            effect.contrast == luvContrastId and
+            effect.saturation == luvSaturationId):
+          continue
+
+        let b = effect.brighthue
+        let c = effect.contrast
+        let s = effect.saturation
+        let bShift = b * 255.0
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"bcs|{b}|{c}|{s}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
+          let lut = fxGraph.add("lutyuv",
+            &"y=(val-128)*{c}+128+{bShift}:u=(val-128)*{s}+128:v=(val-128)*{s}+128")
+          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actOpacity:
+        let o = sampleKf(effect.kf, prog(effect))
+        if o >= 1.0'f32:
+          continue
+        let bgR = (1.0'f32 - o) * float32(tl.bg.red)
+        let bgG = (1.0'f32 - o) * float32(tl.bg.green)
+        let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"opacity|{o}|{bg}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
+          let lut = fxGraph.add("lutrgb",
+            &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actLens:
+        let k1 = effect.k1
+        let k2 = effect.k2
+        if k1 == 0.0'f32 and k2 == 0.0'f32:
+          continue
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"lens|{k1}|{k2}|{bg}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actDrawbox:
+        let col = effect.dbColor.toString
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"drawbox|{effect.dbX}|{effect.dbY}|{effect.dbW}|{effect.dbH}|{col}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let filt = fxGraph.add("drawbox",
+            &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}:color={col}:t=fill")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+    return frame
+
+  proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
+    ## Decode one clip's frame at its native resolution (after any static
+    ## rotation), maintaining per-source seek state. Still images decode once
+    ## and return clones. Caller owns the returned frame.
+    if isStill.getOrDefault(obj.src, false):
+      if obj.src notin stillCache:
+        let imgStream = myCache.cns[obj.src].video[0]
+        var scratch = av_frame_clone(nullFrame)
+        var got: ptr AVFrame = nil
+        for decodedFrame in myCache.cns[obj.src].flushDecode(imgStream.index.cint,
+            decoders[obj.src], scratch):
+          got = av_frame_clone(decodedFrame)
+          break
+        av_frame_free(addr scratch)
+        if got == nil:
+          got = av_frame_clone(nullFrame)
+        stillCache[obj.src] = got
+      return (av_frame_clone(stillCache[obj.src]), true)
+
+    let cacheKey = (obj.src, obj.index)
+    if cacheKey in decodedCache:
+      # Another layer at this same timeline frame already decoded this exact
+      # source frame; reuse it rather than re-advance the shared per-source
+      # decoder (which, already at obj.index, would otherwise decode nothing).
+      return (av_frame_clone(decodedCache[cacheKey]), true)
+
+    var frame = av_frame_clone(nullFrame)
+    var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
+    var frameIndex = frameIndices[obj.src]
+    var seekThreshold = seekThresholds[obj.src]
+    var seekFrame = seekFrames[obj.src]
+    if frameIndex > obj.index:
+      let seekTarget = findBestKeyframe(obj.src, obj.index)
+      if seekTarget < 0 or seekTarget > obj.index:
+        let kfIndex = keyframeIndices[obj.src]
+        let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
+        error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, seekTarget: {seekTarget}, {indexInfo})"
+      if lastSeekTarget[obj.src] != seekTarget:
+        debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {obj.index})"
+        myCache.cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
+        avcodec_flush_buffers(decoders[obj.src])
+        lastSeekTarget[obj.src] = seekTarget
+      frameIndex = min(seekTarget, obj.index - 1)
+
+    let srcTb = myStream.avg_frame_rate
+    var didDecode = false
+    while frameIndex < obj.index:
+      if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
+        if lastSeekTarget[obj.src] != obj.index:
+          seekThreshold = frameIndex + (keyframeIndices[obj.src].avgInterval div 2)
+          seekFrame = some(frameIndex)
+          debug &"Seek: {frameIndex} -> {obj.index}"
+          myCache.cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
+          avcodec_flush_buffers(decoders[obj.src])
+          lastSeekTarget[obj.src] = obj.index
+
+      let decoder: ptr AVCodecContext = decoders[obj.src]
+      var foundFrame = false
+      for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
+        frame = decodedFrame
+        frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
+        if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
+            frameIndex > observedKeyframes[obj.src][^1]:
+          observedKeyframes[obj.src].add frameIndex
+        foundFrame = true
+        break
+
+      if not foundFrame:
+        didDecode = false
+        av_frame_free(addr frame)
+        frame = av_frame_clone(nullFrame)
+        break
+      didDecode = true
+
+      if seekFrame.isSome:
+        let framesAvoided = frameIndex - seekFrame.get
+        debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
+        framesSaved += framesAvoided
+        seekFrame = none(int)
+
+    if didDecode:
+      # Cache the raw frame (before per-clip static rotation) so another layer
+      # sharing this (src, index) reuses it this timeline frame.
+      decodedCache[cacheKey] = av_frame_clone(frame)
+
+      var rotStatic = 0.0'f32
+      for effect in obj.effects:
+        if effect.kind == actRotate and effect.rRate == 0.0'f32:
+          rotStatic = rotDeg(effect.rStart)
+          break
+      if rotStatic != 0.0'f32:
+        let rad = rotStatic * 3.14159265358979'f32 / 180.0'f32
+        let fmtName = $AVPixelFormat(frame.format)
+        let rbufArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={fmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let rk = &"srcrot|{rad}|{bg}|{rbufArgs}"
+        if rotKey != rk:
+          if rotGraph != nil: rotGraph.cleanup()
+          rotGraph = newGraph()
+          let bsrc = rotGraph.add("buffer", rbufArgs)
+          let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
+          let bsink = rotGraph.add("buffersink")
+          rotGraph.linkNodes(@[bsrc, filt, bsink]).configure()
+          rotKey = rk
+        rotGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = rotGraph.pull()
+
+    frameIndices[obj.src] = frameIndex
+    seekThresholds[obj.src] = seekThreshold
+    seekFrames[obj.src] = seekFrame
+    return (frame, didDecode)
+
+  # Output colorspace/range for overlays, from the encoder (stable). Declaring
+  # these on the base buffer keeps the composite yuv420p (not gbrp) and makes the
+  # overlay's rgb->yuv conversion match the base instead of washing out.
+  let ovColorspace = (if encoderCtx.colorspace.int in 1 .. 15: encoderCtx.colorspace.int else: 1)
+  let ovRange = (if encoderCtx.color_range.int == 2: 2 else: 1)
+
+  proc overlayFrame(base, top: ptr AVFrame; x, y: int; scale: float32): ptr AVFrame =
+    ## Composite `top` over `base` at (x, y), preserving the overlay's alpha.
+    ## Built per call because `overlay` is a framesync filter (needs EOF on both
+    ## inputs to emit).
+    base.colorspace = cint(ovColorspace)
+    base.color_range = cint(ovRange)
+    base.pts = 0
+    top.pts = 0
+    let baseArgs = &"video_size={base.width}x{base.height}:pix_fmt={$AVPixelFormat(base.format)}:time_base={graphTb}:pixel_aspect=1/1:colorspace={ovColorspace}:range={ovRange}"
+    let topArgs = &"video_size={top.width}x{top.height}:pix_fmt={$AVPixelFormat(top.format)}:time_base={graphTb}:pixel_aspect=1/1"
+    let nw = max(2, int(top.width.float32 * scale))
+    let nh = max(2, int(top.height.float32 * scale))
+    let g = newGraph()
+    let b0 = g.add("buffer", baseArgs)
+    let b1 = g.add("buffer", topArgs)
+    let topRgba = g.add("format", "pix_fmts=rgba")
+    let scl = g.add("scale", &"{nw}:{nh}:flags=bicubic")
+    let ov = g.add("overlay", &"x={x}:y={y}:format=yuv420")
+    let sink = g.add("buffersink")
+    g.link(b1, topRgba, 0, 0)
+    g.link(topRgba, scl, 0, 0)
+    g.link(b0, ov, 0, 0)
+    g.link(scl, ov, 0, 1)
+    g.link(ov, sink, 0, 0)
+    g.configure()
+    g.pushIdx(0, base)
+    g.pushIdx(1, top)
+    g.flushIdx(0)
+    g.flushIdx(1)
+    result = g.pull()
+    g.cleanup()
+
+  proc finalizeFrame(f: ptr AVFrame; index: int64): ptr AVFrame =
+    var frame = f
+    if frame != nil and (frame.width <= 0 or frame.height <= 0):
+      debug &"Warning: Invalid frame at {index}tb, using fallback"
+      av_frame_free(addr frame)
+      frame = (if lastProcessedFrame != nil: av_frame_clone(lastProcessedFrame)
+               else: av_frame_clone(nullFrame))
+      if frame == nil:
+        error &"Failed to create fallback frame at {index}tb"
+    let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
+    if reformatted != nil and reformatted != frame:
+      av_frame_free(addr frame)
+      frame = reformatted
+    frame.pts = index
+    frame.time_base = av_inv_q(tl.tb)
+    frame.duration = 1
+    result = frame
+
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     # Process each frame in timeline order like Python version
     for index in 0 ..< tl.len:
       objList = @[]
+      # The (src, index) decode cache is only valid within one timeline frame.
+      for _, f in decodedCache:
+        var df = f
+        av_frame_free(addr df)
+      decodedCache.clear()
 
       for layer in tl.v:
         for obj in layer:
@@ -469,13 +892,73 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
             let effectGroup = tl.effects[obj.effects]
             var speed = 1.0
+            # Overlay placement comes from a `pos` action in the clip's effects
+            # (keeps Clip itself position-free); defaults to the canvas origin.
+            var ox, oy = 0'i32
+            var oscale = 1.0'f32
+            var hasPos = false
             for effect in effectGroup:
               if effect.kind in [actSpeed, actVarispeed]:
                 speed *= effect.val
+              elif effect.kind == actPos:
+                hasPos = true
+                ox = effect.px
+                oy = effect.py
+                oscale = effect.pscale
 
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
-              local: int(index - obj.start), dur: int(obj.dur))
+              local: int(index - obj.start), dur: int(obj.dur),
+              x: ox, y: oy, scale: oscale, fit: not hasPos)
+
+      # More than one active clip at this frame => composite layers (overlay /
+      # picture-in-picture / image overlays). objList is in track order, so
+      # objList[0] is the bottom (base) layer and later entries paint on top.
+      if objList.len > 1:
+        av_frame_free(addr frame)
+        var (acc, baseDidDecode) = decodeClipFrame(objList[0])
+        if baseDidDecode and (acc.width.int32, acc.height.int32) != tl.res:
+          let oldAcc = acc
+          acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg)
+          av_frame_free(addr oldAcc)
+        if acc != nil and acc.width > 0 and acc.height > 0:
+          acc = applyEffects(acc, objList[0].effects, objList[0].local, objList[0].dur)
+
+        for k in 1 ..< objList.len:
+          let o = objList[k]
+          var (top, _) = decodeClipFrame(o)
+          if top == nil or top.width <= 0 or top.height <= 0:
+            if top != nil: av_frame_free(addr top)
+            continue
+          # Effects run at native size; overlayFrame scales (in full chroma).
+          top = applyEffects(top, o.effects, o.local, o.dur)
+          # No explicit `pos`: fit the overlay to the canvas and center it, like
+          # the base layer (scaleWithPad), but let the padding stay transparent
+          # so only the image shows over the base.
+          var ox = o.x.int
+          var oy = o.y.int
+          var oscale = o.scale
+          if o.fit:
+            oscale = min(acc.width.float32 / top.width.float32,
+                         acc.height.float32 / top.height.float32)
+            ox = (acc.width - int(top.width.float32 * oscale)) div 2
+            oy = (acc.height - int(top.height.float32 * oscale)) div 2
+          let newAcc = overlayFrame(acc, top, ox, oy, oscale)
+          av_frame_free(addr acc)
+          av_frame_free(addr top)
+          acc = newAcc
+
+        if scaleGraph != nil and acc.width != targetWidth:
+          scaleGraph.push(acc)
+          av_frame_free(addr acc)
+          acc = scaleGraph.pull()
+
+        frame = finalizeFrame(acc, index)
+        av_frame_free(addr lastProcessedFrame)
+        lastProcessedFrame = av_frame_clone(frame)
+        lastFrameIndex = -1  # compositing bypasses the single-layer reuse cache
+        yield (frame, index)
+        continue
 
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
@@ -604,245 +1087,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         frame = scaleGraph.pull()
 
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
-        let local = objList[0].local
-        let clipDur = objList[0].dur
-        let fps = tl.tb.float
-        # Eased progress in [0, 1] for an animated action, using its own packed
-        # easing curve + duration (defaults to linear over the whole clip).
-        template prog(e: Action): float32 =
-          applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
+        frame = applyEffects(frame, objList[0].effects, objList[0].local, objList[0].dur)
 
-        for effect in objList[0].effects:
-          case effect.kind:
-          of actSpeed, actVarispeed, actVolume, actDeesser: discard
-          of actRotate:
-            let rate = effect.rRate
-            if rate == 0.0'f32:
-              continue
-
-            let startDeg = rotDeg(effect.rStart)
-            frame.pts = local.int64
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"rotate|{startDeg}|{rate}|{bg}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add("rotate", &"a=({startDeg}+({rate})*t)*PI/180:c={bg}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actZoom:
-            let z = sampleKf(effect.kf, prog(effect))
-            if z == 1.0:
-              continue
-            let origW = frame.width
-            let origH = frame.height
-            let scaledW = max(cint(float(origW) * z), 2)
-            let scaledH = max(cint(float(origH) * z), 2)
-            let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
-            if scaledFrame != frame:
-              av_frame_free(addr frame)
-              frame = scaledFrame
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let zoomMode = if z > 1.0: "crop" else: "pad"
-            let key = &"zoom|{zoomMode}|{origW}x{origH}|{bg}|{zoomBufArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", zoomBufArgs)
-              let mid = if z > 1.0:
-                  fxGraph.add("crop", &"{origW}:{origH}")
-                else:
-                  fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actHflip, actVflip, actInvert:
-            let filterName = case effect.kind
-              of actHflip: "hflip"
-              of actVflip: "vflip"
-              else: "negate"
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = filterName & "|" & bufferArgs
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add(filterName)
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actBlur:
-            let sigma = sampleKf(effect.kf, prog(effect))
-            if sigma <= 0.0:
-              continue
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"blur|{sigma}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add("gblur", &"sigma={sigma}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actBrightness:
-            let b = sampleKf(effect.kf, prog(effect))
-            if b == 0.0'f32:
-              continue
-            let shift = b * 255.0'f32
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"brightness|{shift}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-              let lut = fxGraph.add("lutrgb",
-                &"r=val+{shift}:g=val+{shift}:b=val+{shift}")
-              let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actLuv:
-            if (effect.brighthue == luvBrighthueId and
-                effect.contrast == luvContrastId and
-                effect.saturation == luvSaturationId):
-              continue
-
-            let b = effect.brighthue
-            let c = effect.contrast
-            let s = effect.saturation
-            let bShift = b * 255.0
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"bcs|{b}|{c}|{s}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
-              let lut = fxGraph.add("lutyuv",
-                &"y=(val-128)*{c}+128+{bShift}:u=(val-128)*{s}+128:v=(val-128)*{s}+128")
-              let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actOpacity:
-            let o = sampleKf(effect.kf, prog(effect))
-            if o >= 1.0'f32:
-              continue
-            let bgR = (1.0'f32 - o) * float32(tl.bg.red)
-            let bgG = (1.0'f32 - o) * float32(tl.bg.green)
-            let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"opacity|{o}|{bg}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-              let lut = fxGraph.add("lutrgb",
-                &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
-              let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actLens:
-            let k1 = effect.k1
-            let k2 = effect.k2
-            if k1 == 0.0'f32 and k2 == 0.0'f32:
-              continue
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"lens|{k1}|{k2}|{bg}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-          of actDrawbox:
-            let col = effect.dbColor.toString
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let key = &"drawbox|{effect.dbX}|{effect.dbY}|{effect.dbW}|{effect.dbH}|{col}|{bufferArgs}"
-            if fxKey != key:
-              if fxGraph != nil:
-                fxGraph.cleanup()
-              fxGraph = newGraph()
-              let bufferSrc = fxGraph.add("buffer", bufferArgs)
-              let filt = fxGraph.add("drawbox",
-                &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}:color={col}:t=fill")
-              let bufferSink = fxGraph.add("buffersink")
-              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-              fxKey = key
-            fxGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = fxGraph.pull()
-
-      # Validate frame before reformatting
-      if frame != nil and (frame.width <= 0 or frame.height <= 0):
-        debug &"Warning: Invalid frame at {index}tb, using fallback"
-        av_frame_free(addr frame)
-        if lastProcessedFrame != nil:
-          frame = av_frame_clone(lastProcessedFrame)
-          if frame == nil:
-            frame = av_frame_clone(nullFrame)
-        else:
-          frame = av_frame_clone(nullFrame)
-        if frame == nil:
-          error &"Failed to create fallback frame at {index}tb"
-
-      let reformattedFrame = frame.reformat(pix_fmt, ctx = reformatCtx)
-      if reformattedFrame != nil and reformattedFrame != frame:
-        av_frame_free(addr frame)
-        frame = reformattedFrame
-
-      frame.pts = index.int64
-      frame.time_base = av_inv_q(tl.tb)
-      frame.duration = 1
+      frame = finalizeFrame(frame, index)
 
       # Update cache for frame reuse BEFORE yielding (which will unref the frame)
       if objList.len > 0:
@@ -861,6 +1108,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     sws_free_context(addr reformatCtx)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
+    for src, f in stillCache:
+      var sf = f
+      av_frame_free(addr sf)
+    for _, f in decodedCache:
+      var df = f
+      av_frame_free(addr df)
     for src, decoder in decoders:
       var p = decoder
       avcodec_free_context(addr p)

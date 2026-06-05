@@ -231,6 +231,12 @@ let x265 = Package(
   buildSystem: "x265",
   ffFlag: "--enable-libx265"
 )
+let zlib = Package(
+  name: "zlib",
+  sourceUrl: "https://zlib.net/zlib-1.3.2.tar.gz",
+  sha256: "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+  ffFlag: "--enable-zlib",
+)
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz",
@@ -250,7 +256,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add libvpl
   if enableWhisper:
     result.add whisper
-  result &= [lame, opus, dav1d, x264]
+  result &= [lame, opus, dav1d, x264, zlib]
   if not disableVpx:
     result.add vpx
   if not disableSvtAv1:
@@ -792,9 +798,9 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
-  let enableDemuxers = enableMuxers & @["mpegts"]
+  let enableDemuxers = enableMuxers & @["image2", "png_pipe", "mpegts"]
 
-  var filters = "aformat,abuffer,abuffersink,aresample,asetrate,atempo,anull,anullsrc,crop,drawbox,deesser,format,gblur,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,negate,pad,rotate,scale,vflip,volume".split(",")
+  var filters = "aformat,abuffer,abuffersink,aresample,asetrate,atempo,anull,anullsrc,crop,drawbox,deesser,format,gblur,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,negate,overlay,pad,rotate,scale,vflip,volume".split(",")
 
   for package in packages:
     if package.name == "libvpx":
@@ -873,7 +879,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, libvpl, whisper, lame, opus, dav1d, x264, vpx, svtav1, x265]
+  let allPackages = @[ffmpeg, nvheaders, libvpl, whisper, lame, opus, dav1d, x264, zlib, vpx, svtav1, x265]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

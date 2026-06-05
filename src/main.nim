@@ -269,6 +269,42 @@ proc parseActions(val: string): Actions =
   except ActionParseError as e:
     error e.msg
 
+proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): string =
+  ## Pull `add:` tokens out of an action value and record them on `args.adds`;
+  ## return the remaining action string (atf-8 effects). `add` is a virtual
+  ## action, so it is removed before the rest is parsed. It is a single
+  ## comma-field (colon-separated), so other actions can still be chained with
+  ## commas. Forms: `add:path` (origin, native size) or `add:path:x:y:scale`
+  ## (placed via a `pos` action). The last three colon fields are x, y, scale;
+  ## the path is the rest joined with ':' (so Windows paths with a colon work).
+  var keep: seq[string]
+  for field in val.split(","):
+    let f = field.strip()
+    if f.startsWith("add:"):
+      let segs = f.split(":")
+      var spec = AddSpec(selector: selector, setActionRef: setActionRef, scale: 1.0'f32)
+      if segs.len >= 5:
+        spec.hasPos = true
+        spec.path = segs[1 ..< segs.len - 3].join(":")
+        try:
+          spec.x = int32(parseInt(segs[^3].strip()))
+          spec.y = int32(parseInt(segs[^2].strip()))
+          spec.scale = parseFloat(segs[^1].strip()).float32
+        except ValueError:
+          error "add: x and y must be integers and scale a number"
+        if spec.scale <= 0.0'f32:
+          error "add: scale must be greater than 0.0"
+      elif segs.len == 2:
+        spec.path = segs[1]
+      else:
+        error "add: expected add:path or add:path:x:y:scale"
+      if spec.path.len == 0:
+        error "add: missing path"
+      args.adds.add spec
+    else:
+      keep.add field
+  keep.join(",")
+
 proc parseSpeed(val, opt: string): float64 =
   result = parseNum(val, opt)
   if result <= 0.0 or result > 99999.0:
@@ -290,14 +326,18 @@ proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   let action = actionFromUserSpeed(speed)
   return (action, parseTime(vals[1]), parseTime(vals[2]))
 
-proc parseActionAndRange(val: string): (Actions, PackedInt, PackedInt) =
+proc parseActionAndRange(val: string, args: var mainArgs): (Actions, PackedInt, PackedInt) =
   let parts = val.strip().split(",")
   if parts.len < 3:
     error "--set-action has too few arguments"
   let actionStr = parts[0 ..< parts.len - 2].join(",")
   let startTime = parseTime(parts[^2])
   let endTime = parseTime(parts[^1])
-  return (parseActions(actionStr), startTime, endTime)
+  # `add` works here too: link it to this set-action's range (its index is the
+  # length now, since the caller appends the returned tuple next).
+  let rest = extractAdds(actionStr, -1, args.setAction.len, args).strip()
+  let acts = (if rest == "": aNil else: parseActions(rest))
+  return (acts, startTime, endTime)
 
 proc main() =
   if paramCount() < 1:
@@ -336,9 +376,13 @@ judge making cuts.
     of "output":
       args.output = key
     of "when-silent":
-      args.whenSilent = parseActions(key)
+      let rest = extractAdds(key, 0, -1, args)
+      if rest.strip() != "":
+        args.whenSilent = parseActions(rest)
     of "when-normal":
-      args.whenNormal = parseActions(key)
+      let rest = extractAdds(key, 1, -1, args)
+      if rest.strip() != "":
+        args.whenNormal = parseActions(rest)
     of "silent-speed":
       args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
     of "video-speed":
@@ -354,7 +398,7 @@ judge making cuts.
     of "set-speed":
       args.setAction.add parseSpeedRange(key)
     of "set-action":
-      args.setAction.add parseActionAndRange(key)
+      args.setAction.add parseActionAndRange(key, args)
     of "yt-dlp-location":
       args.ytDlpLocation = key
     of "output-format":

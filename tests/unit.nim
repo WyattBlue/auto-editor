@@ -1,9 +1,11 @@
 import unittest
-import std/[os, tempfiles]
+import std/[os, tempfiles, json]
 
-import ../src/[action, av, conductor, edit, ffmpeg, media, timeline, wavutil]
+import ../src/[action, av, conductor, edit, ffmpeg, log, media, timeline, wavutil]
 import ../src/util/[color, fun, lang, rational]
 import ../src/exports/[kdenlive, fcp11]
+import ../src/imports/json as jsonImport
+import ../src/exports/json as jsonExport
 import ../src/vendor/tinyre/tinyre
 
 test "avrational":
@@ -94,6 +96,30 @@ test "exports":
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere",
       "Hello \\ World", "11"))
 
+test "v3-overlay-roundtrip":
+  # Overlay placement is a `pos` action carried in a clip's effects, so it
+  # round-trips through the normal effects array of the v3 JSON.
+  var interner: StringInterner
+  let tlStr = """{"version":"3","timebase":"30/1","background":"#000000",
+    "resolution":[1280,720],"samplerate":48000,"layout":"stereo","langs":["eng"],
+    "v":[[{"name":"video","src":"a.mp4","start":0,"dur":60,"offset":0,"stream":0}],
+    [{"name":"video","src":"a.mp4","start":0,"dur":60,"offset":0,"stream":0,
+    "effects":["pos:900:60:0.25"]}]],"a":[]}"""
+  let tl = jsonImport.readJson(tlStr, interner)
+  check tl.v.len == 2
+  block:
+    let p = tl.effects[tl.v[1][0].effects]
+    var found: Action
+    for a in p:
+      if a.kind == actPos: found = a
+    check found.kind == actPos
+    check (found.px, found.py) == (900'i32, 60'i32)
+    check abs(found.pscale - 0.25'f32) < 0.001'f32
+  let node = jsonExport.`%`(tl)
+  check node["v"][1][0]["effects"][0].getStr == "pos:900:60:0.25"
+  check not node["v"][0][0].hasKey("effects")   # base clip has no effects
+  interner.cleanup()
+
 test "actions":
   proc acts(s: string): seq[Action] =
     for a in parseActions(s): result.add a
@@ -134,6 +160,17 @@ test "actions":
   expect ActionParseError: discard parseActions("drawbox:1:2:3:4")
   expect ActionParseError: discard parseActions("drawbox:1:2:0:4:red")
   expect ActionParseError: discard parseActions("drawbox:1:2:3:4:notacolor")
+
+  # pos: overlay placement, scale optional and defaulting to 1.0.
+  check $parseActions("pos:600:300:0.5") == "pos:600:300:0.5"
+  check $parseActions("pos:10:20") == "pos:10:20:1.0"
+  block:
+    let p = acts("pos:600:300:0.5")[0]
+    check p.kind == actPos
+    check (p.px, p.py) == (600'i32, 300'i32)
+    check abs(p.pscale - 0.5'f32) < 0.001'f32
+  expect ActionParseError: discard parseActions("pos:600")
+  expect ActionParseError: discard parseActions("pos:1:2:0")
 
   # Easing packs into the action itself (no separate ease entry).
   block:

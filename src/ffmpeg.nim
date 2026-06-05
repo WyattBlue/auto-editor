@@ -144,6 +144,7 @@ type
     sample_aspect_ratio*: AVRational
     metadata*: ptr AVDictionary
     avg_frame_rate*: AVRational
+    nb_frames*: int64
     attached_pic*: AVPacket
     disposition*: cint
     discardLevel* {.importc: "discard".}: AVDiscard

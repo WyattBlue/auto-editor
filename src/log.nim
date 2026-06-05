@@ -41,6 +41,20 @@ type
     of nkPeak:
       t*: float32    # -99.0 to 0.0, default -8.0
 
+type AddSpec* = object
+  ## A "virtual" `add:` action: overlay an image/video onto the sections whose
+  ## effects index matches `selector`. It does not become an atf-8 effect;
+  ## conductor injects it as an overlay layer in the timeline. For `--when-*`,
+  ## `selector` is the section's index (0 = silent, 1 = normal). For
+  ## `--set-action`, `setActionRef` is the index into `setAction` and conductor
+  ## fills in `selector` with the unique effects index assigned to that range.
+  selector*: int
+  setActionRef*: int = -1
+  path*: string
+  hasPos*: bool        # whether x/y/scale were given (else origin, native size)
+  x*, y*: int32
+  scale*: float32
+
 type mainArgs* = object
   inputs*: seq[string]
 
@@ -53,6 +67,7 @@ type mainArgs* = object
   `export`*: string = ""
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
+  adds*: seq[AddSpec]   # `add:` overlays (see AddSpec)
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"
