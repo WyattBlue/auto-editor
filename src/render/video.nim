@@ -467,6 +467,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var lastFrameIndex = -1
   var observedKeyframes = initTable[ptr string, seq[int]]()
   var lastSeekTarget = initTable[ptr string, int]()
+  # Last requested source index and last held (decoded) frame per source, used to
+  # reuse a frame across timeline frames when a forward request lands on a frame
+  # the (VFR-overshooting) decoder already produced. See decodeClipFrame.
+  var lastReqIndex = initTable[ptr string, int]()
+  var heldFrames = initTable[ptr string, ptr AVFrame]()
+  # For sources carrying a `loop` action: total source frames consumed by fully
+  # played-out loops so far. The local decode target is obj.index - loopBase.
+  var loopBaseTbl = initTable[ptr string, int]()
   let isNonlinear = tl.isNonlinear
 
   debug &"isNonlinear: {isNonlinear}"
@@ -477,6 +485,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     observedKeyframes[src] = @[0]
     lastSeekTarget[src] = -1 # -1 means no seek has been performed yet
     frameIndices[src] = -1
+    lastReqIndex[src] = -1
+    loopBaseTbl[src] = 0
     # First few frames can have an abnormal keyframe count, so never seek there.
     seekThresholds[src] = 10
     seekFrames[src] = none(int)
@@ -516,9 +526,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     for effect in effects:
       case effect.kind:
-      # actRotate (static) is applied at decode time (it expands the canvas);
-      # nothing to do here.
-      of actSpeed, actVarispeed, actVolume, actDeesser, actPos, actRotate: discard
+      of actSpeed, actVarispeed, actVolume, actDeesser, actPos, actRotate, actLoop: discard
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
@@ -743,6 +751,25 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         fxGraph.push(frame)
         av_frame_free(addr frame)
         frame = fxGraph.pull()
+      of actColorKey:
+        if not isOverlay:
+          continue
+        let col = effect.color.toString
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"colorkey|{col}|{effect.similar}|{effect.blend}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+          let clrkey = fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, clrkey, bufferSink]).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
     return frame
 
   proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
@@ -769,39 +796,58 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let cacheKey = (obj.src, obj.index)
     if cacheKey in decodedCache:
       # Another layer at this same timeline frame already decoded this exact
-      # source frame; reuse it rather than re-advance the shared per-source
-      # decoder (which, already at obj.index, would otherwise decode nothing).
+      # source frame. Reuse it.
       return (av_frame_clone(decodedCache[cacheKey]), true)
+
+    # `loop` makes the source restart when it runs out: requests past the source
+    # end map back to its start. `loopBase` is the frames consumed by completed
+    # loops, so the local decode `target` (and the decoder's frameIndex) stay in
+    # one loop's coordinate space while obj.index keeps climbing.
+    var looping = false
+    for e in obj.effects:
+      if e.kind == actLoop:
+        looping = true
+        break
+    var loopBase = loopBaseTbl[obj.src]
+    var target = obj.index - loopBase
+    if isNonlinear and target < 0:
+      loopBase = 0
+      target = obj.index
+
+    if obj.index >= lastReqIndex[obj.src] and obj.index <= loopBase + frameIndices[obj.src] and
+        obj.src in heldFrames:
+      lastReqIndex[obj.src] = obj.index
+      return (av_frame_clone(heldFrames[obj.src]), true)
 
     var frame = av_frame_clone(nullFrame)
     var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
     var frameIndex = frameIndices[obj.src]
     var seekThreshold = seekThresholds[obj.src]
     var seekFrame = seekFrames[obj.src]
-    if frameIndex > obj.index:
-      let seekTarget = findBestKeyframe(obj.src, obj.index)
-      if seekTarget < 0 or seekTarget > obj.index:
+    if frameIndex > target:
+      let seekTarget = findBestKeyframe(obj.src, target)
+      if seekTarget < 0 or seekTarget > target:
         let kfIndex = keyframeIndices[obj.src]
         let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
-        error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, seekTarget: {seekTarget}, {indexInfo})"
+        error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       if lastSeekTarget[obj.src] != seekTarget:
-        debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {obj.index})"
+        debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
         myCache.cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
         avcodec_flush_buffers(decoders[obj.src])
         lastSeekTarget[obj.src] = seekTarget
-      frameIndex = min(seekTarget, obj.index - 1)
+      frameIndex = min(seekTarget, target - 1)
 
     let srcTb = myStream.avg_frame_rate
     var didDecode = false
-    while frameIndex < obj.index:
-      if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
-        if lastSeekTarget[obj.src] != obj.index:
+    while frameIndex < target:
+      if target - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
+        if lastSeekTarget[obj.src] != target:
           seekThreshold = frameIndex + (keyframeIndices[obj.src].avgInterval div 2)
           seekFrame = some(frameIndex)
-          debug &"Seek: {frameIndex} -> {obj.index}"
-          myCache.cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
+          debug &"Seek: {frameIndex} -> {target}"
+          myCache.cns[obj.src].seek(target * tous[obj.src], stream = myStream)
           avcodec_flush_buffers(decoders[obj.src])
-          lastSeekTarget[obj.src] = obj.index
+          lastSeekTarget[obj.src] = target
 
       let decoder: ptr AVCodecContext = decoders[obj.src]
       var foundFrame = false
@@ -815,10 +861,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         break
 
       if not foundFrame:
+        if looping and frameIndex >= 0:
+          loopBase += frameIndex + 1
+          target = obj.index - loopBase
+          myCache.cns[obj.src].seek(0, stream = myStream)
+          avcodec_flush_buffers(decoders[obj.src])
+          lastSeekTarget[obj.src] = -1
+          frameIndex = -1
+          continue
+
         didDecode = false
         av_frame_free(addr frame)
         frame = av_frame_clone(nullFrame)
         break
+
       didDecode = true
 
       if seekFrame.isSome:
@@ -857,6 +913,16 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     frameIndices[obj.src] = frameIndex
     seekThresholds[obj.src] = seekThreshold
     seekFrames[obj.src] = seekFrame
+    loopBaseTbl[obj.src] = loopBase
+    lastReqIndex[obj.src] = obj.index
+    if didDecode:
+      # Hold the final (post-rotation) frame so a later monotonic-forward request
+      # that the overshooting decoder has already passed can reuse it (see the
+      # reuse check at the top) instead of seeking backward.
+      if obj.src in heldFrames:
+        var old = heldFrames[obj.src]
+        av_frame_free(addr old)
+      heldFrames[obj.src] = av_frame_clone(frame)
     return (frame, didDecode)
 
   # Output colorspace/range for overlays, from the encoder (stable). Declaring
@@ -972,8 +1038,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
         for k in 1 ..< objList.len:
           let o = objList[k]
-          var (top, _) = decodeClipFrame(o)
-          if top == nil or top.width <= 0 or top.height <= 0:
+          var (top, topDidDecode) = decodeClipFrame(o)
+          # The overlay has no frame for this timeline position (its source ended,
+          # or hasn't started): leave the base untouched so it shows through,
+          # rather than compositing an opaque bg-filled fallback over it.
+          if not topDidDecode or top == nil or top.width <= 0 or top.height <= 0:
             if top != nil: av_frame_free(addr top)
             continue
           # Effects run at native size; overlayFrame scales (in full chroma).
@@ -1018,114 +1087,28 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           frame = av_frame_clone(nullFrame)
 
       for obj in objList:
-        # Check if we can reuse the last processed frame
+        # Reuse the fully-processed frame from the previous timeline iteration
+        # when this frame maps to the same source frame.
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
           av_frame_free(addr frame)
           frame = av_frame_clone(lastProcessedFrame)
           continue
 
-        var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
-        var frameIndex = frameIndices[obj.src]
-        var seekThreshold = seekThresholds[obj.src]
-        var seekFrame = seekFrames[obj.src]
-        if frameIndex > obj.index:
-          let seekTarget = findBestKeyframe(obj.src, obj.index)
-
-          if seekTarget < 0 or seekTarget > obj.index:
-            let kfIndex = keyframeIndices[obj.src]
-            let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
-            error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, seekTarget: {seekTarget}, {indexInfo})"
-
-          if lastSeekTarget[obj.src] != seekTarget:
-            debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {obj.index})"
-            myCache.cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
-            avcodec_flush_buffers(decoders[obj.src])
-            lastSeekTarget[obj.src] = seekTarget
-          # Use min to ensure the decode loop runs even when seekTarget == obj.index
-          frameIndex = min(seekTarget, obj.index - 1)
-
-        # obj.index is already in source frame coordinates, no conversion needed
-        let srcTb = myStream.avg_frame_rate
-
-        var didDecode = false
-        while frameIndex < obj.index:
-          # Check if skipping ahead is worth it
-          if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
-            if lastSeekTarget[obj.src] != obj.index:
-              seekThreshold = frameIndex + (keyframeIndices[obj.src].avgInterval div 2)
-              seekFrame = some(frameIndex)
-
-              debug &"Seek: {frameIndex} -> {obj.index}"
-              myCache.cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
-              avcodec_flush_buffers(decoders[obj.src])
-              lastSeekTarget[obj.src] = obj.index
-
-          let decoder: ptr AVCodecContext = decoders[obj.src]
-          var foundFrame = false
-          for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
-            frame = decodedFrame
-            frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
-
-            # Record keyframes as they are decoded so backward seeks can land
-            # close to their target. Frames arrive in display order, so a
-            # strictly-greater check keeps the list sorted and de-duplicated
-            # (keyframes are re-seen when decoding resumes after a seek).
-            if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
-                frameIndex > observedKeyframes[obj.src][^1]:
-              observedKeyframes[obj.src].add frameIndex
-
-            foundFrame = true
-            break
-
-          if not foundFrame:
-            didDecode = false
-            av_frame_free(addr frame)
-            frame = av_frame_clone(nullFrame)
-            break
-          didDecode = true
-
-          if seekFrame.isSome:
-            let framesAvoided = frameIndex - seekFrame.get
-            debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
-            framesSaved += framesAvoided
-            seekFrame = none(int)
-
-        # Apply static rotation
+        var (decoded, didDecode) = decodeClipFrame(obj)
         if didDecode:
-          var rotStatic = 0.0'f32
-          for effect in objList[0].effects:
-            if effect.kind == actRotate:
-              rotStatic = rotDeg(effect.rStart)
-              break
-          if rotStatic != 0.0'f32:
-            let rad = rotStatic * 3.14159265358979'f32 / 180.0'f32
-            let fmtName = $AVPixelFormat(frame.format)
-            let rbufArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={fmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let rk = &"srcrot|{rad}|{bg}|{rbufArgs}"
-            if rotKey != rk:
-              if rotGraph != nil: rotGraph.cleanup()
-              rotGraph = newGraph()
-              let bsrc = rotGraph.add("buffer", rbufArgs)
-              let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
-              let bsink = rotGraph.add("buffersink")
-              rotGraph.linkNodes(@[bsrc, filt, bsink]).configure()
-              rotKey = rk
-            rotGraph.push(frame)
-            av_frame_free(addr frame)
-            frame = rotGraph.pull()
-
-        # Scale only the final decoded frame to tl.res. Intermediate frames
-        # decoded just to advance frameIndex are fed back into flushDecode
-        # unscaled, so the resize costs one sws_scale instead of one per frame.
-        if didDecode and (frame.width.int32, frame.height.int32) != tl.res:
-          let oldFrame = frame
-          frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
-          av_frame_free(addr oldFrame)
-
-        # Persist this source's decode position and seek state for next time.
-        frameIndices[obj.src] = frameIndex
-        seekThresholds[obj.src] = seekThreshold
-        seekFrames[obj.src] = seekFrame
+          av_frame_free(addr frame)
+          frame = decoded
+          # decodeClipFrame returns native resolution; scale the final frame to
+          # the canvas (intermediate seek frames never reach here, so the resize
+          # costs one sws_scale rather than one per decoded frame).
+          if (frame.width.int32, frame.height.int32) != tl.res:
+            let oldFrame = frame
+            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
+            av_frame_free(addr oldFrame)
+        else:
+          # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or
+          # the last frame for RGB8 palette persistence) and drop the fallback.
+          av_frame_free(addr decoded)
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
@@ -1160,6 +1143,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     for _, f in decodedCache:
       var df = f
       av_frame_free(addr df)
+    for _, f in heldFrames:
+      var hf = f
+      av_frame_free(addr hf)
     for src, decoder in decoders:
       var p = decoder
       avcodec_free_context(addr p)
