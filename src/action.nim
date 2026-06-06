@@ -9,7 +9,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
     actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actDrawbox, actPos, actSpin
+    actDrawbox, actPos, actSpin, actColorKey, actLoop
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -24,7 +24,7 @@ type
   # section) plus an optional easing curve + duration packed inline.
   Action* = object
     case kind*: ActionKind
-    of actInvert, actHflip, actVflip:
+    of actInvert, actHflip, actVflip, actLoop:
       discard
     of actRotate:
       rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
@@ -53,6 +53,9 @@ type
     of actPos:
       px*, py*: int32        # overlay top-left in canvas pixels
       pscale*: float32       # overlay size multiplier (1.0 = native)
+    of actColorKey:
+      color*: RGBColor
+      similar*, blend*: Unorm16
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -143,6 +146,9 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
+  ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "", range: rng(0.0, 1.0), help: ""),
+  ActionDef(name: "loop", flags: {afVideo},
+    help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
 ]
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
@@ -216,7 +222,7 @@ proc parseKeyframes(spec: string): seq[float32] {.raises: [ActionParseError].} =
     try:
       result.add parseFloat(part).float32
     except ValueError:
-      raise newException(ActionParseError, "Invalid float value")
+      raise newException(ActionParseError, "Invalid float value:" & part)
 
 func sampleKf*(kf: seq[float32], p: float32): float32 =
   ## Piecewise-linear sample of keyframes at progress p in [0, 1].
@@ -242,6 +248,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actHflip)
   if val == "vflip":
     return Action(kind: actVflip)
+  if val == "loop":
+    return Action(kind: actLoop)
 
   let parts = val.split(":")
 
@@ -253,11 +261,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         try:
           toUnorm16(parseFloat(parts[idx]).float32)
         except ValueError:
-          raise newException(ActionParseError, "Invalid float value")
+          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
       )
-    return Action(kind: actDeesser,
-      intensity: vals[0], maxd: vals[1], freq: vals[2]
-    )
+    return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
 
   # lens takes positional args: [k1[:k2]]
   if parts[0] == "lens" and parts.len <= 3:
@@ -270,7 +276,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         try:
           parseFloat(parts[idx]).float32
         except ValueError:
-          raise newException(ActionParseError, "Invalid float value")
+          raise newException(ActionParseError, "Invalid float value: " & parts[idx])
       )
     for v in k:
       if v < -1.0 or v > 1.0:
@@ -285,7 +291,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     try:
       return Action(kind: actRotate, rStart: Unorm16(rotCode(parseFloat(parts[1]).float32)))
     except ValueError:
-      raise newException(ActionParseError, "Invalid float value")
+      raise newException(ActionParseError, "Invalid float value:" & parts[1])
 
   # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
   # `rate` degrees/second.
@@ -321,6 +327,28 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     )
     return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
       dbW: coords[2], dbH: coords[3], dbColor: col)
+
+  if parts[0] == "colorkey":
+    if parts.len < 2 or parts.len > 4:
+      raise newException(ActionParseError, "colorkey requires color[:similar:blend]")
+    let col = (
+      try:
+        parseColor(parts[1])
+      except ValueError:
+        raise newException(ActionParseError, "Invalid color: " & parts[1])
+    )
+    var vals = [toUnorm16(0.01'f32), toUnorm16(0.0'f32)]
+    for idx in 2 ..< parts.len:
+      vals[idx - 2] = (
+        try:
+          toUnorm16(parseFloat(parts[idx]).float32)
+        except ValueError:
+          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
+      )
+    if vals[0] < toUnorm16(0.01'f32):
+      vals[0] = toUnorm16(0.01'f32)
+
+    return Action(kind: actColorKey, color: col, similar: vals[0], blend: vals[1])
 
   # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
   if parts[0] == "pos" and parts.len in {3, 4}:
@@ -384,7 +412,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       try:
         parseFloat(parts[1]).float32
       except ValueError:
-        raise newException(ActionParseError, "Invalid float value")
+        raise newException(ActionParseError, "Invalid float value: " & parts[1])
     )
     case effectType
     of "speed": return Action(kind: actSpeed, val: effectVal)
@@ -432,6 +460,7 @@ when not defined(nimscript):
     of actInvert: "invert"
     of actHflip: "hflip"
     of actVflip: "vflip"
+    of actLoop: "loop"
     of actSpeed: "speed:" & $act.val
     of actVarispeed: "varispeed:" & $act.val
     of actVolume: "volume:" & $act.val
@@ -457,15 +486,17 @@ when not defined(nimscript):
       "drawbox:" & $act.dbX & ":" & $act.dbY & ":" & $act.dbW & ":" &
         $act.dbH & ":" & act.dbColor.toString
     of actPos: "pos:" & $act.px & ":" & $act.py & ":" & $act.pscale
+    of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
   func actionByteSize(a: Action): int =
     case a.kind
-    of actInvert, actHflip, actVflip: 1
+    of actInvert, actHflip, actVflip, actLoop: 1
     of actRotate: 3
     of actLens, actSpeed, actVarispeed, actVolume: 5
     of actDeesser, actSpin: 7
+    of actColorKey: 8
     of actLuv: 11
     of actPos: 13
     of actDrawbox: 20
@@ -484,14 +515,72 @@ when not defined(nimscript):
       while i < n:
         let kind = ActionKind((base[i] and 0x7f'u8).int)
         case kind
-        of actInvert, actHflip, actVflip:
+        of actInvert, actHflip, actVflip, actLoop:
           yield Action(kind: kind)
           i += 1
+        of actRotate:
+          var st: Unorm16
+          copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
+          yield Action(kind: actRotate, rStart: st)
+          i += 3
+        of actLens:
+          var k1v, k2v: Snorm16
+          copyMem(addr k1v, addr base[i + 1], sizeof(Snorm16))
+          copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
+          yield Action(kind: actLens, k1: k1v, k2: k2v)
+          i += 5
         of actSpeed, actVarispeed, actVolume:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
           i += 5
+        of actDeesser:
+          var iu, mu, fu: Unorm16
+          copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
+          copyMem(addr mu, addr base[i + 3], sizeof(Unorm16))
+          copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
+          yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
+          i += 7
+        of actSpin:
+          var st: Unorm16
+          var rate: float32
+          copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
+          copyMem(addr rate, addr base[i + 3], sizeof(float32))
+          yield Action(kind: actSpin, sStart: st, sRate: rate)
+          i += 7
+        of actColorKey:
+          var col: RGBColor
+          var sim, blend: Unorm16
+          copyMem(addr col, addr base[i + 1], sizeof(RGBColor))
+          copyMem(addr sim, addr base[i + 4], sizeof(Unorm16))
+          copyMem(addr blend, addr base[i + 6], sizeof(Unorm16))
+          yield Action(kind: actColorKey, color: col, similar: sim, blend: blend)
+          i += 8
+        of actLuv:
+          var bh: Snorm16
+          var c, s: float32
+          copyMem(addr bh, addr base[i + 1], sizeof(Snorm16))
+          copyMem(addr c, addr base[i + 3], sizeof(float32))
+          copyMem(addr s, addr base[i + 7], sizeof(float32))
+          yield Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
+          i += 11
+        of actPos:
+          var x, y: int32
+          var sc: float32
+          copyMem(addr x, addr base[i + 1], sizeof(int32))
+          copyMem(addr y, addr base[i + 5], sizeof(int32))
+          copyMem(addr sc, addr base[i + 9], sizeof(float32))
+          yield Action(kind: actPos, px: x, py: y, pscale: sc)
+          i += 13
+        of actDrawbox:
+          var x, y, w, h: int32
+          copyMem(addr x, addr base[i + 1], sizeof(int32))
+          copyMem(addr y, addr base[i + 5], sizeof(int32))
+          copyMem(addr w, addr base[i + 9], sizeof(int32))
+          copyMem(addr h, addr base[i + 13], sizeof(int32))
+          let col = RGBColor(red: base[i + 17], green: base[i + 18], blue: base[i + 19])
+          yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h, dbColor: col)
+          i += 20
         of actZoom, actBlur, actOpacity, actBrightness:
           let hasEase = (base[i] and easeFlag) != 0'u8
           var pos = i + 1
@@ -523,58 +612,6 @@ when not defined(nimscript):
               pos += 2
           yield act
           i = pos
-        of actRotate:
-          var st: Unorm16
-          copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
-          yield Action(kind: actRotate, rStart: st)
-          i += 3
-        of actSpin:
-          var st: Unorm16
-          var rate: float32
-          copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
-          copyMem(addr rate, addr base[i + 3], sizeof(float32))
-          yield Action(kind: actSpin, sStart: st, sRate: rate)
-          i += 7
-        of actDeesser:
-          var iu, mu, fu: Unorm16
-          copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
-          copyMem(addr mu, addr base[i + 3], sizeof(Unorm16))
-          copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
-          yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
-          i += 7
-        of actLuv:
-          var bh: Snorm16
-          var c, s: float32
-          copyMem(addr bh, addr base[i + 1], sizeof(Snorm16))
-          copyMem(addr c, addr base[i + 3], sizeof(float32))
-          copyMem(addr s, addr base[i + 7], sizeof(float32))
-          yield Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
-          i += 11
-        of actLens:
-          var k1v, k2v: Snorm16
-          copyMem(addr k1v, addr base[i + 1], sizeof(Snorm16))
-          copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
-          yield Action(kind: actLens, k1: k1v, k2: k2v)
-          i += 5
-        of actDrawbox:
-          var x, y, w, h: int32
-          copyMem(addr x, addr base[i + 1], sizeof(int32))
-          copyMem(addr y, addr base[i + 5], sizeof(int32))
-          copyMem(addr w, addr base[i + 9], sizeof(int32))
-          copyMem(addr h, addr base[i + 13], sizeof(int32))
-          let col = RGBColor(red: base[i + 17], green: base[i + 18],
-            blue: base[i + 19])
-          yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h,
-            dbColor: col)
-          i += 20
-        of actPos:
-          var x, y: int32
-          var sc: float32
-          copyMem(addr x, addr base[i + 1], sizeof(int32))
-          copyMem(addr y, addr base[i + 5], sizeof(int32))
-          copyMem(addr sc, addr base[i + 9], sizeof(float32))
-          yield Action(kind: actPos, px: x, py: y, pscale: sc)
-          i += 13
 
   func actionLen*(a: Actions): int =  # O(n)
     for _ in a: inc result
@@ -605,7 +642,7 @@ when not defined(nimscript):
     for a in list:
       base[i] = uint8(ord(a.kind))
       case a.kind
-      of actInvert, actHflip, actVflip:
+      of actInvert, actHflip, actVflip, actLoop:
         i += 1
       of actRotate:
         base.writeAt(i, 1, a.rStart)
@@ -626,6 +663,11 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.sStart)
         base.writeAt(i, 3, a.sRate)
         i += 7
+      of actColorKey:
+        base.writeAt(i, 1, a.color)
+        base.writeAt(i, 4, a.similar)
+        base.writeAt(i, 6, a.blend)
+        i += 8
       of actLuv:
         base.writeAt(i, 1, a.brighthue)
         base.writeAt(i, 3, a.contrast)
