@@ -66,11 +66,11 @@ task test, "Run unit tests":
   exec "nim c -r tests/unit"
 
 task make, "Export the project":
-  exec "nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
+  exec "nim c -d:danger --out:auto-editor src/main.nim"
   stripProgram()
 
 task brewmake, "Build auto-editor with deps dynamically linked.":
-  exec "nim c -d:dynamic -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
+  exec "nim c -d:dynamic -d:danger --out:auto-editor src/main.nim"
   stripProgram()
 
 task cleanff, "Clean build files":
@@ -692,6 +692,17 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
       if not fileExists("Makefile"):
         exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory -msimd128{memArg}" """
       makeInstall()
+    of "zlib":
+      # zlib ships a hand-written configure (not autotools): it reads CFLAGS
+      # and LDFLAGS from the *environment*, not as positional args, so the
+      # flags must be exported. Without -sMEMORY64=1 reaching the compiler it
+      # silently emits wasm32 objects that can't link into the wasm64 build.
+      # It also hard-codes AR=libtool whenever the build host is macOS,
+      # ignoring emconfigure's AR=emar (native libtool can't archive wasm
+      # objects); spoofing uname keeps it on the generic path.
+      if not fileExists("Makefile"):
+        exec &"""CFLAGS="-matomics -mbulk-memory -msimd128{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --static --uname=Linux """
+      makeInstall()
     else:
       # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
       let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
@@ -943,11 +954,9 @@ task makewin, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists(winBuildPath):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    # lto causes issues with GCC.
-    exec "nim c -d:danger --panics:on --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger --passL:-static --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
-         "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
     stripProgram(gccWin)
 
@@ -980,10 +989,9 @@ task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
   if not dirExists(winArmBuildPath):
     echo "FFmpeg for Windows ARM64 not found. Run 'nimble makeffwinarm' first."
   else:
-    exec "nim c -d:danger --panics:on --os:windows --cpu:arm64 --cc:clang " &
+    exec "nim c -d:danger --passL:-static --os:windows --cpu:arm64 --cc:clang " &
          "--clang.exe:aarch64-w64-mingw32-clang " &
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
-         "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
     stripProgram(llvmWin)
 
@@ -1021,11 +1029,10 @@ task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf tool
   if not dirExists(armv7BuildPath):
     echo "FFmpeg for Linux ARMv7 not found. Run 'nimble makeffarmv7' first."
   else:
-    exec "nim c -d:danger --panics:on --os:linux --cpu:arm --cc:gcc " &
+    exec "nim c -d:danger --passL:-static --os:linux --cpu:arm --cc:gcc " &
          "--gcc.exe:arm-linux-gnueabihf-gcc " &
          "--gcc.linkerexe:arm-linux-gnueabihf-gcc " &
          "--passC:-march=armv7-a --passC:-mfpu=neon-vfpv3 --passC:-mfloat-abi=hard " &
-         "--passL:-static " &
          "--out:auto-editor src/main.nim"
     stripProgram(armv7)
 
@@ -1087,8 +1094,7 @@ task makewasm, "Compile to wasm32 (requires emscripten, wabt)":
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto " &
-        "--threads:on --os:linux --cpu:wasm32 " &
+    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:wasm32 " &
         "--out:docs/src/auto-editor-web.js src/main.nim"
     stripProgram(wasm32)
 
@@ -1099,7 +1105,6 @@ task makewasm64, "Compile to wasm64 (requires emscripten, wabt)":
   else:
     # --cpu:riscv64 picked for its 64-bit pointer ABI; using --cpu:amd64 makes
     # nimcrypto pull in x86 SHA/AVX intrinsics that emscripten can't compile.
-    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto " &
-        "--threads:on --os:linux --cpu:riscv64 " &
-        "--out:docs/src/auto-editor-web64.js src/main.nim"
+    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:riscv64 " &
+         "--out:docs/src/auto-editor-web64.js src/main.nim"
     stripProgram(wasm64)
