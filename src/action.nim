@@ -1,6 +1,10 @@
 import std/[math, strutils, options]
 import ./util/[dnorm16, color]
 
+template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
+  var temp = val
+  copyMem(addr baseBuffer[index + offset], addr temp, sizeof(temp))
+
 type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
@@ -55,19 +59,16 @@ type
   # atf-8: store actions in as small a space as possible, inspirited by utf-8.
 
   ActionParseError* = object of CatchableError
-
   ActionFlag* = enum   # capabilities of an action
-    afAudio,           # affects the audio stream
-    afVideo,           # affects the video stream
+    afAudio,
+    afVideo,
     afAnimatable       # value can be a keyframe ramp (`a..b..c`) with easing
-
   ActionFlags* = set[ActionFlag]
 
   RangeDoc* = object
     lo*, hi*: float
     loIncl*, hiIncl*: bool  # closed (inclusive) bounds
     each*: bool             # the interval applies to each positional arg
-
   ActionDef* = object
     name*: string
     flags*: ActionFlags
@@ -460,18 +461,16 @@ when not defined(nimscript):
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
   func actionByteSize(a: Action): int =
-    ## header(1) [+ ease(6)] + count(1) + count*valueSize for animated kinds.
     case a.kind
     of actInvert, actHflip, actVflip: 1
-    of actSpeed, actVarispeed, actVolume, actLens: 5
     of actRotate: 3
-    of actSpin: 7
-    of actDeesser: 7
+    of actLens, actSpeed, actVarispeed, actVolume: 5
+    of actDeesser, actSpin: 7
     of actLuv: 11
-    of actDrawbox: 20
     of actPos: 13
-    of actZoom, actBlur: 2 + easeBytes(a) + a.kf.len * 4
-    of actOpacity, actBrightness: 2 + easeBytes(a) + a.kf.len * 2
+    of actDrawbox: 20
+    of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
+    of actBlur, actZoom: 2 + easeBytes(a) + a.kf.len * 4
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -608,10 +607,42 @@ when not defined(nimscript):
       case a.kind
       of actInvert, actHflip, actVflip:
         i += 1
-      of actSpeed, actVarispeed, actVolume:
-        var v = a.val
-        copyMem(addr base[i + 1], addr v, sizeof(float32))
+      of actRotate:
+        base.writeAt(i, 1, a.rStart)
+        i += 3
+      of actLens:
+        base.writeAt(i, 1, a.k1)
+        base.writeAt(i, 3, a.k2)
         i += 5
+      of actSpeed, actVarispeed, actVolume:
+        base.writeAt(i, 1, a.val)
+        i += 5
+      of actDeesser:
+        base.writeAt(i, 1, a.intensity)
+        base.writeAt(i, 3, a.maxd)
+        base.writeAt(i, 5, a.freq)
+        i += 7
+      of actSpin:
+        base.writeAt(i, 1, a.sStart)
+        base.writeAt(i, 3, a.sRate)
+        i += 7
+      of actLuv:
+        base.writeAt(i, 1, a.brighthue)
+        base.writeAt(i, 3, a.contrast)
+        base.writeAt(i, 7, a.saturation)
+        i += 11
+      of actPos:
+        base.writeAt(i, 1, a.px)
+        base.writeAt(i, 5, a.py)
+        base.writeAt(i, 9, a.pscale)
+        i += 13
+      of actDrawbox:
+        base.writeAt(i, 1, a.dbX)
+        base.writeAt(i, 5, a.dbY)
+        base.writeAt(i, 9, a.dbW)
+        base.writeAt(i, 13, a.dbH)
+        base.writeAt(i, 17, a.dbColor)
+        i += 20
       of actZoom, actBlur, actOpacity, actBrightness:
         if a.hasEase: base[i] = base[i] or easeFlag
         var pos = i + 1
@@ -637,59 +668,7 @@ when not defined(nimscript):
             copyMem(addr base[pos], addr s, sizeof(Snorm16))
             pos += 2
         i = pos
-      of actRotate:
-        var st = a.rStart
-        copyMem(addr base[i + 1], addr st, sizeof(Unorm16))
-        i += 3
-      of actSpin:
-        var st = a.sStart
-        var rate = a.sRate
-        copyMem(addr base[i + 1], addr st, sizeof(Unorm16))
-        copyMem(addr base[i + 3], addr rate, sizeof(float32))
-        i += 7
-      of actDeesser:
-        var iu = a.intensity
-        var mu = a.maxd
-        var fu = a.freq
-        copyMem(addr base[i + 1], addr iu, sizeof(Unorm16))
-        copyMem(addr base[i + 3], addr mu, sizeof(Unorm16))
-        copyMem(addr base[i + 5], addr fu, sizeof(Unorm16))
-        i += 7
-      of actLuv:
-        var bh = toSnorm16(a.brighthue)
-        var c = a.contrast
-        var s = a.saturation
-        copyMem(addr base[i + 1], addr bh, sizeof(Snorm16))
-        copyMem(addr base[i + 3], addr c, sizeof(float32))
-        copyMem(addr base[i + 7], addr s, sizeof(float32))
-        i += 11
-      of actLens:
-        var k1v = a.k1
-        var k2v = a.k2
-        copyMem(addr base[i + 1], addr k1v, sizeof(Snorm16))
-        copyMem(addr base[i + 3], addr k2v, sizeof(Snorm16))
-        i += 5
-      of actDrawbox:
-        var x = a.dbX
-        var y = a.dbY
-        var w = a.dbW
-        var h = a.dbH
-        copyMem(addr base[i + 1], addr x, sizeof(int32))
-        copyMem(addr base[i + 5], addr y, sizeof(int32))
-        copyMem(addr base[i + 9], addr w, sizeof(int32))
-        copyMem(addr base[i + 13], addr h, sizeof(int32))
-        base[i + 17] = a.dbColor.red
-        base[i + 18] = a.dbColor.green
-        base[i + 19] = a.dbColor.blue
-        i += 20
-      of actPos:
-        var x = a.px
-        var y = a.py
-        var sc = a.pscale
-        copyMem(addr base[i + 1], addr x, sizeof(int32))
-        copyMem(addr base[i + 5], addr y, sizeof(int32))
-        copyMem(addr base[i + 9], addr sc, sizeof(float32))
-        i += 13
+
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
