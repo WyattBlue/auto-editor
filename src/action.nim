@@ -9,7 +9,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
     actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actDrawbox, actPos, actSpin, actColorKey, actLoop
+    actDrawbox, actPos, actSpin, actColorKey, actLoop, actChromaKey
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -53,7 +53,7 @@ type
     of actPos:
       px*, py*: int32        # overlay top-left in canvas pixels
       pscale*: float32       # overlay size multiplier (1.0 = native)
-    of actColorKey:
+    of actColorKey, actChromaKey:
       color*: RGBColor
       similar*, blend*: Unorm16
 
@@ -146,7 +146,10 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
-  ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "", range: rng(0.0, 1.0), help: ""),
+  ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
+    help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.01), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
+  ActionDef(name: "chromakey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
+    help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.01), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
 ]
@@ -328,9 +331,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
       dbW: coords[2], dbH: coords[3], dbColor: col)
 
-  if parts[0] == "colorkey":
+  if parts[0] in ["colorkey", "chromakey"]:
     if parts.len < 2 or parts.len > 4:
-      raise newException(ActionParseError, "colorkey requires color[:similar:blend]")
+      raise newException(ActionParseError, parts[0] & " requires color[:similar:blend]")
     let col = (
       try:
         parseColor(parts[1])
@@ -348,7 +351,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if vals[0] < toUnorm16(0.01'f32):
       vals[0] = toUnorm16(0.01'f32)
 
-    return Action(kind: actColorKey, color: col, similar: vals[0], blend: vals[1])
+    if parts[0] == "colorkey":
+      return Action(kind: actColorKey, color: col, similar: vals[0], blend: vals[1])
+    return Action(kind: actChromaKey, color: col, similar: vals[0], blend: vals[1])
 
   # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
   if parts[0] == "pos" and parts.len in {3, 4}:
@@ -487,6 +492,7 @@ when not defined(nimscript):
         $act.dbH & ":" & act.dbColor.toString
     of actPos: "pos:" & $act.px & ":" & $act.py & ":" & $act.pscale
     of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
+    of actChromaKey: "chromakey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -496,7 +502,7 @@ when not defined(nimscript):
     of actRotate: 3
     of actLens, actSpeed, actVarispeed, actVolume: 5
     of actDeesser, actSpin: 7
-    of actColorKey: 8
+    of actColorKey, actChromaKey: 8
     of actLuv: 11
     of actPos: 13
     of actDrawbox: 20
@@ -506,6 +512,14 @@ when not defined(nimscript):
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
     else: int(cast[ptr uint16](int(a))[])
+
+  func firstIsLoop*(a: Actions): bool =
+    ## True if the action list begins with `loop`. `parseActions` canonicalizes
+    ## `loop` to a single token at the front, so this O(1) header read replaces
+    ## scanning a clip's effects for actLoop on every frame.
+    if a.len == 0: return false
+    let base = cast[ptr UncheckedArray[uint8]](int(a) + sizeof(uint16))
+    (base[0] and 0x7f'u8).int == ord(actLoop)
 
   iterator items*(a: Actions): Action =
     if int(a) > 1:
@@ -548,13 +562,13 @@ when not defined(nimscript):
           copyMem(addr rate, addr base[i + 3], sizeof(float32))
           yield Action(kind: actSpin, sStart: st, sRate: rate)
           i += 7
-        of actColorKey:
+        of actColorKey, actChromaKey:
           var col: RGBColor
           var sim, blend: Unorm16
           copyMem(addr col, addr base[i + 1], sizeof(RGBColor))
           copyMem(addr sim, addr base[i + 4], sizeof(Unorm16))
           copyMem(addr blend, addr base[i + 6], sizeof(Unorm16))
-          yield Action(kind: actColorKey, color: col, similar: sim, blend: blend)
+          yield Action(kind: kind, color: col, similar: sim, blend: blend)
           i += 8
         of actLuv:
           var bh: Snorm16
@@ -663,7 +677,7 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.sStart)
         base.writeAt(i, 3, a.sRate)
         i += 7
-      of actColorKey:
+      of actColorKey, actChromaKey:
         base.writeAt(i, 1, a.color)
         base.writeAt(i, 4, a.similar)
         base.writeAt(i, 6, a.blend)
@@ -759,13 +773,22 @@ when not defined(nimscript):
           continue
       list.add action
 
-    # Drop any all-identity actLuv (no-op).
+    # Drop any all-identity actLuv (no-op), and canonicalize `loop`: it's a
+    # per-clip flag, not an ordered effect, so any number of `loop` tokens
+    # collapse into a single one at the front. This lets `firstIsLoop` answer in
+    # O(1) instead of rescanning a clip's effects for actLoop every frame.
     var pruned: seq[Action]
+    var hasLoop = false
     for a in list:
       if a.kind == actLuv and a.brighthue == luvBrighthueId and
           a.contrast == luvContrastId and a.saturation == luvSaturationId:
         continue
+      if a.kind == actLoop:
+        hasLoop = true
+        continue
       pruned.add a
+    if hasLoop:
+      pruned.insert(Action(kind: actLoop), 0)
     return newActions(pruned)
 
   func `$`*(a: Actions): string =

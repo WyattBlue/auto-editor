@@ -208,6 +208,16 @@ test "actions":
   check abs(sampleKf(kf, 1.0'f32) - 1.0'f32) < 0.001'f32
   check abs(sampleKf(kf, 0.25'f32) - 0.75'f32) < 0.001'f32  # halfway into seg 0
 
+  # loop is a per-clip flag: collapse to a single token at the front.
+  check $parseActions("zoom:1..2,loop,loop") == "loop,zoom:1.0..2.0"
+  check $parseActions("loop,speed:1.5,loop") == "loop,speed:1.5"
+  check $parseActions("loop") == "loop"
+  # firstIsLoop is the O(1) check the renderer uses each frame.
+  check firstIsLoop(parseActions("zoom:1..2,loop"))
+  check firstIsLoop(parseActions("loop"))
+  check not firstIsLoop(parseActions("zoom:1..2"))
+  check not firstIsLoop(parseActions("nil"))
+
   # Easing curves.
   check applyEase(easeLinear, 0.5'f32) == 0.5'f32
   check applyEase(easeIn, 0.5'f32) < 0.5'f32
