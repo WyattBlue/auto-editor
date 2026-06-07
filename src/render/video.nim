@@ -1,4 +1,4 @@
-import std/[options, sets, strformat, tables]
+import std/[sets, strformat, tables]
 from std/math import round, hypot, ceil
 
 import ../[action, av, ffmpeg, graph, log, timeline]
@@ -35,22 +35,22 @@ type KeyframeIndex = object
   hasIndex: bool   # whether the demuxer provided index entries
 
 type SrcState = ref object
-  ## All per-source decode state, held in one table keyed by `ptr string`
-  ## instead of a dozen parallel ones. A `ref` so `srcs[src].field = x` mutates
-  ## in place.
+  kfFrames: seq[int]          # indexed keyframe frame numbers
+  observedKeyframes: seq[int] # keyframes seen while decoding (for backward seeks)
   decoder: ptr AVCodecContext
-  tou: int                    # timebase units per source frame (for seeks)
-  keyframes: KeyframeIndex
-  isStill: bool               # single-frame image source (logo/watermark)
   still: ptr AVFrame          # memoized decoded still; nil until first decode
+  held: ptr AVFrame           # last decoded frame, held for forward reuse
+  tou: int                    # timebase units per source frame (for seeks)
+  kfInterval: int             # average interval between indexed keyframes
   frameIndex: int             # decoder's current source position; -1 = none yet
   seekThreshold: int          # don't seek-ahead before this frame
-  seekFrame: Option[int]      # frame we seeked from, for the frames-saved debug
-  observedKeyframes: seq[int] # keyframes seen while decoding (for backward seeks)
+  seekFrame: int              # frame we seeked from, for the frames-saved debug
   lastSeekTarget: int         # -1 = no seek performed yet
   lastReqIndex: int           # last obj.index requested (held-frame reuse)
-  held: ptr AVFrame           # last decoded frame, held for forward reuse
   loopBase: int               # source frames consumed by completed loops
+  hasKfIndex: bool            # whether the demuxer provided a keyframe index
+  hasSeekFrame: bool          # whether seekFrame holds a pending marker
+  isStill: bool               # single-frame image source (logo/watermark)
 
 proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: int): KeyframeIndex =
   ## Build a keyframe index from the stream's index entries.
@@ -294,7 +294,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # Per-source state with mutable-decode defaults. Decoding always begins on a
     # keyframe, so frame 0 is always a valid seek point (observedKeyframes starts
     # at @[0]); decoder/isStill below fill in for sources that have a video stream.
-    srcs[src] = SrcState(frameIndex: -1, seekThreshold: 10, seekFrame: none(int),
+    srcs[src] = SrcState(frameIndex: -1, seekThreshold: 10,
       observedKeyframes: @[0], lastSeekTarget: -1, lastReqIndex: -1, loopBase: 0)
 
     # Audio-only sources (e.g. the .mp3 behind a synthesized video canvas) have
@@ -397,15 +397,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       st.tou = int(float(stream.time_base.den) / fps)
 
       if args.noSeek:
-        st.keyframes = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: high(int))
+        st.kfFrames = @[]
+        st.hasKfIndex = false
+        st.kfInterval = high(int)
       else:
-        st.keyframes = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
-
-        let kfIndex = st.keyframes
-        if kfIndex.hasIndex:
-          debug &"Source {src[]}: {kfIndex.frames.len} keyframes indexed, avg interval: {kfIndex.avgInterval} frames"
+        let kf = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
+        st.kfFrames = kf.frames
+        st.kfInterval = kf.avgInterval
+        st.hasKfIndex = kf.hasIndex
+        if kf.hasIndex:
+          debug &"Source {src[]}: {kf.frames.len} keyframes indexed, avg interval: {kf.avgInterval} frames"
         else:
-          debug &"Source {src[]}: no index entries, using estimated interval: {kfIndex.avgInterval} frames"
+          debug &"Source {src[]}: no index entries, using estimated interval: {kf.avgInterval} frames"
 
       if src == firstSrc and not st.isStill and
           encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
@@ -830,11 +833,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     var frameIndex = st.frameIndex
     var seekThreshold = st.seekThreshold
     var seekFrame = st.seekFrame
+    var hasSeekFrame = st.hasSeekFrame
     if frameIndex > target:
       let seekTarget = findBestKeyframe(obj.src, target)
       if seekTarget < 0 or seekTarget > target:
-        let kfIndex = st.keyframes
-        let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
+        let indexInfo = if st.hasKfIndex: &"{st.kfFrames.len} indexed" else: "no index"
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       if st.lastSeekTarget != seekTarget:
         debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
@@ -846,10 +849,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let srcTb = myStream.avg_frame_rate
     var didDecode = false
     while frameIndex < target:
-      if target - frameIndex > st.keyframes.avgInterval and frameIndex > seekThreshold:
+      if target - frameIndex > st.kfInterval and frameIndex > seekThreshold:
         if st.lastSeekTarget != target:
-          seekThreshold = frameIndex + (st.keyframes.avgInterval div 2)
-          seekFrame = some(frameIndex)
+          seekThreshold = frameIndex + (st.kfInterval div 2)
+          seekFrame = frameIndex
+          hasSeekFrame = true
           debug &"Seek: {frameIndex} -> {target}"
           myCache.cns[obj.src].seek(target * st.tou, stream = myStream)
           avcodec_flush_buffers(st.decoder)
@@ -883,11 +887,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       didDecode = true
 
-      if seekFrame.isSome:
-        let framesAvoided = frameIndex - seekFrame.get
+      if hasSeekFrame:
+        let framesAvoided = frameIndex - seekFrame
         debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
         framesSaved += framesAvoided
-        seekFrame = none(int)
+        hasSeekFrame = false
 
     if didDecode:
       # Cache the raw frame (before per-clip static rotation) so another layer
@@ -919,6 +923,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     st.frameIndex = frameIndex
     st.seekThreshold = seekThreshold
     st.seekFrame = seekFrame
+    st.hasSeekFrame = hasSeekFrame
     st.loopBase = loopBase
     st.lastReqIndex = obj.index
     if didDecode:
