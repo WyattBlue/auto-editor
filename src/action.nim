@@ -147,9 +147,9 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
   ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
-    help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.01), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
+    help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
   ActionDef(name: "chromakey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
-    help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.01), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
+    help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
 ]
@@ -340,7 +340,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       except ValueError:
         raise newException(ActionParseError, "Invalid color: " & parts[1])
     )
-    var vals = [toUnorm16(0.01'f32), toUnorm16(0.0'f32)]
+    var vals = [toUnorm16(0.25'f32), toUnorm16(0.0'f32)]
     for idx in 2 ..< parts.len:
       vals[idx - 2] = (
         try:
