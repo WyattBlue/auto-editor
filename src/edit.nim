@@ -236,7 +236,18 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       isKey = false
       argPos = 0
 
-    if node[0].kind == ExprSym:
+    if node[0].kind == ExprNum:
+      case text[node[0].`from` ..< node[0].to]:
+      of "0":
+        return @[]
+      of "1":
+        let length = mediaLength(containers[0])
+        let tbLength = (round((length * tb).float64)).int
+
+        return newSeqWith(tbLength, true)
+      else:
+        error "We only support 0 or 1 right now."
+    elif node[0].kind == ExprSym:
       case text[node[0].`from` ..< node[0].to]:
       of "or":
         result = editEval(node[1], text)
@@ -391,6 +402,6 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      error "Expected a function"
+      error "`--edit` expects a valid expression"
 
   return editEval(expr, args.edit)
