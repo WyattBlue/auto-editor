@@ -500,6 +500,36 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       else:
         hi = mid - 1
 
+  proc keyOverBg(frame0: ptr AVFrame, effect: Action): ptr AVFrame =
+    var frame = frame0
+    let w = frame.width
+    let h = frame.height
+    let col = effect.color.toString
+    let isChroma = effect.kind == actChromaKey
+    var bgFrame = makeSolid(w, h, tl.bg)
+    frame.pts = 0
+    bgFrame.pts = 0
+    let g = newGraph()
+    let bgSrc = g.add("buffer", &"video_size={w}x{h}:pix_fmt=yuv420p:time_base={graphTb}:pixel_aspect=1/1")
+    let fgSrc = g.add("buffer", &"video_size={w}x{h}:pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1")
+    let toAlpha = g.add("format", "pix_fmts=" & (if isChroma: "yuva420p" else: "rgba"))
+    let keyer = g.add((if isChroma: "chromakey" else: "colorkey"),
+      &"{col}:{effect.similar}:{effect.blend}")
+    let ov = g.add("overlay", "format=yuv420")
+    discard g.linkNodes(@[fgSrc, toAlpha, keyer])
+    g.link(bgSrc, ov, 0, 0)  # background on the bottom pad
+    g.link(keyer, ov, 0, 1)  # keyed frame on top
+    g.link(ov, g.add("buffersink"))
+    g.configure()
+    g.pushIdx(0, bgFrame)
+    g.pushIdx(1, frame)
+    g.flushIdx(0)
+    g.flushIdx(1)
+    result = g.pull()
+    g.cleanup()
+    av_frame_free(addr bgFrame)
+    av_frame_free(addr frame)
+
   proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int,
       isOverlay = false): ptr AVFrame =
     ## Apply one clip's effect chain to a frame, returning the (possibly new)
@@ -740,44 +770,32 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         fxGraph.push(frame)
         av_frame_free(addr frame)
         frame = fxGraph.pull()
-      of actColorKey:
+      of actColorKey, actChromaKey:
         if not isOverlay:
+          # Base layer: no lower track to reveal, so replace the keyed color with
+          # the timeline background instead of making it transparent.
+          frame = keyOverBg(frame, effect)
           continue
         let col = effect.color.toString
         let frameFmtName = $AVPixelFormat(frame.format)
         let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"colorkey|{col}|{effect.similar}|{effect.blend}|{bufferArgs}"
+        let key = &"{effect.kind}|{col}|{effect.similar}|{effect.blend}|{bufferArgs}"
         if fxKey != key:
           if fxGraph != nil:
             fxGraph.cleanup()
           fxGraph = newGraph()
           let bufferSrc = fxGraph.add("buffer", bufferArgs)
-          let clrkey = fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, clrkey, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
-      of actChromaKey:
-        if not isOverlay:
-          continue
-        let col = effect.color.toString
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"chromakey|{col}|{effect.similar}|{effect.blend}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
-          # chromakey keys in YUV-with-alpha; convert in, then back to rgba so the
-          # composited overlay keeps its alpha channel.
-          let toYuva = fxGraph.add("format", "pix_fmts=yuva420p")
-          let chrkey = fxGraph.add("chromakey", &"{col}:{effect.similar}:{effect.blend}")
-          let toRgba = fxGraph.add("format", "pix_fmts=rgba")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, toYuva, chrkey, toRgba, bufferSink]).configure()
+          var nodes = @[bufferSrc]
+          if effect.kind == actChromaKey:
+            # chromakey keys in YUV-with-alpha; convert in, then back to rgba so
+            # the composited overlay keeps its alpha channel.
+            nodes.add fxGraph.add("format", "pix_fmts=yuva420p")
+            nodes.add fxGraph.add("chromakey", &"{col}:{effect.similar}:{effect.blend}")
+            nodes.add fxGraph.add("format", "pix_fmts=rgba")
+          else:
+            nodes.add fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
+          nodes.add fxGraph.add("buffersink")
+          fxGraph.linkNodes(nodes).configure()
           fxKey = key
         fxGraph.push(frame)
         av_frame_free(addr frame)

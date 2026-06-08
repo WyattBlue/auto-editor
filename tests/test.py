@@ -601,6 +601,27 @@ class Runner:
                 assert r > 200 and g < 80 and b < 80, f"box px {(r, g, b)}"
                 break
 
+    def test_colorkey_base(self) -> None:
+        # On the base track, colorkey has nothing to reveal, so the keyed green
+        # must be replaced with the timeline background (white).
+        out = self.main(
+            ["resources/only-video/man-on-green-screen.mp4"],
+            ["-bg", "white", "-e", "none", "-w:1", "colorkey:#14DB00"],
+            "ck.mp4",
+        )
+        with av.open(out) as container:
+            # Frame 25: the figure has walked into the green screen by now.
+            for i, frame in enumerate(container.decode(container.streams.video[0])):
+                if i < 25:
+                    continue
+                rgb = frame.to_ndarray(format="rgb24")
+                r, g, b = rgb[360, 640]  # center: was green, now background
+                assert r > 230 and g > 230 and b > 230, f"center px {(r, g, b)}"
+                # The figure (dark silhouette) must survive the key.
+                dark = (rgb.max(axis=2) < 48).mean()
+                assert dark > 0.05, f"figure keyed away: {dark * 100:.2f}% dark"
+                break
+
     def test_add_overlay(self) -> None:
         png = self.make_png("ov.png", 200, 200, (255, 0, 0))
         out = self.main(
