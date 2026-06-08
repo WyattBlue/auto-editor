@@ -7,9 +7,9 @@ template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
 
 type
   ActionKind* = enum
-    actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
-    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate,
-    actDrawbox, actPos, actSpin, actColorKey, actLoop, actChromaKey
+    actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actHflip, actVflip,
+    actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate, actSpin,
+    actDrawbox, actPos, actColorKey, actChromaKey, actLoop
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
