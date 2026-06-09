@@ -3,7 +3,7 @@ when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
 
-import ./[av, action, edit, ffmpeg, log, media, timeline]
+import ./[av, action, edit, ffmpeg, license, log, media, timeline]
 import util/[color, bar, fun, lang, rules, rational]
 
 import imports/[fcp7, json]
@@ -331,6 +331,12 @@ proc editMedia*(args: var mainArgs) =
   if args.preview:
     preview(tlV3)
     return
+
+  # Rendering or exporting a timeline that draws from more than one source file
+  # is a paid feature. This is the authoritative gate: it also covers timelines
+  # imported from a file/stdin, which never pass through the CLI-level checks.
+  if tlV3.uniqueSources().len > 1:
+    requireLicense(args, "render or export a timeline with multiple sources")
 
   case exportKind:
   of "v1", "v2", "v3":

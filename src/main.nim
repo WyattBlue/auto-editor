@@ -12,12 +12,11 @@ int __main_argc_argv(int argc, char** argv) {
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, action, cli, conductor, edit, ffmpeg, log, media]
+import ./[about, action, cli, conductor, edit, ffmpeg, license, log, media]
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
 import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
-import vendor/libp2p/ed25519
 
 proc ctrlc() {.noconv.} =
   error "Keyboard Interrupt"
@@ -143,35 +142,6 @@ proc parseFrameRate(val: string): AVRational =
   if val == "film":
     return AVRational(num: 24, den: 1)
   return AVRational(val)
-
-const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
-
-proc validateKey(val: string): (bool, string) =
-  if val == "":
-    return (false, "")
-
-  let parts = val.split('.')
-  if parts.len != 2:
-    return (false, "bfmt")
-
-  let payloadBytes = b64urlDecode(parts[0])
-  let sigBytes = b64urlDecode(parts[1])
-
-  if sigBytes.len != EdSignatureSize:
-    return (false, "Bad signature length")
-
-  var pubKey: EdPublicKey
-  if not init(pubKey, PUBLIC_KEY_HEX):
-    return (false, "Failed to load public key")
-
-  var sig: EdSignature
-  if not init(sig, sigBytes):
-    return (false, "Bad signature length")
-
-  if verify(sig, payloadBytes, pubKey):
-    return (true, cast[string](payloadBytes))
-  return (false, "Incorrect key")
-
 
 when not defined(emscripten):
   proc wantStreams(args: mainArgs): (bool, bool) =
@@ -370,7 +340,6 @@ judge making cuts.
   var args = mainArgs()
   var showVersion: bool = false
   var expecting: string = ""
-  var licenseKey: string
 
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
@@ -461,7 +430,7 @@ judge making cuts.
     of "smooth":
       args.smooth = parseTwoLengths(key, expecting)
     of "key":
-      licenseKey = key
+      args.licenseKey = key
     of "tempdir":
       tempDir = key
     expecting = ""
@@ -485,19 +454,11 @@ judge making cuts.
     echo listAvailableFilters()
     quit(0)
 
-  if args.inputs.len > 1:
-    if licenseKey == "":
-      licenseKey = getEnv("AE_PRIVATE_LK", "")
-
-    let (isValid, reason) = validateKey(licenseKey)
-    if not isValid:
-      echo "inputs: [" & args.inputs.join(", ") & "]"
-      if reason == "":
-        error "You must provide a license key to enable using multiple inputs.\n(set a value to -k)"
-      elif reason == "bfmt":
-        error "License key is in a bad format.\nYou can get a key at https://app.auto-editor.com"
-      else:
-        error reason
+  # Fail fast on `add` (a CLI-only signal) before any expensive analysis. Using
+  # multiple inputs is gated too, but via the multi-source render/export check in
+  # conductor.editMedia, which also covers timelines imported from a file/stdin.
+  if args.adds.len > 0:
+    requireLicense(args, "use the `add` action")
 
   for i, myInput in args.inputs:
     if myInput.startsWith("http://") or myInput.startsWith("https://"):
