@@ -311,10 +311,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # An image source is a single still: known image codec, or a stream that
     # reports exactly one frame (single-frame webp, png_pipe, etc.).
     let vstream = myCache.cns[src].video[0]
-    const imageCodecIds = [ID_PNG, AVCodecID(7), AVCodecID(78), AVCodecID(80)]
-      # png, mjpeg, bmp, tiff
-    srcs[src].isStill = vstream.codecpar.codec_id in imageCodecIds or
-      vstream.nb_frames == 1
+    const imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
+    srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or vstream.nb_frames == 1
 
   var targetWidth = tl.res[0]
   var targetHeight = tl.res[1]

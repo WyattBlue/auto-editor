@@ -601,8 +601,12 @@ proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
 
 const
   ID_NONE* = AVCodecID(0)
+  ID_JPEG* = AVCodecID(7)
   ID_H264* = AVCodecID(27)
   ID_PNG* = AVCodecID(61)
+  ID_BMP* = AVCodecID(78)
+  ID_TIFF* = AVCodecID(96)
+  ID_WEBP* = AVCodecID(171)
   ID_HEVC* = AVCodecID(173)
   ID_AV1* = AVCodecID(225)
   ID_PCM_S16LE* = AVCodecID(65536)
