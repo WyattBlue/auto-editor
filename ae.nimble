@@ -302,7 +302,7 @@ proc getFileHash(filename: string): string =
 
 proc download(package: Package) =
   if not fileExists(package.location):
-    exec &"curl -O -L {package.sourceUrl}"
+    exec &"curl -fL --retry 5 --retry-all-errors --retry-delay 2 -O {package.sourceUrl}"
     let filename = "ffmpeg_sources" / package.location
     let hash = getFileHash(filename)
     if package.sha256 != hash:
