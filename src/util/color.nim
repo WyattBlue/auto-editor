@@ -1,5 +1,7 @@
 import std/[strutils, strformat, parseutils]
-import ../ffmpeg
+
+proc av_get_known_color_name(color_idx: cint, rgbp: ptr ptr uint8): cstring
+    {.importc, header: "<libavutil/parseutils.h>".}
 
 type RGBColor* = object
   red*, green*, blue*: uint8
