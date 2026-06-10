@@ -28,6 +28,30 @@ func envAnimLen(unit: DurUnit, mag: float32, clipDur: int, fps: float): int =
   of duSec: max(1, int(round(mag.float * fps)))
   of duFrames: max(1, int(round(mag.float)))
 
+# Identity of a configured effect filter graph: everything that determines the
+# graph's topology and arguments, as a flat value so the per-frame reuse check
+# is a field compare instead of string formatting. Run-constants (bg color,
+# graph timebase) are deliberately excluded. A tuple, for structural `==`;
+# `valid` is default-false so the zero key never matches a built graph.
+type GraphKey = tuple
+  valid: bool
+  kind: ActionKind
+  overlay: bool
+  w, h, fmt: cint
+  f0, f1, f2: float32
+  i0, i1, i2, i3: int32
+  col: uint32
+
+func fxId(kind: ActionKind, frame: ptr AVFrame, overlay = false,
+    f0 = 0'f32, f1 = 0'f32, f2 = 0'f32,
+    i0 = 0'i32, i1 = 0'i32, i2 = 0'i32, i3 = 0'i32, col = 0'u32): GraphKey =
+  (valid: true, kind: kind, overlay: overlay,
+   w: frame.width, h: frame.height, fmt: frame.format,
+   f0: f0, f1: f1, f2: f2, i0: i0, i1: i1, i2: i2, i3: i3, col: col)
+
+func packRGB(c: RGBColor): uint32 =
+  uint32(c.red) shl 16 or uint32(c.green) shl 8 or uint32(c.blue)
+
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
   frames: seq[int] # sorted list of keyframe frame numbers
@@ -318,9 +342,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var targetHeight = tl.res[1]
   var scaleGraph: Graph = nil
   var fxGraph: Graph = nil
-  var fxKey = ""
+  var fxKey: GraphKey
   var rotGraph: Graph = nil  # static source rotation, applied before the fit
-  var rotKey = ""
+  var rotKey: GraphKey
   var needsScaling = false
 
   if args.scale != 1.0:
@@ -446,6 +470,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
 
+  proc bufArgsOf(frame: ptr AVFrame): string =
+    ## Buffer-source args for feeding `frame` into a graph; only built when a
+    ## graph is actually (re)configured, never on the per-frame reuse path.
+    &"video_size={frame.width}x{frame.height}:pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1"
+
   if needsScaling:
     let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
 
@@ -508,8 +537,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     frame.pts = 0
     bgFrame.pts = 0
     let g = newGraph()
-    let bgSrc = g.add("buffer", &"video_size={w}x{h}:pix_fmt=yuv420p:time_base={graphTb}:pixel_aspect=1/1")
-    let fgSrc = g.add("buffer", &"video_size={w}x{h}:pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1")
+    let bgSrc = g.add("buffer", bufArgsOf(bgFrame))
+    let fgSrc = g.add("buffer", bufArgsOf(frame))
     let toAlpha = g.add("format", "pix_fmts=" & (if isChroma: "yuva420p" else: "rgba"))
     let keyer = g.add((if isChroma: "chromakey" else: "colorkey"),
       &"{col}:{effect.similar}:{effect.blend}")
@@ -541,6 +570,21 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     template prog(e: Action): float32 =
       applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
 
+    # Run `frame` through the effect graph identified by `key`, reusing the
+    # previous graph when the key matches; `build` must add nodes to `fxGraph`
+    # and configure it.
+    template runFx(key: GraphKey, build: untyped) =
+      let k = key
+      if fxKey != k:
+        if fxGraph != nil:
+          fxGraph.cleanup()
+        fxGraph = newGraph()
+        build
+        fxKey = k
+      fxGraph.push(frame)
+      av_frame_free(addr frame)
+      frame = fxGraph.pull()
+
     for effect in effects:
       case effect.kind:
       of actSpeed, actVarispeed, actVolume, actDeesser, actPos, actRotate, actLoop: discard
@@ -549,21 +593,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let startDeg = rotDeg(effect.sStart)
         let w = frame.width
         let h = frame.height
-        # Spin within a constant square sized to the diagonal, so no angle clips
-        # the picture. Overlays fill the exposed corners transparently (only the
-        # picture shows over the base); the base layer fills them with bg.
-        let side = cint(int(ceil(hypot(w.float, h.float))) + 1) and not 1.cint
         frame.pts = local.int64
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={w}x{h}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let aExpr = &"a=({startDeg}+({rate})*t)*PI/180:ow={side}:oh={side}"
-        let key = &"spin|{isOverlay}|{startDeg}|{rate}|{side}|{bg}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
-          var nodes: seq[ptr AVFilterContext] = @[bufferSrc]
+        runFx(fxId(actSpin, frame, overlay = isOverlay, f0 = startDeg, f1 = rate)):
+          # Spin within a constant square sized to the diagonal, so no angle clips
+          # the picture. Overlays fill the exposed corners transparently (only the
+          # picture shows over the base); the base layer fills them with bg.
+          let side = cint(int(ceil(hypot(w.float, h.float))) + 1) and not 1.cint
+          let aExpr = &"a=({startDeg}+({rate})*t)*PI/180:ow={side}:oh={side}"
+          var nodes: seq[ptr AVFilterContext] = @[fxGraph.add("buffer", bufArgsOf(frame))]
           if isOverlay:
             # Convert to rgba first so the rotate fill (and exposed corners) can
             # be transparent.
@@ -573,10 +610,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             nodes.add fxGraph.add("rotate", aExpr & &":c={bg}")
           nodes.add fxGraph.add("buffersink")
           fxGraph.linkNodes(nodes).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
         if not isOverlay:
           # Base layer must stay canvas-sized: shrink the contained square back
           # to the original frame size, centered with bg padding.
@@ -596,88 +629,49 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if scaledFrame != frame:
           av_frame_free(addr frame)
           frame = scaledFrame
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let zoomMode = if z > 1.0: "crop" else: "pad"
-        let key = &"zoom|{zoomMode}|{origW}x{origH}|{bg}|{zoomBufArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", zoomBufArgs)
-          let mid = if z > 1.0:
+        let zoomCrop = z > 1.0
+        runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32,
+            i2 = (if zoomCrop: 1'i32 else: 0'i32))):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+          let mid = if zoomCrop:
               fxGraph.add("crop", &"{origW}:{origH}")
             else:
               fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actHflip, actVflip, actInvert, actErosion:
-        let filterName = case effect.kind
-          of actHflip: "hflip"
-          of actVflip: "vflip"
-          of actErosion: "erosion"
-          else: "negate"
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = filterName & "|" & bufferArgs
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(effect.kind, frame)):
+          let filterName = case effect.kind
+            of actHflip: "hflip"
+            of actVflip: "vflip"
+            of actErosion: "erosion"
+            else: "negate"
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add(filterName)
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actBlur:
         let sigma = sampleKf(effect.kf, prog(effect))
         if sigma <= 0.0:
           continue
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"blur|{sigma}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actBlur, frame, f0 = sigma)):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("gblur", &"sigma={sigma}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actBrightness:
         let b = sampleKf(effect.kf, prog(effect))
         if b == 0.0'f32:
           continue
         let shift = b * 255.0'f32
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"brightness|{shift}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actBrightness, frame, f0 = shift)):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
           let lut = fxGraph.add("lutrgb",
             &"r=val+{shift}:g=val+{shift}:b=val+{shift}")
-          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actLuv:
         if (effect.brighthue == luvBrighthueId and
             effect.contrast == luvContrastId and
@@ -687,104 +681,59 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let b = effect.brighthue
         let c = effect.contrast
         let s = effect.saturation
-        let bShift = b * 255.0
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"bcs|{b}|{c}|{s}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actLuv, frame, f0 = b, f1 = c, f2 = s)):
+          let bShift = b * 255.0
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
           let lut = fxGraph.add("lutyuv",
             &"y=(val-128)*{c}+128+{bShift}:u=(val-128)*{s}+128:v=(val-128)*{s}+128")
-          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actOpacity:
         let o = sampleKf(effect.kf, prog(effect))
         if o >= 1.0'f32:
           continue
-        let bgR = (1.0'f32 - o) * float32(tl.bg.red)
-        let bgG = (1.0'f32 - o) * float32(tl.bg.green)
-        let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"opacity|{o}|{bg}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actOpacity, frame, f0 = o)):
+          let bgR = (1.0'f32 - o) * float32(tl.bg.red)
+          let bgG = (1.0'f32 - o) * float32(tl.bg.green)
+          let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
           let lut = fxGraph.add("lutrgb",
             &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
-          let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actLens:
         let k1 = effect.k1
         let k2 = effect.k2
         if k1 == 0.0'f32 and k2 == 0.0'f32:
           continue
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"lens|{k1}|{k2}|{bg}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actLens, frame, f0 = k1, f1 = k2)):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actDrawbox:
-        let col = effect.dbColor.toString
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"drawbox|{effect.dbX}|{effect.dbY}|{effect.dbW}|{effect.dbH}|{col}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
+        runFx(fxId(actDrawbox, frame, i0 = effect.dbX, i1 = effect.dbY,
+            i2 = effect.dbW, i3 = effect.dbH, col = packRGB(effect.dbColor))):
+          let col = effect.dbColor.toString
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("drawbox",
             &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}:color={col}:t=fill")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actColorKey, actChromaKey:
         if not isOverlay:
           # Base layer: no lower track to reveal, so replace the keyed color with
           # the timeline background instead of making it transparent.
           frame = keyOverBg(frame, effect)
           continue
-        let col = effect.color.toString
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"{effect.kind}|{col}|{effect.similar}|{effect.blend}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          let bufferSrc = fxGraph.add("buffer", bufferArgs)
-          var nodes = @[bufferSrc]
+        runFx(fxId(effect.kind, frame, f0 = effect.similar, f1 = effect.blend,
+            col = packRGB(effect.color))):
+          let col = effect.color.toString
+          var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
           if effect.kind == actChromaKey:
             # chromakey keys in YUV-with-alpha; convert in, then back to rgba so
             # the composited overlay keeps its alpha channel.
@@ -795,10 +744,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             nodes.add fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
           nodes.add fxGraph.add("buffersink")
           fxGraph.linkNodes(nodes).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
       of actChoke:
         # Choke (shrink) the alpha matte a key produced, to cut off the spill
         # fringe. Only overlay layers carry alpha; the base track keys over bg
@@ -806,27 +751,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if not isOverlay or not hasAlpha(AVPixelFormat(frame.format)):
           continue
         let n = max(1, int(effect.chokeN))
-        let frameFmtName = $AVPixelFormat(frame.format)
-        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let key = &"choke|{n}|{frameFmtName}|{bufferArgs}"
-        if fxKey != key:
-          if fxGraph != nil:
-            fxGraph.cleanup()
-          fxGraph = newGraph()
-          var nodes = @[fxGraph.add("buffer", bufferArgs)]
+        runFx(fxId(actChoke, frame, i0 = n.int32)):
+          var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
           # Erode only the alpha plane: in gbrap the color planes are 0=G, 1=B,
           # 2=R, so threshold0..2=0 freezes them and only plane 3 (alpha) erodes.
           # Each pass pulls the matte edge inward by 1px.
           nodes.add fxGraph.add("format", "pix_fmts=gbrap")
           for _ in 0 ..< n:
             nodes.add fxGraph.add("erosion", "threshold0=0:threshold1=0:threshold2=0")
-          nodes.add fxGraph.add("format", &"pix_fmts={frameFmtName}")
+          nodes.add fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           nodes.add fxGraph.add("buffersink")
           fxGraph.linkNodes(nodes).configure()
-          fxKey = key
-        fxGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = fxGraph.pull()
     return frame
 
   proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
@@ -950,13 +885,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           break
       if rotStatic != 0.0'f32:
         let rad = rotStatic * 3.14159265358979'f32 / 180.0'f32
-        let fmtName = $AVPixelFormat(frame.format)
-        let rbufArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={fmtName}:time_base={graphTb}:pixel_aspect=1/1"
-        let rk = &"srcrot|{rad}|{bg}|{rbufArgs}"
+        let rk = fxId(actRotate, frame, f0 = rad)
         if rotKey != rk:
           if rotGraph != nil: rotGraph.cleanup()
           rotGraph = newGraph()
-          let bsrc = rotGraph.add("buffer", rbufArgs)
+          let bsrc = rotGraph.add("buffer", bufArgsOf(frame))
           let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
           let bsink = rotGraph.add("buffersink")
           rotGraph.linkNodes(@[bsrc, filt, bsink]).configure()
@@ -995,8 +928,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     base.color_range = cint(ovRange)
     base.pts = 0
     top.pts = 0
-    let baseArgs = &"video_size={base.width}x{base.height}:pix_fmt={$AVPixelFormat(base.format)}:time_base={graphTb}:pixel_aspect=1/1:colorspace={ovColorspace}:range={ovRange}"
-    let topArgs = &"video_size={top.width}x{top.height}:pix_fmt={$AVPixelFormat(top.format)}:time_base={graphTb}:pixel_aspect=1/1"
+    let baseArgs = bufArgsOf(base) & &":colorspace={ovColorspace}:range={ovRange}"
+    let topArgs = bufArgsOf(top)
     let nw = max(2, int(top.width.float32 * scale))
     let nh = max(2, int(top.height.float32 * scale))
     let g = newGraph()
