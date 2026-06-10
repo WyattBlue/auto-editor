@@ -59,7 +59,8 @@ type
   AVColorSpace* = cint
   AVPixelFormat* = distinct cint
 
-proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.importc.}
+proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.
+  importc, header: "<libavutil/pixdesc.h>".}
 
 func `==`*(x, y: AVPixelFormat): bool {.borrow.}
 func `$`*(pix_fmt: AVPixelFormat): string = $av_get_pix_fmt_name(pix_fmt)
@@ -68,6 +69,21 @@ const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
 const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
 const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
 const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
+
+type
+  AVPixFmtDescriptor* {.importc, incompleteStruct,
+    header: "<libavutil/pixdesc.h>".} = object
+    flags*: uint64
+
+proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.
+  importc, header: "<libavutil/pixdesc.h>".}
+
+const AV_PIX_FMT_FLAG_ALPHA = 1'u64 shl 7
+
+func hasAlpha*(pix_fmt: AVPixelFormat): bool =
+  ## True if the pixel format carries an alpha channel (e.g. rgba, yuva420p).
+  let d = av_pix_fmt_desc_get(pix_fmt)
+  d != nil and (d.flags and AV_PIX_FMT_FLAG_ALPHA) != 0'u64
 
 type
   AVDictionary* {.importc, incompleteStruct, header: "<libavutil/dict.h>".} = object

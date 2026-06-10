@@ -615,10 +615,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         fxGraph.push(frame)
         av_frame_free(addr frame)
         frame = fxGraph.pull()
-      of actHflip, actVflip, actInvert:
+      of actHflip, actVflip, actInvert, actErosion:
         let filterName = case effect.kind
           of actHflip: "hflip"
           of actVflip: "vflip"
+          of actErosion: "erosion"
           else: "negate"
         let frameFmtName = $AVPixelFormat(frame.format)
         let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
@@ -792,6 +793,34 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             nodes.add fxGraph.add("format", "pix_fmts=rgba")
           else:
             nodes.add fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
+          nodes.add fxGraph.add("buffersink")
+          fxGraph.linkNodes(nodes).configure()
+          fxKey = key
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
+      of actChoke:
+        # Choke (shrink) the alpha matte a key produced, to cut off the spill
+        # fringe. Only overlay layers carry alpha; the base track keys over bg
+        # (no matte), so there is nothing to choke there.
+        if not isOverlay or not hasAlpha(AVPixelFormat(frame.format)):
+          continue
+        let n = max(1, int(effect.chokeN))
+        let frameFmtName = $AVPixelFormat(frame.format)
+        let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+        let key = &"choke|{n}|{frameFmtName}|{bufferArgs}"
+        if fxKey != key:
+          if fxGraph != nil:
+            fxGraph.cleanup()
+          fxGraph = newGraph()
+          var nodes = @[fxGraph.add("buffer", bufferArgs)]
+          # Erode only the alpha plane: in gbrap the color planes are 0=G, 1=B,
+          # 2=R, so threshold0..2=0 freezes them and only plane 3 (alpha) erodes.
+          # Each pass pulls the matte edge inward by 1px.
+          nodes.add fxGraph.add("format", "pix_fmts=gbrap")
+          for _ in 0 ..< n:
+            nodes.add fxGraph.add("erosion", "threshold0=0:threshold1=0:threshold2=0")
+          nodes.add fxGraph.add("format", &"pix_fmts={frameFmtName}")
           nodes.add fxGraph.add("buffersink")
           fxGraph.linkNodes(nodes).configure()
           fxKey = key
