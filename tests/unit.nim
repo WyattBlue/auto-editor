@@ -208,6 +208,21 @@ test "actions":
   check abs(sampleKf(kf, 1.0'f32) - 1.0'f32) < 0.001'f32
   check abs(sampleKf(kf, 0.25'f32) - 0.75'f32) < 0.001'f32  # halfway into seg 0
 
+  # Parameterless video filters round-trip through `$`.
+  check $parseActions("erosion") == "erosion"
+  check acts("erosion")[0].kind == actErosion
+
+  # choke: matte erosion, count defaults to 1 and round-trips through `$`.
+  check $parseActions("choke") == "choke:1"
+  check $parseActions("choke:2") == "choke:2"
+  block:
+    let c = acts("choke:3")[0]
+    check c.kind == actChoke
+    check c.chokeN == 3'u8
+  expect ActionParseError: discard parseActions("choke:0")
+  expect ActionParseError: discard parseActions("choke:17")
+  expect ActionParseError: discard parseActions("choke:x")
+
   # loop is a per-clip flag: collapse to a single token at the front.
   check $parseActions("zoom:1..2,loop,loop") == "loop,zoom:1.0..2.0"
   check $parseActions("loop,speed:1.5,loop") == "loop,speed:1.5"

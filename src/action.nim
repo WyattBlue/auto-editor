@@ -9,7 +9,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actHflip, actVflip,
     actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate, actSpin,
-    actDrawbox, actPos, actColorKey, actChromaKey, actLoop
+    actDrawbox, actPos, actColorKey, actChromaKey, actLoop, actErosion, actChoke
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -24,7 +24,7 @@ type
   # section) plus an optional easing curve + duration packed inline.
   Action* = object
     case kind*: ActionKind
-    of actInvert, actHflip, actVflip, actLoop:
+    of actInvert, actHflip, actVflip, actLoop, actErosion:
       discard
     of actRotate:
       rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
@@ -56,6 +56,8 @@ type
     of actColorKey, actChromaKey:
       color*: RGBColor
       similar*, blend*: Unorm16
+    of actChoke:
+      chokeN*: uint8         # matte-erosion passes (px to shrink the alpha matte)
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -120,6 +122,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Flip the section horizontally, mirroring it left to right."),
   ActionDef(name: "vflip", flags: {afVideo},
     help: "Flip the section vertically, mirroring it top to bottom."),
+  ActionDef(name: "erosion", flags: {afVideo},
+    help: "Erode the picture by replacing each pixel with the darkest of its 3x3 neighborhood. Bright details shrink and dark regions grow, giving a gritty, eaten-away look. Implemented via ffmpeg's `erosion` filter."),
   ActionDef(name: "zoom", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 100.0, loIncl = false),
     help: "Scale the picture about its center by val. 1.0 = no zoom, 2.0 = zoom in 2x, 0.5 = zoom out 2x. Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
   ActionDef(name: "opacity", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 1.0),
@@ -150,6 +154,8 @@ Positional args: `k1` is the quadratic correction factor and `k2` the double-qua
     help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
   ActionDef(name: "chromakey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
     help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
+  ActionDef(name: "choke", flags: {afVideo}, argSpec: "[n]", range: rng(1.0, 16.0),
+    help: "Shrink (choke) the alpha matte left by a `colorkey`/`chromakey` inward by `n` pixels (default 1), cutting off the ring of key-color spill and ragged edge pixels around the subject. Must come after the key in the chain, e.g. `add:fg.mp4,chromakey:green,choke:2`. Only meaningful on overlay tracks (where keying produces alpha); a no-op on the base track. Implemented by eroding only the alpha plane via ffmpeg's `erosion` filter."),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
 ]
@@ -253,6 +259,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actVflip)
   if val == "loop":
     return Action(kind: actLoop)
+  if val == "erosion":
+    return Action(kind: actErosion)
 
   let parts = val.split(":")
 
@@ -354,6 +362,20 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if parts[0] == "colorkey":
       return Action(kind: actColorKey, color: col, similar: vals[0], blend: vals[1])
     return Action(kind: actChromaKey, color: col, similar: vals[0], blend: vals[1])
+
+  # choke: shrink the alpha matte inward by `n` pixels (default 1).
+  if parts[0] == "choke" and parts.len <= 2:
+    if parts.len == 1:
+      return Action(kind: actChoke, chokeN: 1)
+    let n = (
+      try:
+        parseInt(parts[1])
+      except ValueError:
+        raise newException(ActionParseError, "Invalid integer value: " & parts[1])
+    )
+    if n < 1 or n > 16:
+      raise newException(ActionParseError, "choke must be in [1, 16]")
+    return Action(kind: actChoke, chokeN: uint8(n))
 
   # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
   if parts[0] == "pos" and parts.len in {3, 4}:
@@ -466,6 +488,7 @@ when not defined(nimscript):
     of actHflip: "hflip"
     of actVflip: "vflip"
     of actLoop: "loop"
+    of actErosion: "erosion"
     of actSpeed: "speed:" & $act.val
     of actVarispeed: "varispeed:" & $act.val
     of actVolume: "volume:" & $act.val
@@ -493,15 +516,17 @@ when not defined(nimscript):
     of actPos: "pos:" & $act.px & ":" & $act.py & ":" & $act.pscale
     of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
     of actChromaKey: "chromakey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
+    of actChoke: "choke:" & $int(act.chokeN)
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
   func actionByteSize(a: Action): int =
     case a.kind
-    of actInvert, actHflip, actVflip, actLoop: 1
+    of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actRotate: 3
     of actLens, actSpeed, actVarispeed, actVolume: 5
     of actDeesser, actSpin: 7
+    of actChoke: 2
     of actColorKey, actChromaKey: 8
     of actLuv: 11
     of actPos: 13
@@ -529,7 +554,7 @@ when not defined(nimscript):
       while i < n:
         let kind = ActionKind((base[i] and 0x7f'u8).int)
         case kind
-        of actInvert, actHflip, actVflip, actLoop:
+        of actInvert, actHflip, actVflip, actLoop, actErosion:
           yield Action(kind: kind)
           i += 1
         of actRotate:
@@ -570,6 +595,9 @@ when not defined(nimscript):
           copyMem(addr blend, addr base[i + 6], sizeof(Unorm16))
           yield Action(kind: kind, color: col, similar: sim, blend: blend)
           i += 8
+        of actChoke:
+          yield Action(kind: actChoke, chokeN: base[i + 1])
+          i += 2
         of actLuv:
           var bh: Snorm16
           var c, s: float32
@@ -656,7 +684,7 @@ when not defined(nimscript):
     for a in list:
       base[i] = uint8(ord(a.kind))
       case a.kind
-      of actInvert, actHflip, actVflip, actLoop:
+      of actInvert, actHflip, actVflip, actLoop, actErosion:
         i += 1
       of actRotate:
         base.writeAt(i, 1, a.rStart)
@@ -682,6 +710,9 @@ when not defined(nimscript):
         base.writeAt(i, 4, a.similar)
         base.writeAt(i, 6, a.blend)
         i += 8
+      of actChoke:
+        base[i + 1] = a.chokeN
+        i += 2
       of actLuv:
         base.writeAt(i, 1, a.brighthue)
         base.writeAt(i, 3, a.contrast)
