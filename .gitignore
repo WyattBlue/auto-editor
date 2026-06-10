@@ -1,11 +1,16 @@
 auto-editor
-build/
-build_*
+build*
 ffmpeg_sources
-tests/
+tests
+
+# Editor
 .vscode
+
+# Models
 *.bin
 *.onnx
+
+# Generated
 *_ALTERED*
 *https*
 *.v3
@@ -16,7 +21,7 @@ tests/
 *.dylib
 *.o
 
-# Generated Files
+# Nimble
 nimble.develop
 nimble.paths
 nimbledeps
