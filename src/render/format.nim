@@ -1,7 +1,7 @@
 import std/[heapqueue, options, strformat, strutils, tables]
 from std/math import round
 
-import ../[av, ffmpeg, log, media, timeline]
+import ../[av, ffmpeg, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
 import video
 import audio
@@ -95,6 +95,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
 proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
     cache: MediaCache = nil) =
+  var throttle = initThrottle()
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
   if args.fragmented and not args.noFragmented:
@@ -412,6 +413,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
           let time = frame.time(encCtx.time_base)
           if time != -1.0:
             bar.tick(round(time * tl.tb))
+            throttle.checkpoint(time)
         output.mux(outPacket[])
         av_packet_unref(outPacket)
 
