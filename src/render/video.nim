@@ -15,12 +15,6 @@ type VideoFrame = object
   scale: float32  # overlay size multiplier; 1.0 for the base layer
   fit: bool   # no explicit `pos`: fit-and-center to the canvas like the base
 
-func clipT(local, animLen: int): float32 =
-  ## Normalized time over an animation of `animLen` frames, reaching 1.0 on the
-  ## last frame and holding there once the animation completes.
-  let l = min(local, max(animLen - 1, 0))
-  float32(l) / float32(max(animLen - 1, 1))
-
 func envAnimLen(unit: DurUnit, mag: float32, clipDur: int, fps: float): int =
   ## Resolve an ease duration to a frame count for the current clip.
   case unit

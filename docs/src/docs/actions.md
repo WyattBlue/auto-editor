@@ -85,6 +85,9 @@ auto-editor video.mp4 --when-silent volume:0.2
 
 # Boost loud sections
 auto-editor video.mp4 --when-normal volume:1.5
+
+# Fade the audio in across the section (see Animations below)
+auto-editor video.mp4 --when-normal volume:0..1
 ```
 
 ### deesser
@@ -272,10 +275,11 @@ auto-editor video.mp4 --when-silent speed:2,varispeed:1.5,volume:0.8
 
 ## Animations
 
-The animatable video effects — `zoom`, `opacity`, `blur`, and `brightness` —
-accept a **ramp** instead of a single value, written `from..to`. The value is
-interpolated across the section, so the effect changes over time. (For rotation,
-use the constant-speed `rotate:deg/rate` form described above.)
+The animatable effects — `zoom`, `opacity`, `blur`, and `brightness` for video,
+plus `volume` for audio — accept a **ramp** instead of a single value, written
+`from..to`. The value is interpolated across the section, so the effect changes
+over time. (For rotation, use the constant-speed `rotate:deg/rate` form
+described above.)
 
 ```bash
 # Slowly zoom in from 1x to 1.5x across the section (Ken Burns)
@@ -283,6 +287,9 @@ auto-editor video.mp4 --when-normal zoom:1..1.5
 
 # Fade in (opacity 0 to 1)
 auto-editor video.mp4 --when-normal opacity:0..1
+
+# Fade the audio in alongside it
+auto-editor video.mp4 --when-normal volume:0..1
 ```
 
 The ramp reaches `to` on the section's last frame.

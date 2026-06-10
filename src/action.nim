@@ -33,9 +33,9 @@ type
       sRate*: float32        # spin rate in degrees/second (continuous)
     of actLens:
       k1*, k2*: Snorm16
-    of actSpeed, actVarispeed, actVolume:
+    of actSpeed, actVarispeed:
       val*: float32
-    of actZoom, actBlur, actOpacity, actBrightness:
+    of actZoom, actBlur, actOpacity, actBrightness, actVolume:
       kf*: seq[float32]      # keyframes in native units; len >= 1
       hasEase*: bool
       easeCurve*: Easing
@@ -110,8 +110,8 @@ const actionDefs*: seq[ActionDef] = @[
     help: """
 Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
 The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`."""),
-  ActionDef(name: "volume", flags: {afAudio}, argSpec: "float32",
-    help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB)."),
+  ActionDef(name: "volume", flags: {afAudio, afAnimatable}, argSpec: "v[..v...]",
+    help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB). Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
   ActionDef(name: "deesser", flags: {afAudio}, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
     help: """
 Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
@@ -178,6 +178,13 @@ const
   luvBrighthueId* = toSnorm16(0.0'f32)
   luvContrastId* = 1.0'f32
   luvSaturationId* = 1.0'f32
+
+func clipT*(local, animLen: int): float32 =
+  ## Normalized time over an animation of `animLen` steps (frames or samples),
+  ## reaching 1.0 on the last step and holding there once the animation
+  ## completes.
+  let l = min(local, max(animLen - 1, 0))
+  float32(l) / float32(max(animLen - 1, 1))
 
 func applyEase*(e: Easing, t: float32): float32 =
   let x = clamp(t, 0.0'f32, 1.0'f32)
@@ -429,6 +436,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     of "opacity":
       return Action(kind: actOpacity, kf: kf, hasEase: hasE, easeCurve: curve,
         easeDurUnit: unit, easeDur: dur)
+    of "volume":
+      return Action(kind: actVolume, kf: kf, hasEase: hasE, easeCurve: curve,
+        easeDurUnit: unit, easeDur: dur)
     else:
       return Action(kind: actBrightness, kf: kf, hasEase: hasE, easeCurve: curve,
         easeDurUnit: unit, easeDur: dur)
@@ -443,7 +453,6 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     )
     case effectType
     of "speed": return Action(kind: actSpeed, val: effectVal)
-    of "volume": return Action(kind: actVolume, val: effectVal)
     of "varispeed": return Action(kind: actVarispeed, val: effectVal)
     of "brighthue":
       return Action(kind: actLuv, brighthue: effectVal,
@@ -491,7 +500,7 @@ when not defined(nimscript):
     of actErosion: "erosion"
     of actSpeed: "speed:" & $act.val
     of actVarispeed: "varispeed:" & $act.val
-    of actVolume: "volume:" & $act.val
+    of actVolume: "volume:" & kfStr(act) & easeSuffix(act)
     of actDeesser:
       let i = act.intensity
       let m = act.maxd
@@ -524,7 +533,7 @@ when not defined(nimscript):
     case a.kind
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actRotate: 3
-    of actLens, actSpeed, actVarispeed, actVolume: 5
+    of actLens, actSpeed, actVarispeed: 5
     of actDeesser, actSpin: 7
     of actChoke: 2
     of actColorKey, actChromaKey: 8
@@ -532,7 +541,7 @@ when not defined(nimscript):
     of actPos: 13
     of actDrawbox: 20
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
-    of actBlur, actZoom: 2 + easeBytes(a) + a.kf.len * 4
+    of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -568,7 +577,7 @@ when not defined(nimscript):
           copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
           yield Action(kind: actLens, k1: k1v, k2: k2v)
           i += 5
-        of actSpeed, actVarispeed, actVolume:
+        of actSpeed, actVarispeed:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
@@ -623,7 +632,7 @@ when not defined(nimscript):
           let col = RGBColor(red: base[i + 17], green: base[i + 18], blue: base[i + 19])
           yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h, dbColor: col)
           i += 20
-        of actZoom, actBlur, actOpacity, actBrightness:
+        of actZoom, actBlur, actOpacity, actBrightness, actVolume:
           let hasEase = (base[i] and easeFlag) != 0'u8
           var pos = i + 1
           var act = Action(kind: kind)
@@ -637,7 +646,7 @@ when not defined(nimscript):
           pos += 1
           act.kf = newSeq[float32](count)
           for c in 0 ..< count:
-            if kind in {actZoom, actBlur}:
+            if kind in {actZoom, actBlur, actVolume}:
               var v: float32
               copyMem(addr v, addr base[pos], sizeof(float32))
               act.kf[c] = v
@@ -693,7 +702,7 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.k1)
         base.writeAt(i, 3, a.k2)
         i += 5
-      of actSpeed, actVarispeed, actVolume:
+      of actSpeed, actVarispeed:
         base.writeAt(i, 1, a.val)
         i += 5
       of actDeesser:
@@ -730,7 +739,7 @@ when not defined(nimscript):
         base.writeAt(i, 13, a.dbH)
         base.writeAt(i, 17, a.dbColor)
         i += 20
-      of actZoom, actBlur, actOpacity, actBrightness:
+      of actZoom, actBlur, actOpacity, actBrightness, actVolume:
         if a.hasEase: base[i] = base[i] or easeFlag
         var pos = i + 1
         if a.hasEase:
@@ -742,7 +751,7 @@ when not defined(nimscript):
         base[pos] = uint8(a.kf.len)
         pos += 1
         for v in a.kf:
-          if a.kind in {actZoom, actBlur}:
+          if a.kind in {actZoom, actBlur, actVolume}:
             var vv = v
             copyMem(addr base[pos], addr vv, sizeof(float32))
             pos += 4
@@ -785,8 +794,8 @@ when not defined(nimscript):
         continue
 
       var action = parseAction(trimmedPart)
-      if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness} and
-          not action.hasEase:
+      if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness,
+          actVolume} and not action.hasEase:
         action.hasEase = true
         action.easeCurve = pendCurve
         action.easeDurUnit = pendUnit

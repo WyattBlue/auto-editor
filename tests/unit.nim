@@ -135,6 +135,18 @@ test "actions":
   check $parseActions("zoom:1..0.5..1") == "zoom:1.0..0.5..1.0"
   check $parseActions("opacity:0..1..0") == "opacity:0.0..1.0..0.0"
 
+  # volume is animatable like the scalar video effects (fade-in/out ramps).
+  check $parseActions("volume:0.5") == "volume:0.5"
+  check $parseActions("volume:0..1") == "volume:0.0..1.0"
+  check $parseActions("volume:1..0..1:ease=inout") == "volume:1.0..0.0..1.0:ease=inout"
+  block:
+    let v = acts("ease:in:2sec,volume:0..1")[0]
+    check v.kind == actVolume
+    check v.kf == @[0.0'f32, 1.0'f32]
+    check v.hasEase
+    check v.easeCurve == easeIn
+    check v.easeDurUnit == duSec
+
   # rotate: a fixed angle (static, expands the canvas).
   check $parseActions("rotate:90") == "rotate:90.0"
   block:
