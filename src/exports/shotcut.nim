@@ -105,8 +105,10 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
       elif effect.kind == actVarispeed:
         speedVal *= effect.val
         lastSpeedWasVarispeed = true
-      elif effect.kind == actVolume:
-        volumeVal *= effect.val
+      elif effect.kind == actVolume and effect.kf.len > 0:
+        # Shotcut's volume filter is a single level; an animated ramp exports
+        # as its starting value.
+        volumeVal *= effect.kf[0]
 
     let tagName = &"chain{chains}"
     inc chains

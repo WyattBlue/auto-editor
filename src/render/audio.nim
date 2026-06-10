@@ -263,7 +263,7 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
+proc createFilterGraph(effects: openArray[Action], sr: cint, layout: ref AVChannelLayout):
   (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
 
   let filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
@@ -307,8 +307,6 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
       let clampedSpeed = max(0.2, min(100.0, effect.val))
       filters.add &"asetrate={sr}*{clampedSpeed}"
       filters.add &"aresample={sr}"
-    of actVolume:
-      filters.add &"volume={effect.val}"
     of actDeesser:
       filters.add &"deesser=i={effect.intensity}:m={effect.maxd}:f={effect.freq}"
     else: discard
@@ -352,26 +350,35 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
 
   return (filterGraph, bufferSrc, bufferSink)
 
-# Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint,
-    layout: ref AVChannelLayout): seq[int16] =
-  if data.len == 0:
-    return @[]
+proc applyVolume(data: var seq[int16], act: Action, channels: int, sr: cint,
+    fps: float) =
+  ## Multiply samples by the volume envelope (a static value or keyframe ramp
+  ## with optional easing), following the video effects' progress rules.
+  let frames = data.len div channels
+  if frames == 0:
+    return
+  let animLen = case act.easeDurUnit
+    of duClip: frames
+    of duSec: max(1, int(round(act.easeDur.float64 * sr.float64)))
+    of duFrames: max(1, int(round(act.easeDur.float64 * sr.float64 / fps)))
+  for i in 0 ..< frames:
+    let gain = sampleKf(act.kf, applyEase(act.easeCurve, clipT(i, animLen)))
+    if gain == 1.0'f32:
+      continue
+    for ch in 0 ..< channels:
+      let idx = i * channels + ch
+      data[idx] = clamp16(int32(round(data[idx].float32 * gain)))
 
-  # First apply speed/volume processing at source sample rate (if needed)
+proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
+    layout: ref AVChannelLayout): seq[int16] =
+  ## Push interleaved s16 samples through an ffmpeg filter chain built from
+  ## `acts`, returning the interleaved result at the same sample rate.
+  let channels = layout.nb_channels
   var processedData = data
 
-  let channels = layout.nb_channels
-  let effectGroup = ef[clip.effects]
-  var needsFiltering = false
-  for effect in effectGroup:
-    if effect.kind in [actSpeed, actVarispeed, actVolume, actDeesser]:
-      needsFiltering = true
-      break
-
-  if needsFiltering:
+  block:
     let samples = data.len div channels
-    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effectGroup, sourceSr, layout)
+    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(acts, sourceSr, layout)
     defer: avfilter_graph_free(addr filterGraph)
 
     # Create audio frame with input data
@@ -476,6 +483,36 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
                 processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
 
         sampleOffset += frameSamples
+
+  return processedData
+
+# Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint,
+    layout: ref AVChannelLayout, fps: float): seq[int16] =
+  if data.len == 0:
+    return @[]
+
+  # Apply the clip's audio effects in their declared order, at the source
+  # sample rate. Graph-backed effects (speed/varispeed/deesser) run as ffmpeg
+  # filter chains; `volume` is applied per-sample in Nim so keyframe ramps and
+  # easing follow the video effects' progress rules. The chain is split at each
+  # volume action so ordering is preserved (e.g. `volume:0.5,deesser` applies
+  # the gain before the deesser sees the signal).
+  var processedData = data
+  let channels = layout.nb_channels
+  var pending: seq[Action]
+  for effect in ef[clip.effects]:
+    case effect.kind
+    of actSpeed, actVarispeed, actDeesser:
+      pending.add effect
+    of actVolume:
+      if pending.len > 0:
+        processedData = runFilterChain(processedData, pending, sourceSr, layout)
+        pending.setLen(0)
+      applyVolume(processedData, effect, channels.int, sourceSr, fps)
+    else: discard
+  if pending.len > 0:
+    processedData = runFilterChain(processedData, pending, sourceSr, layout)
 
   # Now resample from source to target sample rate
   if sourceSr == targetSr:
@@ -655,7 +692,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
 
           let processedData = processAudioClip(tl.effects, clip, srcData,
-              getter.stream.codecpar.sample_rate, sr, getter.layout)
+              getter.stream.codecpar.sample_rate, sr, getter.layout, tb.float)
 
           if processedData.len > 0:
             let sourceChannels = getter.channels

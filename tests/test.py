@@ -1003,6 +1003,28 @@ class Runner:
             assert audio.sample_rate == 48000
             assert audio.channels == 2
 
+    def test_volume_ramp(self) -> None:
+        # An animated volume (0..1) must fade the audio in: the first tenth of
+        # the output should be much quieter than the last tenth.
+        import numpy as np
+
+        out = self.main(
+            ["resources/mono.mp3"], ["-e", "none", "-w:1", "volume:0..1"], "vr.wav"
+        )
+        chunks = []
+        with av.open(out) as container:
+            for frame in container.decode(container.streams.audio[0]):
+                chunks.append(frame.to_ndarray().flatten())
+        samples = np.concatenate(chunks).astype(np.float64)
+        n = len(samples)
+
+        def rms(x) -> float:
+            return float(np.sqrt(np.mean(x * x))) + 1e-9
+
+        head = rms(samples[: n // 10])
+        tail = rms(samples[-(n // 10) :])
+        assert tail / head > 4, f"no fade-in: head={head:.1f}, tail={tail:.1f}"
+
     def test_reordered_streams(self) -> None:
         """
         Files with audio before video in stream order must not produce black screens.
