@@ -102,6 +102,12 @@ jobs:
         run: nimble makeff
       - name: Compile
         run: nimble make
+      - name: Checkout tests
+        uses: actions/checkout@v6
+        with:
+          repository: WyattBlue/auto-editor-tests
+          token: ${{ secrets.TESTS_TOKEN }}
+          path: tests
       - name: Test
         run: nimble test
       - name: e2e Test
@@ -159,6 +165,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: auto-editor-windows
+      - name: Checkout tests
+        uses: actions/checkout@v6
+        with:
+          repository: WyattBlue/auto-editor-tests
+          token: ${{ secrets.TESTS_TOKEN }}
+          path: tests
       - name: e2e Test
         run: python -m pip install av numpy && python tests/test.py
 
@@ -216,6 +228,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: auto-editor-windows-arm
+      - name: Checkout tests
+        uses: actions/checkout@v6
+        with:
+          repository: WyattBlue/auto-editor-tests
+          token: ${{ secrets.TESTS_TOKEN }}
+          path: tests
       - name: e2e Test
         run: python -m pip install av numpy && python tests/test.py --no-failfast
 

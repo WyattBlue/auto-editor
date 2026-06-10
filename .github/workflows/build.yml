@@ -50,6 +50,12 @@ jobs:
         run: nimble makeff
       - name: Compile
         run: nimble make && mv auto-editor ${{ matrix.binary_name }}
+      - name: Checkout tests
+        uses: actions/checkout@v6
+        with:
+          repository: WyattBlue/auto-editor-tests
+          token: ${{ secrets.TESTS_TOKEN }}
+          path: tests
       - name: Test
         run: nimble test
 
