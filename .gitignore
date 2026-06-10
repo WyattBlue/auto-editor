@@ -1,13 +1,11 @@
 auto-editor
-build
+build/
 build_*
 ffmpeg_sources
+tests/
 .vscode
 *.bin
 *.onnx
-tests/*
-!tests/*.nim
-!tests/*.py
 *_ALTERED*
 *https*
 *.v3
@@ -19,11 +17,6 @@ tests/*
 *.o
 
 # Generated Files
-__pycache__/
-*.pyc
-*.pyo
-*.spec
-*.egg-info/
 nimble.develop
 nimble.paths
 nimbledeps
