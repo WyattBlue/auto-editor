@@ -63,9 +63,15 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   smooth*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 100)) # 0.2s,0.1s
-  edit*: string = "audio"
-  whenNormal*: Actions = aNil
-  whenSilent*: Actions = aCut
+  edit*: string = "audio"               # label 1 (the default --edit method)
+  whenNormal*: Actions = aNil            # label 1 action
+  whenSilent*: Actions = aCut            # label 0 action
+  # Additional labels (>= 2) for `--edit:N` / `--when:N`. Higher labels take
+  # priority when merging the edit array. Label 1 lives in `edit`/`whenNormal`,
+  # label 0 (silent) in `whenSilent`. A label present in `labeledEdits` but with
+  # no `--when:N` defaults to "keep" (aNil); see conductor's actionMap.
+  labeledEdits*: seq[tuple[label: int, expr: string]]
+  labeledWhens*: seq[tuple[label: int, action: Actions]]
   `export`*: string = ""
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]

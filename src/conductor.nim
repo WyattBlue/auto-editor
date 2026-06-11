@@ -272,18 +272,45 @@ proc editMedia*(args: var mainArgs) =
         var singleArgs = args
         singleArgs.inputs = @[args.inputs[i]]
 
-        var hasLoud = interpretEdit(singleArgs, @[container], tb, bar)
+        var labels = interpretEdit(singleArgs, @[container], tb, bar)
         let tbf = tb.float64
         let startMargin = toTb(args.margin[0], tbf)
         let endMargin = toTb(args.margin[1], tbf)
         let mincut = toTb(args.smooth[0], tbf)
         let minclip = toTb(args.smooth[1], tbf)
 
-        mutMargin(hasLoud, startMargin, endMargin)
-        smoothing(hasLoud, mincut, minclip)
+        # Margin and smoothing act on the binary keep/cut boundary (active = any
+        # non-silent label). Run them on that mask, then fold the result back into
+        # the labels: where margin/mincut turned silence active, call it label 1
+        # (normal); where minclip cut a short active clip, set it silent (0). With
+        # only labels 0/1 present this reproduces the previous behavior exactly.
+        var active = newSeq[bool](labels.len)
+        for i in 0 ..< labels.len:
+          active[i] = labels[i] != 0'u8
 
-        var actionMap: seq[Actions] = @[args.whenSilent, args.whenNormal]
-        var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
+        mutMargin(active, startMargin, endMargin)
+        smoothing(active, mincut, minclip)
+
+        for i in 0 ..< labels.len:
+          if not active[i]:
+            labels[i] = 0'u8
+          elif labels[i] == 0'u8:
+            labels[i] = 1'u8
+
+        # actionMap is indexed by label: 0 = silent, 1 = normal, >= 2 come from
+        # --when:N (defaulting to aNil = keep). --set-action ranges append unique
+        # indices beyond maxLabel below, so they never collide with a label.
+        var maxLabel = 1
+        for le in args.labeledEdits:
+          maxLabel = max(maxLabel, le.label)
+        for lw in args.labeledWhens:
+          maxLabel = max(maxLabel, lw.label)
+        var actionMap = newSeq[Actions](maxLabel + 1)
+        actionMap[0] = args.whenSilent
+        actionMap[1] = args.whenNormal
+        for lw in args.labeledWhens:
+          actionMap[lw.label] = lw.action
+        var actionIndex: seq[int] = labels.map(proc(x: uint8): int = int(x))
 
         var conLen = 0
         proc getConLen(): int =
