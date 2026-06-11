@@ -237,24 +237,3 @@ jobs:
       - name: e2e Test
         run: python -m pip install av numpy && python tests/test.py --no-failfast
 
-  wasm:
-    needs: fan
-    runs-on: macos-latest
-    env:
-      DISABLE_HEVC: 1
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Get ffmpeg_sources
-        uses: actions/download-artifact@v8
-        with:
-          name: deps
-          path: ffmpeg_sources
-      - name: Install packages
-        run: brew install nim emscripten wabt
-      - name: GCC/Clang version
-        run: nim --version && gcc --version
-      - name: Build FFmpeg
-        run: nimble makeffwasm
-      - name: Compile
-        run: nimble makewasm

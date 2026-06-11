@@ -1,18 +1,13 @@
 import std/[options, os, parseutils, sequtils, strformat, strutils]
 when not defined(emscripten):
   import std/osproc
+  import ./media
   import cmds/completion
-when defined(emscripten):
-  {.emit: """
-extern int main(int argc, char** argv, char** env);
-int __main_argc_argv(int argc, char** argv) {
-  return main(argc, argv, (char**)0);
-}
-""".}
+
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, action, cli, conductor, edit, ffmpeg, license, log, media]
+import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
 import util/[color, fun, term, rational]
 

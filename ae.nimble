@@ -1103,8 +1103,6 @@ task makewasm64, "Compile to wasm64 (requires emscripten, wabt)":
   if not dirExists("build_wasm64"):
     echo "FFmpeg for wasm64 not found. Run 'nimble makeffwasm64' first."
   else:
-    # --cpu:riscv64 picked for its 64-bit pointer ABI; using --cpu:amd64 makes
-    # nimcrypto pull in x86 SHA/AVX intrinsics that emscripten can't compile.
-    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:riscv64 " &
+    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:wasm64 " &
          "--out:docs/src/auto-editor-web64.js src/main.nim"
     stripProgram(wasm64)
