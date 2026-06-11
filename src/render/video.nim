@@ -756,6 +756,24 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           nodes.add fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           nodes.add fxGraph.add("buffersink")
           fxGraph.linkNodes(nodes).configure()
+      of actAberration:
+        # Fake chromatic aberration: slide each color channel by its own offset,
+        # so the gaps show up as colored fringing. Via rgba so an overlay layer's
+        # alpha rides through unshifted.
+        let edge = (if effect.abWrap: "wrap" else: "smear")
+        runFx(fxId(actAberration, frame,
+            i0 = effect.abRh.int32, i1 = effect.abRv.int32,
+            i2 = effect.abGh.int32, i3 = effect.abGv.int32,
+            f0 = effect.abBh.float32, f1 = effect.abBv.float32,
+            col = (if effect.abWrap: 1'u32 else: 0'u32))):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+          let toRgba = fxGraph.add("format", "pix_fmts=rgba")
+          let shift = fxGraph.add("rgbashift",
+            &"rh={effect.abRh}:rv={effect.abRv}:gh={effect.abGh}:gv={effect.abGv}" &
+            &":bh={effect.abBh}:bv={effect.abBv}:edge={edge}")
+          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, toRgba, shift, toOrig, bufferSink]).configure()
     return frame
 
   proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
