@@ -6,11 +6,18 @@ template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
   copyMem(addr baseBuffer[index + offset], addr temp, sizeof(temp))
 
 type
+  # The order is part of the API
   ActionKind* = enum
-    actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actHflip, actVflip,
-    actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate, actSpin,
-    actDrawbox, actPos, actColorKey, actChromaKey, actLoop, actErosion, actChoke,
-    actAberration
+    actSpeed, actVarispeed,
+    # Can add 2 more [VA] actions
+    actVolume = 4,
+    actDeesser,
+    # Can add 14 more [A] actions
+    actInvert = 20,
+    actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
+    actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
+    actErosion, actChoke, actAberration
+    # Can add 89 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
