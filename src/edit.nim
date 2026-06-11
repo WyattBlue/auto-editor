@@ -211,15 +211,10 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
   walk(expressions[^1])
   return (video, audio)
 
-proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[bool] =
-  var lexer = initLexer("--edit", args.edit)
-  var parser = initParser(lexer)
-
-  let expressions: seq[Expr] = parser.parse()
-  let expr = expressions[^1]
-  if expr.kind != ExprList:
-    error "Should never happen"
-
+proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[uint8] =
+  ## Evaluate the label-1 `--edit` method plus any `--edit:N` (N >= 2) methods and
+  ## merge them into one array: each element holds the highest label whose mask is
+  ## active, or 0 (silent). See SPEC.md / [[action-storage-prefer-norm16]].
   proc editEval(expr: Expr, text: string): seq[bool] =
     if expr.kind != ExprList or expr.elements.len == 0:
       error "Bad kind"
@@ -404,4 +399,30 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
     else:
       error "`--edit` expects a valid expression"
 
-  return editEval(expr, args.edit)
+  proc evalEditString(editStr: string): seq[bool] =
+    var lexer = initLexer("--edit", editStr)
+    var parser = initParser(lexer)
+    let expressions: seq[Expr] = parser.parse()
+    let expr = expressions[^1]
+    if expr.kind != ExprList:
+      error "Should never happen"
+    return editEval(expr, editStr)
+
+  # Label 1: the default `--edit` method. Maps the boolean mask onto 0/1.
+  let base = evalEditString(args.edit)
+  result = newSeq[uint8](base.len)
+  for i in 0 ..< base.len:
+    if base[i]:
+      result[i] = 1'u8
+
+  # Labels >= 2: higher label wins on overlap (priority max). A label's mask may
+  # be longer than the running result (e.g. differing stream lengths); extend
+  # with 0 (silent) so the merge covers every sample.
+  for le in args.labeledEdits:
+    let mask = evalEditString(le.expr)
+    if mask.len > result.len:
+      result.setLen(mask.len)
+    let lbl = uint8(le.label)
+    for i in 0 ..< mask.len:
+      if mask[i] and lbl > result[i]:
+        result[i] = lbl

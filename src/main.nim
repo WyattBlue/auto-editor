@@ -147,7 +147,11 @@ when not defined(emscripten):
   proc wantStreams(args: mainArgs): (bool, bool) =
     ## Decide whether the video and/or audio streams are worth downloading,
     ## based on what the output format holds and what --edit needs to analyze.
-    let (editV, editA) = editNeeds(args.edit)
+    var (editV, editA) = editNeeds(args.edit)
+    for le in args.labeledEdits:  # union the needs of every --edit:N method
+      let (v, a) = editNeeds(le.expr)
+      editV = editV or v
+      editA = editA or a
 
     var outV = true
     var outA = true
@@ -323,6 +327,42 @@ proc parseActionAndRange(val: string, args: var mainArgs): (Actions, PackedInt, 
   let acts = (if rest == "": aNil else: parseActions(rest))
   return (acts, startTime, endTime)
 
+proc parseLabeledFlag(key: string): tuple[matched: bool, kind: string, label: int] =
+  ## Detect the generic `:<n>` label suffix on `--edit`/`-e` and `--when`/`-w`.
+  ## Returns kind "edit" (label 1..255) or "when" (label 0..255). The suffix must
+  ## be a bare integer in range; `--edit:0` is rejected (label 0 is silent-only).
+  let ci = key.find(':')
+  if ci == -1:
+    return (false, "", 0)
+  let kind =
+    case key[0 ..< ci]
+    of "-e", "--edit": "edit"
+    of "-w", "--when": "when"
+    else: return (false, "", 0)
+  let suffix = key[ci + 1 .. ^1]
+  var n: int
+  if suffix.len == 0 or parseInt(suffix, n) != suffix.len:
+    error &"Invalid label in {key}: expected an integer after ':'"
+  if kind == "edit" and n == 0:
+    error "--edit:0 is invalid (label 0 is reserved for silent; use --when:0 to act on silent sections)"
+  if n < 0 or n > 255:
+    error &"Label out of range [0, 255] in {key}"
+  return (true, kind, n)
+
+proc setLabeledWhen(args: var mainArgs, label: int, action: Actions) =
+  for w in args.labeledWhens.mitems:
+    if w.label == label:
+      w.action = action
+      return
+  args.labeledWhens.add (label: label, action: action)
+
+proc setLabeledEdit(args: var mainArgs, label: int, expr: string) =
+  for e in args.labeledEdits.mitems:
+    if e.label == label:
+      e.expr = expr
+      return
+  args.labeledEdits.add (label: label, expr: expr)
+
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -340,9 +380,18 @@ judge making cuts.
   var args = mainArgs()
   var showVersion: bool = false
   var expecting: string = ""
+  var expectingLabel: int = 1  # label for a pending "edit"/"when" value (plain --edit => 1)
 
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
+    # Generic `--edit:N` / `-e:N` / `--when:N` / `-w:N`. Plain `--edit` and the
+    # named `--when-*` aliases have no `:` suffix, so they fall through to
+    # genCliMacro below (which sets `expecting` to "edit"/"when-normal"/... ).
+    let lf = parseLabeledFlag(key)
+    if lf.matched:
+      expecting = lf.kind
+      expectingLabel = lf.label
+      continue
     if genCliMacro(key, args, mainOptions):
       continue
     if key in ["-h", "--help"]:
@@ -353,11 +402,23 @@ judge making cuts.
     of "":
       args.inputs.add key
     of "edit":
-      args.edit = key
+      if expectingLabel == 1:
+        args.edit = key
+      else:
+        setLabeledEdit(args, expectingLabel, key)
     of "export":
       args.`export` = key
     of "output":
       args.output = key
+    of "when":
+      # Generic `--when:N` / `-w:N`. Labels 0 and 1 share storage with the named
+      # --when-silent / --when-normal aliases; labels >= 2 go to labeledWhens.
+      let rest = extractAdds(key, expectingLabel, -1, args)
+      if rest.strip() != "":
+        case expectingLabel
+        of 0: args.whenSilent = parseActions(rest)
+        of 1: args.whenNormal = parseActions(rest)
+        else: setLabeledWhen(args, expectingLabel, parseActions(rest))
     of "when-silent":
       let rest = extractAdds(key, 0, -1, args)
       if rest.strip() != "":
@@ -434,6 +495,7 @@ judge making cuts.
     of "tempdir":
       tempDir = key
     expecting = ""
+    expectingLabel = 1
 
   if expecting != "":
     error &"{cmdLineParams[^1]} needs argument."

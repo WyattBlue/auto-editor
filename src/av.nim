@@ -99,8 +99,9 @@ func duration*(container: InputContainer): float64 =
   return 0.0
 
 proc mediaLength*(container: InputContainer): AVRational =
-  # Get the mediaLength in seconds.
+  # Result is in seconds.
   var formatCtx = container.formatContext
+  discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
   var audioStreamIndex = (if container.audio.len == 0: -1 else: container.audio[0].index)
   var videoStreamIndex = (if container.video.len == 0: -1 else: container.video[0].index)
 
