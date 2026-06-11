@@ -217,7 +217,8 @@ Overlay an image or video on top of the matched sections, `add:path` or
   for the whole section.
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
   (above). When omitted, the overlay is scaled to fit the canvas (preserving
-  aspect ratio) and centered, like a full-frame layer.
+  aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
+  (e.g. `0..600`), so the overlay animates across the section.
 
 ```bash
 # Overlay a logo scaled to fit and centered over every kept (normal) section
@@ -225,6 +226,9 @@ auto-editor video.mp4 --when-normal add:./logo.png
 
 # Put a logo at (600, 300)
 auto-editor video.mp4 --when-normal add:./logo.png:600:300:1.0
+
+# Slide a logo across the frame while shrinking it (ramps in x and scale)
+auto-editor video.mp4 --when-normal add:./logo.png:0..1000:300:1..0.5
 
 # Shrink an overlay video to a quarter size in the corner
 auto-editor video.mp4 --when-normal add:./pip.mp4:900:60:0.25
@@ -281,6 +285,9 @@ plus `volume` for audio — accept a **ramp** instead of a single value, written
 over time. (For rotation, use the constant-speed `rotate:deg/rate` form
 described above.)
 
+`pos` is animatable too: each of its `x`, `y`, and `scale` fields takes its own
+ramp, so an overlay can slide and resize across the section.
+
 ```bash
 # Slowly zoom in from 1x to 1.5x across the section (Ken Burns)
 auto-editor video.mp4 --when-normal zoom:1..1.5
@@ -290,6 +297,9 @@ auto-editor video.mp4 --when-normal opacity:0..1
 
 # Fade the audio in alongside it
 auto-editor video.mp4 --when-normal volume:0..1
+
+# Slide a logo across the frame while shrinking it
+auto-editor video.mp4 --when-normal add:./logo.png,pos:0..1200:40:1..0.5
 ```
 
 The ramp reaches `to` on the section's last frame.

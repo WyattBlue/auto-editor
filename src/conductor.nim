@@ -195,7 +195,8 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
     # any actions chained after `add:` (which apply to this layer, not the base).
     var acts: seq[Action]
     if spec.hasPos:
-      acts.add Action(kind: actPos, px: spec.x, py: spec.y, pscale: spec.scale)
+      acts.add Action(kind: actPos, pxKf: spec.xKf, pyKf: spec.yKf,
+        pscaleKf: spec.scaleKf)
     if spec.effects.len > 0:
       try:
         for a in parseActions(spec.effects):
