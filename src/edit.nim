@@ -1,5 +1,5 @@
 import std/[math, options, os, sequtils, strformat, strutils]
-import ./[av, editlexer, ffmpeg, log]
+import ./[av, editlexer, editmethods, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./util/[bar, dnorm16, fun, rational]
 
@@ -177,8 +177,9 @@ proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
       none(InputContainer)
 
 proc editNeeds*(edit: string): tuple[video, audio: bool] =
-  ## Report which media streams an --edit expression analyzes, so callers can
-  ## avoid fetching streams that no editing method will look at.
+  ## Report whether an --edit expression analyzes video and/or audio frames, so
+  ## callers can avoid fetching streams no editing method will look at. Subtitle
+  ## methods read the subtitle stream, so they report neither.
   var lexer = initLexer("--edit", edit)
   var parser = initParser(lexer)
   let expressions =
@@ -197,17 +198,17 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
       if e.elements.len == 0:
         return
       let head = e.elements[0]
-      if head.kind == ExprSym and
-          edit[head.`from` ..< head.to] in ["or", "and", "xor", "not"]:
+      if head.kind == ExprSym and isEditOperator(edit[head.`from` ..< head.to]):
         for i in 1 ..< e.elements.len:
           walk(e.elements[i])
       else:
         walk(head)
     elif e.kind == ExprSym:
-      case edit[e.`from` ..< e.to]:
-      of "motion", "blackdetect", "subtitle", "regex", "word": video = true
-      of "audio": audio = true
-      else: discard
+      for m in editMediaOf(edit[e.`from` ..< e.to]):
+        case m
+        of emVideo: video = true
+        of emAudio: audio = true
+        of emSubtitle: discard # analyzed from the subtitle stream, not v/a frames
 
   walk(expressions[^1])
   return (video, audio)
@@ -263,7 +264,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         return not editEval(node[1], text)
       of "audio":
         stream = -1 # Set to "all" by default
-        let argOrder = @["threshold", "stream"]
+        let argOrder = argOrderOf("audio")
 
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
@@ -287,7 +288,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         return result
       of "motion":
         threshold = defaultMotionThres
-        let argOrder = @["threshold", "stream", "width", "blur"]
+        let argOrder = argOrderOf("motion")
 
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
@@ -308,7 +309,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       of "blackdetect":
         threshold = defaultBlackThres
         var pixelBlack: float32 = 0.10
-        let argOrder = @["threshold", "stream", "pixel-black"]
+        let argOrder = argOrderOf("blackdetect")
 
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
@@ -326,7 +327,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           result.orWithThreshold(blackdetect(bar, containers[ci], args.inputs[ci], tb, stream, pixelBlack), threshold)
         return result
       of "subtitle", "regex":
-        let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
+        let argOrder = argOrderOf("subtitle")
         var pattern = ""
         var flags = {reUtf8}
 
@@ -369,7 +370,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
             result = result or subResult
         return result
       of "word":
-        let argOrder = @["value", "stream", "ignore-case"]
+        let argOrder = argOrderOf("word")
         var pattern = ""
         var ignoreCase = true
         var flags: set[ReFlag]
