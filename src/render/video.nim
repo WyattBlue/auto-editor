@@ -1,5 +1,5 @@
 import std/[sets, strformat, tables]
-from std/math import round, hypot, ceil
+from std/math import round, hypot, ceil, floor
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, dnorm16, rational]
@@ -10,8 +10,8 @@ type VideoFrame = object
   effects: Actions
   local: int  # frame offset within the clip, for animated effects
   dur: int    # clip length in frames
-  x: int32    # overlay placement (canvas pixels); 0 for the base layer
-  y: int32
+  x: float32  # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
+  y: float32
   scale: float32  # overlay size multiplier; 1.0 for the base layer
   fit: bool   # no explicit `pos`: fit-and-center to the canvas like the base
 
@@ -932,37 +932,104 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   let ovColorspace = (if encoderCtx.colorspace.int in 1 .. 15: encoderCtx.colorspace.int else: 1)
   let ovRange = (if encoderCtx.color_range.int == 2: 2 else: 1)
 
-  proc overlayFrame(base, top: ptr AVFrame; x, y: int; scale: float32): ptr AVFrame =
+  proc subpixelShift(src: ptr AVFrame; dx, dy: float32): ptr AVFrame =
+    ## Bilinearly translate a packed-RGBA frame by (dx, dy) px, sampling
+    ## out-of-bounds as transparent. Lets an animated overlay sit at a fractional
+    ## pixel so a slow position ramp slides smoothly instead of stair-stepping.
+    let w = src.width.int
+    let h = src.height.int
+    let dst = av_frame_alloc()
+    if dst == nil: error "subpixelShift: could not allocate frame"
+    dst.format = src.format
+    dst.width = src.width
+    dst.height = src.height
+    dst.pts = src.pts
+    dst.time_base = src.time_base
+    if av_frame_get_buffer(dst, 32) < 0: error "subpixelShift: bad buffer"
+    let sStride = src.linesize[0].int
+    let dStride = dst.linesize[0].int
+    let sBase = cast[int](src.data[0])
+    let dBase = cast[int](dst.data[0])
+    for y in 0 ..< h:
+      let dRow = cast[ptr UncheckedArray[uint8]](dBase + y * dStride)
+      let syf = y.float32 - dy
+      let y0 = floor(syf).int
+      let wy = syf - y0.float32
+      for x in 0 ..< w:
+        let sxf = x.float32 - dx
+        let x0 = floor(sxf).int
+        let wx = sxf - x0.float32
+        for c in 0 ..< 4:  # bilinear blend of the 4 neighbours, per RGBA channel
+          template px(xx, yy: int): float32 =
+            if xx < 0 or xx >= w or yy < 0 or yy >= h: 0.0'f32
+            else: cast[ptr UncheckedArray[uint8]](sBase + yy * sStride)[xx * 4 + c].float32
+          let t = px(x0, y0) * (1 - wx) + px(x0 + 1, y0) * wx
+          let b = px(x0, y0 + 1) * (1 - wx) + px(x0 + 1, y0 + 1) * wx
+          dRow[x * 4 + c] = uint8(clamp(t * (1 - wy) + b * wy + 0.5'f32, 0, 255))
+    return dst
+
+  proc overlayFrame(base, top: ptr AVFrame; x, y: float32; scale: float32): ptr AVFrame =
     ## Composite `top` over `base` at (x, y), preserving the overlay's alpha.
-    ## Built per call because `overlay` is a framesync filter (needs EOF on both
-    ## inputs to emit).
+    ## (x, y) may be fractional: `overlay` places the integer part (it only does
+    ## whole pixels) and a bilinear shift places the sub-pixel remainder, so a slow
+    ## animated position slides smoothly. Built per call because `overlay` is a
+    ## framesync filter (needs EOF on both inputs to emit).
+    let ix = floor(x).int
+    let iy = floor(y).int
+    let fx = x - ix.float32
+    let fy = y - iy.float32
+    let nw = max(2, int(top.width.float32 * scale))
+    let nh = max(2, int(top.height.float32 * scale))
     base.colorspace = cint(ovColorspace)
     base.color_range = cint(ovRange)
     base.pts = 0
-    top.pts = 0
     let baseArgs = bufArgsOf(base) & &":colorspace={ovColorspace}:range={ovRange}"
-    let topArgs = bufArgsOf(top)
-    let nw = max(2, int(top.width.float32 * scale))
-    let nh = max(2, int(top.height.float32 * scale))
+    # The two buffer sources must be nodes 0 (base) and 1 (top) and the sink last,
+    # to match pushIdx(0/1) and pull's nodes[^1].
     let g = newGraph()
     let b0 = g.add("buffer", baseArgs)
-    let b1 = g.add("buffer", topArgs)
-    let topRgba = g.add("format", "pix_fmts=rgba")
-    let scl = g.add("scale", &"{nw}:{nh}:flags=bicubic")
-    let ov = g.add("overlay", &"x={x}:y={y}:format=yuv420")
-    let sink = g.add("buffersink")
-    g.link(b1, topRgba, 0, 0)
-    g.link(topRgba, scl, 0, 0)
-    g.link(b0, ov, 0, 0)
-    g.link(scl, ov, 0, 1)
-    g.link(ov, sink, 0, 0)
-    g.configure()
-    g.pushIdx(0, base)
-    g.pushIdx(1, top)
-    g.flushIdx(0)
-    g.flushIdx(1)
-    result = g.pull()
-    g.cleanup()
+
+    if abs(fx) < 0.001'f32 and abs(fy) < 0.001'f32:
+      # Whole-pixel placement: scale in-graph (bicubic) and overlay, as before.
+      top.pts = 0
+      let b1 = g.add("buffer", bufArgsOf(top))
+      let topRgba = g.add("format", "pix_fmts=rgba")
+      let scl = g.add("scale", &"{nw}:{nh}:flags=bicubic")
+      let ov = g.add("overlay", &"x={ix}:y={iy}:format=yuv420")
+      let sink = g.add("buffersink")
+      g.link(b1, topRgba, 0, 0)
+      g.link(topRgba, scl, 0, 0)
+      g.link(b0, ov, 0, 0)
+      g.link(scl, ov, 0, 1)
+      g.link(ov, sink, 0, 0)
+      g.configure()
+      g.pushIdx(0, base)
+      g.pushIdx(1, top)
+      g.flushIdx(0)
+      g.flushIdx(1)
+      result = g.pull()
+      g.cleanup()
+    else:
+      # Sub-pixel placement: scale to rgba up front (so alpha survives), nudge it by
+      # the fractional remainder, then overlay the prepared frame at the whole pixel.
+      let scaled = top.reformat(AV_PIX_FMT_RGBA, nw.cint, nh.cint)
+      let shifted = subpixelShift(scaled, fx, fy)
+      shifted.pts = 0
+      let b1 = g.add("buffer", bufArgsOf(shifted))
+      let ov = g.add("overlay", &"x={ix}:y={iy}:format=yuv420")
+      let sink = g.add("buffersink")
+      g.link(b0, ov, 0, 0)
+      g.link(b1, ov, 0, 1)
+      g.link(ov, sink, 0, 0)
+      g.configure()
+      g.pushIdx(0, base)
+      g.pushIdx(1, shifted)
+      g.flushIdx(0)
+      g.flushIdx(1)
+      result = g.pull()
+      g.cleanup()
+      av_frame_free(addr shifted)
+      if scaled != top: av_frame_free(addr scaled)
 
   proc finalizeFrame(f: ptr AVFrame; index: int64): ptr AVFrame =
     var frame = f
@@ -1000,7 +1067,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             var speed = 1.0
             # Overlay placement comes from a `pos` action in the clip's effects
             # (keeps Clip itself position-free); defaults to the canvas origin.
-            var ox, oy = 0'i32
+            var ox, oy = 0.0'f32
             var oscale = 1.0'f32
             var hasPos = false
             for effect in effectGroup:
@@ -1008,9 +1075,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 speed *= effect.val
               elif effect.kind == actPos:
                 hasPos = true
-                ox = effect.px
-                oy = effect.py
-                oscale = effect.pscale
+                # Sample the placement ramps at this frame's progress, eased like
+                # the other animatable effects; static pos has 1-keyframe seqs.
+                # Kept as floats so overlayFrame can place at a sub-pixel offset.
+                let pp = applyEase(effect.easeCurve, clipT(int(index - obj.start),
+                  envAnimLen(effect.easeDurUnit, effect.easeDur, int(obj.dur), tl.tb.float)))
+                ox = sampleKf(effect.pxKf, pp)
+                oy = sampleKf(effect.pyKf, pp)
+                oscale = sampleKf(effect.pscaleKf, pp)
 
             # A synthesized background base (nil src) has no source frame.
             let sourceFramePos =
@@ -1050,14 +1122,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # No explicit `pos`: fit the overlay to the canvas and center it, like
           # the base layer (scaleWithPad), but let the padding stay transparent
           # so only the image shows over the base.
-          var ox = o.x.int
-          var oy = o.y.int
+          var ox = o.x
+          var oy = o.y
           var oscale = o.scale
           if o.fit:
             oscale = min(acc.width.float32 / top.width.float32,
                          acc.height.float32 / top.height.float32)
-            ox = (acc.width - int(top.width.float32 * oscale)) div 2
-            oy = (acc.height - int(top.height.float32 * oscale)) div 2
+            ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
+            oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
           let newAcc = overlayFrame(acc, top, ox, oy, oscale)
           av_frame_free(addr acc)
           av_frame_free(addr top)

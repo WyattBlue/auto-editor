@@ -262,22 +262,25 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
     if f.startsWith("add:"):
       let rest = f[4 .. ^1]
       let segs = rest.split(":")
-      var spec = AddSpec(selector: selector, setActionRef: setActionRef, scale: 1.0'f32)
-      # Need at least one path field plus x:y:scale to be a placement.
+      var spec = AddSpec(selector: selector, setActionRef: setActionRef)
+      # Need at least one path field plus x:y:scale to be a placement. Each of the
+      # three may be a ramp (e.g. 0..600); detected by all parsing as keyframes, so
+      # everything before them is the path (a Windows drive-letter colon stays put).
       var hasPlacement = false
       if segs.len >= 4:
         try:
-          spec.x = int32(parseInt(segs[^3].strip()))
-          spec.y = int32(parseInt(segs[^2].strip()))
-          spec.scale = parseFloat(segs[^1].strip()).float32
+          spec.xKf = parseKeyframes(segs[^3].strip())
+          spec.yKf = parseKeyframes(segs[^2].strip())
+          spec.scaleKf = parseKeyframes(segs[^1].strip())
           hasPlacement = true
-        except ValueError:
+        except ActionParseError:
           hasPlacement = false   # trailing fields aren't numeric => part of path
       if hasPlacement:
         spec.hasPos = true
         spec.path = segs[0 ..< segs.len - 3].join(":")
-        if spec.scale <= 0.0'f32:
-          error "add: scale must be greater than 0.0"
+        for s in spec.scaleKf:
+          if s <= 0.0'f32:
+            error "add: scale must be greater than 0.0"
       else:
         spec.path = rest
       if spec.path.len == 0:

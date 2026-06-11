@@ -51,9 +51,8 @@ type AddSpec* = object
   selector*: int
   setActionRef*: int = -1
   path*: string
-  hasPos*: bool        # whether x/y/scale were given (else origin, native size)
-  x*, y*: int32
-  scale*: float32
+  hasPos*: bool        # whether x:y:scale were given (else origin, native size)
+  xKf*, yKf*, scaleKf*: seq[float32]  # placement ramps (len 1 = static), fed to pos
   effects*: string     # actions chained after `add:` — applied to this overlay
                        # layer (not the base), as a comma-separated atf-8 string
 

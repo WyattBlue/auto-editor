@@ -24,6 +24,13 @@ type
   # keyframes (one value = static, several = a ramp interpolated across the
   # section) plus an optional easing curve + duration packed inline.
   Action* = object
+    # Easing envelope shared by every animatable action (zoom/blur/opacity/
+    # brightness/volume/pos). Defaults (off, linear, whole-clip) make a static
+    # action sample trivially, so non-animated actions just ignore these.
+    hasEase*: bool
+    easeCurve*: Easing
+    easeDurUnit*: DurUnit
+    easeDur*: float32        # magnitude in easeDurUnit (ignored for duClip)
     case kind*: ActionKind
     of actInvert, actHflip, actVflip, actLoop, actErosion:
       discard
@@ -40,10 +47,6 @@ type
       val*: float32
     of actZoom, actBlur, actOpacity, actBrightness, actVolume:
       kf*: seq[float32]      # keyframes in native units; len >= 1
-      hasEase*: bool
-      easeCurve*: Easing
-      easeDurUnit*: DurUnit
-      easeDur*: float32      # magnitude in easeDurUnit (ignored for duClip)
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
     of actLuv:
@@ -54,8 +57,9 @@ type
       dbX*, dbY*, dbW*, dbH*: int32   # rectangle in pixels (x, y, width, height)
       dbColor*: RGBColor              # outline color (RGB only)
     of actPos:
-      px*, py*: int32        # overlay top-left in canvas pixels
-      pscale*: float32       # overlay size multiplier (1.0 = native)
+      # Overlay placement ramps: top-left x/y in canvas px and a size multiplier
+      # (1.0 = native). Each is a keyframe seq (len 1 = static) like the scalars.
+      pxKf*, pyKf*, pscaleKf*: seq[float32]
     of actColorKey, actChromaKey:
       color*: RGBColor
       similar*, blend*: Unorm16
@@ -148,8 +152,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo}, argSpec: "x:y:w:h:color",
     help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
-  ActionDef(name: "pos", flags: {afVideo}, argSpec: "x:y[:scale]",
-    help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`."),
+  ActionDef(name: "pos", flags: {afVideo, afAnimatable}, argSpec: "x:y[:scale]",
+    help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`. Animatable: each of `x`, `y`, and `scale` accepts a keyframe ramp `a..b..c` interpolated across the section, optionally eased with `:ease=`, e.g. `pos:0..600:300:1..0.5:ease=inout` slides the overlay across while shrinking it."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
@@ -241,7 +245,7 @@ func rotCode(deg: float32): uint16 =
   let frac = turns - floor(turns)
   uint16(int(round(frac * 65536.0'f32)) and 0xFFFF)
 
-proc parseKeyframes(spec: string): seq[float32] {.raises: [ActionParseError].} =
+proc parseKeyframes*(spec: string): seq[float32] {.raises: [ActionParseError].} =
   ## "2" -> @[2]; "1..0.5..1" -> @[1, 0.5, 1] (keyframes spread across the section).
   for part in spec.split(".."):
     try:
@@ -461,16 +465,35 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv),
       abGh: chk(gh), abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
 
-  # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
-  if parts[0] == "pos" and parts.len in {3, 4}:
-    try:
-      let scale = (if parts.len == 4: parseFloat(parts[3]).float32 else: 1.0'f32)
-      if scale <= 0.0'f32:
+  # pos: overlay placement, each field an animatable ramp:
+  #   pos:x:y   pos:x:y:scale   pos:0..600:300:1..0.5:ease=inout
+  if parts[0] == "pos":
+    if parts.len < 3:
+      raise newException(ActionParseError, "pos requires x:y[:scale]")
+    let xKf = parseKeyframes(parts[1])
+    let yKf = parseKeyframes(parts[2])
+    # parts[3] is the scale ramp unless it's the ease suffix.
+    var sKf = @[1.0'f32]
+    var idx = 3
+    if parts.len > 3 and not parts[3].startsWith("ease="):
+      sKf = parseKeyframes(parts[3])
+      idx = 4
+    for v in sKf:
+      if v <= 0.0'f32:
         raise newException(ActionParseError, "pos scale must be greater than 0.0")
-      return Action(kind: actPos, px: int32(parseInt(parts[1])),
-        py: int32(parseInt(parts[2])), pscale: scale)
-    except ValueError:
-      raise newException(ActionParseError, "Invalid pos value")
+    var hasE = false
+    var curve = easeLinear
+    var unit = duClip
+    var dur = 0.0'f32
+    if parts.len > idx:
+      if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
+        raise newException(ActionParseError, "Unknown action: " & val)
+      hasE = true
+      curve = parseEasing(parts[idx])
+      if parts.len == idx + 2:
+        (dur, unit) = parseDuration(parts[idx + 1])
+    return Action(kind: actPos, pxKf: xKf, pyKf: yKf, pscaleKf: sKf,
+      hasEase: hasE, easeCurve: curve, easeDurUnit: unit, easeDur: dur)
 
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
@@ -599,7 +622,13 @@ when not defined(nimscript):
     of actDrawbox:
       "drawbox:" & $act.dbX & ":" & $act.dbY & ":" & $act.dbW & ":" &
         $act.dbH & ":" & act.dbColor.toString
-    of actPos: "pos:" & $act.px & ":" & $act.py & ":" & $act.pscale
+    of actPos:
+      var xs, ys, ss: seq[string]
+      for v in act.pxKf: xs.add $int(round(v))   # x/y are whole pixels
+      for v in act.pyKf: ys.add $int(round(v))
+      for v in act.pscaleKf: ss.add $v
+      "pos:" & xs.join("..") & ":" & ys.join("..") & ":" & ss.join("..") &
+        easeSuffix(act)
     of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
     of actChromaKey: "chromakey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
     of actChoke: "choke:" & $int(act.chokeN)
@@ -631,7 +660,7 @@ when not defined(nimscript):
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
     of actLuv: 11
-    of actPos: 13
+    of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
     of actDrawbox: 20
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
@@ -716,13 +745,27 @@ when not defined(nimscript):
           yield Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
           i += 11
         of actPos:
-          var x, y: int32
-          var sc: float32
-          copyMem(addr x, addr base[i + 1], sizeof(int32))
-          copyMem(addr y, addr base[i + 5], sizeof(int32))
-          copyMem(addr sc, addr base[i + 9], sizeof(float32))
-          yield Action(kind: actPos, px: x, py: y, pscale: sc)
-          i += 13
+          let hasEase = (base[i] and easeFlag) != 0'u8
+          var pos = i + 1
+          var act = Action(kind: actPos, hasEase: hasEase)
+          if hasEase:
+            act.easeCurve = Easing(base[pos].int)
+            act.easeDurUnit = DurUnit(base[pos + 1].int)
+            copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
+            pos += 6
+          for which in 0 .. 2:  # x, y, scale keyframe seqs in order
+            let count = base[pos].int
+            pos += 1
+            var s = newSeq[float32](count)
+            for c in 0 ..< count:
+              copyMem(addr s[c], addr base[pos], sizeof(float32))
+              pos += 4
+            case which
+            of 0: act.pxKf = s
+            of 1: act.pyKf = s
+            else: act.pscaleKf = s
+          yield act
+          i = pos
         of actDrawbox:
           var x, y, w, h: int32
           copyMem(addr x, addr base[i + 1], sizeof(int32))
@@ -837,10 +880,22 @@ when not defined(nimscript):
         base.writeAt(i, 7, a.saturation)
         i += 11
       of actPos:
-        base.writeAt(i, 1, a.px)
-        base.writeAt(i, 5, a.py)
-        base.writeAt(i, 9, a.pscale)
-        i += 13
+        if a.hasEase: base[i] = base[i] or easeFlag
+        var pos = i + 1
+        if a.hasEase:
+          base[pos] = uint8(ord(a.easeCurve))
+          base[pos + 1] = uint8(ord(a.easeDurUnit))
+          var d = a.easeDur
+          copyMem(addr base[pos + 2], addr d, sizeof(float32))
+          pos += 6
+        for s in [a.pxKf, a.pyKf, a.pscaleKf]:
+          base[pos] = uint8(s.len)
+          pos += 1
+          for v in s:
+            var vv = v
+            copyMem(addr base[pos], addr vv, sizeof(float32))
+            pos += 4
+        i = pos
       of actDrawbox:
         base.writeAt(i, 1, a.dbX)
         base.writeAt(i, 5, a.dbY)
@@ -904,7 +959,7 @@ when not defined(nimscript):
 
       var action = parseAction(trimmedPart)
       if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness,
-          actVolume} and not action.hasEase:
+          actVolume, actPos} and not action.hasEase:
         action.hasEase = true
         action.easeCurve = pendCurve
         action.easeDurUnit = pendUnit
