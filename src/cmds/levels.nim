@@ -2,20 +2,21 @@ import std/[options, strformat, strutils]
 
 import ../util/[rational, dnorm16]
 import ../[av, cache, ffmpeg, log]
-import ../analyze/[audio, motion, subtitle]
+import ../analyze/[audio, blackdetect, motion, subtitle]
 
 import ../vendor/tinyre/tinyre
 
-proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
+proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32) =
   var
     stream: int32 = 0
     pattern = ""
     width: int32 = 400
     blur: int32 = 9
+    pixelBlack: float32 = 0.10
 
   let colonPos = editStr.find(':')
   if colonPos == -1:
-    return (editStr, pattern, stream, width, blur)
+    return (editStr, pattern, stream, width, blur, pixelBlack)
 
   let kind = editStr[0 ..< colonPos]
   let paramsStr = editStr[colonPos+1..^1]
@@ -67,6 +68,7 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
       of "stream": stream = parseInt(value).int32
       of "width": width = parseInt(value).int32
       of "blur": blur = parseInt(value).int32
+      of "pixel-black": pixelBlack = parseFloat(value).float32
       of "pattern": pattern = value
       of "threshold": error "threshold parameter not allowed for levels command"
       else: error &"Unknown parameter: {paramName}"
@@ -75,7 +77,7 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, pattern, stream, width, blur)
+  return (kind, pattern, stream, width, blur, pixelBlack)
 
 
 proc main*(strArgs: seq[string]) =
@@ -123,14 +125,17 @@ proc main*(strArgs: seq[string]) =
 
   av_log_set_level(AV_LOG_QUIET)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, pattern, userStream, width, blur) = parseEdit(edit)
+  let (editMethod, pattern, userStream, width, blur, pixelBlack) = parseEdit(edit)
 
-  if editMethod notin ["audio", "motion", "subtitle", "word", "regex"]:
+  if editMethod notin ["audio", "motion", "blackdetect", "subtitle", "word", "regex"]:
     error &"Unknown editing method: {editMethod}"
   if userStream < 0:
     error "Stream must be positive"
 
-  let cacheArgs = if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}"
+  let cacheArgs =
+    if editMethod == "audio": $userStream
+    elif editMethod == "blackdetect": &"{userStream},{pixelBlack}"
+    else: &"{userStream},{width},{blur}"
 
   template emit(u: Unorm16) =
     if display == "d16": echo uint16(u) else: echo u
@@ -187,6 +192,25 @@ proc main*(strArgs: seq[string]) =
     )
 
     for u in processor.motionness(width, blur):
+      emit u
+      data.add u
+    echo ""
+
+  elif editMethod == "blackdetect":
+    if container.video.len == 0:
+      error "No video stream"
+    if container.video.len <= userStream:
+      error &"Video stream out of range: {userStream}"
+
+    let videoStream: ptr AVStream = container.video[userStream]
+    var processor = VideoProcessor(
+      formatCtx: container.formatContext,
+      codecCtx: initDecoder(videoStream.codecpar),
+      tb: tb,
+      videoIndex: videoStream.index,
+    )
+
+    for u in processor.blackness(pixelBlack):
       emit u
       data.add u
     echo ""

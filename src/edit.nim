@@ -1,6 +1,6 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editlexer, ffmpeg, log]
-import ./analyze/[audio, motion, subtitle]
+import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre
@@ -47,6 +47,7 @@ proc orWithThreshold(result: var seq[bool], levels: seq[Unorm16], t: Unorm16) =
 const
   defaultAudioThres = toUnorm16(0.04)
   defaultMotionThres = toUnorm16(0.02)
+  defaultBlackThres = toUnorm16(0.98)
 
 proc parseThres(val: string): Unorm16 =
   let (num, unit) = splitNumStr(val)
@@ -204,7 +205,7 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
         walk(head)
     elif e.kind == ExprSym:
       case edit[e.`from` ..< e.to]:
-      of "motion", "subtitle", "regex", "word": video = true
+      of "motion", "blackdetect", "subtitle", "regex", "word": video = true
       of "audio": audio = true
       else: discard
 
@@ -303,6 +304,26 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
 
         for ci in 0 ..< containers.len:
           result.orWithThreshold(motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur), threshold)
+        return result
+      of "blackdetect":
+        threshold = defaultBlackThres
+        var pixelBlack: float32 = 0.10
+        let argOrder = @["threshold", "stream", "pixel-black"]
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+
+          case argPos:
+          of 0: threshold = parseThres(val)
+          of 1: stream = parseNat(val)
+          of 2: pixelBlack = parseFloatInRange(val, 0.0, 1.0)
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+
+        for ci in 0 ..< containers.len:
+          result.orWithThreshold(blackdetect(bar, containers[ci], args.inputs[ci], tb, stream, pixelBlack), threshold)
         return result
       of "subtitle", "regex":
         let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]

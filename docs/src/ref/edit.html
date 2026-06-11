@@ -42,7 +42,7 @@
 <p>When you run:<p>
 <pre><code>auto-editor example.mp4 --edit audio:0.05,stream=0</code></pre>
 <p>You're writing the syntax-sugary equivalent of:</p>
-<pre><code>auto-editor example.mp4 --edit "(audio 0.05 #:stream 0)"</code></pre>
+<pre><code>auto-editor example.mp4 --edit "(audio 0.05 (= stream 0))"</code></pre>
 <p>All the edit methods are listed below:</p>
 <h2>Edit Methods</h2>
 <div id="audio" class="palet-block">
@@ -60,6 +60,14 @@
 <p class="mono">&nbsp;<span class="palet-var">width</span>:&nbsp;Natural&nbsp;=&nbsp;400</p>
 </div>
 <p>Scale the video to <span class="palet-var">width</span> pixels, convert to grayscale, apply a Gaussian blur of <span class="palet-var">blur</span> amount, then compare the difference with the previous frame.</p>
+
+<div id="blackdetect" class="palet-block">
+<p class="mono">(<b>blackdetect</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[pixel-black]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">threshold</span>:&nbsp;Threshold&nbsp;=&nbsp;0.98</p>
+<p class="mono">&nbsp;<span class="palet-var">stream</span>:&nbsp;Natural&nbsp;=&nbsp;0</p>
+<p class="mono">&nbsp;<span class="palet-var">pixel-black</span>:&nbsp;Float&nbsp;=&nbsp;0.10</p>
+</div>
+<p>Mark a frame as loud when at least <span class="palet-var">threshold</span> of its pixels are black, where a pixel counts as black when its grayscale luma is at or below <span class="palet-var">pixel-black</span>. Wrap in <span class="palet-var">not</span> to instead cut black frames (fades, dead air).</p>
 
 <div id="subtitle" class="palet-block">
 <p class="mono">(<b>subtitle</b>&nbsp;<span class="palet-var">pattern</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[ignore-case]</span>&nbsp;<span class="palet-var">[max-count]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
