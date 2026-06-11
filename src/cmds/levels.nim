@@ -6,7 +6,7 @@ import ../analyze/[audio, blackdetect, motion, subtitle]
 
 import ../vendor/tinyre/tinyre
 
-proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32) =
+proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32, bool) =
   var
     stream: int32 = 0
     pattern = ""
@@ -15,10 +15,12 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32) 
     pixelBlack: float32 = 0.10
 
   let colonPos = editStr.find(':')
-  if colonPos == -1:
-    return (editStr, pattern, stream, width, blur, pixelBlack)
+  let kind = if colonPos == -1: editStr else: editStr[0 ..< colonPos]
+  var ignoreCase = kind == "word"  # word matches case-insensitively by default
 
-  let kind = editStr[0 ..< colonPos]
+  if colonPos == -1:
+    return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase)
+
   let paramsStr = editStr[colonPos+1..^1]
 
   var i = 0
@@ -70,6 +72,11 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32) 
       of "blur": blur = parseInt(value).int32
       of "pixel-black": pixelBlack = parseFloat(value).float32
       of "pattern": pattern = value
+      of "ignore-case":
+        case value
+        of "#t", "true": ignoreCase = true
+        of "#f", "false": ignoreCase = false
+        else: error &"Invalid boolean (expected true or false): {value}"
       of "threshold": error "threshold parameter not allowed for levels command"
       else: error &"Unknown parameter: {paramName}"
 
@@ -77,7 +84,7 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32) 
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, pattern, stream, width, blur, pixelBlack)
+  return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase)
 
 
 proc main*(strArgs: seq[string]) =
@@ -125,7 +132,7 @@ proc main*(strArgs: seq[string]) =
 
   av_log_set_level(AV_LOG_QUIET)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, pattern, userStream, width, blur, pixelBlack) = parseEdit(edit)
+  let (editMethod, pattern, userStream, width, blur, pixelBlack, ignoreCase) = parseEdit(edit)
 
   if editMethod notin ["audio", "motion", "blackdetect", "subtitle", "word", "regex"]:
     error &"Unknown editing method: {editMethod}"
@@ -219,9 +226,18 @@ proc main*(strArgs: seq[string]) =
     if container.subtitle.len == 0:
       error "No Subtitle stream"
 
+    # subtitle/regex match utf8; ignoreCase already carries word's default.
+    var flags: set[ReFlag]
+    if editMethod != "word":
+      flags.incl reUtf8
+    if ignoreCase:
+      flags.incl reIgnoreCase
+
     var regPattern: Re
     try:
-      regPattern = if editMethod == "word": re("\\b" & escapeRe(pattern) & "\\b") else: re(pattern)
+      regPattern =
+        if editMethod == "word": re("\\b" & escapeRe(pattern) & "\\b", flags)
+        else: re(pattern, flags)
     except ValueError:
       error &"Invalid regex expression: {pattern}"
 

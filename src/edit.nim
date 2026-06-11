@@ -340,6 +340,9 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
               flags.incl reIgnoreCase
           else: error "Too many args"
 
+          if not isKey:
+            argPos += 1
+
         if pattern == "":
           error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
@@ -378,6 +381,9 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           of 1: stream = parseNat(val)
           of 2: ignoreCase = parseBool(val)
           else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
 
         if pattern == "":
           error "word: value required"
