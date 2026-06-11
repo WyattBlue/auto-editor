@@ -9,7 +9,8 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actHflip, actVflip,
     actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate, actSpin,
-    actDrawbox, actPos, actColorKey, actChromaKey, actLoop, actErosion, actChoke
+    actDrawbox, actPos, actColorKey, actChromaKey, actLoop, actErosion, actChoke,
+    actAberration
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -26,6 +27,8 @@ type
     case kind*: ActionKind
     of actInvert, actHflip, actVflip, actLoop, actErosion:
       discard
+    of actChoke:
+      chokeN*: uint8         # matte-erosion passes (px to shrink the alpha matte)
     of actRotate:
       rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
     of actSpin:
@@ -56,8 +59,9 @@ type
     of actColorKey, actChromaKey:
       color*: RGBColor
       similar*, blend*: Unorm16
-    of actChoke:
-      chokeN*: uint8         # matte-erosion passes (px to shrink the alpha matte)
+    of actAberration:
+      abRh*, abRv*, abGh*, abGv*, abBh*, abBv*: int8
+      abWrap*: bool          # edge: wrap around (true) vs smear the border (false)
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -156,6 +160,11 @@ Positional args: `k1` is the quadratic correction factor and `k2` the double-qua
     help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
   ActionDef(name: "choke", flags: {afVideo}, argSpec: "[n]", range: rng(1.0, 16.0),
     help: "Shrink (choke) the alpha matte left by a `colorkey`/`chromakey` inward by `n` pixels (default 1), cutting off the ring of key-color spill and ragged edge pixels around the subject. Must come after the key in the chain, e.g. `add:fg.mp4,chromakey:green,choke:2`. Only meaningful on overlay tracks (where keying produces alpha); a no-op on the base track. Implemented by eroding only the alpha plane via ffmpeg's `erosion` filter."),
+  ActionDef(name: "aberration", flags: {afVideo}, argSpec: "[h[:v[:edge]]]", range: rng(-127.0, 127.0, each = true),
+    help: """
+Fake chromatic aberration by shifting the color channels apart, leaving red/cyan fringing for a cheap-lens or glitch look. Implemented via ffmpeg's `rgbashift` filter.
+Simple form `aberration[:h[:v[:edge]]]`: split red and blue symmetrically by `h` pixels horizontally (default 5) and `v` pixels vertically (default 0), with green left in place. `edge` is `smear` (extend the border pixel, the default) or `wrap` (wrap around to the far side).
+Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`, `bv` (signed pixel shift for each channel/axis, default 0) plus `edge`, e.g. `aberration:rh=8:bh=-8:gv=2:edge=wrap`."""),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
 ]
@@ -384,6 +393,74 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "choke must be in [1, 16]")
     return Action(kind: actChoke, chokeN: uint8(n))
 
+  # aberration: per-channel chromatic split. Positional shorthand (no '=') is the
+  # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
+  # explicit per-channel form, which starts every channel at 0.
+  if parts[0] == "aberration":
+    template chk(n: int): int8 =
+      if n < -127 or n > 127:
+        raise newException(ActionParseError, "aberration shift must be in [-127, 127]")
+      int8(n)
+    proc toEdge(v: string): bool {.raises: [ActionParseError].} =
+      case v
+      of "smear": false
+      of "wrap": true
+      else: raise newException(ActionParseError, "aberration edge must be smear or wrap")
+    var rh, rv, gh, gv, bh, bv = 0
+    var wrap = false
+    var keyword = false
+    for idx in 1 ..< parts.len:
+      if '=' in parts[idx]:
+        keyword = true
+        break
+
+    if parts.len == 1:
+      rh = 5; bh = -5
+    elif not keyword:
+      # Symmetric: up to two bare pixel counts (h, v) plus an optional edge token.
+      var nums: seq[int]
+      for idx in 1 ..< parts.len:
+        let p = parts[idx]
+        if p == "smear" or p == "wrap":
+          wrap = toEdge(p)
+        else:
+          try:
+            nums.add parseInt(p)
+          except ValueError:
+            raise newException(ActionParseError, "Invalid aberration value: " & p)
+      if nums.len > 2:
+        raise newException(ActionParseError, "aberration takes at most h:v positional shifts")
+      let h = (if nums.len >= 1: nums[0] else: 5)
+      let v = (if nums.len >= 2: nums[1] else: 0)
+      rh = h; bh = -h; rv = v; bv = -v
+    else:
+      for idx in 1 ..< parts.len:
+        let p = parts[idx]
+        let eq = p.find('=')
+        if eq < 0:
+          raise newException(ActionParseError, "aberration: expected key=value, got " & p)
+        let key = p[0 ..< eq]
+        let value = p[eq + 1 .. ^1]
+        if key == "edge":
+          wrap = toEdge(value)
+          continue
+        let n = (
+          try:
+            parseInt(value)
+          except ValueError:
+            raise newException(ActionParseError, "Invalid aberration value: " & value)
+        )
+        case key
+        of "rh": rh = n
+        of "rv": rv = n
+        of "gh": gh = n
+        of "gv": gv = n
+        of "bh": bh = n
+        of "bv": bv = n
+        else: raise newException(ActionParseError, "Unknown aberration key: " & key)
+    return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv),
+      abGh: chk(gh), abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
+
   # pos: overlay placement "pos:x:y" or "pos:x:y:scale".
   if parts[0] == "pos" and parts.len in {3, 4}:
     try:
@@ -526,17 +603,33 @@ when not defined(nimscript):
     of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
     of actChromaKey: "chromakey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
     of actChoke: "choke:" & $int(act.chokeN)
+    of actAberration:
+      # A symmetric, green-free, smear split round-trips as the positional shorthand.
+      if not act.abWrap and act.abGh == 0 and act.abGv == 0 and
+          act.abRh >= 0 and act.abBh == -act.abRh and act.abBv == -act.abRv:
+        if act.abRv == 0: "aberration:" & $act.abRh
+        else: "aberration:" & $act.abRh & ":" & $act.abRv
+      else:
+        var ps: seq[string]
+        if act.abRh != 0: ps.add "rh=" & $act.abRh
+        if act.abRv != 0: ps.add "rv=" & $act.abRv
+        if act.abGh != 0: ps.add "gh=" & $act.abGh
+        if act.abGv != 0: ps.add "gv=" & $act.abGv
+        if act.abBh != 0: ps.add "bh=" & $act.abBh
+        if act.abBv != 0: ps.add "bv=" & $act.abBv
+        if act.abWrap: ps.add "edge=wrap"
+        "aberration:" & ps.join(":")
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
   func actionByteSize(a: Action): int =
     case a.kind
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
+    of actChoke: 2
     of actRotate: 3
     of actLens, actSpeed, actVarispeed: 5
     of actDeesser, actSpin: 7
-    of actChoke: 2
-    of actColorKey, actChromaKey: 8
+    of actColorKey, actChromaKey, actAberration: 8
     of actLuv: 11
     of actPos: 13
     of actDrawbox: 20
@@ -607,6 +700,13 @@ when not defined(nimscript):
         of actChoke:
           yield Action(kind: actChoke, chokeN: base[i + 1])
           i += 2
+        of actAberration:
+          yield Action(kind: actAberration,
+            abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
+            abGh: cast[int8](base[i + 3]), abGv: cast[int8](base[i + 4]),
+            abBh: cast[int8](base[i + 5]), abBv: cast[int8](base[i + 6]),
+            abWrap: base[i + 7] != 0'u8)
+          i += 8
         of actLuv:
           var bh: Snorm16
           var c, s: float32
@@ -722,6 +822,15 @@ when not defined(nimscript):
       of actChoke:
         base[i + 1] = a.chokeN
         i += 2
+      of actAberration:
+        base.writeAt(i, 1, a.abRh)
+        base.writeAt(i, 2, a.abRv)
+        base.writeAt(i, 3, a.abGh)
+        base.writeAt(i, 4, a.abGv)
+        base.writeAt(i, 5, a.abBh)
+        base.writeAt(i, 6, a.abBv)
+        base[i + 7] = (if a.abWrap: 1'u8 else: 0'u8)
+        i += 8
       of actLuv:
         base.writeAt(i, 1, a.brighthue)
         base.writeAt(i, 3, a.contrast)
