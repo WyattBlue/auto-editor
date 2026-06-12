@@ -113,8 +113,8 @@ proc main*(strArgs: seq[string]) =
           error &"Input file is already set: {key}"
         inputFile = key
       of "timebase":
-        try: tb = AVRational(key)
-        except ValueError: error &"Invalid rational number: {key}"
+        try: tb = toAVRational(key)
+        except ValueError as e: error e.msg
       of "edit":
         edit = key
       of "display":

@@ -35,10 +35,10 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
     result.effects = uint32(effectIndex)
 
 proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  result.tb = (
-    try: jsonNode["timebase"].getStr()
-    except ValueError as e: error e.msg
-  )
+  let tbString = jsonNode["timebase"].getStr("")
+  if tbString == "":
+    error "Expected 'timebase' key to exist"
+  result.tb = try: toAVRational(tbString) except ValueError as e: error e.msg
   if not jsonNode.hasKey("samplerate"):
     error "Expected 'samplerate' key to exist"
   result.sr = jsonNode["samplerate"].getInt().cint
@@ -100,11 +100,17 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
 
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  let input = jsonNode["source"].getStr()
+  let input = jsonNode["source"].getStr("")
+  if input == "":
+    error "source is a required field"
   let ptrInput = intern(interner, input)
   var effects: seq[Actions]
   var clips: seq[Clip2]
-  let tb: AVRational = jsonNode["tb"].getStr()
+
+  let tbString = jsonNode["tb"].getStr("")
+  if tbString == "":
+    error "tb is a required field"
+  let tb = try: toAVRational(tbString) except ValueError as e: error e.msg
 
   if jsonNode.hasKey("clips") and jsonNode["clips"].kind == JArray:
     for chunkNode in jsonNode["clips"]:

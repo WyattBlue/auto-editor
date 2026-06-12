@@ -2,7 +2,7 @@ import std/[envvars, options, os, strformat, tables, times]
 when not defined(emscripten):
   import std/strutils
 
-import ./[action, cli, ffmpeg]
+import ./[action, cli]
 import ./util/[color, rational, term]
 
 type BarType* = enum
