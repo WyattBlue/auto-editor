@@ -17,3 +17,4 @@
  - The `levels` command now accepts the `ignore-case` parameter for the `word`/`regex`/`subtitle` methods and honors case-folding (`word` is case-insensitive by default), matching `--edit`.
  - The Edit Reference page is now generated from the source, so it documents `word`, `regex`, `xor`, and `not` (previously omitted), corrects `motion`'s argument order, and drops the unimplemented `max-count`.
  - URL inputs edited with only `subtitle`/`word`/`regex` no longer download the full video; these methods read the subtitle stream, so just audio is fetched.
+ - `add:` overlays now follow the base layer's cuts, staying time-synced like a second camera angle, instead of restarting from frame 0 each kept section.
