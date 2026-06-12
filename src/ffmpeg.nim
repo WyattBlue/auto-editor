@@ -100,6 +100,10 @@ type
 
   AVCodecTag* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
 
+  AVIOContext* {.importc, incompleteStruct, header: "<libavformat/avio.h>".} = object
+    seekable*: cint
+    min_packet_size*: cint
+
   AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     name*: cstring
     long_name: cstring

@@ -110,6 +110,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
 
   var output = openWrite(outputPath)
   output.options = options
+  output.streaming = args.fragmented and not args.noFragmented
 
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE

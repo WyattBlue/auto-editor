@@ -242,6 +242,7 @@ type OutputContainer* = object
   formatCtx*: ptr AVFormatContext
   packet: ptr AVPacket
   started: bool = false
+  streaming*: bool = false # consumers tail/mirror the file; writes must be append-only
 
 proc openWrite*(file: string): OutputContainer =
   let formatCtx: ptr AVFormatContext = nil
@@ -365,6 +366,10 @@ proc startEncoding*(self: var OutputContainer) =
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
     if avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE) < 0:
       error &"Could not open output file '{self.file}'"
+    if self.streaming:
+      let pb = cast[ptr AVIOContext](outputCtx.pb)
+      pb.seekable = 0
+      pb.min_packet_size = 0
 
   let options: ptr AVDictionary = nil
   dictToAvdict(addr options, self.options)
