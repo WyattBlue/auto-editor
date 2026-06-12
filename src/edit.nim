@@ -214,9 +214,7 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
   return (video, audio)
 
 proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[uint8] =
-  ## Evaluate the label-1 `--edit` method plus any `--edit:N` (N >= 2) methods and
-  ## merge them into one array: each element holds the highest label whose mask is
-  ## active, or 0 (silent). See SPEC.md / [[action-storage-prefer-norm16]].
+
   proc editEval(expr: Expr, text: string): seq[bool] =
     if expr.kind != ExprList or expr.elements.len == 0:
       error "Bad kind"
