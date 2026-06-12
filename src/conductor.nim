@@ -161,11 +161,12 @@ func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules, isUrl = false):
 proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
   ## Inject `add:` overlays as new video layers. Each spec overlays its source on
   ## every base-layer (v[0]) clip whose section matches the spec's selector
-  ## (0 = silent, 1 = normal), spanning the same timeline range. The overlay
-  ## mirrors the base clip's source offset, so it follows the base layer's cuts
-  ## and stays time-synced like a second camera angle (matching the app), rather
-  ## than restarting from frame 0 each section. Placement (when given) is carried
-  ## by a `pos` action in the overlay clip's effects group.
+  ## (0 = silent, 1 = normal), spanning the same timeline range. With
+  ## `follow-base` (default), the overlay mirrors the base clip's source offset,
+  ## so it follows the base layer's cuts and stays time-synced like a second
+  ## camera angle (matching the app); with `follow-base=0` it restarts from frame
+  ## 0 each section (logo/gif use). Placement (when given) is carried by a `pos`
+  ## action in the overlay clip's effects group.
   if args.adds.len == 0:
     return
 
@@ -216,7 +217,8 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
     for clip in tl.v[0]:
       if clip.effects.int == spec.selector:
         track.add Clip(src: srcPtr, start: clip.start, dur: clip.dur,
-          offset: clip.offset, effects: eIdx, stream: 0)
+          offset: (if spec.followBase: clip.offset else: 0), effects: eIdx,
+          stream: 0)
     if track.len == 0:
       continue
     tl.langs.insert(toLang("und"), tl.v.len)  # keep video langs before audio
