@@ -460,6 +460,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 
+  let baseVid = myCache.cns[tl.v[0][0].src].video
+  if baseVid.len > 0:
+    let srcPar = baseVid[0].codecpar
+    let sd = av_packet_side_data_get(srcPar.coded_side_data,
+        srcPar.nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX)
+    if sd != nil and sd.size > 0:
+      let dstPar = outputStream.codecpar
+      let dst = av_packet_side_data_new(addr dstPar.coded_side_data,
+          addr dstPar.nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX, sd.size, 0)
+      if dst != nil:
+        copyMem(dst.data, sd.data, sd.size)
+
   let pixFmtName = $pix_fmt
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
