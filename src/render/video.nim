@@ -688,17 +688,25 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let o = sampleKf(effect.kf, prog(effect))
         if o >= 1.0'f32:
           continue
-        runFx(fxId(actOpacity, frame, f0 = o)):
-          let bgR = (1.0'f32 - o) * float32(tl.bg.red)
-          let bgG = (1.0'f32 - o) * float32(tl.bg.green)
-          let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-          let lut = fxGraph.add("lutrgb",
-            &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
-          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+        if isOverlay:
+          runFx(fxId(actOpacity, frame, overlay = true, f0 = o)):
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let toRgba = fxGraph.add("format", "pix_fmts=rgba")
+            let lut = fxGraph.add("lutrgb", &"a=val*{o}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(@[bufferSrc, toRgba, lut, bufferSink]).configure()
+        else:
+          runFx(fxId(actOpacity, frame, f0 = o)):
+            let bgR = (1.0'f32 - o) * float32(tl.bg.red)
+            let bgG = (1.0'f32 - o) * float32(tl.bg.green)
+            let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
+            let lut = fxGraph.add("lutrgb",
+              &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
+            let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
       of actLens:
         let k1 = effect.k1
         let k2 = effect.k2
