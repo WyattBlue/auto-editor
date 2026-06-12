@@ -238,6 +238,12 @@ proc parseActions(val: string): Actions =
   except ActionParseError as e:
     error e.msg
 
+proc parseAddBool(val: string): bool =
+  case val
+  of "true", "#t", "1": true
+  of "false", "#f", "0": false
+  else: error "add: follow-base expects true or false, got: " & val
+
 proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): string =
   ## Pull `add:` tokens out of an action value and record them on `args.adds`;
   ## return the remaining action string (atf-8 effects) for the base layer.
@@ -249,15 +255,24 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
   ## the trailing three fields parsing as `x` (int), `y` (int), `scale` (float);
   ## everything before them is the path. This keeps Windows paths working (the
   ## drive-letter colon in `C:\dir\img.png` is part of the path), with or without
-  ## placement.
+  ## placement. A trailing `follow-base=<bool>` option may follow either form.
   var keep: seq[string]
   var curAdd = -1   # index in args.adds that trailing actions attach to; -1 = base
   for field in val.split(","):
     let f = field.strip()
     if f.startsWith("add:"):
       let rest = f[4 .. ^1]
-      let segs = rest.split(":")
+      var segs = rest.split(":")
       var spec = AddSpec(selector: selector, setActionRef: setActionRef)
+      # Pull trailing `key=value` options (e.g. follow-base=0) off the end before
+      # placement detection, leaving the remaining segments as PATH[:x:y:scale].
+      while segs.len > 1:
+        let last = segs[^1].strip()
+        let eq = last.find('=')
+        if eq <= 0 or last[0 ..< eq] != "follow-base":
+          break
+        spec.followBase = parseAddBool(last[eq + 1 .. ^1].strip())
+        segs.setLen(segs.len - 1)
       # Need at least one path field plus x:y:scale to be a placement. Each of the
       # three may be a ramp (e.g. 0..600); detected by all parsing as keyframes, so
       # everything before them is the path (a Windows drive-letter colon stays put).
@@ -277,7 +292,7 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
           if s <= 0.0'f32:
             error "add: scale must be greater than 0.0"
       else:
-        spec.path = rest
+        spec.path = segs.join(":")
       if spec.path.len == 0:
         error "add: missing path"
       args.adds.add spec

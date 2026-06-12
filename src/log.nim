@@ -53,6 +53,8 @@ type AddSpec* = object
   path*: string
   hasPos*: bool        # whether x:y:scale were given (else origin, native size)
   xKf*, yKf*, scaleKf*: seq[float32]  # placement ramps (len 1 = static), fed to pos
+  followBase*: bool = true  # mirror the base clip's offset (stay time-synced) vs.
+                            # restart from frame 0 each kept section (logo/gif use)
   effects*: string     # actions chained after `add:` — applied to this overlay
                        # layer (not the base), as a comma-separated atf-8 string
 
