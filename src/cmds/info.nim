@@ -24,7 +24,7 @@ func fourccToString(fourcc: uint32): string =
   return $cast[cstring](addr buf[0])
 
 proc printYamlInfo(fileInfo: MediaInfo) =
-  var tb = AVRational(30)
+  var tb = AVRational(num: 30, den: 1)
   if fileInfo.v.len > 0:
     tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
   echo &"{fileInfo.path}:\n - recommendedTimebase: {tb.num}/{tb.den}"
@@ -121,7 +121,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
 func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   var varr, aarr, sarr, iarr: seq[JsonNode] = @[]
-  var tb = AVRational(30)
+  var tb = AVRational(num: 30, den: 1)
   if fileInfo.v.len > 0:
     tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
 

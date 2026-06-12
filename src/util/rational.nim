@@ -5,10 +5,7 @@ type AVRational* {.importc, completeStruct, header: "<libavutil/rational.h>", by
 converter toInt64*(r: AVRational): int64 =
   (r.num div r.den).int64
 
-converter toInt32*(r: AVRational): int32 =
-  (r.num div r.den).int32
-
-converter toAVRational*(num: int): AVRational =
+func toAVRational*(num: int): AVRational =
   AVRational(num: num.cint, den: 1)
 
 func `$`*(a: AVRational): string =

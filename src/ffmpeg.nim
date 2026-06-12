@@ -14,28 +14,21 @@ proc av_d2q*(d: cdouble, max: cint): AVRational {.importc, header: "<libavutil/r
 proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
-proc av_cmp_q*(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
+proc av_cmp_q(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
 
-proc `+`*(a, b: AVRational): AVRational =
-  av_add_q(a, b)
+func `+`*(a, b: AVRational): AVRational = av_add_q(a, b)
+func `-`*(a, b: AVRational): AVRational = av_sub_q(a, b)
+func `*`*(a, b: AVRational): AVRational = av_mul_q(a, b)
+func `/`*(a, b: AVRational): AVRational = av_div_q(a, b)
+func `~=`*(a, b: AVRational): bool = av_cmp_q(a, b) == 0
 
-proc `-`*(a, b: AVRational): AVRational =
-  av_sub_q(a, b)
-
-proc `*`*(a, b: AVRational): AVRational =
-  av_mul_q(a, b)
-
-proc `/`*(a, b: AVRational): AVRational =
-  av_div_q(a, b)
-
-proc `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
+func `~=`*[T: int64 | int32 | int](a: AVRational, b: T): bool =
+  a ~= AVRational(num: b.cint, den: 1)
+func `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) * b
-
-proc `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
+func `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) / b
-
-converter toDouble*(r: AVRational): cdouble =
-  av_q2d(r)
+converter toDouble*(r: AVRational): cdouble = av_q2d(r)
 
 func toAVRational*(s: string): AVRational {.raises: [ValueError].} =
   if s.len == 0:

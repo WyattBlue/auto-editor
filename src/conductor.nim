@@ -258,7 +258,7 @@ proc editMedia*(args: var mainArgs) =
       usePath = input
     else:
       usePath = input
-      var tb = AVRational(30)
+      var tb = AVRational(num: 30, den: 1)
       if args.frameRate != AVRational(num: 0, den: 0):
         tb = args.frameRate
 

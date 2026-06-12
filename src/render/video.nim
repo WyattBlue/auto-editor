@@ -389,7 +389,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       encoderCtx.color_trc = color_trc
 
     let sar = src.video[0].codecpar.sample_aspect_ratio
-    if sar != 0:
+    if sar.num != 0 and sar.den != 0:
       encoderCtx.sample_aspect_ratio = sar
 
   if args.videoBitrate >= 0:
