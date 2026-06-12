@@ -128,15 +128,13 @@ proc parseSampleRate(val: string): cint =
     error "Samplerate must be positive"
 
 proc parseFrameRate(val: string): AVRational =
-  if val == "ntsc":
-    return AVRational(num: 30000, den: 1001)
-  if val == "ntsc_film":
-    return AVRational(num: 24000, den: 1001)
-  if val == "pal":
-    return AVRational(num: 25, den: 1)
-  if val == "film":
-    return AVRational(num: 24, den: 1)
-  return AVRational(val)
+  if val == "ntsc": AVRational(num: 30000, den: 1001)
+  elif val == "ntsc_film": AVRational(num: 24000, den: 1001)
+  elif val == "pal": AVRational(num: 25, den: 1)
+  elif val == "film": AVRational(num: 24, den: 1)
+  else:
+    try: toAVRational(val)
+    except ValueError as e: error e.msg
 
 when not defined(emscripten):
   proc wantStreams(args: mainArgs): (bool, bool) =

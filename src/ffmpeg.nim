@@ -37,7 +37,7 @@ proc `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
 
-converter toAVRational*(s: string): AVRational =
+func toAVRational*(s: string): AVRational {.raises: [ValueError].} =
   if s.len == 0:
     raise newException(ValueError, "Empty string cannot be converted to AVRational")
 
@@ -46,6 +46,10 @@ converter toAVRational*(s: string): AVRational =
 
   if ret < 0:
     raise newException(ValueError, "Failed to rational: " & s)
+  if rational.den == 0:
+    raise newException(ValueError, "Rational cannot have a zero denominator: " & s)
+  if rational.num == 0:
+    raise newException(ValueError, "Rational cannot be zero: " & s)
 
   return rational
 
