@@ -39,6 +39,7 @@ type v3* = object
   langs*: seq[Lang]   # Video, Audio (flattened).
   effects*: seq[Actions]
   clips2*: seq[Clip2] # Empty when the timeline is non-linear.
+  templateFile*: ptr string
 
 func len*(self: v3): int64 =
   result = 0
@@ -49,9 +50,16 @@ func len*(self: v3): int64 =
     if len(clips) > 0:
       result = max(result, clips[^1].start + clips[^1].dur)
 
+func firstSource*(self: v3): ptr string =
+  for vlayer in self.v:
+    if vlayer.len > 0 and vlayer[0].src != nil:
+      return vlayer[0].src
+  for alayer in self.a:
+    if alayer.len > 0 and alayer[0].src != nil:
+      return alayer[0].src
+  return nil
+
 func uniqueSources*(self: v3): HashSet[ptr string] =
-  # A nil src is a synthesized background clip (audio-only `add`); it has no
-  # file to open, so it never belongs in the source set.
   for vlayer in self.v:
     for video in vlayer:
       if video.src != nil:
@@ -166,7 +174,8 @@ proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: Medi
       start += dur
       i += 1
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
+    templateFile: src)
   mutHelper(result, mi, clips)
 
 proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionIndex: seq[int]) =
@@ -269,7 +278,8 @@ proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       start += dur
       i += 1
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
+    templateFile: src)
   mutHelper(result, mi, clips)
 
 proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
@@ -296,7 +306,8 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
     start += dur
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
+    templateFile: src)
   mutHelper(result, mi, clips)
 
 proc applyArgs*(tl: var v3, args: mainArgs) =

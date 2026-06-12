@@ -19,3 +19,4 @@
  - URL inputs edited with only `subtitle`/`word`/`regex` no longer download the full video; these methods read the subtitle stream, so just audio is fetched.
  - `add:` overlays now follow the base layer's cuts by default, staying time-synced like a second camera angle, instead of restarting from frame 0 each kept section. Pass `follow-base=0` (e.g. `add:logo.gif:follow-base=0`) to restore the restart-per-section behavior for logos/gifs.
  - The render now copies the source's display-matrix rotation onto the output, so phone-shot portrait videos (stored landscape with a rotate flag) no longer play sideways.
+ - The v3 timeline format gained a `templateFile` field (the first input), used as the source for stream rotation and attachment passthrough.

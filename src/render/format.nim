@@ -258,57 +258,45 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     error "Could not allocate output packet"
   defer: av_packet_free(addr outPacket)
 
-  if not args.dn:
-    # Get the first source pointer from the timeline so we can hit the cache.
-    var sourceSrc: ptr string = nil
-    block findSource:
-      for vlayer in tl.v:
-        if vlayer.len > 0:
-          sourceSrc = vlayer[0].src
-          break findSource
-      for alayer in tl.a:
-        if alayer.len > 0:
-          sourceSrc = alayer[0].src
-          break findSource
+  # Attachments (fonts, cover art) are copied from the template file.
+  if not args.dn and tl.templateFile != nil:
+    if cache != nil:
+      imageSourceCtx = cache.getContainer(tl.templateFile).formatContext
+    else:
+      imageSourceCtx = av.openFormatCtx(tl.templateFile[].cstring)
+      ownsImageSourceCtx = true
 
-    if sourceSrc != nil:
-      if cache != nil:
-        imageSourceCtx = cache.getContainer(sourceSrc).formatContext
-      else:
-        imageSourceCtx = av.openFormatCtx(sourceSrc[].cstring)
-        ownsImageSourceCtx = true
-
-      for i in 0 ..< imageSourceCtx.nb_streams:
-        let strm = imageSourceCtx.streams[i]
-        if strm.codecpar.codec_type == AVMEDIA_TYPE_ATTACHMENT:
-          let outStrm = avformat_new_stream(output.formatCtx, nil)
-          if outStrm == nil:
-            error "Could not allocate attachment stream"
-          if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
-            error "Could not copy attachment codec parameters"
-          if strm.metadata != nil:
-            discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
-        elif strm.codecpar.codec_type == AVMEDIA_TYPE_VIDEO and
-            (strm.disposition and AV_DISPOSITION_ATTACHED_PIC) != 0:
-          if avformat_query_codec(output.formatCtx.oformat, strm.codecpar.codec_id,
-              FF_COMPLIANCE_EXPERIMENTAL) == 0:
-            continue
-          let outStrm = avformat_new_stream(output.formatCtx, nil)
-          if outStrm == nil:
-            error "Could not allocate image stream"
-          if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
-            error "Could not copy image codec parameters"
-          if outStrm.codecpar.width == 0 or outStrm.codecpar.height == 0:
-            if strm.codecpar.codec_id == ID_PNG:
-              let (w, h) = pngDimensions(strm.attached_pic.data, strm.attached_pic.size)
-              if w > 0 and h > 0:
-                outStrm.codecpar.width = w
-                outStrm.codecpar.height = h
-          outStrm.time_base = strm.time_base
-          outStrm.disposition = strm.disposition
-          if strm.metadata != nil:
-            discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
-          imageStreams.add((outStrm, addr strm.attached_pic))
+    for i in 0 ..< imageSourceCtx.nb_streams:
+      let strm = imageSourceCtx.streams[i]
+      if strm.codecpar.codec_type == AVMEDIA_TYPE_ATTACHMENT:
+        let outStrm = avformat_new_stream(output.formatCtx, nil)
+        if outStrm == nil:
+          error "Could not allocate attachment stream"
+        if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
+          error "Could not copy attachment codec parameters"
+        if strm.metadata != nil:
+          discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
+      elif strm.codecpar.codec_type == AVMEDIA_TYPE_VIDEO and
+          (strm.disposition and AV_DISPOSITION_ATTACHED_PIC) != 0:
+        if avformat_query_codec(output.formatCtx.oformat, strm.codecpar.codec_id,
+            FF_COMPLIANCE_EXPERIMENTAL) == 0:
+          continue
+        let outStrm = avformat_new_stream(output.formatCtx, nil)
+        if outStrm == nil:
+          error "Could not allocate image stream"
+        if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
+          error "Could not copy image codec parameters"
+        if outStrm.codecpar.width == 0 or outStrm.codecpar.height == 0:
+          if strm.codecpar.codec_id == ID_PNG:
+            let (w, h) = pngDimensions(strm.attached_pic.data, strm.attached_pic.size)
+            if w > 0 and h > 0:
+              outStrm.codecpar.width = w
+              outStrm.codecpar.height = h
+        outStrm.time_base = strm.time_base
+        outStrm.disposition = strm.disposition
+        if strm.metadata != nil:
+          discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
+        imageStreams.add((outStrm, addr strm.attached_pic))
 
   output.startEncoding()
 

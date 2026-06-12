@@ -61,6 +61,7 @@ func `%`*(self: v3): JsonNode =
 
   return %* {
     "version": "3",
+    "templateFile": (if self.templateFile != nil: self.templateFile[] else: ""),
     "timebase": $self.tb.num & "/" & $self.tb.den,
     "background": self.bg.toString,
     "resolution": [self.res[0], self.res[1]],
