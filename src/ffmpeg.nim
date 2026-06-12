@@ -153,6 +153,11 @@ type
     opaque_ref: pointer
     time_base*: AVRational
 
+  AVPacketSideData* {.importc, completeStruct, header: "<libavcodec/packet.h>".} = object
+    data*: ptr uint8
+    size*: csize_t
+    `type`*: cint
+
   AVStream* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     index*: cint
     codecpar*: ptr AVCodecParameters
@@ -180,6 +185,8 @@ type
     codec_tag*: cuint
     extradata*: ptr uint8
     extradata_size*: cint
+    coded_side_data*: ptr AVPacketSideData
+    nb_coded_side_data*: cint
     format*: cint
     bit_rate*: int64
     bits_per_coded_sample*: cint
@@ -466,6 +473,13 @@ proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
 proc av_new_packet*(pkt: ptr AVPacket, size: cint): cint {.importc,
+    header: "<libavcodec/packet.h>".}
+
+let AV_PKT_DATA_DISPLAYMATRIX* {.importc, header: "<libavcodec/packet.h>".}: cint
+proc av_packet_side_data_get*(sd: ptr AVPacketSideData, nb_sd: cint,
+    `type`: cint): ptr AVPacketSideData {.importc, header: "<libavcodec/packet.h>".}
+proc av_packet_side_data_new*(psd: ptr ptr AVPacketSideData, pnb_sd: ptr cint,
+    `type`: cint, size: csize_t, flags: cint): ptr AVPacketSideData {.importc,
     header: "<libavcodec/packet.h>".}
 
 # Frames
