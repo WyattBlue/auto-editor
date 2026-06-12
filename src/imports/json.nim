@@ -95,6 +95,9 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   while result.langs.len < result.v.len + result.a.len:
     result.langs.add ['u', 'n', 'd', '\0']
 
+  let tf = jsonNode{"templateFile"}.getStr("")
+  result.templateFile = if tf != "": interner.intern(tf) else: result.firstSource
+
 
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   let input = jsonNode["source"].getStr()
