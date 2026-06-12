@@ -418,7 +418,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         let tbLength = (round((length * tb).float64)).int
 
         return newSeqWith(tbLength, true)
-      of "all", "all/e": # TODO: Remove all/e next major release
+      of "all":
         return @[]
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
