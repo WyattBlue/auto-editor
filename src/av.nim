@@ -106,27 +106,24 @@ proc mediaLength*(container: InputContainer): AVRational =
   var videoStreamIndex = (if container.video.len == 0: -1 else: container.video[0].index)
 
   if audioStreamIndex != -1:
-    var time_base: AVRational
-    var packet = ffmpeg.av_packet_alloc()
-    var biggest_pts: int64
+    let packet = ffmpeg.av_packet_alloc()
+    var biggestPts = 0'i64
 
     while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
       if packet.stream_index == audioStreamIndex:
-        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggest_pts:
-          biggest_pts = packet.pts
-
+        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggestPts:
+          biggestPts = packet.pts
       ffmpeg.av_packet_unref(packet)
 
     if packet != nil:
       ffmpeg.av_packet_free(addr packet)
 
-    time_base = formatCtx.streams[audioStreamIndex].time_base
-    return biggest_pts * time_base
+    return biggestPts * formatCtx.streams[audioStreamIndex].time_base
 
   if videoStreamIndex != -1:
-    var video = container.video[0]
+    let video = container.video[0]
     if video.duration == AV_NOPTS_VALUE or video.time_base == AV_NOPTS_VALUE:
-      return AVRational(0)
+      return AVRational(num: 0, den: 1)
     else:
       return video.duration * video.time_base
 
@@ -396,9 +393,9 @@ proc startEncoding*(self: var OutputContainer) =
 
 proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders
-  if ctx.time_base == 0:
+  if ctx.time_base.num == 0 or ctx.time_base.den == 0:
     if ctx.codec_type == AVMEDIA_TYPE_VIDEO:
-      if ctx.framerate == 0:
+      if ctx.framerate.num == 0 or ctx.framerate.den == 0:
         ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
       else:
         ctx.time_base = av_inv_q(ctx.framerate)
@@ -446,7 +443,7 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
 
   # Rebase packet time
   let dst = stream.time_base
-  if packet.time_base == 0:
+  if packet.time_base.num == 0 or packet.time_base.den == 0:
     packet.time_base = dst
   elif packet.time_base == dst:
     discard

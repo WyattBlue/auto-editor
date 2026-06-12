@@ -90,8 +90,10 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
 
-      let sar = (if codecCtx.sample_aspect_ratio == 0: AVRational(
-          1) else: codecCtx.sample_aspect_ratio)
+      let ctxSAR = codecCtx.sample_aspect_ratio
+      let sar =
+        if ctxSAR.num == 0 or ctxSAR.den == 0: AVRational(num: 1, den: 1)
+        else: ctxSAR
 
       let newStream = VideoStream(
         duration: duration,

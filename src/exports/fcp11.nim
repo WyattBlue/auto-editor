@@ -36,11 +36,11 @@ func getColorspace(mi: MediaInfo): string =
   return "1-1-1 (Rec. 709)"
 
 func makeName(mi: MediaInfo, tb: AVRational): string =
-  if mi.getRes()[1] == 720'i32 and tb == 30:
+  if mi.getRes()[1] == 720'i32 and tb ~= 30:
     return "FFVideoFormat720p30"
-  if mi.getRes()[1] == 720'i32 and tb == 25:
+  if mi.getRes()[1] == 720'i32 and tb ~= 25:
     return "FFVideoFormat720p25"
-  if mi.getRes() == (3840'i32, 2160'i32) and tb == AVRational(num: 24000, den: 1001):
+  if mi.getRes() == (3840'i32, 2160'i32) and tb ~= AVRational(num: 24000, den: 1001):
     return "FFVideoFormat3840x2160p2398"
   return "FFVideoFormatRateUndefined"
 
@@ -94,13 +94,10 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
       return "0s"
     return &"{val * tl.tb.den}/{tl.tb.num}s"
 
-  var verStr: string
-  if version == "11":
-    verStr = "1.11"
-  elif version == "10":
-    verStr = "1.10"
-  else:
-    error(&"Unknown final cut pro version: {version}")
+  let verStr =
+    if version == "11": "1.11"
+    elif version == "10": "1.10"
+    else: error &"Unknown final cut pro version: {version}"
 
   let fcpxml = <>fcpxml(version = verStr)
   let resources = newElement("resources")

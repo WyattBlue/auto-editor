@@ -32,10 +32,6 @@ else:
   switch("passL", &"-L./{buildPath}/lib")
   when defined(emscripten):
     switch("define", "noSignalHandler")
-    --cc:clang
-    --clang.exe:emcc
-    --clang.linkerexe:emcc
-
     switch("passC", "-pthread")
     switch("passC", "-msimd128")
     switch("passC", "-g0")
