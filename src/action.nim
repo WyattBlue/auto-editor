@@ -11,8 +11,8 @@ type
     actSpeed, actVarispeed,
     # Can add 2 more [VA] actions
     actVolume = 4,
-    actDeesser,
-    # Can add 14 more [A] actions
+    actDeesser, actDuck,
+    # Can add 13 more [A] actions
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
@@ -56,6 +56,10 @@ type
       kf*: seq[float32]      # keyframes in native units; len >= 1
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
+    of actDuck:
+      # Cross-track sidechain: rendered at the mix stage, not in the clip chain.
+      duckAmount*, duckThresh*: Unorm16  # 0..1; gain floor = 1 - amount
+      duckAttack*, duckRelease*: uint16  # milliseconds
     of actLuv:
       contrast*: float32
       saturation*: float32
@@ -131,6 +135,10 @@ The optional `duration` (e.g. `2sec` or a bare frame count) is how long the anim
     help: """
 Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
 Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the reduction (default 0.5), and `freq` sets the split frequency (default 0.5)."""),
+  ActionDef(name: "duck", flags: {afAudio}, argSpec: "[amount[:threshold[:attack[:release]]]]",
+    help: """
+Autoduck (sidechain): lower this clip's audio wherever the louder audio layers beneath it (higher track indices) are active, e.g. tuck a music/desktop track under a voice track. Cross-track, so it is applied when the audio layers are mixed; a no-op on the bottom-most layer and on single-layer audio.
+Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to silence, default 0.85), `threshold` the key loudness 0.0..1.0 that engages the duck (default 0.04), and `attack`/`release` the duck-down/recover times in milliseconds (defaults 100 and 500)."""),
   ActionDef(name: "invert", flags: {afVideo},
     help: "Invert every pixel in the section, producing a photo-negative."),
   ActionDef(name: "hflip", flags: {afVideo},
@@ -302,6 +310,26 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           raise newException(ActionParseError, "Invalid float value:" & parts[idx])
       )
     return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
+
+  # duck takes positional args: [amount[:threshold[:attack[:release]]]]
+  if parts[0] == "duck" and parts.len <= 5:
+    var vals = [0.85'f32, 0.04'f32, 100.0'f32, 500.0'f32]
+    for idx in 1 ..< parts.len:
+      vals[idx - 1] = (
+        try:
+          parseFloat(parts[idx]).float32
+        except ValueError:
+          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
+      )
+    if vals[0] < 0.0 or vals[0] > 1.0:
+      raise newException(ActionParseError, "duck amount must be in [0.0, 1.0]")
+    if vals[1] < 0.0 or vals[1] > 1.0:
+      raise newException(ActionParseError, "duck threshold must be in [0.0, 1.0]")
+    if vals[2] < 0.0 or vals[2] > 65535.0 or vals[3] < 0.0 or vals[3] > 65535.0:
+      raise newException(ActionParseError, "duck attack/release must be in [0, 65535] ms")
+    return Action(kind: actDuck, duckAmount: toUnorm16(vals[0]),
+      duckThresh: toUnorm16(vals[1]), duckAttack: uint16(vals[2]),
+      duckRelease: uint16(vals[3]))
 
   # lens takes positional args: [k1[:k2]]
   if parts[0] == "lens" and parts.len <= 3:
@@ -613,6 +641,9 @@ when not defined(nimscript):
       let m = act.maxd
       let f = act.freq
       "deesser:" & $i & ":" & $m & ":" & $f
+    of actDuck:
+      "duck:" & $act.duckAmount & ":" & $act.duckThresh & ":" &
+        $int(act.duckAttack) & ":" & $int(act.duckRelease)
     of actZoom: "zoom:" & kfStr(act) & easeSuffix(act)
     of actOpacity: "opacity:" & kfStr(act) & easeSuffix(act)
     of actBlur: "blur:" & kfStr(act) & easeSuffix(act)
@@ -665,6 +696,7 @@ when not defined(nimscript):
     of actRotate: 3
     of actLens, actSpeed, actVarispeed: 5
     of actDeesser, actSpin: 7
+    of actDuck: 9
     of actColorKey, actChromaKey, actAberration: 8
     of actLuv: 11
     of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
@@ -718,6 +750,16 @@ when not defined(nimscript):
           copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
           yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
           i += 7
+        of actDuck:
+          var amt, thr: Unorm16
+          var atk, rel: uint16
+          copyMem(addr amt, addr base[i + 1], sizeof(Unorm16))
+          copyMem(addr thr, addr base[i + 3], sizeof(Unorm16))
+          copyMem(addr atk, addr base[i + 5], sizeof(uint16))
+          copyMem(addr rel, addr base[i + 7], sizeof(uint16))
+          yield Action(kind: actDuck, duckAmount: amt, duckThresh: thr,
+            duckAttack: atk, duckRelease: rel)
+          i += 9
         of actSpin:
           var st: Unorm16
           var rate: float32
@@ -860,6 +902,12 @@ when not defined(nimscript):
         base.writeAt(i, 3, a.maxd)
         base.writeAt(i, 5, a.freq)
         i += 7
+      of actDuck:
+        base.writeAt(i, 1, a.duckAmount)
+        base.writeAt(i, 3, a.duckThresh)
+        base.writeAt(i, 5, a.duckAttack)
+        base.writeAt(i, 7, a.duckRelease)
+        i += 9
       of actSpin:
         base.writeAt(i, 1, a.sStart)
         base.writeAt(i, 3, a.sRate)

@@ -594,7 +594,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     for effect in effects:
       case effect.kind:
-      of actSpeed, actVarispeed, actVolume, actDeesser, actPos, actRotate, actLoop: discard
+      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPos, actRotate, actLoop: discard
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
