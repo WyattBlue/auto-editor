@@ -4,6 +4,7 @@
  - Remove deprecated value `all/e` for `--edit`, use `all` or `0`.
 
 ## Features
+ - Add the `duck` audio action (autoduck/sidechain), which lowers a clip's audio wherever the louder audio layers beneath it (higher track indices) are active — e.g. tuck a music/desktop track under a voice track. Applied when audio layers are mixed; a no-op on the bottom-most layer and on single-layer audio. Tunable as `duck[:amount[:threshold[:attack[:release]]]]` (defaults `0.85:0.04:100:500`, times in ms).
  - Add the `erosion` action (3x3 local-minimum filter, a gritty eaten-away look) and the `choke:[n]` action, which shrinks the alpha matte left by `colorkey`/`chromakey` inward by `n` pixels to cut off key-color spill fringe on overlay tracks.
  - Add the `blackdetect` edit method, which marks frames as loud when at least `threshold` of their pixels are black. Wrap in `(not ...)` to cut black fades/dead air.
  - Add the `aberration` action, which fakes chromatic aberration by shifting the color channels apart for a cheap-lens/glitch color-fringing look. Use the shorthand `aberration[:h[:v[:edge]]]` for a symmetric red/blue split (horizontal `h`, vertical `v`, `edge` of `smear`/`wrap`), or `key=value` pairs (`rh rv gh gv bh bv edge`) for full per-channel control, e.g. `aberration:rh=8:bh=-8:gv=2:edge=wrap`.

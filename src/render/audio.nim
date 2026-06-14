@@ -620,6 +620,89 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
 
+  # --- Autoducking (the `duck` action) -------------------------------------
+  # A `duck` on layer L attenuates that clip by the mix of every active layer
+  # with a higher index (the sidechain), so a lower layer tucks under the ones
+  # beneath it. The key is mixed only over the duck clip's span (bounded memory,
+  # like the normalize passes re-run the producer), with higher layers' own
+  # ducks applied recursively.
+  var activeLayers: seq[int]
+  for li in layerIndices:
+    if li < tl.a.len and tl.a[li].len > 0:
+      activeLayers.add li
+
+  proc duckGainEnvelope(keyMix: seq[int32], n: int, d: Action): seq[float32] =
+    ## Per-sample gain (1.0 = open) tracking the key's peak: drop toward the
+    ## floor (1 - amount) when it exceeds the threshold, smoothed by a one-pole
+    ## follower whose time constant is the attack (ducking down) or release.
+    result = newSeq[float32](n)
+    let floorG = max(0.0'f32, 1.0'f32 - d.duckAmount.toFloat32)
+    let thr = d.duckThresh.toFloat32
+    let aCoef = exp(-1.0 / (sr.float * max(0.001, d.duckAttack.float / 1000.0))).float32
+    let rCoef = exp(-1.0 / (sr.float * max(0.001, d.duckRelease.float / 1000.0))).float32
+    var cur = 1.0'f32
+    for i in 0 ..< n:
+      var peak = 0'i32
+      for ch in 0 ..< targetChannels:
+        let v = abs(keyMix[i * targetChannels + ch])
+        if v > peak: peak = v
+      let target = (if peak.float32 / 32768.0'f32 > thr: floorG else: 1.0'f32)
+      let coef = (if target < cur: aCoef else: rCoef)
+      cur = target + (cur - target) * coef
+      result[i] = cur
+
+  proc mixRangeDucked(layers: seq[int], startSample, count: int): seq[int32] =
+    ## Interleaved int32 mix of `layers` over output samples
+    ## [startSample, startSample+count), with each clip's own duck applied.
+    result = newSeq[int32](count * targetChannels)
+    if count <= 0: return
+    for li in layers:
+      if li >= tl.a.len: continue
+      for clip in tl.a[li]:
+        let cStart = int(clip.start * sr.int64 * tb.den div tb.num)
+        let cDur = int(clip.dur * sr.int64 * tb.den div tb.num)
+        let lo = max(cStart, startSample)
+        let hi = min(cStart + cDur, startSample + count)
+        if hi <= lo: continue
+        let key = (clip.src[], clip.stream)
+        if key notin samples: continue
+        let getter = samples[key]
+        let effectGroup = tl.effects[clip.effects]
+        var speed = 1.0
+        var duckAct: Action
+        var hasDuck = false
+        for e in effectGroup:
+          if e.kind in [actSpeed, actVarispeed]:
+            speed *= e.val
+          elif e.kind == actDuck:
+            duckAct = e
+            hasDuck = true
+        let sourceSr = getter.stream.codecpar.sample_rate.float64
+        let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
+        let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
+        let srcData = getter.get(sampStart, sampEnd)
+        var processed = processAudioClip(tl.effects, clip, srcData,
+            getter.stream.codecpar.sample_rate, sr, getter.layout, tb.float)
+        if processed.len == 0: continue
+        let srcCh = getter.channels
+        let avail = processed.len div srcCh
+        if hasDuck:
+          let above = activeLayers.filterIt(it > li)
+          if above.len > 0:
+            let n = min(avail, cDur)
+            let env = duckGainEnvelope(mixRangeDucked(above, cStart, n), n, duckAct)
+            for local in 0 ..< n:
+              let g = env[local]
+              for ch in 0 ..< srcCh:
+                let idx = local * srcCh + ch
+                processed[idx] = clamp16(int32(round(processed[idx].float32 * g)))
+        for o in lo ..< hi:
+          let local = o - cStart
+          if local >= avail: break
+          let dst = (o - startSample) * targetChannels
+          for ch in 0 ..< min(targetChannels, srcCh):
+            result[dst + ch] += int32(processed[local * srcCh + ch])
+
   # Re-runnable streaming producer: yields the assembled, mixed, fade-applied
   # timeline as interleaved int16 chunks of up to `frameSize` sample-frames, in
   # time order, zero-padded out to `totalSamples`. Memory stays bounded by the
@@ -627,10 +710,6 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   # timeline (`mixLayers` is implicit: clips from every active layer are summed).
   proc newTimelineProducer(): iterator(): seq[int16] =
     return iterator(): seq[int16] =
-      var activeLayers: seq[int] = @[]
-      for li in layerIndices:
-        if li < tl.a.len and tl.a[li].len > 0:
-          activeLayers.add li
       var cursors = newSeq[int](tl.a.len)
 
       var acc: seq[int32] = @[]   # interleaved accumulator over [bufStart, ...)
@@ -698,6 +777,16 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
             let sourceChannels = getter.channels
             let numSamples = processedData.len div sourceChannels
             let n = min(durSamples, numSamples)
+            # Autoduck: scale this clip by the sidechain (active layers above it).
+            var duckEnv: seq[float32]
+            block:
+              for e in effectGroup:
+                if e.kind == actDuck:
+                  let above = activeLayers.filterIt(it > bestLi)
+                  if above.len > 0:
+                    duckEnv = duckGainEnvelope(
+                      mixRangeDucked(above, startSample, n), n, e)
+                  break
             let neededFrames = startSample + n - bufStart
             if neededFrames * targetChannels > acc.len:
               acc.setLen(neededFrames * targetChannels)
@@ -715,10 +804,11 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                 )
                 let gain = min(1.0'f32, min(fadeIn, fadeOut))
                 let baseIndex = (outputSampleIndex - bufStart) * targetChannels
+                let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
                 for ch in 0 ..< min(targetChannels, sourceChannels):
                   let sourceIndex = i * sourceChannels + ch
                   if sourceIndex < processedData.len:
-                    acc[baseIndex + ch] += int32(round(processedData[sourceIndex].float32 * gain))
+                    acc[baseIndex + ch] += int32(round(processedData[sourceIndex].float32 * gain * dg))
 
         # Everything below the next clip's start can receive no further writes.
         var hasRemaining = false
