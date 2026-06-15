@@ -9,9 +9,9 @@ app.get("/app/{*splat}", (req, res) => {
   res.redirect(301, `https://app.auto-editor.com${newPath}`);
 });
 
-app.get("/blog", (req, res) => { res.redirect(301, `https://basswood-io.com/blog`) });
+app.get("/blog", (req, res) => { res.redirect(301, `https://basswood.io/blog`) });
 app.get("/blog/{*splat}", (req, res) => {
-  res.redirect(301, `https://basswood-io.com${req.path}`);
+  res.redirect(301, `https://basswood.io${req.path}`);
 });
 
 app.get("/options", (req, res) => {
