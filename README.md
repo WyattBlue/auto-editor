@@ -161,7 +161,7 @@ auto-editor --help
  - [How to Install Auto-Editor](https://auto-editor.com/installing)
  - [All the Options (And What They Do)](https://auto-editor.com/ref/options)
  - [Docs](https://auto-editor.com/docs)
- - [Blog](https://basswood-io.com/blog/)
+ - [Blog](https://basswood.io/blog/)
 
 ## Run Online and as an Application
 You can [run auto-editor online](https://app.auto-editor.com/online) or [download the application](https://app.auto-editor.com/download). They use assets from this repository (Unlicense); their own unique assets are under a separate proprietary license.
