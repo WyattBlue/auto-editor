@@ -2,3 +2,7 @@ baseURL = 'https://auto-editor.com/'
 languageCode = 'en-us'
 title = 'Auto-Editor'
 
+[markdown]
+keepSource = true
+stripFrontmatter = false
+
