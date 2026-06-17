@@ -40,7 +40,7 @@ proc printHelp() {.noreturn.} =
   var first = true
 
   for opt in mainOptions:
-    if opt.help == "":
+    if opt.hidden:
       continue
 
     if opt.c != currentCat or first:

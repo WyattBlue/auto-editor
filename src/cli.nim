@@ -55,10 +55,11 @@ type OptDef* = object
   datum*: string
   metavar*: string # Shouldn't be set for flags.
   help*: string
+  hidden*: bool
 
 const whisperOptions*: seq[OptDef] = @[
-  OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
-  OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: "splitWords", help: ""),
+  OptDef(names: "--debug", kind: Flag, datum: "isDebug"),
+  OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: "splitWords"),
   OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
     help: "Set the language instead of using \"auto\". Examples: en, ja"),
   OptDef(names: "-f, --format", datum: "format", metavar: "FORMAT",
@@ -106,16 +107,16 @@ Examples:
 Examples:
   --set-action nil,0,5sec
   --set-action speed:1.5,varispeed:1.5,30sec,end"""),
-  OptDef(names: "--silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM",
+  OptDef(names: "--silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM", hidden: true,
     help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),
-  OptDef(names: "--video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
+  OptDef(names: "--video-speed", c: cEdit, datum: "video-speed", metavar: "NUM", hidden: true,
     help: "[Deprecated] Set speed of active segments to NUM. (default is 1)"),
 
-  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: "premiere"),
-  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: "resolve"),
-  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: "final-cut-pro"),
-  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: "shotcut"),
-  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: "kdenlive"),
+  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: "premiere", hidden: true),
+  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: "resolve", hidden: true),
+  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: "final-cut-pro", hidden: true),
+  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: "shotcut", hidden: true),
+  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: "kdenlive", hidden: true),
 
   OptDef(names: "-ex, --export", c: cTl, datum: "export",
     metavar: "EXPORT:ATTRS?", help: "Choose the export mode"),
@@ -216,7 +217,7 @@ proc zshcomplete*() =
   echo "  )"
   echo "  options=("
   for opt in mainOptions:
-    if opt.kind == Special:
+    if opt.hidden:
       continue
     # Get first line of help for description
     let desc = if opt.help != "": opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:") else: ""
