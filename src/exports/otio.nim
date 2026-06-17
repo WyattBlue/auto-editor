@@ -85,11 +85,11 @@ proc opacityEffect(rate: float): JsonNode =
     startParam("Blend Mode", 3, %0, rate),
   ))
 
-proc motionEffect(rate: float): JsonNode =
+proc motionEffect(rate: float, position: JsonNode, scalePct: float): JsonNode =
   effectNode("AE.ADBE Motion", "Motion", "", true, jarr(
-    startParam("Position", 1, center(), rate),
-    startParam("Scale", 2, %100.0, rate),
-    startParam("Scale Width", 3, %100.0, rate),
+    startParam("Position", 1, position, rate),
+    startParam("Scale", 2, %scalePct, rate),
+    startParam("Scale Width", 3, %scalePct, rate),
     startParam(" ", 4, %true, rate),
     startParam("Rotation", 5, %0.0, rate),
     startParam("Anchor Point", 6, center(), rate),
@@ -99,6 +99,29 @@ proc motionEffect(rate: float): JsonNode =
     startParam("Crop Right", 10, %0.0, rate),
     startParam("Crop Bottom", 11, %0.0, rate),
   ))
+
+proc motionFor(actions: Actions, mi: MediaInfo, res: (int32, int32),
+    rate: float): JsonNode =
+  ## Translate an overlay `pos` placement into Premiere's intrinsic Motion.
+  ## auto-editor's pos is a top-left corner in canvas px plus a multiplier of the
+  ## source's native size; Premiere's Position is the clip centre as a fraction of
+  ## the frame and Scale is a percentage of native size. Without a `pos` the clip
+  ## stays centred at native scale. Only the first keyframe is read, so an animated
+  ## slide collapses to its start position (keyframe export is a separate task).
+  var position = center()
+  var scalePct = 100.0
+  for a in actions:
+    if a.kind == actPos:
+      let (srcW, srcH) = mi.getRes()
+      let scale = (if a.pscaleKf.len > 0: a.pscaleKf[0].float else: 1.0)
+      let x = (if a.pxKf.len > 0: a.pxKf[0].float else: 0.0)
+      let y = (if a.pyKf.len > 0: a.pyKf[0].float else: 0.0)
+      let cx = x + srcW.float * scale / 2.0
+      let cy = y + srcH.float * scale / 2.0
+      position = %*{"X": cx / res[0].float, "Y": cy / res[1].float}
+      scalePct = scale * 100.0
+      break
+  motionEffect(rate, position, scalePct)
 
 proc invertEffect(rate: float): JsonNode =
   effectNode("AE.ADBE Invert", "Invert", "", false, jarr(
@@ -168,7 +191,8 @@ proc hasAction(actions: Actions, kind: ActionKind): bool =
       return true
 
 proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
-    tb: AVRational, isVideo: bool, linkId: int, nbCh: int): JsonNode =
+    tb: AVRational, isVideo: bool, linkId: int, nbCh: int,
+    res: (int32, int32)): JsonNode =
   let speed = clipSpeed(actions)
   let srcStart = round(clip.offset.float * speed)
   let srcDur = max(1.0, round(clip.dur.float * speed))
@@ -176,7 +200,7 @@ proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
   let effectsArr = newJArray()
   if isVideo:
     effectsArr.add opacityEffect(rate)
-    effectsArr.add motionEffect(rate)
+    effectsArr.add motionFor(actions, mi, res, rate)
     if hasAction(actions, actInvert):
       effectsArr.add invertEffect(rate)
     if hasAction(actions, actHflip):
@@ -228,16 +252,42 @@ proc otioWrite*(name, output: string, tl: v3) =
 
   let children = newJArray()
 
-  for i, track in tl.v:
+  # LinkID groups the parts of one linked A/V clip in Premiere. The base video
+  # clip j and the audio clips at index j (the same cut) share LinkID j+1;
+  # independent `add:` overlay clips must get unique IDs past that range, or
+  # Premiere fuses them with the audio (showing it as "[V]" and muting it).
+  var maxAligned = 0
+  if tl.v.len > 0:
+    maxAligned = max(maxAligned, tl.v[0].len)
+  for atrack in tl.a:
+    maxAligned = max(maxAligned, atrack.len)
+  var nextOverlayLink = maxAligned
+
+  var videoTrackNum = 0
+  for vIdx, track in tl.v:
     let clipArr = newJArray()
     for j, clip in track:
+      # An audio-only timeline that gained `add:` overlays has a synthesized base
+      # track with no source file; it exists only as a render canvas, so there is
+      # nothing to reference here. Skip it (and any track left empty).
+      if clip.src == nil:
+        continue
+      var linkId: int
+      if vIdx == 0:
+        linkId = j + 1
+      else:
+        inc nextOverlayLink
+        linkId = nextOverlayLink
       let actions = tl.effects[clip.effects]
       clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = true, linkId = j + 1, nbCh = nbCh)
+        isVideo = true, linkId = linkId, nbCh = nbCh, res = tl.res)
+    if clipArr.len == 0:
+      continue
+    videoTrackNum += 1
     children.add %*{
       "OTIO_SCHEMA": "Track.1",
       "metadata": newJObject(),
-      "name": "Video " & $(i + 1),
+      "name": "Video " & $videoTrackNum,
       "source_range": nil,
       "effects": newJArray(),
       "markers": newJArray(),
@@ -251,7 +301,7 @@ proc otioWrite*(name, output: string, tl: v3) =
     for j, clip in track:
       let actions = tl.effects[clip.effects]
       clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = false, linkId = j + 1, nbCh = nbCh)
+        isVideo = false, linkId = j + 1, nbCh = nbCh, res = tl.res)
     children.add %*{
       "OTIO_SCHEMA": "Track.1",
       "metadata": {"PremierePro_OTIO": {"AudioChannels": {

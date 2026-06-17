@@ -22,3 +22,6 @@
  - `add:` overlays now follow the base layer's cuts by default, staying time-synced like a second camera angle, instead of restarting from frame 0 each kept section. Pass `follow-base=0` (e.g. `add:logo.gif:follow-base=0`) to restore the restart-per-section behavior for logos/gifs.
  - The render now copies the source's display-matrix rotation onto the output, so phone-shot portrait videos (stored landscape with a rotate flag) no longer play sideways.
  - The v3 timeline format gained a `templateFile` field (the first input), used as the source for stream rotation and attachment passthrough.
+ - The Premiere (FCP7 XML) export now writes `add:` overlays as their own video tracks instead of dropping every track above the base. File defs report the source's real frame size, and still images get a finite duration so Premiere holds them correctly.
+ - The Premiere OTIO export now maps an overlay's `pos:x:y:scale` to Premiere's Motion effect, and gives each overlay a unique link ID so Premiere no longer fuses overlays with the audio.
+ - Exporting an audio-only input with `add:` overlays to Premiere no longer crashes; the synthesized background canvas is skipped in both exports.
