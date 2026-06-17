@@ -11,6 +11,8 @@ proc printHelp(opts: seq[OptDef]) =
   echo "Options:"
 
   for opt in opts:
+    if opt.hidden:
+      continue
     var optStr = "    " & opt.names
     if opt.metavar != "":
       optStr &= " " & opt.metavar

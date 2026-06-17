@@ -18,8 +18,7 @@ proc aliasNames(names: string): seq[string] =
       result.add(n)
 
 proc renderOpt(opt: OptDef): string =
-  if opt.kind == Special: return ""
-  if opt.c == cNone: return ""
+  if opt.hidden or opt.c == cNone: return ""
 
   let pname = primaryName(opt.names)
   let alts = aliasNames(opt.names)
