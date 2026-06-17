@@ -312,8 +312,8 @@ proc editMedia*(args: var mainArgs) =
         for lw in args.labeledWhens:
           maxLabel = max(maxLabel, lw.label)
         var actionMap = newSeq[Actions](maxLabel + 1)
-        actionMap[0] = args.whenSilent
-        actionMap[1] = args.whenNormal
+        actionMap[0] = args.whenInactive
+        actionMap[1] = args.whenActive
         for lw in args.labeledWhens:
           actionMap[lw.label] = lw.action
         var actionIndex: seq[int] = labels.map(proc(x: uint8): int = int(x))
