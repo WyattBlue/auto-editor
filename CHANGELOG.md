@@ -1,7 +1,9 @@
-# 30.5.1
+# 31.0.0
 
 ## Major
+ - `--edit` now supports up to 255 labels. Stack extra edit methods with `--edit:N` (N is 2–255) on top of the default `--edit` (label 1), and give each label its own action with `--when:N ACTION` (label 0 is silent, 1 is normal). Where masks overlap, the higher label wins. `-w:0`/`-w:1` alias `--when-inactive`/`--when-active`.
  - Remove deprecated value `all/e` for `--edit`, use `all` or `0`.
+ - `-s` is now an alias for `--smoothing`.
 
 ## Features
  - Add the `blackdetect` edit method, which marks frames as loud when at least `threshold` of their pixels are black. Wrap in `(not ...)` to cut black fades/dead air.
