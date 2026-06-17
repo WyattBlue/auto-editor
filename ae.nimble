@@ -809,7 +809,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
-  let enableDemuxers = enableMuxers & @["image2", "png_pipe", "mpegts"]
+  let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts"]
 
   var filters = "aformat,abuffer,abuffersink,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,negate,overlay,pad,rgbashift,rotate,scale,vflip,volume".split(",")
 
