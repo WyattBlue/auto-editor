@@ -79,21 +79,20 @@ const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD",
       help: """
 Set an expression which determines how to make auto edits. (default is "audio")"""),
-  OptDef(names: "-w:1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
+  OptDef(names: "-w:1, --when-normal, --when-active", c: cEdit, datum: "when-active", metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
-  OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION",
+  OptDef(names: "-w:0, --when-silent, --when-inactive", c: cEdit, datum: "when-inactive", metavar: "ACTION",
       help: &"""
 When a segment is inactive (defined by --edit) do an action. The default action being 'cut'. See the {actionsRef} for all available actions."""),
   OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH[,LENGTH?]",
       help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),
-  OptDef(names: "--smooth", c: cEdit, datum: "smooth", metavar: "MINCUT[,MINCLIP?]",
+  OptDef(names: "-s, --smooth", c: cEdit, datum: "smooth", metavar: "MINCUT[,MINCLIP?]",
       help: """
 Make sections 'smoother' by applying minimum cut and minimum clip rules. (default is 0.2s,0.1s)
 Examples:
   --smooth 0.2s,0.1s  # Set mincut to 0.2 seconds, minclip to 0.1 seconds.
   --smooth 0  # Turn off smoothing"""),
-  # TODO: Add `-s` for smoothing next major release.
   OptDef(names: "-o, --output", c: cEdit, datum: "output",
     metavar: "FILE", help: "Set the name/path of the new output file"),
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: "cut-out",
