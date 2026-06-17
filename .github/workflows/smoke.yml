@@ -27,6 +27,17 @@ on:
 env:
   AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
 jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Nim
+        run: brew install nim
+      - name: Install Deps
+        run: nimble install --depsOnly
+      - name: Check 32-bit
+        run: nim check --cpu:i386 --hints:off src/main.nim
   fan:
     runs-on: ubuntu-latest
     steps:
