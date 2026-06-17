@@ -36,7 +36,7 @@ func mean(data: seq[int64]): f64 =
   for d in data:
     sum += d
 
-  return sum / data.len
+  return sum.f64 / data.len.f64
 
 func median(data: seq[int64]): f64 =
   if data.len == 0:
@@ -51,7 +51,7 @@ func median(data: seq[int64]): f64 =
   else:
     let mid1 = sortedData[(n div 2) - 1]
     let mid2 = sortedData[n div 2]
-    return (mid1 + mid2) / 2
+    return (mid1 + mid2).f64 / 2
 
 func round(a: f64): int64 =
   int64(math.round(a))
