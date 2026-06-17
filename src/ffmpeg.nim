@@ -15,6 +15,8 @@ proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rationa
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
 proc av_cmp_q(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
+proc av_reduce(dst_num, dst_den: ptr cint, num, den, max: int64): cint {.importc,
+  header: "<libavutil/rational.h>".}
 
 func `+`*(a, b: AVRational): AVRational = av_add_q(a, b)
 func `-`*(a, b: AVRational): AVRational = av_sub_q(a, b)
@@ -25,9 +27,11 @@ func `~=`*(a, b: AVRational): bool = av_cmp_q(a, b) == 0
 func `~=`*[T: int64 | int32 | int](a: AVRational, b: T): bool =
   a ~= AVRational(num: b.cint, den: 1)
 func `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
-  AVRational(num: a.cint, den: 1) * b
+  discard av_reduce(addr result.num, addr result.den,
+    a.int64 * b.num.int64, b.den.int64, high(cint).int64)
 func `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
-  AVRational(num: a.cint, den: 1) / b
+  discard av_reduce(addr result.num, addr result.den,
+    a.int64 * b.den.int64, b.num.int64, high(cint).int64)
 converter toDouble*(r: AVRational): cdouble = av_q2d(r)
 
 func toAVRational*(s: string): AVRational {.raises: [ValueError].} =
