@@ -1,5 +1,5 @@
 import std/[os, sets, strformat, tables, xmltree]
-from std/math import ceil
+from std/math import ceil, round
 when defined(windows):
   import std/strutils
 
@@ -63,7 +63,7 @@ func speedup(speed: float): XmlNode =
 
 
 proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
-    ntsc: string) =
+    ntsc: string, durationStr: string) =
   filedef.add elem("name", agSplitFile(mi.path).name)
   filedef.add elem("pathurl", url)
 
@@ -81,8 +81,10 @@ proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
   rate2.add elem("ntsc", ntsc)
   filedef.add rate2
 
-  # DaVinci Resolve needs this tag even though it's blank
-  filedef.add elem("duration", "")
+  # Blank for Resolve (which needs the tag present but empty) and for real video
+  # (Premiere reads the length from the media); a frame count for still images so
+  # Premiere holds them instead of falling back to its huge default still length.
+  filedef.add elem("duration", durationStr)
 
   let mediadef = newElement("media")
 
@@ -93,8 +95,10 @@ proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
     rate3.add elem("timebase", $tb)
     rate3.add elem("ntsc", ntsc)
     vschar.add rate3
-    vschar.add elem("width", $tl.res[0])
-    vschar.add elem("height", $tl.res[1])
+    # The file def must describe the source's own frame size, not the sequence's;
+    # an overlay still/clip is often a different size than the timeline.
+    vschar.add elem("width", $mi.v[0].width)
+    vschar.add elem("height", $mi.v[0].height)
     vschar.add elem("pixelaspectratio", "square")
     videodef.add vschar
     mediadef.add videodef
@@ -264,6 +268,12 @@ proc handlePath(src: string): string =
   else:
     absPath
 
+func isStillImage(mi: MediaInfo, tb: AVRational): bool =
+  ## A source with a video stream but essentially no duration (0 or 1 frame) is a
+  ## still image. Premiere holds these for a fixed length; given a blank
+  ## `<duration>` it ignores the clip's in/out and falls back to a ~12h default.
+  mi.v.len > 0 and int64(round(mi.duration * tb.float64)) <= 1
+
 proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   let (width, height) = tl.res
   let (timebase, ntsc) = setTbNtsc(tl.tb)
@@ -286,12 +296,25 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     let pathurl = miToUrl[mi]
     let filedef = <>file(id = miToId[mi])
     if pathurl notin fileDefs:
-      mediaDef(filedef, pathurl, mi, tl, timebase, ntsc)
+      let durationStr =
+        if resolve: ""                              # Resolve wants it blank
+        elif isStillImage(mi, tl.tb): $tl.len       # hold the still long enough
+        else: ""                                    # Premiere reads media length
+      mediaDef(filedef, pathurl, mi, tl, timebase, ntsc, durationStr)
       fileDefs.incl(pathurl)
     clipitem.add filedef
 
   let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
-  let firstAudioId = (if hasVideo: tl.v[0].len + 1 else: 1)
+
+  # clipitem ids run V1, V2, ... then audio. Overlay tracks (v[1..]) used to be
+  # dropped entirely; emitting them means audio ids must start past every video
+  # clip, not just v[0]'s.
+  var videoTrackStart = newSeq[int](tl.v.len)
+  var nextVideoId = 1
+  for k in 0 ..< tl.v.len:
+    videoTrackStart[k] = nextVideoId
+    nextVideoId += tl.v[k].len
+  let firstAudioId = (if hasVideo: nextVideoId else: 1)
   let audioPlan = (if resolve: @[]
                    else: planPremiereAudio(tl, ptrToMi, firstAudioId))
 
@@ -322,59 +345,80 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   video.add vformat
 
   if hasVideo:
-    let track = newElement("track")
+    for vIdx, vlayer in tl.v:
+      # resolve-fcp7's link/id scheme is wired for a single video track; only
+      # Premiere gets the overlay tracks (v[1..]).
+      if resolve and vIdx > 0:
+        break
+      if vlayer.len == 0:
+        continue
+      let track = newElement("track")
+      let trackStart = videoTrackStart[vIdx]
 
-    for j, clip in tl.v[0].pairs:
-      let startVal = $clip.start
-      let endVal = $(clip.start + clip.dur)
-      let inVal = $clip.offset
-      let outVal = $(clip.offset + clip.dur)
+      for j, clip in vlayer.pairs:
+        # An audio-only timeline that gained `add:` overlays has a synthesized
+        # base track with no source file (just a render canvas); there is nothing
+        # to write for Premiere, so skip it (and drop a track left empty).
+        if clip.src == nil:
+          continue
 
-      let thisClipid = &"clipitem-{j + 1}"
-      let clipitem = <>clipitem(id = thisClipid)
-      clipitem.add elem("name", agSplitFile(clip.src[]).name)
-      clipitem.add elem("enabled", "TRUE")
-      clipitem.add elem("start", startVal)
-      clipitem.add elem("end", endVal)
-      clipitem.add elem("in", inVal)
-      clipitem.add elem("out", outVal)
+        let mi = ptrToMi[clip.src]
+        let still = isStillImage(mi, tl.tb)
+        let startVal = $clip.start
+        let endVal = $(clip.start + clip.dur)
+        # A still is the same frame at every offset, so read `dur` frames from 0;
+        # real media keeps its true source in/out.
+        let inVal = (if still: "0" else: $clip.offset)
+        let outVal = (if still: $clip.dur else: $(clip.offset + clip.dur))
 
-      let mi = ptrToMi[clip.src]
-      makeFiledef(clipitem, mi)
+        let thisClipid = &"clipitem-{trackStart + j}"
+        let clipitem = <>clipitem(id = thisClipid)
+        clipitem.add elem("name", agSplitFile(clip.src[]).name)
+        clipitem.add elem("enabled", "TRUE")
+        clipitem.add elem("start", startVal)
+        clipitem.add elem("end", endVal)
+        clipitem.add elem("in", inVal)
+        clipitem.add elem("out", outVal)
 
-      clipitem.add elem("compositemode", "normal")
+        makeFiledef(clipitem, mi)
 
-      let effectGroup = tl.effects[clip.effects]
-      for effect in effectGroup:
-        if effect.kind in [actSpeed, actVarispeed]:
-          clipitem.add speedup(effect.val * 100)
-          break
+        clipitem.add elem("compositemode", "normal")
 
-      if resolve:
-        let link1 = newElement("link")
-        link1.add elem("linkclipref", thisClipid)
-        clipitem.add link1
-        let link2 = newElement("link")
-        link2.add elem("linkclipref", &"clipitem-{tl.v[0].len + j + 1}")
-        clipitem.add link2
-      else:
-        let vlink = newElement("link")
-        vlink.add elem("linkclipref", thisClipid)
-        vlink.add elem("mediatype", "video")
-        vlink.add elem("trackindex", "1")
-        vlink.add elem("clipindex", $(j + 1))
-        clipitem.add vlink
-        for k, atrack in audioPlan:
-          if j >= tl.a[atrack.layerIdx].len: continue
-          let link = newElement("link")
-          link.add elem("linkclipref", &"clipitem-{atrack.firstClipId + j}")
-          link.add elem("mediatype", "audio")
-          link.add elem("trackindex", $(k + 1))
-          link.add elem("clipindex", $(j + 1))
-          clipitem.add link
+        let effectGroup = tl.effects[clip.effects]
+        for effect in effectGroup:
+          if effect.kind in [actSpeed, actVarispeed]:
+            clipitem.add speedup(effect.val * 100)
+            break
 
-      track.add clipitem
-    video.add track
+        if resolve:
+          let link1 = newElement("link")
+          link1.add elem("linkclipref", thisClipid)
+          clipitem.add link1
+          let link2 = newElement("link")
+          link2.add elem("linkclipref", &"clipitem-{tl.v[0].len + j + 1}")
+          clipitem.add link2
+        elif vIdx == 0:
+          # Base track: link the clip to itself and to its aligned audio clips so
+          # they move together. Overlay tracks (v[1..]) carry no audio, so they
+          # stay standalone rather than forming a one-member self-link group.
+          let vlink = newElement("link")
+          vlink.add elem("linkclipref", thisClipid)
+          vlink.add elem("mediatype", "video")
+          vlink.add elem("trackindex", "1")
+          vlink.add elem("clipindex", $(j + 1))
+          clipitem.add vlink
+          for k, atrack in audioPlan:
+            if j >= tl.a[atrack.layerIdx].len: continue
+            let link = newElement("link")
+            link.add elem("linkclipref", &"clipitem-{atrack.firstClipId + j}")
+            link.add elem("mediatype", "audio")
+            link.add elem("trackindex", $(k + 1))
+            link.add elem("clipindex", $(j + 1))
+            clipitem.add link
+
+        track.add clipitem
+      if track.len > 0:
+        video.add track
 
   media.add video
 
