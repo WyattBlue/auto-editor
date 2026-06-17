@@ -423,25 +423,24 @@ judge making cuts.
       args.output = key
     of "when":
       # Generic `--when:N` / `-w:N`. Labels 0 and 1 share storage with the named
-      # --when-silent / --when-normal aliases; labels >= 2 go to labeledWhens.
       let rest = extractAdds(key, expectingLabel, -1, args)
       if rest.strip() != "":
         case expectingLabel
-        of 0: args.whenSilent = parseActions(rest)
-        of 1: args.whenNormal = parseActions(rest)
+        of 0: args.whenInactive = parseActions(rest)
+        of 1: args.whenActive = parseActions(rest)
         else: setLabeledWhen(args, expectingLabel, parseActions(rest))
-    of "when-silent":
+    of "when-inactive":
       let rest = extractAdds(key, 0, -1, args)
       if rest.strip() != "":
-        args.whenSilent = parseActions(rest)
-    of "when-normal":
+        args.whenInactive = parseActions(rest)
+    of "when-active":
       let rest = extractAdds(key, 1, -1, args)
       if rest.strip() != "":
-        args.whenNormal = parseActions(rest)
+        args.whenActive = parseActions(rest)
     of "silent-speed":
-      args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
+      args.whenInactive = actionFromUserSpeed(parseSpeed(key, expecting))
     of "video-speed":
-      args.whenNormal = actionFromUserSpeed(parseSpeed(key, expecting))
+      args.whenActive = actionFromUserSpeed(parseSpeed(key, expecting))
     of "add-in":
       block:
         let span = parseTimeRange(key, expecting)
