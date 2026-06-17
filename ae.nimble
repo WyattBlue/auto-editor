@@ -801,7 +801,7 @@ func basicPcms(): seq[string] =
       result.add &"pcm_{t}{size}le"
 
 proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string =
-  var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
+  var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,png,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
 
   enableEncoders &= basicPcms()
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
