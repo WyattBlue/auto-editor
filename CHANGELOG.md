@@ -10,4 +10,4 @@
  - 
 
 ## Fixes
- -
+ - Use ffmpeg 8.1.2

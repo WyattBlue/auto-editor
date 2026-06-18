@@ -239,8 +239,8 @@ let zlib = Package(
 )
 let ffmpeg = Package(
   name: "ffmpeg",
-  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz",
-  sha256: "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+  sha256: "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
 )
 
 proc selectPackages(kind: CrossKind = native): seq[Package] =
