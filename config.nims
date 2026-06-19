@@ -48,6 +48,7 @@ else:
     switch("passL", "-sEXPORT_NAME=AutoEditor")
     switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS,ENV]")
     switch("passL", "-sENVIRONMENT=web,worker")
+    switch("passL", "-lworkerfs.js")
 
     when hostCPU == "wasm32":
       switch("passL", "-sMAXIMUM_MEMORY=4294967296")
