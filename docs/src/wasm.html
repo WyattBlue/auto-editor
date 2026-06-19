@@ -75,19 +75,6 @@
       0,97,115,109, 1,0,0,0, 5,3,1,4,1
     ]));
     if (!hasWasm64) document.getElementById('memNotice').style.display = '';
-    const wasmBase = hasWasm64 ? 'auto-editor-web64' : 'auto-editor-web';
-    const wasmBinaryPromise = fetch(wasmBase + '.wasm').then(r => r.arrayBuffer());
-    const mainScriptBlobPromise = fetch(wasmBase + '.js')
-      .then(r => r.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        return new Promise((resolve) => {
-          const s = document.createElement('script');
-          s.src = url;
-          s.onload = () => resolve(url);
-          document.head.appendChild(s);
-        });
-      });
 
     let progressLineActive = false;
     const pendingOutput = [];
@@ -177,45 +164,31 @@
       document.getElementById('downloadArea').appendChild(a);
     }
 
-    async function runModule(btn, args, entries) {
+    // Run a job in a fresh worker. The worker mounts the input Files via
+    // WORKERFS (read on demand, never fully resident) and posts back outputs as
+    // Blobs. Inputs are referenced at /work/<name>; args must use those paths.
+    function runViaWorker(btn, args, files) {
       btn.disabled = true;
       clearDownloads();
-      try {
-        const buffers = await Promise.all(
-          entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
-        );
-        handleOutput('<wasm>auto-editor ' + args.join(' ') + '</wasm>');
-
-        let resolve, reject;
-        const done = new Promise((res, rej) => { resolve = res; reject = rej; });
-
-        let mod;
-        try {
-          mod = await AutoEditor({
-            arguments: args,
-            preRun: [(m) => entries.forEach(({path}, i) => m.FS.writeFile(path, buffers[i]))],
-            print:    handleOutput,
-            printErr: handleOutput,
-            wasmBinary: await wasmBinaryPromise,
-            mainScriptUrlOrBlob: await mainScriptBlobPromise,
-            onExit: (code) => code === 0 ? resolve() : reject(new Error('exited with code ' + code)),
-          });
-        } catch (e) {
-          handleOutput('<wasm>module init failed: ' + e + '</wasm>');
-          return null;
-        }
-
-        try {
-          await done;
-        } catch (e) {
-          handleOutput('<wasm>' + e.message + '</wasm>');
-          return null;
-        }
-
-        return mod;
-      } finally {
-        btn.disabled = false;
-      }
+      handleOutput('<wasm>auto-editor ' + args.join(' ') + '</wasm>');
+      const worker = new Worker('runner.js');
+      return new Promise((resolve) => {
+        const finish = () => { worker.terminate(); btn.disabled = false; resolve(); };
+        worker.onmessage = (e) => {
+          const m = e.data;
+          switch (m.type) {
+            case 'print':  handleOutput(m.text); break;
+            case 'output': addDownload(m.blob, m.name); break;
+            case 'error':  handleOutput('<wasm>' + m.message + '</wasm>'); finish(); break;
+            case 'done':   finish(); break;
+          }
+        };
+        worker.onerror = (e) => {
+          handleOutput('<wasm>worker error: ' + (e.message || e) + '</wasm>');
+          finish();
+        };
+        worker.postMessage({ type: 'run', args, files });
+      });
     }
 
     async function runEditor() {
@@ -223,39 +196,10 @@
       const otherEl = document.getElementById('otherFilesInput');
       const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
 
-      const inputFiles = Array.from(fileEl.files).map(f => ({file: f, path: '/' + f.name}));
-      const otherFiles = Array.from(otherEl.files).map(f => ({file: f, path: '/' + f.name}));
-      const allFiles = [...inputFiles, ...otherFiles];
-      const args = [...inputFiles.map(e => e.path), ...extraArgs];
-
-      const mod = await runModule(document.getElementById('runBtn'), args, allFiles);
-      offerOutputDownloads(mod, allFiles);
-    }
-
-    // Scan FS root for anything the run produced and offer each as a download.
-    function offerOutputDownloads(mod, inputFiles) {
-      if (!mod) return;
-      const skip = new Set(['tmp', 'home', 'dev', 'proc']);
-      const inputSet = new Set(inputFiles.map(e => e.path));
-      const outputs = [];
-      for (const name of mod.FS.readdir('/')) {
-        if (name === '.' || name === '..' || skip.has(name)) continue;
-        const path = '/' + name;
-        if (inputSet.has(path)) continue;
-        let st;
-        try { st = mod.FS.stat(path); } catch (e) { continue; }
-        if (mod.FS.isFile(st.mode)) outputs.push({name, path});
-      }
-      if (outputs.length === 0) {
-        handleOutput('<wasm>no output files produced</wasm>');
-        return;
-      }
-      for (const {name, path} of outputs) {
-        let data;
-        try { data = mod.FS.readFile(path); }
-        catch (e) { handleOutput('<wasm>could not read ' + path + ': ' + e + '</wasm>'); continue; }
-        addDownload(data, name);
-      }
+      const inputs = Array.from(fileEl.files);
+      const files = [...inputs, ...Array.from(otherEl.files)];
+      const args = [...inputs.map(f => '/work/' + f.name), ...extraArgs];
+      await runViaWorker(document.getElementById('runBtn'), args, files);
     }
 
     async function runWhisper() {
@@ -264,27 +208,25 @@
       if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
       if (!modelEl.files.length) { handleOutput('No model file selected.'); return; }
       const file = fileEl.files[0];
-      const inputPath = '/' + file.name;
+      const model = modelEl.files[0];
       const extraArgs = document.getElementById('whisperArgs').value.trim().split(/\s+/).filter(Boolean);
 
-      const inputFiles = [{file, path: inputPath}, {file: modelEl.files[0], path: '/model.bin'}];
-      const mod = await runModule(
+      await runViaWorker(
         document.getElementById('whisperRunBtn'),
-        ['whisper', inputPath, '/model.bin', ...extraArgs],
-        inputFiles
+        ['whisper', '/work/' + file.name, '/work/' + model.name, ...extraArgs],
+        [file, model]
       );
-      offerOutputDownloads(mod, inputFiles);
     }
 
     async function runInfo() {
       const fileEl = document.getElementById('infoFileInput');
       if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
-      const inputFiles = Array.from(fileEl.files).map(f => ({file: f, path: '/' + f.name}));
+      const files = Array.from(fileEl.files);
 
-      await runModule(
+      await runViaWorker(
         document.getElementById('infoRunBtn'),
-        ['info', ...inputFiles.map(e => e.path)],
-        inputFiles
+        ['info', ...files.map(f => '/work/' + f.name)],
+        files
       );
     }
   </script>
