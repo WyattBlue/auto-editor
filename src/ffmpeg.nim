@@ -720,6 +720,8 @@ proc av_interleaved_write_frame*(s: ptr AVFormatContext,
     pkt: ptr AVPacket): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational,
     tb_dst: AVRational) {.importc, header: "<libavcodec/packet.h>".}
+proc av_rescale_q*(a: int64, bq, cq: AVRational): int64 {.importc,
+    header: "<libavutil/mathematics.h>".}
 
 # Filters
 type
