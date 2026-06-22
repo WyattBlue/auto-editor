@@ -22,6 +22,34 @@ These options have aliases:
 - `--when-inactive` = `--when-silent`, `-w:0`
 - `--when-active` = `--when-normal`, `-w:1`
 
+## Labels
+
+The `:0` and `:1` in `-w:0`/`-w:1` are **labels**. Auto-editor tags every moment
+of the timeline with an integer label (0–255) and runs that label's action. Two
+labels are built in:
+
+- **0** — *inactive* ("silent"): everything `--edit` does **not** match. Its
+  action is `--when-inactive` / `-w:0` / `--when:0` (default `cut`).
+- **1** — *active* ("normal"): what `--edit` matches. Its action is
+  `--when-active` / `-w:1` / `--when:1` (default `nil`).
+
+So `--edit METHOD` is shorthand for `--edit:1 METHOD` — it sets which moments get
+label 1.
+
+### Custom classes (`--edit:N` / `--when:N`)
+
+Define extra classes with `--edit:N EXPR` (where `N` is `2`–`255`) and give each
+its own action with `--when:N ACTION`. Where two classes overlap, the **higher
+label wins**, so later/larger labels layer on top of the basic silent/active split.
+
+```bash
+# Cut silence and keep speech as usual, but additionally speed up the loud parts
+auto-editor video.mp4 --edit:2 audio:-12dB --when:2 speed:1.5
+
+# -e/-w short forms; zoom wherever there is motion, on top of the audio edit
+auto-editor video.mp4 -e:2 motion:0.02 -w:2 zoom:2
+```
+
 ## Available Actions
 
 ### nil

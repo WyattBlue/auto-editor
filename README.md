@@ -17,6 +17,11 @@ auto-editor path/to/your/video.mp4
 
 See [Installing](https://auto-editor.com/installing) for more information.
 
+<h2 align="center">Skills</h2>
+
+```
+npx skills add WyattBlue/auto-editor
+```
 
 <h2 align="center">Cutting</h2>
 
@@ -62,6 +67,14 @@ auto-editor example.mp4 --edit audio:-7dB
 auto-editor example.mp4 --edit motion:-19dB
 ```
 
+### Labels
+Every moment gets an integer **label**: `0` is silent (cut by default), `1` is active (kept). `--edit` sets what's label `1`; `-w:0`/`-w:1` set each one's action. Add more classes with `--edit:N` and `--when:N` (`N` up to 255); where they overlap, the higher label wins.
+```
+# Cut silence, keep speech, and additionally speed up the loud parts
+auto-editor example.mp4 --edit:2 audio:-12dB --when:2 speed:1.5
+```
+As a value (not a label), `--edit 1` keeps everything and `--edit 0` cuts everything. See the [actions docs](https://auto-editor.com/docs/actions) for more.
+
 ### See What Auto-Editor Cuts Out
 To export what auto-editor normally cuts out. Set `--when-active` to `cut` and `--when-inactive` to `nil` (leave as is). This is the reverse of the usual default values.
 
@@ -83,71 +96,6 @@ Auto-Editor can also export to:
 - ShotCut with `--export shotcut`
 - Kdenlive with `--export kdenlive`
 - Individual media clips with `--export clip-sequence`
-
-### Naming Timelines
-Some editors support naming timelines. By default, auto-editor will use the name "Auto-Editor Media Group". For `premiere` `resolve` and `final-cut-pro` export options, you can change the name with the following syntax.
-
-```
-# for POSIX shells
-auto-editor example.mp4 --export 'premiere:name="Your name here"'
-
-# for Powershell
-auto-editor example.mp4 --export 'premiere:name=""Your name here""'
-```
-
-### Split by Clip
-
-If you want to split the clips, but don't want auto-editor to do any more editing. There's a simple command.
-```
-auto-editor example.mp4 -w:0 nil -w:1 nil --export premiere
-```
-
-<h2 align="center">Importing timeline files</h2>
-Auto-Editor can read fcp7 xml files and render them as media files:
-
-```
-auto-editor myFcp7File.xml -o render.mp4
-```
-
-Available Importers:
- - Auto-Editor timeline files (`.v1`, `.v2`, `.v3`)
- - FCP7 XML (experimental)
-
-PRs implementing more importers are encouraged.
-
-<h2 align="center">Manual Editing</h2>
-
-Use the `--cut-out` option to always remove a section.
-
-```
-# Cut out the first 30 seconds.
-auto-editor example.mp4 --cut-out 0,30sec
-
-# Cut out the first 30 frames.
-auto-editor example.mp4 --cut-out 0,30
-
-# Always leave in the first 30 seconds.
-auto-editor example.mp4 --add-in 0,30sec
-
-# Cut out the last 10 seconds.
-auto-editor example.mp4 --cut-out -10sec,end
-
-# You can do multiple at once.
-auto-editor example.mp4 --cut-out 0,10 15sec,20sec
-auto-editor example.mp4 --add-in 30sec,40sec 120,150sec
-```
-
-And of course, you can use any `--edit` configuration.
-
-If you don't want **any automatic cuts**, you can use `--edit none` or `--edit all`
-
-```
-# Cut out the first 5 seconds, leave the rest untouched.
-auto-editor example.mp4 --edit none --cut-out 0,5sec
-
-# Leave in the first 5 seconds, cut everything else out.
-auto-editor example.mp4 --edit all --add-in 0,5sec
-```
 
 <h2 align="center">More Options</h2>
 
