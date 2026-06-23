@@ -50,15 +50,36 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      params.n_threads = ff_filter_get_nb_threads(ctx);
      params.print_special = 0;
      params.print_progress = 0;
-@@ -207,6 +216,7 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
+@@ -207,12 +216,28 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
      params.print_timestamps = 0;
      params.max_len = wctx->max_len;
      params.token_timestamps = (wctx->max_len > 0);
 +    params.split_on_word = (wctx->max_len > 0);
- 
+
      if (whisper_full(wctx->ctx_wsp, params, wctx->audio_buffer, samples) != 0) {
          av_log(ctx, AV_LOG_ERROR, "Failed to process audio with whisper.cpp\n");
-@@ -443,6 +453,10 @@ static int query_formats(const AVFilterContext *ctx,
+         return;
+     }
+
++    // "auto" re-runs language detection on every chunk; lock in the first
++    // result so later chunks reuse it instead of re-detecting (an extra encoder
++    // pass per chunk that can also drift to a different language mid-file).
++    if (!av_strcasecmp(wctx->language, "auto")) {
++        const int lang_id = whisper_full_lang_id(wctx->ctx_wsp);
++        if (lang_id >= 0) {
++            char *detected = av_strdup(whisper_lang_str(lang_id));
++            if (detected) {
++                av_freep(&wctx->language);
++                wctx->language = detected;
++                av_log(ctx, AV_LOG_INFO, "Locked auto-detected language: %s\n", detected);
++            }
++        }
++    }
++
+     const int n_segments = whisper_full_n_segments(wctx->ctx_wsp);
+     char *segments_text = NULL;
+
+@@ -443,6 +468,10 @@ static int query_formats(const AVFilterContext *ctx,
  static const AVOption whisper_options[] = {
      { "model", "Path to the whisper.cpp model file", OFFSET(model_path), AV_OPT_TYPE_STRING,.flags = FLAGS },
      { "language", "Language for transcription ('auto' for auto-detect)", OFFSET(language), AV_OPT_TYPE_STRING, {.str = "auto"}, .flags = FLAGS },
