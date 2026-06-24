@@ -1,4 +1,4 @@
-import std/[envvars, strformat, strutils]
+import std/[envvars, json, strformat, strutils]
 
 import ./log
 import ./util/fun
@@ -42,6 +42,10 @@ proc requireLicense*(args: mainArgs, feature: string) =
 
   let (isValid, reason) = validateKey(key)
   if isValid:
+    # Subscription tiers must be server validated.
+    if parseJson(reason){"tier"}.getStr == "sub":
+      # Just print an error for now
+      error "Update auto-editor to a newer version"
     return
 
   if reason == "":
