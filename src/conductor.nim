@@ -1,4 +1,4 @@
-import std/[options, os, random, sets, sequtils, strformat, strutils, terminal, times]
+import std/[options, os, sets, sequtils, strformat, strutils, tempfiles, terminal, times]
 when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
@@ -275,10 +275,7 @@ proc editMedia*(args: var mainArgs) =
             if avgFr.num > 0 and avgFr.den > 0:
               tb = makeSaneTimebase(avgFr)
 
-        var singleArgs = args
-        singleArgs.inputs = @[args.inputs[i]]
-
-        var labels = interpretEdit(singleArgs, @[container], tb, bar)
+        var labels = interpretEdit(args, container, args.inputs[i], tb, bar)
         let tbf = tb.float64
         let startMargin = toTb(args.margin[0], tbf)
         let endMargin = toTb(args.margin[1], tbf)
@@ -408,21 +405,8 @@ proc editMedia*(args: var mainArgs) =
   let rule = initRules(output)
   args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
 
-  proc createAlphanumTempDir(length: int = 8): string =
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-    const prefix = "tmp"
-    var suffix = ""
-    for i in 0..<length:
-      suffix.add(chars[rand(chars.len - 1)])
-
-    let dirName = prefix & suffix
-    let fullPath = getTempDir() / dirName
-    createDir(fullPath)
-    return fullPath
-
   if tempDir == "":
-    randomize()
-    tempDir = createAlphanumTempDir()
+    tempDir = createTempDir("tmp", "")
   else:
     if fileExists(tempDir):
       error "Temp directory cannot be an already existing file."

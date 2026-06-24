@@ -12,11 +12,6 @@ type Priority = object
   frame: ptr AVFrame
   stream: ptr AVStream
 
-func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Priority =
-  result.index = index
-  result.frame = frame
-  result.stream = stream
-
 func `<`(a, b: Priority): bool = a.index < b.index
 
 func pngDimensions(data: ptr uint8, size: cint): (cint, cint) =
@@ -352,7 +347,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
       (videoFrame, index) = videoFrameIter()
       if videoFrame != nil:
         earliestVideoIndex = some(index)
-        frameQueue.push(initPriority(float(index), videoFrame, vOutStream))
+        frameQueue.push(Priority(index: float(index), frame: videoFrame, stream: vOutStream))
 
     for i in 0..<audioFrameIters.len:
       if finished(audioFrameIters[i]):
@@ -377,7 +372,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     for i in 0..<audioFrameIters.len:
       if shouldGetAudio[i] and audioFrames[i] != nil:
         let audioIndex = int(round(audioFrames[i].time(audioEncoders[i].time_base) * tl.tb))
-        frameQueue.push(initPriority(float(audioIndex), audioFrames[i], audioStreams[i]))
+        frameQueue.push(Priority(index: float(audioIndex), frame: audioFrames[i], stream: audioStreams[i]))
 
     while frameQueue.len > 0 and frameQueue[0].index <= float64(index):
       let item = frameQueue.pop()

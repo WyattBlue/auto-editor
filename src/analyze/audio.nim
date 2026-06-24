@@ -50,9 +50,6 @@ type
     targetFormat: AVSampleFormat
     readBuffer: ptr uint8
     maxBufferSize: int
-    totalFramesProcessed: int = 0
-    totalSamplesWritten: int = 0
-    isInitialized: bool = false
 
   AudioProcessor* = object
     `iterator`*: AudioIterator
@@ -95,8 +92,6 @@ proc cleanup(iter: AudioIterator) =
     iter.readBuffer = nil
 
 proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
-  iter.totalFramesProcessed += 1
-
   try:
     # Use AudioResampler to process the frame
     let resampledFrames = iter.resampler.resample(frame)
@@ -107,7 +102,6 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
                                   resampledFrame.nb_samples)
       if ret < resampledFrame.nb_samples:
         error "Could not write data to FIFO"
-      iter.totalSamplesWritten += resampledFrame.nb_samples
 
       # Free the resampled frame (since AudioResampler allocated it)
       av_frame_free(addr resampledFrame)
@@ -232,7 +226,6 @@ proc flushResampler(iter: AudioIterator) =
                                 flushedFrame.nb_samples)
     if ret < flushedFrame.nb_samples:
       error "Could not write flushed data to FIFO"
-    iter.totalSamplesWritten += flushedFrame.nb_samples
     av_frame_free(addr flushedFrame)
 
 iterator peaks*(processor: var AudioProcessor, container: InputContainer,
