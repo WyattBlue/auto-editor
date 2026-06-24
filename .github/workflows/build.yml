@@ -6,8 +6,40 @@ on:
 permissions:
   contents: write
 jobs:
+  fan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Make cache file
+        run: |
+          grep 'sha256: "' ae.nimble > cache.txt
+      - name: Cache tarballs
+        id: cache-tarballs
+        uses: actions/cache@v5
+        with:
+          path: ffmpeg_sources
+          key: tarballs-${{ hashFiles('cache.txt') }}
+      - name: Homebrew
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install packages
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
+        run: brew install nim
+      - name: Download
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
+        run: nimble downloaddeps
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: deps
+          path: ffmpeg_sources/*.tar.*
+          if-no-files-found: error
   main:
     runs-on: ${{ matrix.os }}
+    needs: fan
     strategy:
       matrix:
         include:
@@ -21,7 +53,12 @@ jobs:
             binary_name: auto-editor-macos-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Get ffmpeg_sources
+        uses: actions/download-artifact@v8
+        with:
+          name: deps
+          path: ffmpeg_sources
       - name: Install Homebrew
         if: runner.os != 'macOS'
         run: |
@@ -51,7 +88,7 @@ jobs:
       - name: Compile
         run: nimble make && mv auto-editor ${{ matrix.binary_name }}
       - name: Checkout tests
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: WyattBlue/auto-editor-tests
           token: ${{ secrets.TESTS_TOKEN }}
@@ -69,9 +106,15 @@ jobs:
 
   windows:
     runs-on: ubuntu-latest
+    needs: fan
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Get ffmpeg_sources
+        uses: actions/download-artifact@v8
+        with:
+          name: deps
+          path: ffmpeg_sources
       - name: Nim
         uses: jiro4989/setup-nim-action@v2
         with:
@@ -95,9 +138,15 @@ jobs:
 
   windows-arm:
     runs-on: ubuntu-24.04-arm
+    needs: fan
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Get ffmpeg_sources
+        uses: actions/download-artifact@v8
+        with:
+          name: deps
+          path: ffmpeg_sources
       - name: Install Homebrew
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -125,12 +174,18 @@ jobs:
 
   linux-armv7:
     runs-on: ubuntu-24.04-arm
+    needs: fan
     env:
       DISABLE_WHISPER: "1"
       DISABLE_HEVC: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Get ffmpeg_sources
+        uses: actions/download-artifact@v8
+        with:
+          name: deps
+          path: ffmpeg_sources
       - name: Install Homebrew
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"

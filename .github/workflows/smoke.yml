@@ -31,7 +31,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Nim
         run: brew install nim
       - name: Install Deps
@@ -42,13 +42,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Make cache file
+        run: |
+          grep 'sha256: "' ae.nimble > cache.txt
       - name: Cache tarballs
         id: cache-tarballs
         uses: actions/cache@v5
         with:
           path: ffmpeg_sources
-          key: tarballs-${{ hashFiles('ae.nimble') }}
+          key: tarballs-${{ hashFiles('cache.txt') }}
       - name: Homebrew
         if: steps.cache-tarballs.outputs.cache-hit != 'true'
         run: |
@@ -78,7 +81,7 @@ jobs:
           - os: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Python
         uses: actions/setup-python@v6
         with:
@@ -114,7 +117,7 @@ jobs:
       - name: Compile
         run: nimble make
       - name: Checkout tests
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: WyattBlue/auto-editor-tests
           token: ${{ secrets.TESTS_TOKEN }}
@@ -129,7 +132,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Get ffmpeg_sources
         uses: actions/download-artifact@v8
         with:
@@ -166,7 +169,7 @@ jobs:
       DISABLE_HEVC: 1
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Python
         uses: actions/setup-python@v6
         with:
@@ -176,7 +179,7 @@ jobs:
         with:
           name: auto-editor-windows
       - name: Checkout tests
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: WyattBlue/auto-editor-tests
           token: ${{ secrets.TESTS_TOKEN }}
@@ -189,7 +192,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Get ffmpeg_sources
         uses: actions/download-artifact@v8
         with:
@@ -229,7 +232,7 @@ jobs:
       DISABLE_HEVC: 1
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Python
         uses: actions/setup-python@v6
         with:
@@ -239,7 +242,7 @@ jobs:
         with:
           name: auto-editor-windows-arm
       - name: Checkout tests
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: WyattBlue/auto-editor-tests
           token: ${{ secrets.TESTS_TOKEN }}
