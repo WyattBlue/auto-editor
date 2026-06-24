@@ -143,7 +143,7 @@ jobs:
         run: brew install nim
       - name: Install mingw-w64
         run: |
-          sudo apt-get install -y mingw-w64 mingw-w64-x86-64-dev build-essential pkg-config nasm git meson
+          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 mingw-w64-x86-64-dev build-essential pkg-config nasm git meson
           echo "DISABLE_VPX=1" >> $GITHUB_ENV
           echo "DISABLE_SVTAV1=1" >> $GITHUB_ENV
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
