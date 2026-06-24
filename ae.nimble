@@ -301,7 +301,13 @@ proc getFileHash(filename: string): string =
 
 proc download(package: Package) =
   if not fileExists(package.location):
-    exec &"curl -fL --retry 5 --retry-all-errors --retry-delay 2 -O {package.sourceUrl}"
+    # An uncaught exec failure makes nimble exit 0, which would let a partial
+    # ffmpeg_sources get cached. quit(1) fails the job so the cache isn't saved.
+    try:
+      exec &"curl -fL --retry 5 --retry-all-errors --retry-delay 2 -O {package.sourceUrl}"
+    except OSError:
+      echo &"Failed to download {package.name} from {package.sourceUrl}"
+      quit(1)
     let filename = "ffmpeg_sources" / package.location
     let hash = getFileHash(filename)
     if package.sha256 != hash:
