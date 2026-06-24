@@ -909,6 +909,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   mkDir(ffmpegBuildDirWin)
   withDir ffmpegBuildDirWin:
     exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{winBuildPath}" \
+      --pkg-config=pkg-config \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{winBuildPath}/include" \
       --extra-ldflags="-L{winBuildPath}/lib" \
