@@ -856,9 +856,6 @@ when not defined(nimscript):
           yield act
           i = pos
 
-  func actionLen*(a: Actions): int =  # O(n)
-    for _ in a: inc result
-
   func `==`*(a, b: Actions): bool =
     let ia = int(a)
     let ib = int(b)

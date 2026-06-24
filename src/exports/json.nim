@@ -9,6 +9,24 @@ func effectGroupToJson(actions: Actions): JsonNode =
   for a in actions: parts.add $a
   return %parts
 
+func tracksToJson(tracks: seq[seq[Clip]], name: string, effects: seq[Actions]): JsonNode =
+  result = newJArray()
+  for track in tracks:
+    var trackArray = newJArray()
+    for clip in track:
+      var clipObj = newJObject()
+      clipObj["name"] = %name
+      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
+      clipObj["start"] = %clip.start
+      clipObj["dur"] = %clip.dur
+      clipObj["offset"] = %clip.offset
+      clipObj["stream"] = %clip.stream
+      let effectGroup = effects[clip.effects]
+      if not effectGroup.isEmpty:
+        clipObj["effects"] = effectGroupToJson(effectGroup)
+      trackArray.add(clipObj)
+    result.add(trackArray)
+
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
   return %* {"version": "1", "source": self.source, "chunks": jsonChunks}
@@ -25,40 +43,6 @@ func `%`(self: v2): JsonNode =
   }
 
 func `%`*(self: v3): JsonNode =
-  var videoTracks = newJArray()
-  for track in self.v:
-    var trackArray = newJArray()
-    for clip in track:
-      var clipObj = newJObject()
-      clipObj["name"] = %"video"
-      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
-      clipObj["start"] = %clip.start
-      clipObj["dur"] = %clip.dur
-      clipObj["offset"] = %clip.offset
-      clipObj["stream"] = %clip.stream
-      let effectGroup = self.effects[clip.effects]
-      if not effectGroup.isEmpty:
-        clipObj["effects"] = effectGroupToJson(effectGroup)
-      trackArray.add(clipObj)
-    videoTracks.add(trackArray)
-
-  var audioTracks = newJArray()
-  for track in self.a:
-    var trackArray = newJArray()
-    for clip in track:
-      var clipObj = newJObject()
-      clipObj["name"] = %"audio"
-      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
-      clipObj["start"] = %clip.start
-      clipObj["dur"] = %clip.dur
-      clipObj["offset"] = %clip.offset
-      clipObj["stream"] = %clip.stream
-      let effectGroup = self.effects[clip.effects]
-      if not effectGroup.isEmpty:
-        clipObj["effects"] = effectGroupToJson(effectGroup)
-      trackArray.add(clipObj)
-    audioTracks.add(trackArray)
-
   return %* {
     "version": "3",
     "templateFile": (if self.templateFile != nil: self.templateFile[] else: ""),
@@ -68,8 +52,8 @@ func `%`*(self: v3): JsonNode =
     "samplerate": self.sr,
     "layout": $(self.layout),
     "langs": self.langs,
-    "v": videoTracks,
-    "a": audioTracks,
+    "v": tracksToJson(self.v, "video", self.effects),
+    "a": tracksToJson(self.a, "audio", self.effects),
   }
 
 proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =

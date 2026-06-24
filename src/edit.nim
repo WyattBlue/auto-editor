@@ -213,7 +213,7 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
   walk(expressions[^1])
   return (video, audio)
 
-proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[uint8] =
+proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb: AVRational, bar: Bar): seq[uint8] =
 
   proc editEval(expr: Expr, text: string): seq[bool] =
     if expr.kind != ExprList or expr.elements.len == 0:
@@ -236,7 +236,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       of "0":
         return @[]
       of "1":
-        let length = mediaLength(containers[0])
+        let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int
 
         return newSeqWith(tbLength, true)
@@ -275,14 +275,11 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           if not isKey:
             argPos += 1
 
-        for ci in 0 ..< containers.len:
-          let container = containers[ci]
-          let inp = args.inputs[ci]
-          if stream == -1:
-            for i in 0 ..< container.audio.len:
-              result.orWithThreshold(audio(bar, container, inp, tb, i.int32), threshold)
-          else:
-            result.orWithThreshold(audio(bar, container, inp, tb, stream), threshold)
+        if stream == -1:
+          for i in 0 ..< container.audio.len:
+            result.orWithThreshold(audio(bar, container, input, tb, i.int32), threshold)
+        else:
+          result.orWithThreshold(audio(bar, container, input, tb, stream), threshold)
         return result
       of "motion":
         threshold = defaultMotionThres
@@ -301,8 +298,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           if not isKey:
             argPos += 1
 
-        for ci in 0 ..< containers.len:
-          result.orWithThreshold(motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur), threshold)
+        result.orWithThreshold(motion(bar, container, input, tb, stream, width, blur), threshold)
         return result
       of "blackdetect":
         threshold = defaultBlackThres
@@ -321,8 +317,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           if not isKey:
             argPos += 1
 
-        for ci in 0 ..< containers.len:
-          result.orWithThreshold(blackdetect(bar, containers[ci], args.inputs[ci], tb, stream, pixelBlack), threshold)
+        result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
       of "subtitle", "regex":
         let argOrder = argOrderOf("subtitle")
@@ -346,27 +341,18 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
         let regexPattern = re(pattern, flags)
-        for ci in 0 ..< containers.len:
-          let container = containers[ci]
-          let (ret, val) = subtitle(container, tb, regexPattern, stream)
-          var subResult: seq[bool]
-          if ret != -1:
-            let subcontainer = findExternSubs(args.inputs[ci])
-            if subcontainer.isNone():
-              error &"regex: subtitle stream '{ret}' does not exist."
+        let (ret, val) = subtitle(container, tb, regexPattern, stream)
+        if ret != -1:
+          let subcontainer = findExternSubs(input)
+          if subcontainer.isNone():
+            error &"regex: subtitle stream '{ret}' does not exist."
 
-            let index = int32(stream - container.subtitle.len)
-            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
-            if ret2 != -1:
-              error &"regex: subtitle stream '{ret2}' does not exist."
-            subResult = val2
-          else:
-            subResult = val
-          if result.len == 0:
-            result = subResult
-          else:
-            result = result or subResult
-        return result
+          let index = int32(stream - container.subtitle.len)
+          let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          if ret2 != -1:
+            error &"regex: subtitle stream '{ret2}' does not exist."
+          return val2
+        return val
       of "word":
         let argOrder = argOrderOf("word")
         var pattern = ""
@@ -392,29 +378,20 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           flags.incl reIgnoreCase
 
         let regexPattern = re(pattern, flags)
-        for ci in 0 ..< containers.len:
-          let container = containers[ci]
-          let (ret, val) = subtitle(container, tb, regexPattern, stream)
-          var subResult: seq[bool]
-          if ret != -1:
-            let subcontainer = findExternSubs(args.inputs[ci])
-            if subcontainer.isNone():
-              error &"word: subtitle stream '{ret}' does not exist."
+        let (ret, val) = subtitle(container, tb, regexPattern, stream)
+        if ret != -1:
+          let subcontainer = findExternSubs(input)
+          if subcontainer.isNone():
+            error &"word: subtitle stream '{ret}' does not exist."
 
-            let index = int32(stream - container.subtitle.len)
-            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
-            if ret2 != -1:
-              error &"word: subtitle stream '{ret2}' does not exist."
-            subResult = val2
-          else:
-            subResult = val
-          if result.len == 0:
-            result = subResult
-          else:
-            result = result or subResult
-        return result
+          let index = int32(stream - container.subtitle.len)
+          let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          if ret2 != -1:
+            error &"word: subtitle stream '{ret2}' does not exist."
+          return val2
+        return val
       of "none":
-        let length = mediaLength(containers[0])
+        let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int
 
         return newSeqWith(tbLength, true)

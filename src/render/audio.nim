@@ -587,7 +587,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 const audioFadeMs = 3.0
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
-    int], mixLayers: bool, norm: Norm,
+    int], norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
   var samples: Table[(string, int32), Getter]
@@ -707,7 +707,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   # timeline as interleaved int16 chunks of up to `frameSize` sample-frames, in
   # time order, zero-padded out to `totalSamples`. Memory stays bounded by the
   # largest in-flight clip plus any cross-layer overlap — never the whole
-  # timeline (`mixLayers` is implicit: clips from every active layer are summed).
+  # timeline. Clips from every active layer are summed.
   proc newTimelineProducer(): iterator(): seq[int16] =
     return iterator(): seq[int16] =
       var cursors = newSeq[int](tl.a.len)
@@ -1069,10 +1069,10 @@ proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: No
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
   let allLayerIndices = toSeq(0..<tl.a.len)
-  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm, cache)
+  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, norm, cache)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
     frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
-  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm, cache)
+  return makeAudioFrames(fmt, tl, frameSize, @[index.int], norm, cache)
 

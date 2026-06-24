@@ -1,5 +1,3 @@
-import std/strutils
-
 type
   TokenKind = enum
     Lparen, Rparen, Sym, Num, Colon, Comma, Equal, Eof
@@ -189,16 +187,3 @@ proc parse*(self: var Parser): seq[Expr] =
     result.add(Expr(kind: ExprList, elements: tokens, `from`: 0, to: uint32(self.lexer.text.len)))
   else:
     result = tokens
-
-# Pretty printing functions
-proc printExpr(expr: Expr, text: string): string =
-  case expr.kind:
-  of ExprNum:
-    return "Num:" & text[expr.`from` ..< expr.to]
-  of ExprSym:
-    return text[expr.`from` ..< expr.to]
-  of ExprList:
-    var parts: seq[string] = @[]
-    for elem in expr.elements:
-      parts.add(elem.printExpr(text))
-    return "(" & parts.join(" ") & ")"

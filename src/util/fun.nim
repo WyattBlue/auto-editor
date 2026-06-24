@@ -3,11 +3,6 @@ from std/math import gcd, `mod`, round, trunc
 
 import ../log
 
-func hexToBytes*(hex: string): seq[byte] =
-  result = newSeq[byte](hex.len div 2)
-  for i in 0 ..< result.len:
-    result[i] = parseHexInt(hex[i * 2 .. i * 2 + 1]).byte
-
 func b64urlDecode*(s: string): seq[byte] =
   var padded = s.replace('-', '+').replace('_', '/')
   while padded.len mod 4 != 0:

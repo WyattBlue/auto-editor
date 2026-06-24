@@ -469,7 +469,6 @@ type
 # Packets
 proc av_packet_alloc*(): ptr AVPacket {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
-proc av_init_packet*(pkt: ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
@@ -497,8 +496,6 @@ proc av_frame_ref*(dst: ptr AVFrame, src: ptr AVFrame): cint {.importc,
 proc av_frame_unref*(frame: ptr AVFrame) {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_get_buffer*(frame: ptr AVFrame, align: cint): cint {.importc,
-    header: "<libavutil/frame.h>".}
-proc av_frame_is_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
@@ -570,8 +567,6 @@ proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer,
     nb_samples: cint): cint {.importc,
     header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc.}
-proc av_audio_fifo_drain*(af: ptr AVAudioFifo, nb_samples: cint): cint {.importc.}
-proc av_audio_fifo_reset*(af: ptr AVAudioFifo) {.importc.}
 
 proc av_get_bytes_per_sample*(sample_fmt: AVSampleFormat): cint {.importc.}
 proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
@@ -788,9 +783,6 @@ proc avfilter_graph_create_filter*(filt_ctx: ptr ptr AVFilterContext,
 proc avfilter_graph_parse_ptr*(graph: ptr AVFilterGraph, filters: cstring,
     inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
-proc avfilter_graph_parse2*(graph: ptr AVFilterGraph, filters: cstring,
-    inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut): cint {.importc,
-    header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_config*(graphctx: ptr AVFilterGraph,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
 proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint,
@@ -812,8 +804,6 @@ proc avfilter_inout_free*(inout: ptr ptr AVFilterInOut) {.importc,
 # Buffer source/sink operations
 proc av_buffersrc_write_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
-proc av_buffersrc_add_frame*(ctx: ptr AVFilterContext,
-    frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
 proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersink.h>".}
 proc av_buffersink_set_frame_size*(ctx: ptr AVFilterContext,
@@ -829,9 +819,6 @@ const AVSEEK_FLAG_BACKWARD* = 1
 
 proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
     flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
-proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int64,
-    ts: int64, max_ts: int64, flags: cint): cint {.importc,
-    header: "<libavformat/avformat.h>".}
 
 type AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
   pos*: int64       # byte position in file
