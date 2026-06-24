@@ -921,6 +921,23 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     ebuEmitted += c.len div targetChannels
     return emitChunk(c)
 
+  # loudnorm's output frames track its internal 100ms block size, not the
+  # encoder's frame_size. Fixed-frame-size encoders (e.g. AAC) reject any
+  # non-final frame whose sample count differs, with -22. Buffer and re-chunk
+  # loudnorm output into frameSize-aligned frames before encoding.
+  var rechunkBuf: seq[int16]
+  proc drainRechunk(final: bool): seq[(ptr AVFrame, int64)] =
+    let full = frameSize * targetChannels
+    while rechunkBuf.len >= full or (final and rechunkBuf.len > 0):
+      if ebuEmitted >= totalSamples:
+        rechunkBuf = @[]
+        break
+      let take = min(full, rechunkBuf.len)
+      let piece = rechunkBuf[0 ..< take]
+      rechunkBuf = (if take < rechunkBuf.len: rechunkBuf[take .. ^1] else: @[])
+      for fr in emitCapped(piece):
+        result.add fr
+
   return iterator(): (ptr AVFrame, int64) =
     defer:
       for getter in samples.values:
@@ -1030,23 +1047,23 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
             let outF = loudnormGraph.pullTransient()
             if outF == nil:
               break
-            for fr in emitCapped(loudnormOutToChunk(outF)):
-              yield fr
+            rechunkBuf.add loudnormOutToChunk(outF)
+          for fr in drainRechunk(false):
+            yield fr
       loudnormGraph.flush()
       while true:
         let outF = loudnormGraph.pullTransient()
         if outF == nil:
           break
-        for fr in emitCapped(loudnormOutToChunk(outF)):
-          yield fr
+        rechunkBuf.add loudnormOutToChunk(outF)
       loudnormGraph.cleanup()
 
       # Pad with silence if loudnorm produced fewer samples than the timeline.
-      if ebuEmitted < totalSamples:
-        let pad = newSeq[int16]((totalSamples - ebuEmitted) * targetChannels)
-        ebuEmitted = totalSamples
-        for fr in emitChunk(pad):
-          yield fr
+      let pending = rechunkBuf.len div targetChannels
+      if ebuEmitted + pending < totalSamples:
+        rechunkBuf.add newSeq[int16]((totalSamples - ebuEmitted - pending) * targetChannels)
+      for fr in drainRechunk(true):
+        yield fr
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
