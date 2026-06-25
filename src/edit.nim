@@ -165,7 +165,7 @@ proc parseNorm*(norm: string): Norm =
     else:
       error "Invalid audio norm expression."
 
-  return normEval(expr, norm)
+  return normEval(expr, parser.lexer.text) # mutated buffer: escapes unescaped
 
 proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
   try:
@@ -400,7 +400,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      error "`--edit` expects a valid expression"
+      error &"`--edit` expects a valid expression: {text[node[0].`from` ..< node[0].to]}"
 
   proc evalEditString(editStr: string): seq[bool] =
     var lexer = initLexer("--edit", editStr)
@@ -409,7 +409,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
     let expr = expressions[^1]
     if expr.kind != ExprList:
       error "Should never happen"
-    return editEval(expr, editStr)
+    return editEval(expr, parser.lexer.text) # mutated buffer: escapes unescaped
 
   # Label 1: the default `--edit` method. Maps the boolean mask onto 0/1.
   let base = evalEditString(args.edit)
