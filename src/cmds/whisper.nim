@@ -47,6 +47,7 @@ proc main*(cArgs: seq[string]) =
   var output = "-"
   var queue: int = 30
   var vadModel: string = ""
+  var prompt: string = ""
   var threads: cint = 4
 
   var expecting: string = ""
@@ -76,6 +77,8 @@ proc main*(cArgs: seq[string]) =
       queue = parseInt(key)
     of "vad-model":
       vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
+    of "prompt":
+      prompt = key.replace("\\", "\\\\").replace(":", "\\:")
     of "threads":
       threads = parseInt(key).cint
     expecting = ""
@@ -152,6 +155,9 @@ proc main*(cArgs: seq[string]) =
 
   if vadModel != "":
     whisperArgs &= ":vad_model=" & vadModel
+
+  if prompt != "":
+    whisperArgs &= ":prompt=" & prompt
 
   debug whisperArgs
   var whisperCtx: ptr AVFilterContext

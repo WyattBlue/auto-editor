@@ -72,6 +72,8 @@ const whisperOptions*: seq[OptDef] = @[
     help: "The maximum size in seconds that will be queued into before processing. (default 30)"),
   OptDef(names: "--vad-model", datum: "vad-model", metavar: "VAD-MODEL",
     help: "Set Voice activity detection (VAD) model"),
+  OptDef(names: "--prompt", datum: "prompt", metavar: "TEXT",
+    help: "Bias transcription toward given vocabulary/spelling (e.g. names, jargon)"),
   OptDef(names: "--threads", datum: "threads", metavar: "N",
     help: "Number of CPU threads for whisper processing (default 4)"),
 ]
