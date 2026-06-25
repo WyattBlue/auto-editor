@@ -16,8 +16,8 @@ type
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
-    actErosion, actChoke, actAberration
-    # Can add 89 more [V] actions
+    actErosion, actChoke, actAberration, actMask, actConfine
+    # Can add 87 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -77,6 +77,13 @@ type
     of actAberration:
       abRh*, abRv*, abGh*, abGv*, abBh*, abBv*: int8
       abWrap*: bool          # edge: wrap around (true) vs smear the border (false)
+    of actMask, actConfine:
+      # `mask` shapes the clip's alpha; `confine` restricts following effects to
+      # this region. Shared geometry, in canvas pixels like drawbox.
+      mShape*: uint8         # 0=rect, 1=ellipse, 2=none (confine reset only)
+      mInvert*: bool         # swap inside/outside
+      mFeather*: uint8       # soft-edge width in px (0 = hard edge)
+      mX*, mY*, mW*, mH*: int32
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -186,6 +193,10 @@ Simple form `aberration[:h[:v[:edge]]]`: split red and blue symmetrically by `h`
 Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`, `bv` (signed pixel shift for each channel/axis, default 0) plus `edge`, e.g. `aberration:rh=8:bh=-8:gv=2:edge=wrap`."""),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
+  ActionDef(name: "mask", flags: {afVideo}, argSpec: "shape:x:y:w:h[:feather][:invert]",
+    help: "Cut the picture to a `rect` or `ellipse`, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels (for an ellipse, the bounding box). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:ellipse:640:360:300:300:40`."),
+  ActionDef(name: "confine", flags: {afVideo}, argSpec: "[shape:x:y:w:h[:feather][:invert]]",
+    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`) to a `rect` or `ellipse` region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:rect:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
 ]
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
@@ -285,6 +296,46 @@ proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   of "inout", "in-out": easeInOut
   else: raise newException(ActionParseError, "Unknown easing: " & spec)
 
+proc parseShapeRegion(parts: seq[string], kind: ActionKind,
+    name: string): Action {.raises: [ActionParseError].} =
+  ## Shared `shape:x:y:w:h[:feather][:invert]` geometry for `mask` and `confine`.
+  if parts.len < 6 or parts.len > 8:
+    raise newException(ActionParseError,
+      name & " requires shape:x:y:w:h[:feather][:invert]")
+  let shape = case parts[1]
+    of "rect": 0'u8
+    of "ellipse": 1'u8
+    else: raise newException(ActionParseError, name & " shape must be rect or ellipse")
+  var coords: array[4, int32]
+  for idx in 0 ..< 4:
+    try:
+      coords[idx] = int32(parseInt(parts[idx + 2]))
+    except ValueError:
+      raise newException(ActionParseError, "Invalid integer value")
+  if coords[2] <= 0 or coords[3] <= 0:
+    raise newException(ActionParseError, name & " width and height must be positive")
+  # Trailing tokens after the coords: `invert` (literal) and/or `feather` (px).
+  var inv = false
+  var feather = 0
+  for idx in 6 ..< parts.len:
+    if parts[idx] == "invert":
+      inv = true
+    else:
+      try:
+        feather = parseInt(parts[idx])
+      except ValueError:
+        raise newException(ActionParseError, "Unknown " & name & " option: " & parts[idx])
+      if feather < 0 or feather > 255:
+        raise newException(ActionParseError, name & " feather must be in [0, 255]")
+  result = Action(kind: kind)  # branch fields assigned after (shared by both kinds)
+  result.mShape = shape
+  result.mInvert = inv
+  result.mFeather = uint8(feather)
+  result.mX = coords[0]
+  result.mY = coords[1]
+  result.mW = coords[2]
+  result.mH = coords[3]
+
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
     return Action(kind: actInvert)
@@ -296,8 +347,15 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actLoop)
   if val == "erosion":
     return Action(kind: actErosion)
+  if val == "confine":  # bare = reset to full frame
+    return Action(kind: actConfine, mShape: 2)
 
   let parts = val.split(":")
+
+  if parts[0] == "mask":
+    return parseShapeRegion(parts, actMask, "mask")
+  if parts[0] == "confine":
+    return parseShapeRegion(parts, actConfine, "confine")
 
   # deesser takes positional args: intensity[:max[:freq]]
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
@@ -625,6 +683,12 @@ func kfStr(a: Action): string =
     else: parts.add $v
   parts.join("..")
 
+func maskStr(a: Action, name: string): string =
+  let shape = if a.mShape == 1: "ellipse" else: "rect"
+  result = name & ":" & shape & ":" & $a.mX & ":" & $a.mY & ":" & $a.mW & ":" & $a.mH
+  if a.mFeather > 0'u8: result &= ":" & $int(a.mFeather)
+  if a.mInvert: result &= ":invert"
+
 when not defined(nimscript):
   func `$`*(act: Action): string =
     case act.kind
@@ -686,6 +750,9 @@ when not defined(nimscript):
         if act.abBv != 0: ps.add "bv=" & $act.abBv
         if act.abWrap: ps.add "edge=wrap"
         "aberration:" & ps.join(":")
+    of actMask: maskStr(act, "mask")
+    of actConfine:
+      if act.mShape == 2: "confine" else: maskStr(act, "confine")
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -703,6 +770,7 @@ when not defined(nimscript):
     of actDrawbox: 20
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
+    of actMask, actConfine: 19  # header + flags + feather + 4x int32
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -778,6 +846,18 @@ when not defined(nimscript):
         of actChoke:
           yield Action(kind: actChoke, chokeN: base[i + 1])
           i += 2
+        of actMask, actConfine:
+          let flags = base[i + 1]
+          let feather = base[i + 2]
+          var x, y, w, h: int32
+          copyMem(addr x, addr base[i + 3], sizeof(int32))
+          copyMem(addr y, addr base[i + 7], sizeof(int32))
+          copyMem(addr w, addr base[i + 11], sizeof(int32))
+          copyMem(addr h, addr base[i + 15], sizeof(int32))
+          yield Action(kind: kind, mShape: flags and 0x3'u8,
+            mInvert: (flags and 0x4'u8) != 0, mFeather: feather,
+            mX: x, mY: y, mW: w, mH: h)
+          i += 19
         of actAberration:
           yield Action(kind: actAberration,
             abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
@@ -917,6 +997,14 @@ when not defined(nimscript):
       of actChoke:
         base[i + 1] = a.chokeN
         i += 2
+      of actMask, actConfine:
+        base[i + 1] = a.mShape or (if a.mInvert: 0x4'u8 else: 0'u8)
+        base[i + 2] = a.mFeather
+        base.writeAt(i, 3, a.mX)
+        base.writeAt(i, 7, a.mY)
+        base.writeAt(i, 11, a.mW)
+        base.writeAt(i, 15, a.mH)
+        i += 19
       of actAberration:
         base.writeAt(i, 1, a.abRh)
         base.writeAt(i, 2, a.abRv)
