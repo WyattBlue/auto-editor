@@ -136,6 +136,10 @@ Examples:
   OptDef(names: "--yt-dlp-extras", c: cUrl, datum: "yt-dlp-extras", metavar: "CMD",
     help: "Add extra options for yt-dlp. Must be in quotes"),
 
+  OptDef(names: "--pegasus-prompt", c: cEdit, datum: "pegasus-prompt", metavar: "TEXT",
+    help: "Natural-language prompt for `--edit pegasus`. Use this for multi-word " &
+          "prompts, since `--edit` tokens cannot contain spaces. Must be in quotes"),
+
   OptDef(names: "--progress", c: cDis, datum: "progress", metavar: "PROGRESS",
     help: "Set what type of progress bar to use"),
   OptDef(names: "--debug", c: cDis, kind: Flag, datum: "isDebug",

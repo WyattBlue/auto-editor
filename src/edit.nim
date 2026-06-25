@@ -1,6 +1,6 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editlexer, editmethods, ffmpeg, log]
-import ./analyze/[audio, blackdetect, motion, subtitle]
+import ./analyze/[audio, blackdetect, motion, pegasus, subtitle]
 import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre
@@ -319,6 +319,33 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
+      of "pegasus":
+        let argOrder = argOrderOf("pegasus")
+        # `--edit` tokens can't contain spaces, so a multi-word prompt comes from
+        # `--pegasus-prompt`. The inline `pegasus:token` form still works for a
+        # single-token prompt and, when both are set, is overridden by the flag.
+        var prompt = args.pegasusPrompt
+        var minSeg: float = 4.0
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+          case argPos:
+          of 0:
+            if prompt == "":
+              prompt = val
+          of 1: minSeg = parseFloatInRange(val, 2.0, 3600.0)
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+
+        if prompt == "":
+          error "pegasus: a prompt is required. Pass one with " &
+            "--pegasus-prompt \"...\" (recommended for multi-word prompts)."
+
+        let length = mediaLength(container)
+        let tbLength = (round((length * tb).float64)).int
+        return pegasus(input, tb, prompt, minSeg, tbLength)
       of "subtitle", "regex":
         let argOrder = argOrderOf("subtitle")
         var pattern = ""

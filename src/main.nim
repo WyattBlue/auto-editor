@@ -459,6 +459,8 @@ judge making cuts.
       args.outputFormat = key
     of "yt-dlp-extras":
       args.ytDlpExtras = key
+    of "pegasus-prompt":
+      args.pegasusPrompt = key
     of "scale":
       args.scale = parseNum(key, expecting)
     of "resolution":

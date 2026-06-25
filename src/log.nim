@@ -69,6 +69,7 @@ type mainArgs* = object
   whenActive*: Actions = aNil
   labeledEdits*: seq[tuple[label: int, expr: string]]
   labeledWhens*: seq[tuple[label: int, action: Actions]]
+  pegasusPrompt*: string  # natural-language prompt for `--edit pegasus`
   `export`*: string = ""
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]

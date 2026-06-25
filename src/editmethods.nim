@@ -49,6 +49,14 @@ const editMethodDefs*: seq[EditMethodDef] = @[
     help: "Mark a frame as loud when at least `threshold` of its pixels are " &
           "black, where a pixel counts as black when its grayscale luma is at " &
           "or below `pixel-black`. Wrap in `not` to instead cut black frames."),
+  EditMethodDef(names: @["pegasus"], media: emVideo,
+    params: @[p("prompt", "String"),
+              p("min-segment", "Float", "4.0")],
+    help: "Content-aware editing with TwelveLabs Pegasus. Upload the video and " &
+          "ask the model, in plain language via `prompt`, which moments to " &
+          "keep; matching time spans become loud. `min-segment` is the minimum " &
+          "segment length in seconds. Requires the TWELVELABS_API_KEY env var; " &
+          "get a free key at https://twelvelabs.io."),
   EditMethodDef(names: @["subtitle", "regex"], media: emSubtitle,
     params: @[p("pattern", "String"),
               p("stream", "Natural", "0"),

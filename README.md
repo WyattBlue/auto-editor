@@ -60,6 +60,19 @@ Different editing methods can be used together.
 auto-editor example.mp4 --edit "(or audio:0.03 motion:0.06)"
 ```
 
+### Content-Aware Cuts with TwelveLabs Pegasus
+The `pegasus` method goes beyond loudness and motion: it asks [TwelveLabs](https://twelvelabs.io) Pegasus, a video-understanding model, *what* is happening on screen and keeps only the moments that match a plain-language prompt. It is fully opt-in and changes nothing unless you ask for it.
+
+```
+# Keep only the parts where someone is speaking on camera.
+auto-editor example.mp4 --edit pegasus --pegasus-prompt "a person is speaking to the camera"
+
+# Combine it with the audio heuristic: keep loud parts OR action shots.
+auto-editor example.mp4 --edit "(or audio:0.04 pegasus)" --pegasus-prompt "an exciting action moment"
+```
+
+Set the `TWELVELABS_API_KEY` environment variable first. You can grab a free API key at [twelvelabs.io](https://twelvelabs.io) — there's a generous free tier. The video is uploaded to TwelveLabs for analysis. Use `--pegasus-prompt` for any multi-word prompt, since `--edit` tokens cannot contain spaces.
+
 You can also use `dB` unit, a volume unit familiar to video-editors (case-sensitive):
 ```
 auto-editor example.mp4 --edit audio:-19dB
