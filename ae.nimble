@@ -84,7 +84,6 @@ task cleanff, "Clean build files":
 
 
 var disableDecoders: seq[string] = @[]
-var disableParsers: seq[string] = @[]
 
 # Can only decode (ambiguous encoder), Video [A-C]
 disableDecoders &= "4xm,aasc,agm,aic,anm,ansi,apv,arbc,argo,aura,aura2,avrn,avs,bethsoftvid,bfi,bink,binkvideo,bmv_video,brender_pix,c93,cavs,cdgraphics,cdtoons,cdxl,clearvideo,cllc,cmv,cpia,cri,cscd,cyuv".split(",")
@@ -100,11 +99,11 @@ disableDecoders &= "targa_y216,tdsc,tgq,tgv,thp,tiertexseqvideo,tmv,tqi,truemoti
 disableDecoders &= "vplayer,vqc,vvc,wcmv,wmv1,wmv2,wmv3,wmv3image,wnv1,ws_vqa,xan_wc3,xan_wc4,xbin,xpm,ylc,yop,zerocodec".split(",")
 
 # Can only decode, Audio [0-A]
-disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp.kelvin,adpcm_4xm,adpcm_afc,adpcm_agm,adpcm_aica,adpcm_ct,adpcm_dtk,adpcm_ea,adpcm_ea_maxis_xa,adpcm_ea_r1,adpcm_ea_r2,adpcm_ea_r3,adpcm_ea_xas,adpcm_ima_acorn,adpcm_ima_apc".split(",")
+disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp_kelvin,adpcm_4xm,adpcm_afc,adpcm_agm,adpcm_aica,adpcm_ct,adpcm_dtk,adpcm_ea,adpcm_ea_maxis_xa,adpcm_ea_r1,adpcm_ea_r2,adpcm_ea_r3,adpcm_ea_xas,adpcm_ima_acorn,adpcm_ima_apc".split(",")
 # [B-F]
 disableDecoders &= "binkaudio_dct,binkaudio_rdft,bmv_audio,bonk,cbd2_dpcm,cook,derf_dpcm,dolby_e,dsd_lsbf,dsd_lsbf_planar,dsd_msbf,dsd_msbf_planar,dsicinaudio,dss_sp,dst,dvaudio,evrc,fastaudio,ftr".split(",")
 # [G-Q]
-disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
+disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,mpc7,mpc8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
 # [R-Z]
 disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmav1,wmav2,wmavoice,xan_dpcm,xma1,xma2,zero12v".split(",")
 
@@ -121,10 +120,8 @@ disableDecoders &= ["h261", "opus"]  # We use libopus
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff,vvc_qsv".split(",")
 
-disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
-
-disableParsers &= ["h261", "vvc"]
-disableParsers &= "adx,dirac,jpeg2000,jpegxs,qoi,vc1".split(",")
+# Bluetooth/VoIP/game/screencap/exotic image+subtitle: never in editable media
+disableDecoders &= "aptx,aptx_hd,sbc,ilbc,dfpwm,s302m,als,tta,wavpack,mp1float,mp3adufloat,mp3on4,mp3on4float,dxv,hap,vqa,fourxm,zmbv,flashsv,flashsv2,msvideo1,svq1,xl,vbn,bintext,bitpacked,avui,pcx,pfm,pgm,phm,ppm,realtext,stl".split(",")
 
 type Package = object
   name: string
@@ -778,12 +775,13 @@ func basicPcms(): seq[string] =
       result.add &"pcm_{t}{size}le"
 
 proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string =
-  var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,png,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
+  let enableParsers = "aac,aac_latm,ac3,amr,av1,dca,dnxhd,dvbsub,dvdsub,ffv1,flac,gif,h263,h264,hdr,hevc,mjpeg,mlp,mpeg4video,mpegaudio,mpegvideo,opus,png,pnm,prores,prores_raw,vorbis,vp3,vp8,vp9,webp".split(",")
 
+  var enableEncoders = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,png,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
   enableEncoders &= basicPcms()
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
 
-  var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
+  var enableMuxers = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
   let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts"]
@@ -835,7 +833,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   --enable-demuxer={enableDemuxers.join(",")} \
   --disable-muxers \
   --enable-muxer={enableMuxers.join(",")} \
-  --disable-parser={disableParsers.join(",")} \
+  --disable-parsers \
+  --enable-parser={enableParsers.join(",")} \
 """
 
   for package in packages:
