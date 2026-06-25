@@ -581,10 +581,24 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       result[i * channels + ch] = tempChannelData[ch][i]
 
 
-# Micro-fade applied at every clip edge to kill cut pops. A splice between two
-# clips is an instantaneous amplitude step (a click); ramping each edge to/from
-# zero over a few ms removes the discontinuity. ~3 ms is inaudible as a fade.
+# Micro-fade applied at every real clip edge to kill cut pops. A splice between
+# two clips is an instantaneous amplitude step (a click); ramping each edge
+# to/from zero over a few ms removes the discontinuity. ~3 ms is inaudible.
 const audioFadeMs = 3.0
+
+func clipSpeed(effs: seq[Actions], clip: Clip): float64 =
+  result = 1.0
+  for e in effs[clip.effects]:
+    if e.kind in [actSpeed, actVarispeed]:
+      result *= e.val
+
+func sameRun(effs: seq[Actions], a, b: Clip): bool =
+  ## True when `b` continues `a` with no gap or jump: same source/stream/speed,
+  ## adjacent in both output time and source offset. Such an edge is a mere
+  ## split, not a cut, so fading across it would notch a continuous signal.
+  a.src != nil and b.src != nil and a.src[] == b.src[] and a.stream == b.stream and
+    a.start + a.dur == b.start and a.offset + a.dur == b.offset and
+    clipSpeed(effs, a) == clipSpeed(effs, b)
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], norm: Norm,
@@ -754,6 +768,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         let clip = tl.a[bestLi][cursors[bestLi]]
         inc cursors[bestLi]
 
+        # Only fade an edge that's a real cut; skip it when the neighbor merely
+        # continues this clip (a split), so continuous audio isn't notched.
+        let idx = cursors[bestLi] - 1
+        let fadeInEdge = idx == 0 or
+          not sameRun(tl.effects, tl.a[bestLi][idx - 1], clip)
+        let fadeOutEdge = idx == tl.a[bestLi].len - 1 or
+          not sameRun(tl.effects, clip, tl.a[bestLi][idx + 1])
+
         let key = (clip.src[], clip.stream)
         let effectGroup = tl.effects[clip.effects]
         var speed = 1.0
@@ -794,12 +816,12 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
               let outputSampleIndex = startSample + i
               if outputSampleIndex < totalSamples:
                 let fadeIn = (
-                  if i < fadeSamples: (i.float32 + 0.5) / fadeSamples.float32
+                  if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) / fadeSamples.float32
                   else: 1.0'f32
                 )
                 let tailDist = max(0, n - 1 - i)
                 let fadeOut = (
-                  if tailDist < fadeSamples: (tailDist.float32 + 0.5) / fadeSamples.float32
+                  if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) / fadeSamples.float32
                   else: 1.0'f32
                 )
                 let gain = min(1.0'f32, min(fadeIn, fadeOut))
