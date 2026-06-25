@@ -9,12 +9,12 @@ type
 
   Lexer* = object
     filename: string
-    text: string
+    text*: string
     pos: uint32
     `char`: char
 
   Parser* = object
-    lexer: Lexer
+    lexer*: Lexer
     currentToken: Token
 
   # AST node types
@@ -74,6 +74,26 @@ proc getNextToken(self: var Lexer): Token =
     if self.`char` == ',':
       self.advance()
       return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
+
+    if self.`char` == '"':
+      self.advance()
+      let `from` = self.pos
+      var writePos = self.pos
+      while self.`char` != '\0' and self.`char` != '"':
+        if self.`char` == '\\' and self.pos + 1 < uint32(self.text.len):
+          self.advance()
+          case self.`char`
+          of 'n': self.text[writePos] = '\n'
+          of 't': self.text[writePos] = '\t'
+          else: self.text[writePos] = self.`char` # \" \\ and others: literal
+        else:
+          self.text[writePos] = self.`char`
+        writePos += 1
+        self.advance()
+      let `to` = writePos
+      if self.`char` == '"':
+        self.advance()
+      return Token(kind: Sym, `from`: `from`, to: `to`)
 
     if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 < uint32(
         self.text.len) and self.text[self.pos + 1] in "0123456789."):
