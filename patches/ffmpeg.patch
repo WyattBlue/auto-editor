@@ -23,10 +23,11 @@ index 732de59292..136347a0d2 100755
 diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
 --- a/libavfilter/af_whisper.c
 +++ b/libavfilter/af_whisper.c
-@@ -42,7 +42,11 @@ typedef struct WhisperContext {
+@@ -42,7 +42,12 @@ typedef struct WhisperContext {
      const AVClass *class;
      char *model_path;
      char *language;
++    char *prompt;
 +    bool translate;
      bool use_gpu;
 +    bool flash_attn;
@@ -35,7 +36,7 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      int gpu_device;
      char *vad_model_path;
      float vad_threshold;
-@@ -198,8 +202,13 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
+@@ -198,8 +202,14 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
             "run transcription at %" PRId64 " ms, %d/%d samples (%.2f seconds)...\n",
             timestamp_ms, samples, wctx->audio_buffer_fill_size, duration);
  
@@ -47,6 +48,7 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
 +    params.translate = wctx->translate;
 +    params.beam_search.beam_size = wctx->beam_size;
 +    params.greedy.best_of = wctx->best_of;
++    params.initial_prompt = wctx->prompt;
      params.n_threads = ff_filter_get_nb_threads(ctx);
      params.print_special = 0;
      params.print_progress = 0;
@@ -79,10 +81,11 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      const int n_segments = whisper_full_n_segments(wctx->ctx_wsp);
      char *segments_text = NULL;
 
-@@ -443,6 +468,10 @@ static int query_formats(const AVFilterContext *ctx,
+@@ -443,6 +468,11 @@ static int query_formats(const AVFilterContext *ctx,
  static const AVOption whisper_options[] = {
      { "model", "Path to the whisper.cpp model file", OFFSET(model_path), AV_OPT_TYPE_STRING,.flags = FLAGS },
      { "language", "Language for transcription ('auto' for auto-detect)", OFFSET(language), AV_OPT_TYPE_STRING, {.str = "auto"}, .flags = FLAGS },
++    { "prompt", "Initial prompt to bias transcription toward given vocabulary/spelling", OFFSET(prompt), AV_OPT_TYPE_STRING, {.str = NULL}, .flags = FLAGS },
 +    { "translate", "Translate from source language to English", OFFSET(translate), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, .flags = FLAGS },
 +    { "flash_attn", "Use flash attention", OFFSET(flash_attn), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, .flags = FLAGS },
 +    { "beam_size", "Beam size (>1 enables beam search)", OFFSET(beam_size), AV_OPT_TYPE_INT, {.i64 = 1}, 1, INT_MAX, .flags = FLAGS },
