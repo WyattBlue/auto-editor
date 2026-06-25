@@ -46,6 +46,38 @@ func fxId(kind: ActionKind, frame: ptr AVFrame, overlay = false,
 func packRGB(c: RGBColor): uint32 =
   uint32(c.red) shl 16 or uint32(c.green) shl 8 or uint32(c.blue)
 
+# Effects `confine` restricts to a region (adjustment effects only; geometry
+# effects like zoom/rotate/pos are intentionally left full-frame).
+const confinable = {actBlur, actBrightness, actLuv, actInvert, actErosion, actAberration}
+
+func maskGray(a: Action): string =
+  ## geq luma expression (0..255) for the matte: opaque inside the shape, black
+  ## outside, with an optional `feather`-pixel soft edge; `invert` flips it.
+  let f = a.mFeather.float
+  var cover: string  # 0..1 coverage, 1 = fully inside
+  if a.mShape == 1:  # ellipse
+    let cx = a.mX.float + a.mW.float / 2
+    let cy = a.mY.float + a.mH.float / 2
+    let rx = a.mW.float / 2
+    let ry = a.mH.float / 2
+    let rr2 = &"pow((X-{cx})/{rx},2)+pow((Y-{cy})/{ry},2)"
+    if f <= 0:
+      cover = &"lte({rr2},1)"
+    else:
+      # Feather (px) -> a normalized-radius band centered on the edge (r=1).
+      let nf = f / ((rx + ry) / 2)
+      cover = &"clip(0.5+(1-sqrt({rr2}))/{nf},0,1)"
+  else:              # rectangle
+    let x1 = a.mX + a.mW
+    let y1 = a.mY + a.mH
+    if f <= 0:
+      cover = &"between(X,{a.mX},{x1})*between(Y,{a.mY},{y1})"
+    else:
+      # Signed distance to the nearest edge (positive inside), ramped over f px.
+      let d = &"min(min(X-{a.mX},{x1}-X),min(Y-{a.mY},{y1}-Y))"
+      cover = &"clip(0.5+({d})/{f},0,1)"
+  if a.mInvert: &"255*(1-({cover}))" else: &"255*({cover})"
+
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
   frames: seq[int] # sorted list of keyframe frame numbers
@@ -339,6 +371,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var fxKey: GraphKey
   var rotGraph: Graph = nil  # static source rotation, applied before the fit
   var rotKey: GraphKey
+  # Cached mask/confine mattes (gray8), rebuilt only when the region/size changes
+  # so the per-pixel geq runs once, not every frame.
+  var maskMatte: ptr AVFrame = nil
+  var maskMatteKey: GraphKey
+  var confineMatte: ptr AVFrame = nil
+  var confineMatteKey: GraphKey
   var needsScaling = false
 
   if args.scale != 1.0:
@@ -564,6 +602,124 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     av_frame_free(addr bgFrame)
     av_frame_free(addr frame)
 
+  proc buildMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
+    ## A gray8 matte: white where the mask/effect applies, black elsewhere, with
+    ## a feathered ramp between. Built once per (region, size) and cached.
+    var black = makeSolid(w, h, RGBColor(red: 0, green: 0, blue: 0))
+    black.pts = 0
+    let g = newGraph()
+    let src = g.add("buffer", bufArgsOf(black))
+    let geq = g.add("geq", &"lum={maskGray(effect)}")
+    let toGray = g.add("format", "pix_fmts=gray8")
+    let sink = g.add("buffersink")
+    g.linkNodes(@[src, geq, toGray, sink]).configure()
+    g.push(black)
+    result = g.pull()
+    g.cleanup()
+    av_frame_free(addr black)
+
+  proc cachedMatte(cache: var ptr AVFrame, key: var GraphKey,
+      frame: ptr AVFrame, effect: Action): ptr AVFrame =
+    ## Return the cached matte for `effect` at `frame`'s size, rebuilding only
+    ## when the region/feather/size changes. Caller must NOT free the result.
+    let k = fxId(effect.kind, frame, i0 = effect.mX, i1 = effect.mY,
+        i2 = effect.mW, i3 = effect.mH,
+        col = uint32(effect.mShape) or (if effect.mInvert: 0x100'u32 else: 0'u32) or
+          (uint32(effect.mFeather) shl 16))
+    if cache == nil or key != k:
+      if cache != nil: av_frame_free(addr cache)
+      cache = buildMaskMatte(frame.width, frame.height, effect)
+      key = k
+    cache
+
+  proc alphamergeOnto(frame0, matte: ptr AVFrame): ptr AVFrame =
+    ## Set `frame`'s alpha from the gray matte (cheap; no per-pixel geq).
+    var frame = frame0
+    frame.pts = 0
+    var m = av_frame_clone(matte)  # cached matte; push a fresh ref
+    m.pts = 0
+    let g = newGraph()
+    let fSrc = g.add("buffer", bufArgsOf(frame))
+    let mSrc = g.add("buffer", bufArgsOf(m))
+    let toGbrp = g.add("format", "pix_fmts=gbrp")
+    let am = g.add("alphamerge")
+    let toRgba = g.add("format", "pix_fmts=rgba")
+    let sink = g.add("buffersink")
+    discard g.linkNodes(@[fSrc, toGbrp])
+    g.link(toGbrp, am, 0, 0)
+    g.link(mSrc, am, 0, 1)
+    g.link(am, toRgba)
+    g.link(toRgba, sink)
+    g.configure()
+    g.pushIdx(0, frame)
+    g.pushIdx(1, m)
+    g.flushIdx(0)
+    g.flushIdx(1)
+    result = g.pull()
+    g.cleanup()
+    av_frame_free(addr m)
+    av_frame_free(addr frame)
+
+  proc overBg(frame0: ptr AVFrame): ptr AVFrame =
+    ## Flatten an alpha-shaped rgba frame over a solid `-bg` (base-track mask).
+    var top = frame0
+    var bgFrame = makeSolid(top.width, top.height, tl.bg)
+    top.pts = 0
+    bgFrame.pts = 0
+    let g = newGraph()
+    let bgSrc = g.add("buffer", bufArgsOf(bgFrame))
+    let fgSrc = g.add("buffer", bufArgsOf(top))
+    let ov = g.add("overlay", "format=yuv420")
+    g.link(bgSrc, ov, 0, 0)
+    g.link(fgSrc, ov, 0, 1)
+    g.link(ov, g.add("buffersink"))
+    g.configure()
+    g.pushIdx(0, bgFrame)
+    g.pushIdx(1, top)
+    g.flushIdx(0)
+    g.flushIdx(1)
+    result = g.pull()
+    g.cleanup()
+    av_frame_free(addr bgFrame)
+    av_frame_free(addr top)
+
+  proc maskedMergeRegion(saved, effected, matte: ptr AVFrame): ptr AVFrame =
+    ## Merge `effected` over `saved` weighted by the gray `matte` (in gbrp, so
+    ## the per-plane merge is clean), then back to the original format.
+    let origFmt = AVPixelFormat(saved.format)
+    saved.pts = 0
+    effected.pts = 0
+    var m = av_frame_clone(matte)  # cached matte; push a fresh ref
+    m.pts = 0
+    let g = newGraph()
+    let bSrc = g.add("buffer", bufArgsOf(saved))
+    let oSrc = g.add("buffer", bufArgsOf(effected))
+    let mSrc = g.add("buffer", bufArgsOf(m))
+    let bFmt = g.add("format", "pix_fmts=gbrp")
+    let oFmt = g.add("format", "pix_fmts=gbrp")
+    let mFmt = g.add("format", "pix_fmts=gbrp")
+    let mm = g.add("maskedmerge")
+    let toOrig = g.add("format", &"pix_fmts={$origFmt}")
+    let sink = g.add("buffersink")
+    discard g.linkNodes(@[bSrc, bFmt])
+    discard g.linkNodes(@[oSrc, oFmt])
+    discard g.linkNodes(@[mSrc, mFmt])
+    g.link(bFmt, mm, 0, 0)
+    g.link(oFmt, mm, 0, 1)
+    g.link(mFmt, mm, 0, 2)
+    g.link(mm, toOrig)
+    g.link(toOrig, sink)
+    g.configure()
+    g.pushIdx(0, saved)
+    g.pushIdx(1, effected)
+    g.pushIdx(2, m)
+    g.flushIdx(0)
+    g.flushIdx(1)
+    g.flushIdx(2)
+    result = g.pull()
+    g.cleanup()
+    av_frame_free(addr m)
+
   proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int,
       isOverlay = false): ptr AVFrame =
     ## Apply one clip's effect chain to a frame, returning the (possibly new)
@@ -572,6 +728,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## from `spin`.
     var frame = frame0
     let fps = tl.tb.float
+    # `confine` state: the active region's matte (lazily (re)built at the frame
+    # size of the next confined effect) and whether this iteration's effect is
+    # restricted to it.
+    var confineActive = false
+    var confineThis = false
+    var confineEffect: Action
     # Eased progress in [0, 1] for an animated action, using its own packed
     # easing curve + duration (defaults to linear over the whole clip).
     template prog(e: Action): float32 =
@@ -579,7 +741,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     # Run `frame` through the effect graph identified by `key`, reusing the
     # previous graph when the key matches; `build` must add nodes to `fxGraph`
-    # and configure it.
+    # and configure it. When the active `confine` covers this effect, run it on a
+    # copy and merge only the masked region back over the untouched frame.
     template runFx(key: GraphKey, build: untyped) =
       let k = key
       if fxKey != k:
@@ -588,11 +751,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         fxGraph = newGraph()
         build
         fxKey = k
-      fxGraph.push(frame)
-      av_frame_free(addr frame)
-      frame = fxGraph.pull()
+      if confineThis:
+        let matte = cachedMatte(confineMatte, confineMatteKey, frame, confineEffect)
+        let saved = av_frame_clone(frame)
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        let effected = fxGraph.pull()
+        frame = maskedMergeRegion(saved, effected, matte)
+        av_frame_free(addr saved)
+        av_frame_free(addr effected)
+      else:
+        fxGraph.push(frame)
+        av_frame_free(addr frame)
+        frame = fxGraph.pull()
 
     for effect in effects:
+      confineThis = confineActive and effect.kind in confinable
       case effect.kind:
       of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPos, actRotate, actLoop: discard
       of actSpin:
@@ -795,6 +969,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toRgba, shift, toOrig, bufferSink]).configure()
+      of actMask:
+        # Shape the alpha from a cached matte via alphamerge (cheap per frame).
+        let matte = cachedMatte(maskMatte, maskMatteKey, frame, effect)
+        frame = alphamergeOnto(frame, matte)
+        if not isOverlay:
+          # Base layer: nothing below to reveal, so flatten the masked-out area
+          # over the timeline background.
+          frame = overBg(frame)
+      of actConfine:
+        # Set/clear the region the following adjustment effects are masked to.
+        confineActive = effect.mShape != 2
+        confineEffect = effect
     return frame
 
   proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
@@ -1227,6 +1413,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       fxGraph.cleanup()
     if rotGraph != nil:
       rotGraph.cleanup()
+    if maskMatte != nil: av_frame_free(addr maskMatte)
+    if confineMatte != nil: av_frame_free(addr confineMatte)
     sws_free_context(addr reformatCtx)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
