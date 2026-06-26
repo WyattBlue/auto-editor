@@ -9,13 +9,12 @@ func effectGroupToJson(actions: Actions): JsonNode =
   for a in actions: parts.add $a
   return %parts
 
-func tracksToJson(tracks: seq[seq[Clip]], name: string, effects: seq[Actions]): JsonNode =
+func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
   result = newJArray()
   for track in tracks:
     var trackArray = newJArray()
     for clip in track:
       var clipObj = newJObject()
-      clipObj["name"] = %name
       clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
       clipObj["start"] = %clip.start
       clipObj["dur"] = %clip.dur
@@ -52,8 +51,8 @@ func `%`*(self: v3): JsonNode =
     "samplerate": self.sr,
     "layout": $(self.layout),
     "langs": self.langs,
-    "v": tracksToJson(self.v, "video", self.effects),
-    "a": tracksToJson(self.a, "audio", self.effects),
+    "v": tracksToJson(self.v, self.effects),
+    "a": tracksToJson(self.a, self.effects),
   }
 
 proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
