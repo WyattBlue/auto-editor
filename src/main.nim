@@ -8,7 +8,7 @@ when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
-import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
+import cmds/[info, desc, cache, levels, subdump, waveform, whisper, transcribe]
 import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre

@@ -12,6 +12,7 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out"),
   CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface"),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]"),
+  CmdDef(name: "transcribe", help: "Transcribe audio using Cloud AI APIs (Groq, OpenAI, Gemini)\nUsage: <file> [options]"),
 ] & (
   when defined(emscripten): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells")]
 )
@@ -75,6 +76,22 @@ const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--threads", datum: "threads", metavar: "N",
     help: "Number of CPU threads for whisper processing (default 4)"),
 ]
+
+const transcribeOptions*: seq[OptDef] = @[
+  OptDef(names: "--provider", datum: "provider", metavar: "PROVIDER",
+    help: "AI provider: groq, openai, gemini (default: groq)"),
+  OptDef(names: "--api-key", datum: "apiKey", metavar: "KEY",
+    help: "API Key (optional, defaults to environment variables GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY)"),
+  OptDef(names: "--model", datum: "model", metavar: "MODEL",
+    help: "Model name (optional, defaults: Groq=whisper-large-v3, OpenAI=whisper-1, Gemini=gemini-1.5-flash)"),
+  OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
+    help: "Set transcription language (optional, e.g. en, tr)"),
+  OptDef(names: "-f, --format", datum: "format", metavar: "FORMAT",
+    help: "Output in a specific format {srt|text|json} (default srt)"),
+  OptDef(names: "-o, --output", datum: "output", metavar: "FILE",
+    help: "Choose where to output (defaults to stdout)"),
+]
+
 
 const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD",
