@@ -15,6 +15,7 @@
   --charcoal-1000: #131417;
 
   --hero-weight: 800;
+  --flow-space: 1.25rem;
 }
 
 html {
@@ -32,7 +33,6 @@ html, p, h1, h2, h3, h4, html, blockquote {
 }
 
 h1 {
-  margin-bottom: 1.5rem;
   line-height: 1.125;
   word-break: break-word;
   text-align: center;
@@ -47,14 +47,12 @@ h1 {
   text-align: left;
 }
 
-/* h2:not(:first-child) { margin-top: 1.1428em } */
-h2 { margin-bottom: .5714em }
-
-/* h3:not(:first-child) { margin-top: 1.3333em } */
-h3 { margin-bottom: .5em }
-
 li, ol {margin: 0}
 ul {margin-top: 0}
+.section > .container > * + * { margin-top: var(--flow-space) }
+.section > .container > * + :is(h2, h3, h4) { margin-top: 2rem }
+.section > .container > :is(h1, h2, h3, h4) + * { margin-top: .5rem }
+li + li { margin-top: .25rem }
 
 body {
   font-size: 1em;
@@ -66,7 +64,7 @@ body {
 @media (max-width: 55em) { body {padding: 0 1rem} }
 
 hr {
-  margin: 24px 0;
+  margin: 0;
   padding: 0;
   height: .28rem;
   border: 0;
@@ -153,7 +151,7 @@ pre code {
 
 blockquote {
   padding: 0 10px;
-  margin: 0 0 20px;
+  margin: 0;
 }
 
 th {padding: 10px}
@@ -169,7 +167,6 @@ p {
   display: block;
   text-wrap: pretty;
   max-width: 88ch;
-  margin-bottom: 16px;
 }
 
 .section {padding: 1rem 0}
@@ -224,11 +221,6 @@ a.navbar-item:hover {background-color: #F9F7F7}
 .navbar-start > .navbar-item {color: #323232}
 li {color: black; text-decoration: black;}
 
-/* highlighting */
-.kw {color: #ad46ad; font-style: italic;}
-.function-name {color: #549ACF; }
-.dv {color: #4594e2; font-style: italic;}
-
 /* Dark Theme Colors */
 @media (prefers-color-scheme: dark) {
   html {background-color: #262626}
@@ -243,11 +235,4 @@ li {color: black; text-decoration: black;}
   a.navbar-item:hover {background-color: #323232}
   .navbar-start > .navbar-item {color: #F9F7F7}
   li {color: #F9F7F7; text-decoration: #F9F7F7;}
-
-   /* highlighting */
-  .kw {color: #c78bc8; font-style: italic;}
-  .dv {color: #6eaadf; font-style: italic;}
-  .st, .dt {color: #99c794;}
-  .co {color: #a6acb9;}
-  .op {color: #e07457;}
 }

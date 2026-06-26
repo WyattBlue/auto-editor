@@ -8,17 +8,8 @@ title: Auto-Editor - Install
 Get the official binary, available on Windows, MacOS, and Linux.
 
  1. Go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform.
-
  2. Rename the binary to auto-editor (or auto-editor.exe for Windows).
-
- 3. In the terminal/PowerShell, `cd` into your downloads folder.
-
-If you're on MacOS/Linux, run:
-
-```
-chmod +x ./auto-editor
-```
-
+ 3. `cd` into your downloads folder. If on MacOS/Linux, run `chmod +x ./auto-editor` first.
  4. Run Auto-Editor in the terminal. Because the binaries are unsigned, you may get "Unknown developer" warnings. Ignore them.
 
 Congratulations, auto-editor should now be installed. To verify auto-editor is installed, run:
@@ -28,7 +19,6 @@ Congratulations, auto-editor should now be installed. To verify auto-editor is i
 ```
 
 It's recommended to place the binary in a PATH directory so that `auto-editor` is always available no matter your current working directory.
-
 
 ## Method 2: Platform Installers
 If you're on MacOS, use [Homebrew](https://brew.sh):
@@ -49,8 +39,7 @@ The auto-editor cli is no longer being published on pip. It is recommended to sw
 The pkg versions available are very old. Either use the official binaries (recommened) or use [Homebrew for Linux](https://docs.brew.sh/Homebrew-on-Linux).
 
 ## Installing from Source (Unix-Like):
-
-Install nim, make sure `nimble` is available. You'll also need cmake, meson, and ninja.
+Install `nim`, `nimble`, `cmake`, `meson`, `ninja`, then run:
 
 ```
 nimble makeff  # Downloads and builds all dependencies
@@ -65,16 +54,14 @@ nimble brewmake
 ```
 
 ## Installing from Source (Windows)
-To build an `.exe`, you'll need to install [WSL](https://learn.microsoft.com/en-us/windows/wsl/about), then install nim on that environment. Make sure `nimble` is available. You'll also need cmake, meson, and ninja.
-
-Then run:
+To build an `.exe`, you'll need [WSL](https://learn.microsoft.com/en-us/windows/wsl/about). In that environment, install `nim`, `nimble`, `cmake`, `meson`, `ninja`, then run:
 
 ```
 nimble makeffwin
 nimble makewin
 ```
 
-For ARM, run:
+For Windows ARM, run:
 
 ```
 nimble makeffwinarm
