@@ -75,3 +75,5 @@ auto-editor "https://www.youtube.com/watch?v=kcs82HnguGc"
 ```
 
 How yt-dlp is installed does not matter.
+
+<a class="next" href="/docs/cookbook">Next: Cookbook</a>

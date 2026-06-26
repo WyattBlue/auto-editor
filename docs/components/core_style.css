@@ -14,18 +14,17 @@
   --charcoal-900: #1B2326;
   --charcoal-1000: #131417;
 
-  --hero-weight: 800;
   --flow-space: 1.25rem;
 }
 
 html {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background-color: white;
+  @media (prefers-color-scheme: dark) { background-color: #262626 }
 }
 
-body, button, input {
-  font-family: BlinkMacSystemFont, -apple-system, sans-serif;
-}
+body, button, input { font-family: -apple-system, sans-serif }
 
 html, p, h1, h2, h3, h4, html, blockquote {
   margin: 0;
@@ -36,23 +35,46 @@ h1 {
   line-height: 1.125;
   word-break: break-word;
   text-align: center;
-}
-.hero-title > p {
-  font-size: 2rem;
-  font-weight: var(--hero-weight);
-  line-height: 1.125;
-  word-break: break-word;
-}
-.hero-title > p {
-  text-align: left;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #323232;
+  @media (max-width: 55em) { font-size: 2rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
 }
 
-li, ol {margin: 0}
-ul {margin-top: 0}
-.section > .container > * + * { margin-top: var(--flow-space) }
-.section > .container > * + :is(h2, h3, h4) { margin-top: 2rem }
-.section > .container > :is(h1, h2, h3, h4) + * { margin-top: .5rem }
-li + li { margin-top: .25rem }
+h2 {
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: #323232;
+  @media (max-width: 55em) { font-size: 1.8rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+}
+
+h3 {
+  font-size: 1.7rem;
+  font-weight: 500;
+  color: #323232;
+  @media (max-width: 55em) { font-size: 1.5rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+}
+
+h4 {
+  font-size: 1.5rem;
+  color: #323232;
+  @media (max-width: 55em) { font-size: 1.3rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+}
+
+li, ol { margin: 0 }
+ul { margin-top: 0 }
+li {
+  color: black;
+  text-decoration: black;
+  font-size: 1.28rem;
+  & + li { margin-top: .25rem }
+  @media (max-width: 55em) { font-size: 1.1rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7; text-decoration: #F9F7F7 }
+}
 
 body {
   font-size: 1em;
@@ -60,8 +82,8 @@ body {
   line-height: 1.5;
   padding: 0 2em;
   margin: 0;
+  @media (max-width: 55em) { padding: 0 1rem }
 }
-@media (max-width: 55em) { body {padding: 0 1rem} }
 
 hr {
   margin: 0;
@@ -70,6 +92,8 @@ hr {
   border: 0;
   overflow: hidden;
   box-sizing: content-box;
+  background-color: #EAEAEA;
+  @media (prefers-color-scheme: dark) { background-color: #4A4A4A }
 }
 
 .container {
@@ -85,45 +109,63 @@ hr {
   display: flex;
   min-height: 3.25rem;
 }
-.navbar > .container { display: flex }
-.navbar, .navbar-menu, .navbar-start {
+
+.navbar {
+  display: flex;
+  align-items: stretch;
+  & > .container { display: flex }
+}
+.navbar-menu {
   display: flex;
   align-items: stretch;
 }
-
 .navbar-start {
+  display: flex;
+  align-items: stretch;
   justify-content: flex-start;
   flex-wrap: wrap;
+  & > .navbar-item {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #323232;
+    @media (max-width: 45em) { font-size: 1em }
+    @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+  }
 }
-.navbar-item img {max-height: 1.75rem}
+.navbar-item img { max-height: 1.75rem }
 
 img { max-width: 100%; height: auto }
 
-.navbar-link, a.navbar-item {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  padding: .5rem .4rem;
-  margin: 0 0.25rem;
-  position: relative;
-  text-decoration: none;
-}
-
 a {
   outline: none;
-  text-decoration: none;
-  padding: 2px 1px 0;
-}
-a:hover {border-bottom: 1px solid}
-a.navbar-item:hover {border-bottom: 0}
-a.no-underline {
-  border-bottom: 0;
+  color: #0573D9;
+  &:hover { color: #63C0F4 }
+  &.navbar-item {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: .5rem .4rem;
+    margin: 0 0.25rem;
+    position: relative;
+    text-decoration: none;
+    &:hover { background-color: #F9F7F7 }
+    @media (max-width: 45em) { padding: .5rem .2rem }
+    @media (prefers-color-scheme: dark) {
+      &:hover { background-color: #323232 }
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    color: #63C0F4;
+    &:hover { color: #A3DEFF }
+  }
 }
 
 code {
   font-size: 80%;
   border-radius: 5px;
   padding: 2px;
+  color: #323232;
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
 }
 
 code, pre {
@@ -142,19 +184,50 @@ pre {
   white-space: pre;
   word-wrap: normal;
   overflow-x: auto;
-}
-pre code {
-  background-color: transparent;
-  color: currentColor;
-  padding: 0;
+  line-height: 1.25;
+  background-color: #F9F5F5;
+  color: #323232;
+  & code {
+    background-color: transparent;
+    color: currentColor;
+    padding: 0;
+  }
+  @media (max-width: 55em) {
+    padding: 1rem 1.25rem;
+    line-height: 1;
+  }
+  @media (prefers-color-scheme: dark) {
+    background-color: #323232;
+    color: #F9F7F7;
+  }
 }
 
 blockquote {
   padding: 0 10px;
   margin: 0;
+  border-left: 5px solid #EAEAEA;
+  & > p { color: #696969 }
+  @media (prefers-color-scheme: dark) {
+    border-left: 5px solid #4A4A4A;
+    & > p { color: #DBDBDB }
+  }
 }
 
-th {padding: 10px}
+th {
+  padding: 10px;
+  font-weight: bold;
+  color: #323232;
+
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+}
+
+td { padding: 10px }
+
+thead, tbody {
+  color: #323232;
+
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
+}
 
 g-emoji {
   font-family: Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol;
@@ -167,72 +240,53 @@ p {
   display: block;
   text-wrap: pretty;
   max-width: 88ch;
+  font-size: 1.28rem;
+  color: #323232;
+
+  @media (max-width: 55em) { font-size: 1.1rem }
+  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
 }
 
-.section {padding: 1rem 0}
-
-.huge {font-size: 5rem}
-h1, .bigger {font-size: 2.5rem}
-h2, .big {font-size: 2.1rem}
-h3, .medium {font-size: 1.7rem}
-h4, .smedium {font-size: 1.5rem}
-p, li, th, pre, blockquote, .small {font-size: 1.28rem}
-.tiny {font-size: 1rem}
-pre {line-height: 1.25}
-.navbar-start > .navbar-item {font-size: 1.3em}
-
-@media (max-width: 55em){
-  .huge {font-size: 4rem}
-  h1, .bigger {font-size: 2rem}
-  h2, .big {font-size: 1.8rem}
-  h3, .medium {font-size: 1.5rem}
-  h4, .smedium {font-size: 1.3rem}
-  p, li, th, pre, blockquote, .small {font-size: 1.1rem}
-  pre {padding: 1rem 1.25rem}
-  pre {line-height: 1}
-  .navbar-link, a.navbar-item { padding: .5rem .3rem }
+.next {
+  text-decoration: underline;
+  border: 0;
+  font-size: xx-large;
+  text-align: center;
+  margin: auto;
+  display: block;
+  font-weight: bold;
+  padding: 1em;
+  &:before { content: "👉" }
 }
 
-@media (max-width: 45em){
-  .navbar-start > .navbar-item {font-size: 1em }
-  .navbar-link, a.navbar-item { padding: .5rem .2rem }
+.section {
+  padding: 1rem 0;
+  & > .container {
+    & > * + * { margin-top: var(--flow-space) }
+    & > * + :is(h2, h3, h4) { margin-top: 2rem }
+    & > :is(h1, h2, h3, h4) + * { margin-top: .5rem }
+  }
 }
+
+.huge { font-size: 5rem }
+.bigger { font-size: 2.5rem }
+.big { font-size: 2.1rem }
+.medium { font-size: 1.7rem }
+.smedium { font-size: 1.5rem }
+
+.small, th, pre, blockquote { font-size: 1.28rem }
+@media (max-width: 55em) {
+  .small, th, pre, blockquote { font-size: 1.1rem }
+}
+
+.tiny { font-size: 1rem }
+.bold { font-weight: bold }
+.underline { text-decoration: underline }
 
 table { border-collapse: collapse }
-th, td { padding: 10px }
 
-h1, th, .bold {font-weight: bold}
-h2 {font-weight: 600}
-h3 {font-weight: 500}
-.navbar-start > .navbar-item {font-weight: bold}
-.underline {text-decoration: underline}
-
-/* Light Theme Colors */
-html {background-color: white}
-hr {background-color: #EAEAEA}
-h1, h2, h3, h4, p, code, pre, thead, tbody {color: #323232}
-blockquote {border-left: 5px solid #EAEAEA}
-blockquote > p {color: #696969}
-pre {background-color: #F9F5F5}
-th, td {border: 1px solid #323232}
-a {color: #0573D9}
-a:hover {color: #63C0F4}
-a.navbar-item:hover {background-color: #F9F7F7}
-.navbar-start > .navbar-item {color: #323232}
-li {color: black; text-decoration: black;}
-
-/* Dark Theme Colors */
-@media (prefers-color-scheme: dark) {
-  html {background-color: #262626}
-  hr {background-color: #4A4A4A}
-  h1, h2, h3, h4, p, code, pre, thead, tbody {color: #F9F7F7}
-  blockquote {border-left: 5px solid #4A4A4A}
-  blockquote > p {color: #DBDBDB}
-  pre {background-color: #323232}
-  th, td {border: 1px solid #F9F7F7}
-  a {color: #63C0F4}
-  a:hover {color: #A3DEFF}
-  a.navbar-item:hover {background-color: #323232}
-  .navbar-start > .navbar-item {color: #F9F7F7}
-  li {color: #F9F7F7; text-decoration: #F9F7F7;}
+th, td {
+  padding: 10px;
+  border: 1px solid #323232;
+  @media (prefers-color-scheme: dark) { border: 1px solid #F9F7F7 }
 }
