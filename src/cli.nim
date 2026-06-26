@@ -81,17 +81,20 @@ const transcribeOptions*: seq[OptDef] = @[
   OptDef(names: "--provider", datum: "provider", metavar: "PROVIDER",
     help: "AI provider: groq, openai, gemini (default: groq)"),
   OptDef(names: "--api-key", datum: "apiKey", metavar: "KEY",
-    help: "API Key (optional, defaults to environment variables GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY)"),
+    help: "API Key (optional, defaults to GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY env vars)"),
   OptDef(names: "--model", datum: "model", metavar: "MODEL",
-    help: "Model name (optional, defaults: Groq=whisper-large-v3, OpenAI=whisper-1, Gemini=gemini-1.5-flash)"),
+    help: "Model override (defaults: Groq=whisper-large-v3, OpenAI=whisper-1, Gemini=gemini-1.5-flash)"),
   OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
-    help: "Set transcription language (optional, e.g. en, tr)"),
+    help: "Transcription language code (e.g. tr, en). Default: auto-detect"),
   OptDef(names: "-f, --format", datum: "format", metavar: "FORMAT",
-    help: "Output in a specific format {srt|text|json} (default srt)"),
+    help: "Output format: srt, text, or json (default: srt)"),
   OptDef(names: "-o, --output", datum: "output", metavar: "FILE",
-    help: "Choose where to output (defaults to stdout)"),
+    help: "Output file path (defaults to stdout)"),
+  OptDef(names: "--detect-topics", kind: Flag, datum: "detectTopics",
+    help: "Detect topic boundaries in the audio and return them as JSON timestamps. Works best with --language tr for Turkish content."),
+  OptDef(names: "--chat-model", datum: "chatModel", metavar: "MODEL",
+    help: "Chat model used for topic detection with Groq/OpenAI providers (default: Groq=llama-3.3-70b-versatile, OpenAI=gpt-4o-mini)"),
 ]
-
 
 const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD",
