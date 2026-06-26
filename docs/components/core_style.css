@@ -23,8 +23,7 @@ html {
 }
 
 body, button, input {
-  font-family: BlinkMacSystemFont, -apple-system, sans-serif, "Segoe UI", Roboto, Oxygen, Ubuntu,
-    Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial;
+  font-family: BlinkMacSystemFont, -apple-system, sans-serif;
 }
 
 html, p, h1, h2, h3, h4, html, blockquote {
@@ -132,11 +131,11 @@ code {
 code, pre {
   -moz-osx-font-smoothing: auto;
   -webkit-font-smoothing: auto;
-  font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-family: monospace, monospace;
 }
 
 .mono {
-  font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-family: monospace, monospace;
   font-size: 110%;
 }
 
