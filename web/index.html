@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Editor</title>
+  <link rel="stylesheet" href="styles/theme.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-logo">
+        <h1>Auto-Editor</h1>
+        <span id="app-subtitle">Otomatik Video Düzenleyici</span>
+      </div>
+      <div class="header-actions">
+        <div class="language-switcher">
+          <button class="language-btn active" data-lang="tr">TR</button>
+          <button class="language-btn" data-lang="en">EN</button>
+        </div>
+        <button class="btn btn-outline btn-sm" id="settings-btn">⚙️</button>
+        <button class="btn btn-outline btn-sm" id="theme-toggle">🌙</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <!-- File Selection -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title" data-i18n="file.select">Dosya Seç</span>
+          </div>
+          <div class="file-drop-zone" id="file-drop-zone">
+            <div class="file-drop-zone-icon">📁</div>
+            <div class="file-drop-zone-text" data-i18n="file.dragdrop">Dosyayı buraya sürükleyin veya tıklayın</div>
+            <div class="file-drop-zone-hint" data-i18n="file.supported">Desteklenen formatlar: MP4, MOV, AVI, MKV, MP3, WAV</div>
+          </div>
+          <input type="file" id="file-input" accept="video/*,audio/*" hidden>
+          <div id="file-name" style="margin-top: 12px; font-size: 0.875rem; color: var(--text-secondary); word-break: break-all;"></div>
+        </div>
+
+        <!-- Edit Settings -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title" data-i18n="edit.method">Düzenleme Metodu</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="edit.method">Düzenleme Metodu</label>
+            <select class="form-select" id="edit-method">
+              <option value="audio" data-i18n="edit.method.audio">Ses (Varsayılan)</option>
+              <option value="motion" data-i18n="edit.method.motion">Hareket</option>
+              <option value="blackdetect" data-i18n="edit.method.blackdetect">Siyah Ekran Tespiti</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="edit.threshold">Eşik Değeri</label>
+            <input type="number" class="form-input" id="threshold" value="0.04" min="0" max="1" step="0.01">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="edit.margin">Marginal (Saniye)</label>
+            <input type="number" class="form-input" id="margin" value="0.2" min="0" max="5" step="0.1">
+          </div>
+        </div>
+
+        <!-- Transcribe Settings -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title" data-i18n="transcribe.title">Transkripsiyon</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="transcribe.provider">Sağlayıcı</label>
+            <select class="form-select" id="provider">
+              <option value="groq" data-i18n="transcribe.provider.groq">Groq (Hızlı)</option>
+              <option value="openai" data-i18n="transcribe.provider.openai">OpenAI (Yüksek Kalite)</option>
+              <option value="gemini" data-i18n="transcribe.provider.gemini">Gemini (Google)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="transcribe.language">Dil</label>
+            <select class="form-select" id="language">
+              <option value="auto" data-i18n="transcribe.language.auto">Otomatik Algıla</option>
+              <option value="tr" data-i18n="transcribe.language.tr">Türkçe</option>
+              <option value="en" data-i18n="transcribe.language.en">İngilizce</option>
+              <option value="ja" data-i18n="transcribe.language.ja">Japonca</option>
+              <option value="de" data-i18n="transcribe.language.de">Almanca</option>
+              <option value="fr" data-i18n="transcribe.language.fr">Fransızca</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="transcribe.api_key">API Anahtarı</label>
+            <input type="password" class="form-input" id="api-key" placeholder="API anahtarınızı girin">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="transcribe.format">Çıktı Formatı</label>
+            <select class="form-select" id="transcribe-format">
+              <option value="srt" data-i18n="transcribe.format.srt">SRT Altyazı</option>
+              <option value="text" data-i18n="transcribe.format.text">Düz Metin</option>
+              <option value="json" data-i18n="transcribe.format.json">JSON</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary btn-block" id="transcribe-btn" data-i18n="transcribe.transcript">Transkript Al</button>
+            <button class="btn btn-secondary btn-block" id="detect-topics-btn" data-i18n="transcribe.detect_topics">Konu Tespit Et</button>
+            <button class="btn btn-secondary btn-block" id="summarize-btn" data-i18n="transcribe.summarize">Özet Çıkar</button>
+          </div>
+        </div>
+
+        <!-- Export -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title" data-i18n="export.title">Dışa Aktarma</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="export.format">Format</label>
+            <select class="form-select" id="export-format">
+              <option value="srt" data-i18n="export.format.srt">SRT Altyazı</option>
+              <option value="json" data-i18n="export.format.json">JSON</option>
+              <option value="txt" data-i18n="export.format.txt">Metin</option>
+              <option value="premiere" data-i18n="export.format.premiere">Adobe Premiere Pro</option>
+              <option value="resolve" data-i18n="export.format.resolve">DaVinci Resolve</option>
+              <option value="finalcutpro" data-i18n="export.format.finalcutpro">Final Cut Pro</option>
+            </select>
+          </div>
+          <button class="btn btn-success btn-block" id="save-btn" data-i18n="export.save">Kaydet</button>
+        </div>
+
+        <!-- Process Button -->
+        <button class="btn btn-primary btn-lg btn-block" id="process-btn" data-i18n="action.process">İşle</button>
+      </aside>
+
+      <!-- Content Area -->
+      <section class="content-area">
+        <!-- Video Preview -->
+        <div class="video-container" id="video-container">
+          <video id="video-player" controls></video>
+          <div class="video-placeholder" id="video-placeholder">
+            <div class="video-placeholder-icon">🎬</div>
+            <div data-i18n="file.dragdrop">Dosyayı buraya sürükleyin veya tıklayın</div>
+          </div>
+        </div>
+
+        <!-- Video Controls -->
+        <div class="video-controls">
+          <button class="btn btn-outline" id="play-btn" data-i18n="preview.play">▶️</button>
+          <button class="btn btn-outline" id="pause-btn" data-i18n="preview.pause">⏸️</button>
+          <button class="btn btn-outline" id="stop-btn" data-i18n="preview.stop">⏹️</button>
+          <div class="progress-bar" id="progress-bar">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+          <span class="time-display" id="time-display">00:00 / 00:00</span>
+          <div class="volume-control">
+            <button class="btn btn-outline" id="mute-btn">🔊</button>
+            <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
+          </div>
+          <button class="btn btn-outline" id="fullscreen-btn">⛶</button>
+        </div>
+
+        <!-- Waveform -->
+        <div class="waveform-container">
+          <canvas class="waveform-canvas" id="waveform-canvas"></canvas>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="results-panel">
+          <div class="results-tabs">
+            <button class="results-tab active" data-tab="transcript" data-i18n="results.transcript">Transkript</button>
+            <button class="results-tab" data-tab="topics" data-i18n="results.topics">Konular</button>
+            <button class="results-tab" data-tab="summary" data-i18n="results.summary">Özet</button>
+          </div>
+          <div class="results-content" id="results-content">
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+              <div style="font-size: 2rem; margin-bottom: 16px;">📝</div>
+              <div>Henüz sonuç yok</div>
+              <div style="font-size: 0.75rem; margin-top: 8px;">Dosya seçin ve işleme başlatın</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div class="status-left">
+        <div class="status-indicator">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text" data-i18n="status.ready">Hazır</span>
+        </div>
+      </div>
+      <div class="status-right">
+        <span id="version-info">v2.6.2-dev</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Processing Overlay -->
+  <div class="processing-overlay" id="processing-overlay">
+    <div class="processing-card">
+      <div class="processing-spinner"></div>
+      <div class="processing-text" id="processing-text">İşleniyor...</div>
+      <div class="processing-progress" id="processing-progress">Lütfen bekleyin</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

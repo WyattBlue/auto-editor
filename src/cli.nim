@@ -92,8 +92,10 @@ const transcribeOptions*: seq[OptDef] = @[
     help: "Output file path (defaults to stdout)"),
   OptDef(names: "--detect-topics", kind: Flag, datum: "detectTopics",
     help: "Detect topic boundaries in the audio and return them as JSON timestamps. Works best with --language tr for Turkish content."),
+  OptDef(names: "--summarize", kind: Flag, datum: "summarize",
+    help: "Generate a summary of the audio content. Works best with --language tr for Turkish content."),
   OptDef(names: "--chat-model", datum: "chatModel", metavar: "MODEL",
-    help: "Chat model used for topic detection with Groq/OpenAI providers (default: Groq=llama-3.3-70b-versatile, OpenAI=gpt-4o-mini)"),
+    help: "Chat model used for topic detection/summarization with Groq/OpenAI providers (default: Groq=llama-3.3-70b-versatile, OpenAI=gpt-4o-mini)"),
 ]
 
 const mainOptions*: seq[OptDef] = @[

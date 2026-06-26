@@ -13,6 +13,10 @@ import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
 
+# GUI support
+when not defined(emscripten):
+  import gui/app as guiApp
+
 proc ctrlc() {.noconv.} =
   error "Keyboard Interrupt"
 
@@ -548,5 +552,22 @@ judge making cuts.
 
   editMedia(args)
 
+# GUI mode
+when not defined(emscripten):
+  proc startGUI() =
+    echo "Starting Auto-Editor GUI..."
+    let app = guiApp.newApp()
+    guiApp.startServer(app)
+
 when isMainModule:
-  main()
+  let params = commandLineParams()
+  
+  # Check for --gui flag
+  if "--gui" in params:
+    when not defined(emscripten):
+      startGUI()
+    else:
+      echo "GUI mode is not available in web build"
+      quit(1)
+  else:
+    main()
