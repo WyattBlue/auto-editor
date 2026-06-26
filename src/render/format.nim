@@ -65,23 +65,21 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   if ctx.codec.sample_fmts == nil:
     error &"{ctx.codec.name}: No known audio formats avail."
 
-  var myOut: pointer = nil
+  var configPtr: pointer = nil
   var num: cint = 0
   discard avcodec_get_supported_config(
-    ctx, nil, AV_CODEC_CONFIG_SAMPLE_RATE, 0.cuint, addr myOut, addr num
+    ctx, nil, AV_CODEC_CONFIG_SAMPLE_RATE, 0.cuint, addr configPtr, addr num
   )
 
-  const AAC_AT_RATES = [48000.cint, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
+  const AAC_RATES = [48000.cint, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
 
-  if myOut == nil:
-    if ctx.codec.id == ID_AAC:
-      if rate notin AAC_AT_RATES:
-        error "AudioToolbox only supports these samplerates: " & AAC_AT_RATES.join(", ")
-    else:
-      debug "audio encoder claims to support every samplerate"
-      return
+  if configPtr == nil:
+    debug "Audio encoder does not have a config"
+    if ctx.codec.id == ID_AAC and rate notin AAC_RATES:
+      error "AAC encoder only supports these samplerates: " & AAC_RATES.join(", ")
+    return
 
-  let rates = cast[ptr UncheckedArray[cint]](myOut)
+  let rates = cast[ptr UncheckedArray[cint]](configPtr)
   for i in 0..<num:
     if rates[i] == rate:
       return
