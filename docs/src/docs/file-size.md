@@ -28,8 +28,8 @@ Your audio contributes to size too, if you use the AAC encoder, it should always
 
 | Encoder               | Type             | Quality   | Speed     |
 |-----------------------|------------------|-----------|-----------|
-| aac_at (AudioToolBox) | Hardware (Apple) | best      | very fast |
-| fdk_aac               | Software         | very good | fast      |
+| fdk_aac               | Software         | best      | fast      |
+| aac_at (AudioToolBox) | Hardware (Apple) | very good | very fast |
 | aac (ffmpeg)          | Software         | good      | fast      |
 
 ## Using Better Video Encoders
@@ -42,7 +42,7 @@ The table below compares different video codecs:
 | h264    | high        | very fast  | best          |
 | hevc    | very high   | fast*      | so-so         |
 | vp9     | very high   | slow       | high          |
-| av1     | very high   | very slow  | high          |
+| av1     | very high   | slow       | high          |
 | mpeg4   | very low    | superfast  | so-so         |
 
 
@@ -54,10 +54,10 @@ ffmpeg -i my-video.mp4 -c:a copy -c:v hevc -b:v 0 my-video-h265.mp4
 ```
 
 ## Tips for libx264
-Auto-Editor doesn't ship libx264 for legal reasons, but you can still use x264 if you have ffmpeg installed.
+You can use these options with auto-editor:
 
 ```
-ffmpeg -i input.mp4 -c:a copy -c:v libx264 -preset medium out.mp4
+auto-editor input.mp4 -c:v libx264 -preset medium
 ```
 
 Use Constant Rate Factor (CRF) unless you already know exactly what you want the bitrate to be. Setting `-preset` to a slower value than `medium` doesn't hurt either.
@@ -65,3 +65,5 @@ Use Constant Rate Factor (CRF) unless you already know exactly what you want the
 If you do use video bitrate, don't set it to a high number like `10M`. Unlike libopenh264, libx264 with faithfully target that absurd number even if the quality gain is teeny-tiny.
 
 [FFmpeg's wiki page explains the options you can use in more detail.](https://trac.ffmpeg.org/wiki/Encode/H.264)
+
+<a class="next" href="./subcommands">Next: Subcommands</a>

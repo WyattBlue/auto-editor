@@ -119,11 +119,9 @@ input:
 auto-editor "https://www.youtube.com/watch?v=kcs82HnguGc"
 ```
 
-## Where to go next
-
-- [Actions Cookbook](./actions) — speed, volume, zoom, overlays, animations
-- [Range Syntax](./range-syntax) — manual cuts with `--cut-out` / `--add-in`
+## See Also
 - [How To Shrink File Size](./file-size)
 - [All the Options (and What They Do)](/ref/options)
-</content>
-</invoke>
+
+<a class="next" href="./actions">Next: Actions Cookbook</a>
+

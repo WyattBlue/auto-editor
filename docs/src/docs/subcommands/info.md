@@ -30,7 +30,7 @@ example.mp4:
    - track 0:
      - codec: aac
      - samplerate: 48000
-     - channels: 2
+     - layout: stereo
      - duration: 42.400000
      - bitrate: 317375
      - lang: eng
@@ -107,3 +107,5 @@ auto-editor info example.mp4 --json
     }
 }
 ```
+
+<a class="next" href="./levels">Next: levels</a>

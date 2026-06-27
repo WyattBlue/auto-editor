@@ -83,3 +83,4 @@ auto-editor example.mp4 --set-speed-for-range 2,0,30
 auto-editor example.mp4 --set-speed-for-range 0.5,start,end
 ```
 
+<a class="next" href="./file-size">Next: File Size</a>

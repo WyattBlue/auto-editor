@@ -2,7 +2,7 @@
 title: whisper
 ---
 
-## whisper
+# whisper
 `whisper` transcribes the audio of a media file using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) `ggml` models. It is useful both on its own and for generating subtitles that `--edit subtitle` can then cut on.
 
 Usage:
@@ -60,3 +60,5 @@ Number of CPU threads to use for whisper processing. (default 4)
 ---
 ### Notes
 The `whisper` filter must be enabled in the ffmpeg auto-editor is using. If it isn't, whisper will report that it `Could not find whisper filter`.
+
+<a class="next" href="/docs/v1">Next: The v1 timeline format</a>

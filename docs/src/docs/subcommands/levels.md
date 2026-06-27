@@ -47,3 +47,5 @@ auto-editor levels example.mp4
 ```
 
 levels uses `--edit` to determine what is being analyzed, which by default is `audio`.
+
+<a class="next" href="./subdump">Next: subdump</a>

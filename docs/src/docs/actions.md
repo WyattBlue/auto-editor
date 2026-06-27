@@ -430,5 +430,6 @@ auto-editor video.mp4 -w:0 speed:6,volume:0.4
 
 ## See Also
 - [Complete Actions Reference](/ref/actions)
-- [Range Syntax](./range-syntax) - Manual editing with `--cut-out` and `--add-in`
 - [Audio Normalization](./anorm) - Volume normalization options
+
+<a class="next" href="./range-syntax">Next: Range Syntax</a>
