@@ -1,7 +1,8 @@
-import std/[os, strformat, terminal]
+import std/[os, strformat, strutils, terminal]
 
-import ../about
+import ../[about, cli, log]
 import ../util/fun
+import ./help
 
 func formatBytes(intSize: BiggestInt): (string, string) =
   if intSize < 1024:
@@ -15,9 +16,19 @@ func formatBytes(intSize: BiggestInt): (string, string) =
 
 
 proc main*(args: seq[string]) =
+  var positionals: seq[string] = @[]
+  for key in args:
+    if genCliMacro(key, args, cacheOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("[clean | clear]", cacheOptions)
+    if key.startsWith("-"):
+      error "Unknown option: " & key
+    positionals.add key
+
   let cacheDir = getTempDir() / &"ae-{version}"
 
-  if args.len > 0 and args[0] in ["clean", "clear"]:
+  if positionals.len > 0 and positionals[0] in ["clean", "clear"]:
     try: removeDir cacheDir
     except: discard
     return

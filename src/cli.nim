@@ -58,8 +58,10 @@ type OptDef* = object
   hidden*: bool
 
 const whisperOptions*: seq[OptDef] = @[
-  OptDef(names: "--debug", kind: Flag, datum: "isDebug"),
-  OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: "splitWords"),
+  OptDef(names: "--debug", kind: Flag, datum: "isDebug",
+    help: "Show debugging messages and values"),
+  OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: "splitWords",
+    help: "Output one word per cue instead of full segments"),
   OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
     help: "Set the language instead of using \"auto\". Examples: en, ja"),
   OptDef(names: "-f, --format", datum: "format", metavar: "FORMAT",
@@ -76,6 +78,57 @@ const whisperOptions*: seq[OptDef] = @[
     help: "Bias transcription toward given vocabulary/spelling (e.g. names, jargon)"),
   OptDef(names: "--threads", datum: "threads", metavar: "N",
     help: "Number of CPU threads for whisper processing (default 4)"),
+]
+
+const infoOptions*: seq[OptDef] = @[
+  OptDef(names: "--json", kind: Flag, datum: "isJson",
+    help: "Print the information as JSON"),
+  OptDef(names: "-encoders", datum: "encoders", metavar: "EXT",
+    help: "Show all usable encoders for a given container extension"),
+  OptDef(names: "-decoders", datum: "decoders", metavar: "EXT",
+    help: "Show all usable decoders for a given container extension"),
+  OptDef(names: "-codecs", datum: "codecs", metavar: "EXT",
+    help: "Show all usable codecs for a given container extension"),
+]
+
+const descOptions*: seq[OptDef] = @[]
+
+const cacheOptions*: seq[OptDef] = @[]
+
+const levelsOptions*: seq[OptDef] = @[
+  OptDef(names: "--edit", datum: "edit", metavar: "METHOD",
+    help: "Set the kind of detection to analyze with (default audio)"),
+  OptDef(names: "-tb, --timebase", datum: "timebase", metavar: "NUM",
+    help: "Set the timebase/chunk rate to analyze at (default 30)"),
+  OptDef(names: "--display", datum: "display", metavar: "FORMAT",
+    help: "Set the output format {float|d16} (default float)"),
+  OptDef(names: "--no-cache", kind: Flag, datum: "noCache",
+    help: "Disable reading and writing cache files"),
+]
+
+const subdumpOptions*: seq[OptDef] = @[
+  OptDef(names: "--json", kind: Flag, datum: "asJson",
+    help: "Print the subtitles as JSON"),
+]
+
+const waveformOptions*: seq[OptDef] = @[
+  OptDef(names: "--stream", datum: "stream", metavar: "NAT",
+    help: "Set which audio stream to analyze (default 0)"),
+  OptDef(names: "--samples-per-bucket", datum: "samples-per-bucket", metavar: "NAT",
+    help: "Number of audio samples per drawn bucket (default 256)"),
+  OptDef(names: "--start-sample", datum: "start-sample", metavar: "NAT",
+    help: "First audio sample to analyze from (default 0)"),
+  OptDef(names: "--length-samples", datum: "length-samples", metavar: "INT",
+    help: "Number of samples to analyze, -1 for all (default -1)"),
+  OptDef(names: "--display", datum: "display", metavar: "FORMAT",
+    help: "Set the output format {float|d16} (default float)"),
+  OptDef(names: "--no-cache", kind: Flag, datum: "noCache",
+    help: "Disable reading and writing cache files"),
+]
+
+const completionOptions*: seq[OptDef] = @[
+  OptDef(names: "-s, --shell", datum: "shell", metavar: "SHELL",
+    help: "Shell type: {zsh}"),
 ]
 
 const mainOptions*: seq[OptDef] = @[

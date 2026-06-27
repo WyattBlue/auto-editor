@@ -1,7 +1,8 @@
 import std/[json, sets, strformat, strutils, tables]
 
-import ../[av, ffmpeg, log, media, timeline]
+import ../[av, cli, ffmpeg, log, media, timeline]
 import ../util/[fun, lang, rational]
+import ./help
 
 proc genericTrack(lang: Lang, bitrate: int64) =
   if bitrate != 0:
@@ -288,30 +289,36 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
+  var expecting = ""
   var isJson = false
   var queryExt = ""
   var queryKind: CodecListKind
   var inputFiles: seq[string] = @[]
 
-  var i = 0
-  while i < args.len:
-    let key = args[i]
-    if key == "--json":
-      isJson = true
-    elif key in ["-encoders", "-decoders", "-codecs"]:
-      inc i
-      if i >= args.len:
-        error &"{key} requires a format argument"
-      queryExt = args[i]
-      queryKind = case key
-        of "-encoders": clkEncoders
-        of "-decoders": clkDecoders
-        else: clkCodecs
-    else:
-      if key.startsWith("--"):
-        error &"Unknown option: {key}"
+  for key in args:
+    if genCliMacro(key, args, infoOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", infoOptions)
+    if key.startsWith("--"):
+      error &"Unknown option: {key}"
+
+    case expecting
+    of "":
       inputFiles.add key
-    inc i
+    of "encoders":
+      queryExt = key
+      queryKind = clkEncoders
+    of "decoders":
+      queryExt = key
+      queryKind = clkDecoders
+    of "codecs":
+      queryExt = key
+      queryKind = clkCodecs
+    expecting = ""
+
+  if expecting != "":
+    error &"-{expecting} requires a format argument"
 
   if queryExt != "":
     let ofmt = av_guess_format(nil, ("." & queryExt).cstring, nil)

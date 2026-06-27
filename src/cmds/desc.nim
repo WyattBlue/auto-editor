@@ -1,10 +1,22 @@
-import ../[av, ffmpeg]
+import std/strutils
+import ../[av, cli, ffmpeg, log]
+import ./help
 
-proc main*(args: seq[string]) {.raises: [].} =
+proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
+  var inputFiles: seq[string] = @[]
+  for key in args:
+    if genCliMacro(key, args, descOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("<file ...>", descOptions)
+    if key.startsWith("--"):
+      error "Unknown option: " & key
+    inputFiles.add key
+
   var formatContext: ptr AVFormatContext
-  for inputFile in args:
+  for inputFile in inputFiles:
     try:
       formatContext = av.openFormatCtx(inputFile.cstring)
     except IOError:

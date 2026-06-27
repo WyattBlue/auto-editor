@@ -1,39 +1,6 @@
 import std/[os, strformat, strutils]
 import ../[av, cli, ffmpeg, log]
-import ../util/[fun, term]
-
-proc printHelp(opts: seq[OptDef]) =
-  let termWidth = max(terminalWidth(), 40)
-  let optWidth = min(32, termWidth div 3)
-  let helpWidth = termWidth - optWidth - 4
-
-  echo "Usage: <file> <model> [options]\n"
-  echo "Options:"
-
-  for opt in opts:
-    if opt.hidden:
-      continue
-    var optStr = "    " & opt.names
-    if opt.metavar != "":
-      optStr &= " " & opt.metavar
-
-    if optStr.len >= optWidth:
-      echo optStr
-      let wrapped = wrapText(opt.help, helpWidth, 0)
-      for line in wrapped.split("\n"):
-        echo " ".repeat(optWidth) & line
-    else:
-      let padding = optWidth - optStr.len
-      let wrapped = wrapText(opt.help, helpWidth, optWidth)
-      let helpLines = wrapped.split("\n")
-      echo optStr & " ".repeat(padding) & helpLines[0]
-      for i in 1 ..< helpLines.len:
-        echo helpLines[i]
-
-  echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
-    wrapText("Show info about this program then exit", helpWidth, optWidth)
-  echo ""
-  quit(0)
+import ./help
 
 proc main*(cArgs: seq[string]) =
   var inputPath: string = ""
@@ -55,7 +22,7 @@ proc main*(cArgs: seq[string]) =
     if genCliMacro(key, args, whisperOptions):
       continue
     if key in ["-h", "--help"]:
-      printHelp(whisperOptions)
+      printHelp("<file> <model> [options]", whisperOptions)
     if key.startsWith("--"):
       error &"Unknown option: {key}"
     case expecting:

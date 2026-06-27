@@ -1,6 +1,7 @@
 import std/[json, strutils]
 
-import ../[av, ffmpeg, log]
+import ../[av, cli, ffmpeg, log]
+import ./help
 
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
@@ -9,12 +10,13 @@ proc main*(args: seq[string]) =
     asJson = false
     inputFiles: seq[string] = @[]
   for key in args:
-    if key == "--json":
-      asJson = true
-    elif key.startsWith("--"):
+    if genCliMacro(key, args, subdumpOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("<file> [options]", subdumpOptions)
+    if key.startsWith("--"):
       error "Unknown option: " & key
-    else:
-      inputFiles.add key
+    inputFiles.add key
 
   var jsonOut = %* {}
 

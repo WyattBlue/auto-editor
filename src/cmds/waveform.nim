@@ -1,8 +1,9 @@
 import std/[options, strformat, strutils]
 
 import ../util/[rational, dnorm16]
-import ../[av, cache, ffmpeg, log]
+import ../[av, cache, cli, ffmpeg, log]
 import ../analyze/audio
+import ./help
 
 proc main*(strArgs: seq[string]) =
   var
@@ -15,35 +16,33 @@ proc main*(strArgs: seq[string]) =
     display = "float"
 
   for key in strArgs:
-    case key
-    of "--no-cache":
-      noCache = true
-    of "--stream", "--samples-per-bucket", "--start-sample", "--length-samples", "--display":
-      expecting = key[2..^1]
-    else:
-      if key.startsWith("--"):
-        error &"Unknown option: {key}"
+    if genCliMacro(key, strArgs, waveformOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("<file> [options]", waveformOptions)
+    if key.startsWith("--"):
+      error &"Unknown option: {key}"
 
-      case expecting
-      of "":
-        if inputFile != "":
-          error &"Input file is already set: {key}"
-        inputFile = key
-      of "stream":
-        try: userStream = parseInt(key).int32
-        except ValueError: error &"Invalid stream index: {key}"
-      of "samples-per-bucket":
-        try: samplesPerBucket = parseInt(key).int32
-        except ValueError: error &"Invalid samples-per-bucket: {key}"
-      of "start-sample":
-        try: startSample = parseBiggestInt(key).int64
-        except ValueError: error &"Invalid start-sample: {key}"
-      of "length-samples":
-        try: lengthSamples = parseBiggestInt(key).int64
-        except ValueError: error &"Invalid length-samples: {key}"
-      of "display":
-        display = key
-      expecting = ""
+    case expecting
+    of "":
+      if inputFile != "":
+        error &"Input file is already set: {key}"
+      inputFile = key
+    of "stream":
+      try: userStream = parseInt(key).int32
+      except ValueError: error &"Invalid stream index: {key}"
+    of "samples-per-bucket":
+      try: samplesPerBucket = parseInt(key).int32
+      except ValueError: error &"Invalid samples-per-bucket: {key}"
+    of "start-sample":
+      try: startSample = parseBiggestInt(key).int64
+      except ValueError: error &"Invalid start-sample: {key}"
+    of "length-samples":
+      try: lengthSamples = parseBiggestInt(key).int64
+      except ValueError: error &"Invalid length-samples: {key}"
+    of "display":
+      display = key
+    expecting = ""
 
   if expecting != "":
     error &"--{expecting} needs argument."

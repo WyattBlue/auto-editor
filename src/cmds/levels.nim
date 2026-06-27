@@ -1,8 +1,9 @@
 import std/[options, strformat, strutils]
 
 import ../util/[rational, dnorm16]
-import ../[av, cache, ffmpeg, log]
+import ../[av, cache, cli, ffmpeg, log]
 import ../analyze/[audio, blackdetect, motion, subtitle]
+import ./help
 
 import ../vendor/tinyre/tinyre
 
@@ -96,30 +97,26 @@ proc main*(strArgs: seq[string]) =
     tb = AVRational(num: 30, den: 1)
 
   for key in strArgs:
-    case key
-    of "--no-cache":
-      noCache = true
-    of "-tb":
-      expecting = "timebase"
-    of "--timebase", "--edit", "--display":
-      expecting = key[2..^1]
-    else:
-      if key.startsWith("--"):
-        error &"Unknown option: {key}"
+    if genCliMacro(key, strArgs, levelsOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp("<file> [options]", levelsOptions)
+    if key.startsWith("--"):
+      error &"Unknown option: {key}"
 
-      case expecting
-      of "":
-        if inputFile != "":
-          error &"Input file is already set: {key}"
-        inputFile = key
-      of "timebase":
-        try: tb = toAVRational(key)
-        except ValueError as e: error e.msg
-      of "edit":
-        edit = key
-      of "display":
-        display = key
-      expecting = ""
+    case expecting
+    of "":
+      if inputFile != "":
+        error &"Input file is already set: {key}"
+      inputFile = key
+    of "timebase":
+      try: tb = toAVRational(key)
+      except ValueError as e: error e.msg
+    of "edit":
+      edit = key
+    of "display":
+      display = key
+    expecting = ""
 
   if expecting != "":
     error &"--{expecting} needs argument."
