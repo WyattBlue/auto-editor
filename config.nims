@@ -34,6 +34,7 @@ else:
     switch("define", "noSignalHandler")
     switch("passC", "-pthread")
     switch("passC", "-msimd128")
+    switch("passC", "-mrelaxed-simd")
     switch("passC", "-g0")
     switch("passL", "-pthread")
     switch("passL", "-g0")

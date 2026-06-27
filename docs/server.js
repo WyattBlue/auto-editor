@@ -17,6 +17,9 @@ app.get("/blog/{*splat}", (req, res) => {
 app.get("/options", (req, res) => {
   res.redirect(301, "https://auto-editor.com/ref/options");
 });
+app.get("/online", (req, res) => {
+  res.redirect(301, "https://app.auto-editor.com/online");
+});
 
 app.use(express.static("public", {
   index: ["index.html"],
