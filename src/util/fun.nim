@@ -1,7 +1,8 @@
 import std/[base64, strutils, strformat]
-from std/math import gcd, `mod`, round, trunc
+from std/math import gcd, `mod`, round, trunc, pow
 
 import ../log
+import dnorm16
 
 func b64urlDecode*(s: string): seq[byte] =
   var padded = s.replace('-', '+').replace('_', '/')
@@ -173,6 +174,21 @@ proc splitNumStr*(val: string): (float64, string) =
   except:
     error &"Invalid number: '{val}'"
   return (floatNum, unit)
+
+proc parseThres*(val: string): Unorm16 =
+  let (num, unit) = splitNumStr(val)
+  var r: float32
+  if unit == "%":
+    r = float32(num / 100)
+  elif unit == "dB":
+    r = float32(pow(10, num / 20))
+  elif unit == "":
+    r = float32(num)
+  else:
+    error &"Unknown unit: {unit}"
+  if r < 0 or r > 1:
+    error &"Threshold not in range: {val} ({r})"
+  return toUnorm16(r)
 
 proc parseBitrate*(input: string): int =
   if input == "auto":

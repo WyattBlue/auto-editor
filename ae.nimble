@@ -797,8 +797,6 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       enableEncoders.add "libsvtav1"
     if package.name == "amf-headers":
       enableEncoders &= ["h264_amf", "hevc_amf", "av1_amf"]
-    if package.name == "whisper":
-      filters.add "whisper"
 
   let isCrossWasm = kind == wasm32 or kind == wasm64
   let isMacNative = defined(macosx) and kind == native
@@ -848,6 +846,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     if isMacNative:
       commonFlags &= "  --enable-videotoolbox \\\n"
       commonFlags &= "  --enable-audiotoolbox \\\n"
+      commonFlags &= "  --enable-avfoundation \\\n"
+      commonFlags &= "  --enable-indev=avfoundation \\\n"
     elif kind != armv7 and kind != llvmWin:
       commonFlags &= "  --enable-nvenc \\\n"
       commonFlags &= "  --enable-ffnvcodec \\\n"

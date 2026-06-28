@@ -16,9 +16,15 @@ when defined(dynamic):
   let ffmpegCflags = gorgeEx("pkg-config --cflags libavutil", "")
   if ffmpegCflags.exitCode == 0:
     switch("passC", ffmpegCflags.output.strip())
-  let ffmpegLibs = gorgeEx("pkg-config --libs libavfilter libavformat libavcodec libswresample libswscale libavutil", "")
+  let ffmpegLibs = gorgeEx("pkg-config --libs libavdevice libavfilter libavformat libavcodec libswresample libswscale libavutil", "")
   if ffmpegLibs.exitCode == 0:
     switch("passL", ffmpegLibs.output.strip())
+
+  let whisperCflags = gorgeEx("pkg-config --cflags whisper ggml", "")
+  let whisperLibs = gorgeEx("pkg-config --libs whisper ggml", "")
+  if whisperCflags.exitCode == 0 and whisperLibs.exitCode == 0:
+    switch("passC", whisperCflags.output.strip())
+    switch("passL", whisperLibs.output.strip())
 else:
   let buildPath = (
     if hostCPU == "wasm32": "build_wasm"
@@ -88,7 +94,10 @@ when hostOS == "macosx":
     switch("passC", "-mmacosx-version-min=" & majorVer & ".0")
     switch("passL", "-mmacosx-version-min=" & majorVer & ".0")
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
-  switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreVideo")
+  switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreAudio -framework CoreVideo")
+  when not defined(dynamic):
+    switch("passL", "-lavdevice")
+    switch("passL", "-framework AVFoundation -framework Foundation -framework CoreGraphics")
 elif hostOS == "windows":
   switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
 elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):
@@ -102,6 +111,7 @@ elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):
     switch("passL", "-L./build/lib64")
 
 if not defined(dynamic) and enableWhisper:
+  switch("define", "whisper")
   switch("passL", "-lwhisper")
   switch("passL", "-lggml-base")
   switch("passL", "-lggml")

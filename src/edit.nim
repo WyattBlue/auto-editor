@@ -49,21 +49,6 @@ const
   defaultMotionThres = toUnorm16(0.02)
   defaultBlackThres = toUnorm16(0.98)
 
-proc parseThres(val: string): Unorm16 =
-  let (num, unit) = splitNumStr(val)
-  var r: float32
-  if unit == "%":
-    r = float32(num / 100)
-  elif unit == "dB":
-    r = float32(pow(10, num / 20))
-  elif unit == "":
-    r = float32(num)
-  else:
-    error &"Unknown unit: {unit}"
-  if r < 0 or r > 1:
-    error &"Threshold not in range: {val} ({r})"
-  return toUnorm16(r)
-
 proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
   try:
     result = parseFloat(val)

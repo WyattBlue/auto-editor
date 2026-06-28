@@ -318,6 +318,9 @@ proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
     fmt: pointer, options: pointer): cint {.importc,
     header: "<libavformat/avformat.h>".}
+proc av_find_input_format*(short_name: cstring): pointer {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avdevice_register_all*() {.importc, header: "<libavdevice/avdevice.h>".}
 proc avformat_find_stream_info*(ic: ptr AVFormatContext,
     options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,

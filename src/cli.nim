@@ -71,13 +71,14 @@ const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "-tr, --translate", kind: Flag, datum: "translate",
     help: "Translate from source language to english"),
   OptDef(names: "--queue", datum: "queue", metavar: "SECS",
-    help: "The maximum size in seconds that will be queued into before processing. (default 30)"),
-  OptDef(names: "--vad-model", datum: "vad-model", metavar: "VAD-MODEL",
-    help: "Set Voice activity detection (VAD) model"),
+    help: "The maximum size in seconds of a single transcribed segment (default 30)"),
   OptDef(names: "--prompt", datum: "prompt", metavar: "TEXT",
     help: "Bias transcription toward given vocabulary/spelling (e.g. names, jargon)"),
   OptDef(names: "--threads", datum: "threads", metavar: "N",
     help: "Number of CPU threads for whisper processing (default 4)"),
+  OptDef(names: "-t, --threshold", datum: "threshold", metavar: "THRES",
+    help: "The loudness (0-1) below which audio is treated as silence and " &
+          "skipped, like the audio edit method (default 0.04)"),
 ]
 
 const infoOptions*: seq[OptDef] = @[
