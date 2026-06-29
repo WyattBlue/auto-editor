@@ -313,12 +313,12 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     chunkDuration: av_inv_q(tb),
   )
 
-  var inaccurateDur: float = 1024.0
+  var inaccurateDur = 1024.0'f64
   var knownDur = true
   if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base != AV_NOPTS_VALUE:
     inaccurateDur = float(audioStream.duration) * float(audioStream.time_base * tb)
   elif container.duration != 0.0:
-    inaccurateDur = container.duration / float(tb)
+    inaccurateDur = container.duration * float(tb)
   else:
     knownDur = false
 

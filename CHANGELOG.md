@@ -10,4 +10,4 @@
  - 
 
 ## Fixes
- -
+ - Fix wrong progress bar total when analysis duration falls back to the container duration
