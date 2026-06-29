@@ -161,14 +161,14 @@ proc error*(msg: string) {.noreturn.} =
 
 type StringInterner* = Table[string, ptr string]
 
-proc intern*(interner: var StringInterner, s: string): ptr string =
-  if s in interner:
-    return interner[s]
+proc intern*(interner: var StringInterner, s: string): ptr string {.raises: [].}=
+  result = interner.getOrDefault(s)
+  if result != nil:
+    return result
 
-  let internedStr = cast[ptr string](alloc0(sizeof(string)))
-  internedStr[] = s
-  interner[s] = internedStr
-  return internedStr
+  result = cast[ptr string](alloc0(sizeof(string)))
+  result[] = s
+  interner[s] = result
 
 proc cleanup*(interner: var StringInterner) =
   for ptrStr in interner.values:
