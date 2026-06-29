@@ -313,19 +313,14 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     chunkDuration: av_inv_q(tb),
   )
 
-  var inaccurateDur = 1024.0'f64
-  var knownDur = true
-  if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base != AV_NOPTS_VALUE:
-    inaccurateDur = float(audioStream.duration) * float(audioStream.time_base * tb)
-  elif container.duration != 0.0:
-    inaccurateDur = container.duration * float(tb)
-  else:
-    knownDur = false
+  let inaccurateDur = (
+    if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base != AV_NOPTS_VALUE:
+      float(audioStream.duration) * float(audioStream.time_base * tb)
+    else:
+      container.duration * float(tb)
+  )
+  bar.start(inaccurateDur, "Analyzing audio volume")
 
-  if knownDur:
-    bar.start(inaccurateDur, "Analyzing audio volume")
-  else:
-    bar.startIndeterminate("Analyzing audio volume")
   result = newSeqOfCap[Unorm16](int(inaccurateDur) + 1)
   var i: float = 0
   for value in processor.loudness(container):

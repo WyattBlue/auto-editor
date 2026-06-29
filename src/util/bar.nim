@@ -48,7 +48,6 @@ type
     shouldStop: Atomic[bool]
     paused: Atomic[bool]        # set by end() to halt writes
     sleeping: Atomic[bool]      # set by worker to acknowledge it isn't writing
-    indeterminate: Atomic[bool] # animate without a known total
     title: string
     lenTitle: int
     begin: float
@@ -92,66 +91,11 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle, columns: i
 
     return &"  {config.icon}{title} {barString} {pPad}{percent}%  ETA {newTime}    "
 
-# Indeterminate sweep: one band whose leading and trailing edges each follow
-# their own eased timing, so it stretches as it accelerates in and squashes as
-# it slides out — Material Design style, but a single band (no overlap). The
-# band travels from off the left edge to off the right edge each `sweepCycle`
-# seconds, with a brief gap before re-entering.
-const sweepCycle = 1.8
-
-proc cubicBezier(x1, y1, x2, y2, t: float): float =
-  ## Evaluate a CSS cubic-bezier(x1,y1,x2,y2) easing at input fraction t.
-  proc sampleX(s: float): float =
-    let u = 1.0 - s
-    3 * u * u * s * x1 + 3 * u * s * s * x2 + s * s * s
-  proc sampleY(s: float): float =
-    let u = 1.0 - s
-    3 * u * u * s * y1 + 3 * u * s * s * y2 + s * s * s
-
-  # Invert x(s) = t with Newton-Raphson, then read off y(s).
-  var s = t
-  for _ in 0 ..< 8:
-    let x = sampleX(s) - t
-    let d = 3 * (1 - s) * (1 - s) * x1 + 6 * (1 - s) * s * (x2 - x1) +
-            3 * s * s * (1 - x2)
-    if abs(d) < 1e-6:
-      break
-    s = clamp(s - x / d, 0.0, 1.0)
-  sampleY(s)
-
-proc createIndeterminateBarString(config: BarConfig, phase: float, width: int): string =
-  ## A single eased band sweeping across the track.
-  # Edges run from -0.15 (off left) to 1.15 (off right). The leading edge
-  # accelerates early; the trailing edge lags then catches up.
-  let leading = -0.15 + 1.30 * cubicBezier(0.20, 0.80, 0.40, 1.00, phase)
-  let trailing = -0.15 + 1.30 * cubicBezier(0.60, 0.00, 0.75, 0.45, phase)
-
-  var cells = newSeq[string](width)
-  for i in 0 ..< width:
-    let center = (i.float + 0.5) / width.float
-    cells[i] = if center >= trailing and center <= leading: config.chars[^1]
-               else: config.chars[0]
-
-  result = config.brackets.left & cells.join("") & config.brackets.right
-
-proc formatIndeterminateOutput(config: BarConfig, title: string, lenTitle,
-    columns: int, elapsed: float): string =
-  if config.machine:
-    return &"{title}~-1~-1~{round(elapsed, 2)}"
-  else:
-    # No percent/ETA suffix, so the bar can stretch across most of the line.
-    let barLen = max(1, columns - lenTitle - 14)
-    let phase = (elapsed mod sweepCycle) / sweepCycle
-    let barString = createIndeterminateBarString(config, phase, barLen)
-    return &"  {config.icon}{title} {barString}  "
-
 proc progressWorker(data: ThreadData) {.thread.} =
   ## Background thread worker that handles progress bar updates with full format
   var lastProgress: float = -1
-  var lastFrame = -1
   let config = data.config[] # Dereference once and cache
   const sleepRate = 8 # ~120 FPS update rate
-  const animFps = 60.0 # indeterminate animation refresh rate
   var columns = terminalWidth()
   when defined(windows):
     var widthCounter = 0
@@ -174,25 +118,6 @@ proc progressWorker(data: ThreadData) {.thread.} =
       if widthCounter >= widthRefreshRate:
         columns = terminalWidth()
         widthCounter = 0
-
-    if data.indeterminate.load():
-      let elapsed = epochTime() - data.begin
-      let frame = int(elapsed * animFps)
-      if frame == lastFrame:
-        data.sleeping.store(true)
-        sleep(sleepRate)
-        continue
-      lastFrame = frame
-
-      let output = formatIndeterminateOutput(config, data.title, data.lenTitle,
-          columns, elapsed)
-      when defined(emscripten):
-        wasmProgressWrite(output.cstring)
-      else:
-        stdout.write(output & "\r")
-        stdout.flushFile()
-      sleep(sleepRate)
-      continue
 
     let currentProgress = data.progress.load()
     if currentProgress == lastProgress:
@@ -284,27 +209,19 @@ func displayLen(title: string): int =
     elif c == 'm':
       inEscape = false
 
-proc beginBar(bar: Bar, title: string, total: float, indeterminate: bool) =
-  when defined(windows):
-    stdout.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
-    stdout.flushFile()
-
-  bar.threadData.title = title
-  bar.threadData.lenTitle = displayLen(title)
-  bar.threadData.total.store(total)
-  bar.threadData.progress.store(0.0)
-  bar.threadData.begin = epochTime()
-  bar.threadData.indeterminate.store(indeterminate)
-  bar.threadData.sleeping.store(false)
-  bar.threadData.paused.store(false)
-
 proc start*(bar: Bar, total: float, title: string) =
   if not bar.hide:
-    beginBar(bar, title, total, indeterminate = false)
+    when defined(windows):
+      stdout.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
+      stdout.flushFile()
 
-proc startIndeterminate*(bar: Bar, title: string) =
-  if not bar.hide:
-    beginBar(bar, title, 0.0, indeterminate = true)
+    bar.threadData.title = title
+    bar.threadData.lenTitle = displayLen(title)
+    bar.threadData.total.store(total)
+    bar.threadData.progress.store(0.0)
+    bar.threadData.begin = epochTime()
+    bar.threadData.sleeping.store(false)
+    bar.threadData.paused.store(false)
 
 proc `end`*(bar: Bar) =
   if not bar.hide:
