@@ -294,7 +294,7 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): Un
       yield processor.`iterator`.readChunk()
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int32): seq[Unorm16] =
+    stream: int16): seq[Unorm16] =
   if not noCache:
     let cacheData = readCache[Unorm16](path, tb, "audio", $stream)
     if cacheData.isSome:

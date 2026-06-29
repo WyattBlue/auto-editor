@@ -12,7 +12,12 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
   result.start = node["start"].getInt()
   result.dur = node["dur"].getInt()
   result.offset = node["offset"].getInt()
-  result.stream = node["stream"].getInt().int32
+
+  let streamVal = node["stream"].getInt(0)
+  if streamVal > 1000 or streamVal < 0:
+    error &"Invalid stream: {streamVal}"
+
+  result.stream = streamVal.int16
 
   var group = aNil
   if node.hasKey("effects") and node["effects"].kind == JArray:

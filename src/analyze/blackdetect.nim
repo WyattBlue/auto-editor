@@ -33,7 +33,7 @@ iterator blackness*(processor: var VideoProcessor, pixelBlack: float32): Unorm16
     prevIndex = index
 
 proc blackdetect*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int32, pixelBlack: float32): seq[Unorm16] =
+    stream: int16, pixelBlack: float32): seq[Unorm16] =
   let cacheArgs = &"{stream},{pixelBlack}"
   if not noCache:
     let cacheData = readCache[Unorm16](path, tb, "blackdetect", cacheArgs)

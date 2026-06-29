@@ -9,7 +9,7 @@ proc main*(strArgs: seq[string]) =
   var
     expecting = ""
     inputFile = ""
-    userStream: int32 = 0
+    userStream: int16 = 0
     samplesPerBucket: int32 = 256
     startSample: int64 = 0
     lengthSamples: int64 = -1
@@ -29,7 +29,7 @@ proc main*(strArgs: seq[string]) =
         error &"Input file is already set: {key}"
       inputFile = key
     of "stream":
-      try: userStream = parseInt(key).int32
+      try: userStream = parseInt(key).int16
       except ValueError: error &"Invalid stream index: {key}"
     of "samples-per-bucket":
       try: samplesPerBucket = parseInt(key).int32

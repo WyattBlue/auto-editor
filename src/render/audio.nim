@@ -604,7 +604,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     int], norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
-  var samples: Table[(string, int32), Getter]
+  var samples: Table[(string, int16), Getter]
   let targetChannels = tl.layout.nb_channels
   let tb = tl.tb
   let sr = tl.sr

@@ -7,9 +7,9 @@ import ./help
 
 import ../vendor/tinyre/tinyre
 
-proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32, bool) =
+proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32, bool) =
   var
-    stream: int32 = 0
+    stream: int16 = 0
     pattern = ""
     width: int32 = 400
     blur: int32 = 9
@@ -68,7 +68,7 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32, float32, 
         inc i
 
     case paramName:
-      of "stream": stream = parseInt(value).int32
+      of "stream": stream = parseInt(value).int16
       of "width": width = parseInt(value).int32
       of "blur": blur = parseInt(value).int32
       of "pixel-black": pixelBlack = parseFloat(value).float32

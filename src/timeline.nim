@@ -24,8 +24,8 @@ type Clip* = object
   start*: int64
   dur*: int64
   offset*: int64
+  stream*: int16
   effects*: uint32 # Reference to global effects in Timeline.
-  stream*: int32
 
 type v3* = object
   layout*: ref AVChannelLayout
@@ -103,7 +103,7 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
     var alayer = newSeqOfCap[Clip](clips.len)
     for clip in clips:
       var audioClip = clip
-      audioClip.stream = i.int32
+      audioClip.stream = i.int16
       alayer.add audioClip
     tl.a.add alayer
     tl.langs.add mi.a[i].lang
@@ -112,7 +112,7 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
     var slayer = newSeqOfCap[Clip](clips.len)
     for clip in clips:
       var subtitleClip = clip
-      subtitleClip.stream = i.int32
+      subtitleClip.stream = i.int16
       slayer.add subtitleClip
     tl.s.add slayer
 
@@ -228,7 +228,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
       tl.langs.add mi.a[i].lang
     for clip in clips:
       var audioClip = clip
-      audioClip.stream = i.int32
+      audioClip.stream = i.int16
       tl.a[i].add audioClip
 
   for i in 0 ..< mi.s.len:
@@ -236,7 +236,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
       tl.s.add @[]
     for clip in clips:
       var subtitleClip = clip
-      subtitleClip.stream = i.int32
+      subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
 
 proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,

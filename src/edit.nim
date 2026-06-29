@@ -58,9 +58,22 @@ proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
     error &"value {result} is outside range [{min}, {max}]"
 
 proc parseNat(val: string): int32 =
-  result = int32(parseInt(val))
-  if result < 0:
-    error "Invalid natural: " & val
+  let n = (
+    try: parseInt(val)
+    except ValueError: error &"Invalid natural: {val}"
+  )
+  if n < 0: error &"Invalid natural: {val}"
+  result = int32(n)
+
+proc parseStream(val: string): int16 =
+  if val == "all":
+    return -1
+  let n = (
+    try: parseInt(val)
+    except ValueError: error &"Invalid stream: {val}"
+  )
+  if n > 1000 or n < 0: error &"Invalid stream: {val}"
+  result = int16(n)
 
 proc parseBool(val: string): bool =
   if val == "#t" or val == "true":
@@ -210,7 +223,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
     var
       threshold: Unorm16 = defaultAudioThres
-      stream: int32 = 0
+      stream: int16 = 0
       width: int32 = 400
       blur: int32 = 9
       isKey = false
@@ -254,7 +267,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
           case argPos:
           of 0: threshold = parseThres(val)
-          of 1: stream = (if val == "all": -1 else: parseNat(val))
+          of 1: stream = parseStream(val)
           else: error "Too many args"
 
           if not isKey:
@@ -262,7 +275,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         if stream == -1:
           for i in 0 ..< container.audio.len:
-            result.orWithThreshold(audio(bar, container, input, tb, i.int32), threshold)
+            result.orWithThreshold(audio(bar, container, input, tb, i.int16), threshold)
         else:
           result.orWithThreshold(audio(bar, container, input, tb, stream), threshold)
         return result
@@ -275,7 +288,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
           case argPos:
           of 0: threshold = parseThres(val)
-          of 1: stream = parseNat(val)
+          of 1: stream = parseStream(val)
           of 2: width = parseNat(val)
           of 3: blur = parseNat(val)
           else: error "Too many args"
@@ -295,7 +308,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
           case argPos:
           of 0: threshold = parseThres(val)
-          of 1: stream = parseNat(val)
+          of 1: stream = parseStream(val)
           of 2: pixelBlack = parseFloatInRange(val, 0.0, 1.0)
           else: error "Too many args"
 
@@ -313,7 +326,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
           case argPos:
           of 0: pattern = val
-          of 1: stream = parseNat(val)
+          of 1: stream = parseStream(val)
           of 2:
             if parseBool(val):
               flags.incl reIgnoreCase
@@ -332,7 +345,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if subcontainer.isNone():
             error &"regex: subtitle stream '{ret}' does not exist."
 
-          let index = int32(stream - container.subtitle.len)
+          let index = int16(stream - container.subtitle.len)
           let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
           if ret2 != -1:
             error &"regex: subtitle stream '{ret2}' does not exist."
@@ -348,7 +361,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
           case argPos:
           of 0: pattern = escapeRe(val)
-          of 1: stream = parseNat(val)
+          of 1: stream = parseStream(val)
           of 2: ignoreCase = parseBool(val)
           else: error "Too many args"
 
@@ -369,7 +382,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if subcontainer.isNone():
             error &"word: subtitle stream '{ret}' does not exist."
 
-          let index = int32(stream - container.subtitle.len)
+          let index = int16(stream - container.subtitle.len)
           let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
           if ret2 != -1:
             error &"word: subtitle stream '{ret2}' does not exist."
