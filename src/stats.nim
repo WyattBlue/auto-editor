@@ -90,7 +90,7 @@ func allCuts(tl: v3, inLen: int64): seq[int64] =
 
 
 proc preview*(tl: var v3) =
-  clearline()
+  conwrite ""
 
   var inputLength: int64 = 0
   for src in tl.uniqueSources:

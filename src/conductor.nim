@@ -235,7 +235,7 @@ proc editMedia*(args: var mainArgs) =
   defer: interner.cleanup()
 
   if args.progress == BarType.machine and args.output != "-":
-    conwrite("Starting")
+    conwrite "Starting"
 
   let bar = initBar(args.progress)
 

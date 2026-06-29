@@ -126,11 +126,9 @@ proc conwrite*(msg: string) {.raises: [].} =
     except IOError:
       discard
 
-proc clearline* = (when not defined(emscripten): conwrite(""))
-
 proc debug*(msg: string) =
   if isDebug:
-    clearline()
+    conwrite ""
     if not noColor:
       stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
     else:
@@ -138,7 +136,7 @@ proc debug*(msg: string) =
 
 proc warning*(msg: string) =
   if not quiet:
-    clearline()
+    conwrite ""
     stderr.write(&"Warning! {msg}\n")
 
 proc closeTempDir*() {.raises: [].} =
@@ -150,7 +148,7 @@ proc closeTempDir*() {.raises: [].} =
 
 proc error*(msg: string) {.noreturn.} =
   closeTempDir()
-  clearline()
+  conwrite ""
   try:
     if not noColor:
       stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
