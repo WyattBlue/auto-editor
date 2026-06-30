@@ -6,6 +6,7 @@
 ## Features
  - MacOS: Allow using the microphone as an input for the whisper cmd with `:mic`.
  - Add `--prompt` to the whisper cmd, allowing biasing for certain vocab.
+ - MacOS: Default to the `aac_at` (AudioToolbox) encoder for AAC audio.
 
 ## Performance
  - 
