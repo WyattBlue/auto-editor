@@ -7,22 +7,32 @@ proc parseActionOrErr(val: string): Action {.raises: [].} =
   try: parseAction(val)
   except ActionParseError as e: error e.msg
 
-proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip =
-  result.src = interner.intern(node["src"].getStr())
-  result.start = node["start"].getInt()
-  result.dur = node["dur"].getInt()
-  result.offset = node["offset"].getInt()
+proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip {.raises: [].} =
+  let srcVal = node{"src"}.getStr("")
+  if srcVal == "":
+    error "Invalid src json value"
+  result.src = interner.intern(srcVal)
 
-  let streamVal = node["stream"].getInt(0)
+  result.start = node{"start"}.getInt(-1)
+  result.dur = node{"dur"}.getInt(-1)
+  result.offset = node{"offset"}.getInt(-1)
+  if result.start < 0:
+    error "Invalid start json value"
+  if result.dur <= 0:
+    error "Invalid dur json value"
+  if result.offset < 0:
+    error "Invalid offset json value"
+
+  let streamVal = node{"stream"}.getInt(0)
   if streamVal > 1000 or streamVal < 0:
     error &"Invalid stream: {streamVal}"
 
   result.stream = streamVal.int16
 
   var group = aNil
-  if node.hasKey("effects") and node["effects"].kind == JArray:
+  if node{"effects"} != nil and node{"effects"}.kind == JArray:
     var list: seq[Action]
-    for effectNode in node["effects"]:
+    for effectNode in node{"effects"}:
       let effectStr = effectNode.getStr()
       if effectStr == "cut":
         group = aCut
@@ -30,7 +40,10 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
       elif effectStr != "nil":
         list.add parseActionOrErr(effectStr)
     if group.isEmpty:
-      group = newActions(list)
+      try:
+        group = newActions(list)
+      except ActionParseError:
+        error "Too many actions"
 
   let effectIndex = effects.find(group)
   if effectIndex == -1:
@@ -39,33 +52,36 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
   else:
     result.effects = uint32(effectIndex)
 
-proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  let tbString = jsonNode["timebase"].getStr("")
+proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+  let tbString = jsonNode{"timebase"}.getStr("")
   if tbString == "":
     error "Expected 'timebase' key to exist"
   result.tb = try: toAVRational(tbString) except ValueError as e: error e.msg
-  if not jsonNode.hasKey("samplerate"):
-    error "Expected 'samplerate' key to exist"
-  result.sr = jsonNode["samplerate"].getInt().cint
+  if result.tb.num == 0 or result.tb.den == 0:
+    error "Invalid timebase json value"
 
-  if not jsonNode.hasKey("background"):
+  let srVal = jsonNode{"samplerate"}.getInt(0)
+  if srVal > high(cint) or srVal < 100:
+    error "Invalid samplerate json value"
+  result.sr = srVal.cint
+
+  let bgNode = jsonNode{"background"}
+  if bgNode == nil:
     error "Expected 'background' key to exist"
-  if jsonNode["background"].kind != JString:
+  if bgNode.kind != JString:
     error "Expected 'background' key to be a string"
   result.bg = (
-    try: parseColor(jsonNode["background"].getStr())
+    try: parseColor(bgNode.getStr())
     except ValueError as e: error e.msg
   )
 
-  if not jsonNode.hasKey("layout"):
-    error "Expected 'layout' key to exist"
-  result.layout = initLayout(jsonNode["layout"].getStr())
+  result.layout = initLayout(jsonNode{"layout"}.getStr(""))
 
-  if not jsonNode.hasKey("resolution"):
+  let resArray = jsonNode{"resolution"}
+  if resArray == nil:
     error "Expected 'resolution' to exist"
-  if jsonNode["resolution"].kind != JArray:
+  if resArray.kind != JArray:
     error "Expected 'resolution' to be an array"
-  let resArray = jsonNode["resolution"]
   if resArray.len >= 2:
     result.res = (resArray[0].getInt().int32, resArray[1].getInt().int32)
   else:
@@ -73,8 +89,9 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   result.effects = @[]
 
-  if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
-    for trackNode in jsonNode["v"]:
+  let vNode = jsonNode{"v"}
+  if vNode != nil and vNode.kind == JArray:
+    for trackNode in vNode:
       var track: seq[Clip]
       if trackNode.kind == JArray:
         for videoNode in trackNode:
@@ -82,16 +99,18 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
       result.v.add track
 
   # Parse audio tracks
-  if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
-    for trackNode in jsonNode["a"]:
+  let aNode = jsonNode{"a"}
+  if aNode != nil and aNode.kind == JArray:
+    for trackNode in aNode:
       var track: seq[Clip]
       if trackNode.kind == JArray:
         for audioNode in trackNode:
           track.add(parseClip(audioNode, interner, result.effects))
       result.a.add track
 
-  if jsonNode.hasKey("langs") and jsonNode["langs"].kind == JArray:
-    for trackNode in jsonNode["langs"]:
+  let langsNode = jsonNode{"langs"}
+  if langsNode != nil and langsNode.kind == JArray:
+    for trackNode in langsNode:
       result.langs.add toLang(trackNode.getStr())
 
   if result.langs.len > result.v.len + result.a.len:
@@ -174,8 +193,9 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   result = toNonLinear(ptrInput, tb, bg, mi, chunks)
 
 proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
-  let jsonNode = parseJson(jsonStr)
-  let version: string = jsonNode["version"].getStr("unknown")
+  let jsonNode = try: parseJson(jsonStr)
+    except CatchableError as e: error "Invalid JSON: " & e.msg
+  let version = jsonNode{"version"}.getStr("unknown")
 
   case version:
     of "3": return parseV3(jsonNode, interner)
