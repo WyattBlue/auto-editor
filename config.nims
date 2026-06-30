@@ -22,7 +22,8 @@ when defined(dynamic):
 
   let whisperCflags = gorgeEx("pkg-config --cflags whisper ggml", "")
   let whisperLibs = gorgeEx("pkg-config --libs whisper ggml", "")
-  if whisperCflags.exitCode == 0 and whisperLibs.exitCode == 0:
+  if enableWhisper and whisperCflags.exitCode == 0 and whisperLibs.exitCode == 0:
+    switch("define", "whisper")
     switch("passC", whisperCflags.output.strip())
     switch("passL", whisperLibs.output.strip())
 else:
