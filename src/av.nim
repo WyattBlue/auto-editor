@@ -317,7 +317,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, 
   if ctx == nil:
     error "Could not allocate encoder context"
 
-  # Now lets set some more sane video defaults
+  # Some sane video defaults
   if codec.`type` == AVMEDIA_TYPE_VIDEO:
     ctx.pix_fmt = AV_PIX_FMT_YUV420P
     ctx.width = width

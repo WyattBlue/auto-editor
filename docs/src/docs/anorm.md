@@ -4,9 +4,9 @@ title: Audio Normalizing
 
 # Audio Normalizing
 
-Audio normalization is the process of adjusting audio levels to achieve consistent loudness across your media. This is especially useful when combining multiple audio sources with different volume levels, or when preparing content for platforms that have specific loudness requirements.
+Audio normalization adjusts audio levels for consistent loudness — useful when combining sources at different volumes, or meeting a platform's loudness target.
 
-Auto-Editor supports two kinds of audio normalization: **peak** and **ebu**. Peak normalization is simpler and faster, scaling audio based on the highest amplitude. EBU R128 normalization is more sophisticated, analyzing perceived loudness to meet broadcast standards. Choose peak normalization for quick volume adjustments, or EBU normalization when you need precise loudness control for professional distribution.
+Auto-Editor supports two kinds: **peak** scales by the highest amplitude (simple, fast, preserves dynamic range); **ebu** (EBU R128) analyzes perceived loudness over time to meet broadcast standards.
 
 ## Peak
 
@@ -16,12 +16,7 @@ Example:
 auto-editor --audio-normalize peak:-3  # set max peak to -3dB
 ```
 
-The key idea is that peak normalization preserves the dynamic range of your audio—it just scales everything up or down so the loudest moment hits your target level. This is different from EBU normalization which
-analyzes perceived loudness over time.
-
 ## EBU
-
-EBU R128 normalization analyzes the perceived loudness of your audio over time and adjusts it to meet broadcast standards. Unlike peak normalization which simply scales the audio, EBU normalization uses a more sophisticated algorithm that considers how humans perceive loudness.
 
 Example:
 
@@ -59,5 +54,3 @@ EBU normalization uses a two-pass process:
 
 1. **Analysis Pass**: Measures the integrated loudness, loudness range, and true peak of the entire audio
 2. **Normalization Pass**: Applies the FFmpeg `loudnorm` filter with the measured values to normalize the audio to your target levels
-
-This approach ensures consistent perceived loudness across different audio content, making it ideal for broadcast, streaming platforms, and podcast production.

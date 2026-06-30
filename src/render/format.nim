@@ -214,7 +214,6 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   if includeSubtitle and tl.s.len > 0:
     for i in 0..<tl.s.len:
       if tl.s[i].len > 0:
-        # Get source file and stream index from first clip
         let firstClip = tl.s[i][0]
         let sourcePath = firstClip.src[]
         let streamIdx = firstClip.stream

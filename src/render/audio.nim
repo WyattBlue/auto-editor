@@ -134,7 +134,7 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   if targetSamples <= 0:
     return @[]
 
-  # Initialize result with proper size for interleaved multi-channel (default zero-filled)
+  # Interleaved multi-channel; zero-filled so unwritten samples stay silent.
   result = newSeq[int16](targetSamples * getter.channels)
 
   # Convert sample position to time and seek
@@ -168,7 +168,6 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   var totalSamples = 0
   var samplesProcessed = 0
 
-  # Decode frames until we have enough samples
   while av_read_frame(container.formatContext, packet) >= 0 and totalSamples < targetSamples:
     defer: av_packet_unref(packet)
 
@@ -548,7 +547,6 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       else:
         channelData[i] = 0
 
-  # Resample
   let outputFrames = resampler.resample(inputFrame)
 
   # Convert back to interleaved seq[int16]

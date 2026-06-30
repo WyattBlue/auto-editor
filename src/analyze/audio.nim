@@ -70,7 +70,6 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
   discard av_channel_layout_copy(addr layoutRef[], channelLayout)
   result.resampler = newAudioResampler(AV_SAMPLE_FMT_S16, layoutRef, sampleRate)
 
-  # Initialize audio FIFO
   result.fifo = av_audio_fifo_alloc(result.targetFormat, result.channelCount, 1024)
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
@@ -93,10 +92,8 @@ proc cleanup(iter: AudioIterator) =
 
 proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
   try:
-    # Use AudioResampler to process the frame
     let resampledFrames = iter.resampler.resample(frame)
 
-    # Write all resampled frames to FIFO
     for resampledFrame in resampledFrames:
       let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr resampledFrame.data[0]),
                                   resampledFrame.nb_samples)

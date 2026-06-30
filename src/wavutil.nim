@@ -45,15 +45,12 @@ proc processAndEncodeFrame(
     if (inputFrame.format == encoderCtx.sample_fmt.cint and
         inputFrame.ch_layout.nb_channels == encoderCtx.ch_layout.nb_channels and
         inputFrame.sample_rate == encoderCtx.sample_rate):
-      # Frame is already in target format, add directly to buffer
       if addSamplesToBuffer(audioBuffer, inputFrame) < 0:
         error "Failed to add samples to buffer"
     else:
       try:
-        # Use the AudioResampler to convert the frame
         let resampledFrames = audioResampler.resample(inputFrame)
 
-        # Add all resampled frames to buffer
         for resampledFrame in resampledFrames:
           if addSamplesToBuffer(audioBuffer, resampledFrame) < 0:
             error "Failed to add samples to buffer"

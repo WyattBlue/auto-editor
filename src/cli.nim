@@ -273,7 +273,6 @@ proc zshcomplete*() =
   for opt in mainOptions:
     if opt.hidden:
       continue
-    # Get first line of help for description
     let desc = if opt.help != "": opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:") else: ""
     for name in opt.names.split(", "):
       let n = name.strip().replace(":", "\\:")

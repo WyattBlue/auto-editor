@@ -314,7 +314,6 @@ proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples
                             nb_channels: cint,
                                 sample_fmt: AVSampleFormat): cint {.importc,
     header: "<libavutil/samplefmt.h>".}
-# Procedure declarations remain the same
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
     fmt: pointer, options: pointer): cint {.importc,
     header: "<libavformat/avformat.h>".}

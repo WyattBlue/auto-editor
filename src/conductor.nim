@@ -72,7 +72,6 @@ proc parseExportString*(exportStr: string): (string, string, string) =
       of "version": version = value
       else: error &"Unknown parameter: {paramName}"
 
-    # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
@@ -114,7 +113,7 @@ proc setOutput(userOut, `export`, path: string, isUrl = false): (string, string)
     # Use `mkv` as the default, because it can handle any encoder.
     ext = (if isUrl or path == "": ".mkv" else: agSplitFile(path).ext)
 
-  var myExport = `export` # Create mutable copy
+  var myExport = `export`
   if myExport == "":
     case ext:
       of ".xml": myExport = "premiere"

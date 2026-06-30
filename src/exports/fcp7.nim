@@ -290,7 +290,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     let mi = initMediaInfo(src)
     miToUrl[mi] = handlePath(src)
     miToId[mi] = &"file-{idCounter}"
-    ptrToMi[ptrSrc] = mi # Store ptr -> MediaInfo mapping
+    ptrToMi[ptrSrc] = mi
 
   proc makeFiledef(clipitem: XmlNode, mi: MediaInfo) =
     let pathurl = miToUrl[mi]

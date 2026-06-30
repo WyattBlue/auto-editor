@@ -1197,7 +1197,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let b0 = g.add("buffer", baseArgs)
 
     if abs(fx) < 0.001'f32 and abs(fy) < 0.001'f32:
-      # Whole-pixel placement: scale in-graph (bicubic) and overlay, as before.
+      # Whole-pixel placement: scale in-graph (bicubic) and overlay.
       top.pts = 0
       let b1 = g.add("buffer", bufArgsOf(top))
       let topRgba = g.add("format", "pix_fmts=rgba")
