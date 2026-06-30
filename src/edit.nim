@@ -335,9 +335,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if not isKey:
             argPos += 1
 
-        if pattern == "":
-          error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
-
         let regexPattern = re(pattern, flags)
         let (ret, val) = subtitle(container, tb, regexPattern, stream)
         if ret != -1:
