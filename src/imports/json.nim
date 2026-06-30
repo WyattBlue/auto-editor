@@ -13,9 +13,9 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
     error "Invalid src json value"
   result.src = interner.intern(srcVal)
 
-  result.start = node{"start"}.getInt(-1)
-  result.dur = node{"dur"}.getInt(-1)
-  result.offset = node{"offset"}.getInt(-1)
+  result.start = node{"start"}.getBiggestInt(-1)
+  result.dur = node{"dur"}.getBiggestInt(-1)
+  result.offset = node{"offset"}.getBiggestInt(-1)
   if result.start < 0:
     error "Invalid start json value"
   if result.dur <= 0:
@@ -40,10 +40,8 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
       elif effectStr != "nil":
         list.add parseActionOrErr(effectStr)
     if group.isEmpty:
-      try:
-        group = newActions(list)
-      except ActionParseError:
-        error "Too many actions"
+      try: group = newActions(list)
+      except ActionParseError: error "Too many actions"
 
   let effectIndex = effects.find(group)
   if effectIndex == -1:
@@ -123,29 +121,34 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   result.templateFile = if tf != "": interner.intern(tf) else: result.firstSource
 
 
-proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  let input = jsonNode["source"].getStr("")
+proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+  let input = jsonNode{"source"}.getStr("")
   if input == "":
     error "source is a required field"
+
   let ptrInput = intern(interner, input)
   var effects: seq[Actions]
   var clips: seq[Clip2]
 
-  let tbString = jsonNode["tb"].getStr("")
+  let tbString = jsonNode{"tb"}.getStr("")
   if tbString == "":
-    error "tb is a required field"
+    error "Expected 'tb' key to exist"
   let tb = try: toAVRational(tbString) except ValueError as e: error e.msg
+  if tb.num == 0 or tb.den == 0:
+    error "Invalid timebase json value"
 
-  if jsonNode.hasKey("clips") and jsonNode["clips"].kind == JArray:
-    for chunkNode in jsonNode["clips"]:
+  let clipsNode = jsonNode{"clips"}
+  if clipsNode != nil and clipsNode.kind == JArray:
+    for chunkNode in clipsNode:
       if chunkNode.kind == JArray and chunkNode.len >= 3:
-        let start: int64 = chunkNode[0].getInt()
-        let `end`: int64 = chunkNode[1].getInt()
+        let start: int64 = chunkNode[0].getBiggestInt()
+        let `end`: int64 = chunkNode[1].getBiggestInt()
         let effect = uint32(chunkNode[2].getInt())
         clips.add Clip2(start: start, `end`: `end`, effect: effect)
 
-  if jsonNode.hasKey("effects") and jsonNode["effects"].kind == JArray:
-    for effectNode in jsonNode["effects"]:
+  let effectsNode = jsonNode{"effects"}
+  if effectsNode != nil and effectsNode.kind == JArray:
+    for effectNode in effectsNode:
       var group = aNil
       if effectNode.kind == JArray:
         var list: seq[Action]
@@ -157,7 +160,8 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
           elif s != "nil":
             list.add parseActionOrErr(s)
         if group.isEmpty:
-          group = newActions(list)
+          try: group = newActions(list)
+          except ActionParseError: error "Too many actions"
       else:
         error "effects must be a list of lists"
 
@@ -165,7 +169,10 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
       if effectIndex == -1:
         effects.add(group)
 
-  let mi = initMediaInfo(input)
+  let mi = (
+    try: initMediaInfo(input)
+    except IOError as e: error e.msg
+  )
   let bg = RGBColor(red: 0, green: 0, blue: 0)
   result = toNonLinear2(ptrInput, tb, bg, mi, clips, effects)
 
@@ -179,8 +186,8 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   if jsonNode.hasKey("chunks") and jsonNode["chunks"].kind == JArray:
     for chunkNode in jsonNode["chunks"]:
       if chunkNode.kind == JArray and chunkNode.len >= 3:
-        let start: int64 = chunkNode[0].getInt()
-        let `end`: int64 = chunkNode[1].getInt()
+        let start: int64 = chunkNode[0].getBiggestInt()
+        let `end`: int64 = chunkNode[1].getBiggestInt()
         let speed = chunkNode[2].getFloat()
         chunks.add((start, `end`, speed))
 
