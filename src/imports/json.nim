@@ -173,31 +173,39 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     try: initMediaInfo(input)
     except IOError as e: error e.msg
   )
-  let bg = RGBColor(red: 0, green: 0, blue: 0)
-  result = toNonLinear2(ptrInput, tb, bg, mi, clips, effects)
+  result = toNonLinear2(ptrInput, tb, mi, clips, effects)
 
 
-proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  var chunks: seq[(int64, int64, float64)] = @[]
-
-  let input = jsonNode["source"].getStr()
+proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+  let input = jsonNode{"source"}.getStr("")
+  if input == "":
+    error "source is a required field"
   let ptrInput = intern(interner, input)
 
-  if jsonNode.hasKey("chunks") and jsonNode["chunks"].kind == JArray:
-    for chunkNode in jsonNode["chunks"]:
-      if chunkNode.kind == JArray and chunkNode.len >= 3:
-        let start: int64 = chunkNode[0].getBiggestInt()
-        let `end`: int64 = chunkNode[1].getBiggestInt()
-        let speed = chunkNode[2].getFloat()
-        chunks.add((start, `end`, speed))
+  let chunksNode = jsonNode{"chunks"}
+  if chunksNode == nil:
+    error "chunks is a required field"
+  if chunksNode.kind != JArray:
+    error "chunks must be an array"
 
-  let mi = initMediaInfo(input)
-  var tb = AVRational(num: 30, den: 1)
-  if mi.v.len > 0:
-    tb = makeSaneTimebase(mi.v[0].avgRate)
+  var chunks = newSeqOfCap[(int64, int64, float64)](chunksNode.len)
+  for chunkNode in chunksNode:
+    if chunkNode.kind != JArray or chunkNode.len != 3:
+      error "Invalid chunk structure"
+    let start: int64 = chunkNode[0].getBiggestInt()
+    let `end`: int64 = chunkNode[1].getBiggestInt()
+    let speed = chunkNode[2].getFloat()
+    chunks.add (start, `end`, speed)
 
-  let bg = RGBColor(red: 0, green: 0, blue: 0)
-  result = toNonLinear(ptrInput, tb, bg, mi, chunks)
+  let mi = (
+    try: initMediaInfo(input)
+    except IOError as e: error e.msg
+  )
+  let tb = (
+    if mi.v.len > 0: makeSaneTimebase(mi.v[0].avgRate)
+    else: AVRational(num: 30, den: 1)
+  )
+  result = toNonLinear(ptrInput, tb, mi, chunks)
 
 proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
   let jsonNode = try: parseJson(jsonStr)

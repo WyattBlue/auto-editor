@@ -239,8 +239,8 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
       subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
 
-proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
-    chunks: seq[(int64, int64, float64)]): v3 =
+proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
+    chunks: seq[(int64, int64, float64)]): v3 {.raises: [].} =
   var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
   var effects: seq[Actions] = @[]
@@ -263,7 +263,10 @@ proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
             effects.add aNil
             effectIndex = effects.len - 1
         else:
-          let a = newActions([Action(kind: actSpeed, val: float32(chunk[2]))])
+          let a = (
+            try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
+            except ActionParseError: error "Too many actions"
+          )
           effectIndex = effects.find(a)
           if effectIndex == -1:
             effects.add a
@@ -278,11 +281,11 @@ proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       start += dur
       i += 1
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
-    templateFile: src)
+  result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
+  result.res = mi.getRes()
   mutHelper(result, mi, clips)
 
-proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
+proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
   clips2: seq[Clip2], effects: seq[Actions]): v3 =
   var clips: seq[Clip] = @[]
   var start: int64 = 0
@@ -306,8 +309,8 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
     start += dur
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
-    templateFile: src)
+  result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
+  result.res = mi.getRes()
   mutHelper(result, mi, clips)
 
 proc applyArgs*(tl: var v3, args: mainArgs) =
