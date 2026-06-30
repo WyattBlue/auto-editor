@@ -1,4 +1,4 @@
-import std/[os, json, strformat, strutils]
+import std/[os, json, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
 
 type
@@ -58,6 +58,38 @@ proc segCb(user: pointer, text: cstring, t0ms, t1ms: int64) {.cdecl.} =
     oc.f.write(s & "\n")
   oc.f.flushFile()
 
+type
+  Job = object
+    samples: seq[float32]    # mono f32 @16k; len 0 is the end-of-stream sentinel
+    startMs: int64
+  WorkerArgs = object
+    wctx: WhisperCtx
+    oc: ptr OutCtx
+    jobs: ptr Channel[Job]
+    language: string
+    translate: cint
+    threads: cint
+    prompt: string
+    maxLen: cint
+    debug: bool
+
+const MaxPending = 16  # queued utterances before capture has to wait (back-pressure)
+
+# Whisper runs here, off the capture thread, so a (multi-second) transcription
+# never stalls av_read_frame and live mic audio isn't dropped. This thread alone
+# drives the run-call sequence — preserving whisper's cross-call prompt context —
+# and owns every output write (via segCb); the capture thread only feeds it jobs.
+proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
+  while true:
+    var job = a.jobs[].recv()
+    if job.samples.len == 0: break
+    a.oc.segStartMs = job.startMs
+    if a.debug:
+      stderr.writeLine(&"transcribing {job.samples.len} samples at {job.startMs} ms")
+    discard ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
+      a.language.cstring, a.translate, a.threads, a.prompt.cstring,
+      a.maxLen, segCb, a.oc)
+
 proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     model, language: string, translate: bool, format, output: string,
     queue: int, threshold: float32, prompt: string, threads: cint,
@@ -106,6 +138,9 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   var oc = OutCtx(f: outFile, format: format, splitWords: splitWords)
   let maxSeg = queue * Rate
 
+  var jobs: Channel[Job]
+  jobs.open(MaxPending)
+
   var seg = newSeqOfCap[float32](maxSeg + Rate)
   var preroll = newSeqOfCap[float32](PrerollMax)
   var inSpeech = false
@@ -115,14 +150,11 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   var segStartSample: int64 = 0
 
   proc flushSeg() =
+    # Hand the utterance to the worker and keep capturing; blocks only if the
+    # queue is full (whisper falling behind real-time) — never silently drops.
     if seg.len > 0 and speechSamples >= MinSpeech:
-      oc.segStartMs = (segStartSample * 1000) div Rate
-      if debug:
-        stderr.writeLine(&"transcribing {seg.len} samples at {oc.segStartMs} ms")
-      discard ae_whisper_run(wctx, addr seg[0], seg.len.cint, language.cstring,
-        (if translate: 1.cint else: 0.cint), threads, prompt.cstring,
-        (if splitWords: 1.cint else: 0.cint), segCb, addr oc)
-    seg.setLen(0)
+      jobs.send(Job(samples: move seg, startMs: (segStartSample * 1000) div Rate))
+    seg = newSeqOfCap[float32](maxSeg + Rate)
     inSpeech = false
     silenceRun = 0
     speechSamples = 0
@@ -176,6 +208,13 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   let pkt = av_packet_alloc()
   defer: av_packet_free(addr pkt)
 
+  var wargs = WorkerArgs(wctx: wctx, oc: addr oc, jobs: addr jobs,
+    language: language, translate: (if translate: 1.cint else: 0.cint),
+    threads: threads, prompt: prompt,
+    maxLen: (if splitWords: 1.cint else: 0.cint), debug: debug)
+  var worker: Thread[ptr WorkerArgs]
+  createThread(worker, whisperWorker, addr wargs)
+
   while not stop[]:
     # avfoundation returns EAGAIN whenever no buffer is ready yet (including right
     # at startup), so retry on that; only EOF/fatal (e.g. device unplugged) stops.
@@ -194,9 +233,17 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
           av_frame_unref(outFrame)
     av_packet_unref(pkt)
 
-  # Drain the resampler, then transcribe whatever utterance was in progress.
+  # Drain the resampler, enqueue whatever utterance was in progress, then let the
+  # worker finish the whole backlog (Ctrl-C included) before we tear anything down.
   discard av_buffersrc_write_frame(srcCtx, nil)
   while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
     gateFrame(outFrame)
     av_frame_unref(outFrame)
   flushSeg()
+
+  let pending = jobs.peek()
+  if pending > 0:
+    stderr.writeLine(&"finishing {pending} queued segment(s)...")
+  jobs.send(Job(samples: @[]))  # sentinel
+  joinThread(worker)
+  jobs.close()
