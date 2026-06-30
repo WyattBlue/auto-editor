@@ -502,8 +502,6 @@ judge making cuts.
       args.smooth = parseTwoLengths(key, expecting)
     of "key":
       args.licenseKey = key
-    of "tempdir":
-      tempDir = key
     expecting = ""
     expectingLabel = 1
 

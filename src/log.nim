@@ -109,7 +109,6 @@ genFlagInterface(mainArgs)
 var isDebug* = false
 var quiet* = false
 var noCache* = false
-var tempDir* = ""
 let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
@@ -139,15 +138,7 @@ proc warning*(msg: string) =
     conwrite ""
     stderr.write(&"Warning! {msg}\n")
 
-proc closeTempDir*() {.raises: [].} =
-  if tempDir != "":
-    try:
-      removeDir(tempDir)
-    except OSError:
-      discard
-
 proc error*(msg: string) {.noreturn.} =
-  closeTempDir()
   conwrite ""
   try:
     if not noColor:

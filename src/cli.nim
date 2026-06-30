@@ -253,8 +253,6 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
     help: "Do not open the output file after editing is done (default)"),
   OptDef(names: "-k, --license-key", c: cMis, datum: "key",
     help: "Provide a license key, which activates certain features"),
-  OptDef(names: "--temp-dir", c: cMis, datum: "tempdir",
-    metavar: "PATH", help: "Set where the temporary directory is located"),
   OptDef(names: "-V, -v, --version", c: cMis, kind: Flag, datum: "showVersion",
     help: "Show info about this program or option"),
 ]

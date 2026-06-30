@@ -1,4 +1,4 @@
-import std/[options, os, sets, sequtils, strformat, strutils, tempfiles, terminal, times]
+import std/[options, os, sets, sequtils, strformat, strutils, terminal, times]
 when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
@@ -405,18 +405,6 @@ proc editMedia*(args: var mainArgs) =
   let rule = initRules(output)
   args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
 
-  if tempDir == "":
-    tempDir = createTempDir("tmp", "")
-  else:
-    if fileExists(tempDir):
-      error "Temp directory cannot be an already existing file."
-    if dirExists(tempDir):
-      discard
-    else:
-      createDir(tempDir)
-
-  debug &"Temp Directory: {tempDir}"
-
   if args.`export` == "clip-sequence":
     if tlV3.isNonlinear:
       error "Timeline too complex to use clip-sequence export"
@@ -460,4 +448,3 @@ proc editMedia*(args: var mainArgs) =
   elif args.open:
     when not defined(emscripten):
       openDefaultBrowser(output)
-  closeTempDir()
