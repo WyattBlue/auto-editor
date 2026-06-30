@@ -53,11 +53,12 @@ const confinable = {actBlur, actBrightness, actLuv, actInvert, actErosion, actAb
 func maskGray(a: Action): string =
   ## geq luma expression (0..255) for the matte: opaque inside the shape, black
   ## outside, with an optional `feather`-pixel soft edge; `invert` flips it.
+  ## Shape from `mRadius`: -1 = ellipse, 0 = sharp rect, >0 = rounded-rect px.
   let f = a.mFeather.float
+  let cx = a.mX.float + a.mW.float / 2
+  let cy = a.mY.float + a.mH.float / 2
   var cover: string  # 0..1 coverage, 1 = fully inside
-  if a.mShape == 1:  # ellipse
-    let cx = a.mX.float + a.mW.float / 2
-    let cy = a.mY.float + a.mH.float / 2
+  if a.mRadius < 0:  # ellipse
     let rx = a.mW.float / 2
     let ry = a.mH.float / 2
     let rr2 = &"pow((X-{cx})/{rx},2)+pow((Y-{cy})/{ry},2)"
@@ -67,15 +68,20 @@ func maskGray(a: Action): string =
       # Feather (px) -> a normalized-radius band centered on the edge (r=1).
       let nf = f / ((rx + ry) / 2)
       cover = &"clip(0.5+(1-sqrt({rr2}))/{nf},0,1)"
-  else:              # rectangle
-    let x1 = a.mX + a.mW
-    let y1 = a.mY + a.mH
+  else:
+    # Rounded-box signed distance (>0 outside, 0 on edge). r=0 is a sharp rect;
+    # r is clamped to the half-extent so corners can't over-round.
+    let hx = a.mW.float / 2
+    let hy = a.mH.float / 2
+    let r = min(a.mRadius.float, min(hx, hy))
+    let qx = &"(abs(X-{cx})-{hx - r})"
+    let qy = &"(abs(Y-{cy})-{hy - r})"
+    let sdf = &"(hypot(max({qx},0),max({qy},0))+min(max({qx},{qy}),0)-{r})"
     if f <= 0:
-      cover = &"between(X,{a.mX},{x1})*between(Y,{a.mY},{y1})"
+      cover = &"lte({sdf},0)"
     else:
-      # Signed distance to the nearest edge (positive inside), ramped over f px.
-      let d = &"min(min(X-{a.mX},{x1}-X),min(Y-{a.mY},{y1}-Y))"
-      cover = &"clip(0.5+({d})/{f},0,1)"
+      # Ramp coverage across the f-px band centered on the edge (sdf=0).
+      cover = &"clip(0.5-({sdf})/{f},0,1)"
   if a.mInvert: &"255*(1-({cover}))" else: &"255*({cover})"
 
 # Keyframe index built from AVIndexEntry for efficient seeking
@@ -622,9 +628,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       frame: ptr AVFrame, effect: Action): ptr AVFrame =
     ## Return the cached matte for `effect` at `frame`'s size, rebuilding only
     ## when the region/feather/size changes. Caller must NOT free the result.
-    let k = fxId(effect.kind, frame, i0 = effect.mX, i1 = effect.mY,
-        i2 = effect.mW, i3 = effect.mH,
-        col = uint32(effect.mShape) or (if effect.mInvert: 0x100'u32 else: 0'u32) or
+    let k = fxId(effect.kind, frame, f0 = effect.mRadius.float32,
+        i0 = effect.mX, i1 = effect.mY, i2 = effect.mW, i3 = effect.mH,
+        col = (if effect.mInvert: 0x100'u32 else: 0'u32) or
           (uint32(effect.mFeather) shl 16))
     if cache == nil or key != k:
       if cache != nil: av_frame_free(addr cache)
@@ -979,7 +985,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           frame = overBg(frame)
       of actConfine:
         # Set/clear the region the following adjustment effects are masked to.
-        confineActive = effect.mShape != 2
+        confineActive = not effect.mReset
         confineEffect = effect
     return frame
 

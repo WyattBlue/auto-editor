@@ -80,7 +80,8 @@ type
     of actMask, actConfine:
       # `mask` shapes the clip's alpha; `confine` restricts following effects to
       # this region. Shared geometry, in canvas pixels like drawbox.
-      mShape*: uint8         # 0=rect, 1=ellipse, 2=none (confine reset only)
+      mRadius*: int32        # corner radius px: 0=rect, >0=rounded rect, -1=ellipse
+      mReset*: bool          # confine bare: reset to full frame (region fields unused)
       mInvert*: bool         # swap inside/outside
       mFeather*: uint8       # soft-edge width in px (0 = hard edge)
       mX*, mY*, mW*, mH*: int32
@@ -193,10 +194,10 @@ Simple form `aberration[:h[:v[:edge]]]`: split red and blue symmetrically by `h`
 Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`, `bv` (signed pixel shift for each channel/axis, default 0) plus `edge`, e.g. `aberration:rh=8:bh=-8:gv=2:edge=wrap`."""),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
-  ActionDef(name: "mask", flags: {afVideo}, argSpec: "shape:x:y:w:h[:feather][:invert]",
-    help: "Cut the picture to a `rect` or `ellipse`, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels (for an ellipse, the bounding box). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:ellipse:640:360:300:300:40`."),
-  ActionDef(name: "confine", flags: {afVideo}, argSpec: "[shape:x:y:w:h[:feather][:invert]]",
-    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`) to a `rect` or `ellipse` region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:rect:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
+  ActionDef(name: "mask", flags: {afVideo}, argSpec: "x:y:w:h[:radius][:feather][:invert]",
+    help: "Cut the picture to a rounded-rectangle or ellipse, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."),
+  ActionDef(name: "confine", flags: {afVideo}, argSpec: "[x:y:w:h[:radius][:feather][:invert]]",
+    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
 ]
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
@@ -298,43 +299,67 @@ proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
-  ## Shared `shape:x:y:w:h[:feather][:invert]` geometry for `mask` and `confine`.
-  if parts.len < 6 or parts.len > 8:
-    raise newException(ActionParseError,
-      name & " requires shape:x:y:w:h[:feather][:invert]")
-  let shape = case parts[1]
-    of "rect": 0'u8
-    of "ellipse": 1'u8
-    else: raise newException(ActionParseError, name & " shape must be rect or ellipse")
-  var coords: array[4, int32]
-  for idx in 0 ..< 4:
-    try:
-      coords[idx] = int32(parseInt(parts[idx + 2]))
-    except ValueError:
-      raise newException(ActionParseError, "Invalid integer value")
-  if coords[2] <= 0 or coords[3] <= 0:
-    raise newException(ActionParseError, name & " width and height must be positive")
-  # Trailing tokens after the coords: `invert` (literal) and/or `feather` (px).
+  ## Shared `x:y:w:h[:radius][:feather][:invert]` geometry for `mask`/`confine`.
+  ## Fields take positional or `key=value` form (freely mixed); `invert` is a
+  ## bare flag. radius: 0 = rect, >0 = rounded-rect corner px, -1 = ellipse.
+  const slots = ["x", "y", "w", "h", "radius", "feather"]  # positional order
+  var vals: array[6, int]            # x, y, w, h, radius, feather
+  var seen: array[6, bool]
   var inv = false
-  var feather = 0
-  for idx in 6 ..< parts.len:
-    if parts[idx] == "invert":
+  var nextPos = 0                    # next unfilled positional slot
+
+  proc slotOf(key: string): int =
+    case key
+    of "x": 0
+    of "y": 1
+    of "w", "width": 2
+    of "h", "height": 3
+    of "radius", "r": 4
+    of "feather": 5
+    else: -1
+
+  proc setSlot(i: int, raw, ctx: string) {.raises: [ActionParseError].} =
+    try:
+      vals[i] = parseInt(raw)
+    except ValueError:
+      raise newException(ActionParseError, name & ": invalid integer: " & ctx)
+    seen[i] = true
+
+  for idx in 1 ..< parts.len:
+    let p = parts[idx]
+    let eq = p.find('=')
+    if p == "invert":
       inv = true
+    elif eq >= 0:
+      let key = p[0 ..< eq]
+      let s = slotOf(key)
+      if s < 0:
+        raise newException(ActionParseError, name & ": unknown key: " & key)
+      setSlot(s, p[eq + 1 .. ^1], p)
     else:
-      try:
-        feather = parseInt(parts[idx])
-      except ValueError:
-        raise newException(ActionParseError, "Unknown " & name & " option: " & parts[idx])
-      if feather < 0 or feather > 255:
-        raise newException(ActionParseError, name & " feather must be in [0, 255]")
+      while nextPos < slots.len and seen[nextPos]: inc nextPos
+      if nextPos >= slots.len:
+        raise newException(ActionParseError, name & ": too many values: " & p)
+      setSlot(nextPos, p, p)
+
+  for i in 0 ..< 4:
+    if not seen[i]:
+      raise newException(ActionParseError, name & " requires " & slots[i])
+  if vals[2] <= 0 or vals[3] <= 0:
+    raise newException(ActionParseError, name & " width and height must be positive")
+  if vals[4] < -1:
+    raise newException(ActionParseError, name & " radius must be -1 (ellipse) or >= 0")
+  if vals[5] < 0 or vals[5] > 255:
+    raise newException(ActionParseError, name & " feather must be in [0, 255]")
+
   result = Action(kind: kind)  # branch fields assigned after (shared by both kinds)
-  result.mShape = shape
+  result.mX = int32(vals[0])
+  result.mY = int32(vals[1])
+  result.mW = int32(vals[2])
+  result.mH = int32(vals[3])
+  result.mRadius = int32(vals[4])
+  result.mFeather = uint8(vals[5])
   result.mInvert = inv
-  result.mFeather = uint8(feather)
-  result.mX = coords[0]
-  result.mY = coords[1]
-  result.mW = coords[2]
-  result.mH = coords[3]
 
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
@@ -348,7 +373,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "erosion":
     return Action(kind: actErosion)
   if val == "confine":  # bare = reset to full frame
-    return Action(kind: actConfine, mShape: 2)
+    return Action(kind: actConfine, mReset: true)
 
   let parts = val.split(":")
 
@@ -684,8 +709,10 @@ func kfStr(a: Action): string =
   parts.join("..")
 
 func maskStr(a: Action, name: string): string =
-  let shape = if a.mShape == 1: "ellipse" else: "rect"
-  result = name & ":" & shape & ":" & $a.mX & ":" & $a.mY & ":" & $a.mW & ":" & $a.mH
+  result = name & ":" & $a.mX & ":" & $a.mY & ":" & $a.mW & ":" & $a.mH
+  # radius (0 = rect, default) only needs emitting when set or to hold feather's
+  # positional slot; feather then follows so both round-trip positionally.
+  if a.mRadius != 0 or a.mFeather > 0'u8: result &= ":" & $a.mRadius
   if a.mFeather > 0'u8: result &= ":" & $int(a.mFeather)
   if a.mInvert: result &= ":invert"
 
@@ -752,7 +779,7 @@ when not defined(nimscript):
         "aberration:" & ps.join(":")
     of actMask: maskStr(act, "mask")
     of actConfine:
-      if act.mShape == 2: "confine" else: maskStr(act, "confine")
+      if act.mReset: "confine" else: maskStr(act, "confine")
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -770,7 +797,7 @@ when not defined(nimscript):
     of actDrawbox: 20
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
-    of actMask, actConfine: 19  # header + flags + feather + 4x int32
+    of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -849,15 +876,16 @@ when not defined(nimscript):
         of actMask, actConfine:
           let flags = base[i + 1]
           let feather = base[i + 2]
-          var x, y, w, h: int32
+          var x, y, w, h, radius: int32
           copyMem(addr x, addr base[i + 3], sizeof(int32))
           copyMem(addr y, addr base[i + 7], sizeof(int32))
           copyMem(addr w, addr base[i + 11], sizeof(int32))
           copyMem(addr h, addr base[i + 15], sizeof(int32))
-          yield Action(kind: kind, mShape: flags and 0x3'u8,
-            mInvert: (flags and 0x4'u8) != 0, mFeather: feather,
-            mX: x, mY: y, mW: w, mH: h)
-          i += 19
+          copyMem(addr radius, addr base[i + 19], sizeof(int32))
+          yield Action(kind: kind, mRadius: radius,
+            mReset: (flags and 0x2'u8) != 0, mInvert: (flags and 0x1'u8) != 0,
+            mFeather: feather, mX: x, mY: y, mW: w, mH: h)
+          i += 23
         of actAberration:
           yield Action(kind: actAberration,
             abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
@@ -998,13 +1026,15 @@ when not defined(nimscript):
         base[i + 1] = a.chokeN
         i += 2
       of actMask, actConfine:
-        base[i + 1] = a.mShape or (if a.mInvert: 0x4'u8 else: 0'u8)
+        base[i + 1] = (if a.mInvert: 0x1'u8 else: 0'u8) or
+          (if a.mReset: 0x2'u8 else: 0'u8)
         base[i + 2] = a.mFeather
         base.writeAt(i, 3, a.mX)
         base.writeAt(i, 7, a.mY)
         base.writeAt(i, 11, a.mW)
         base.writeAt(i, 15, a.mH)
-        i += 19
+        base.writeAt(i, 19, a.mRadius)
+        i += 23
       of actAberration:
         base.writeAt(i, 1, a.abRh)
         base.writeAt(i, 2, a.abRv)

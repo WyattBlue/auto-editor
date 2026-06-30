@@ -4,6 +4,7 @@
  - 
 
 ## Features
+ - Add mask/confine actions. `mask` creates an alpha mask. `confine` confines effects to a certain region. Both use rectanges, squircles, or ellipses as the region shape.
  - MacOS: Allow using the microphone as an input for the whisper cmd with `:mic`.
  - Add `--prompt` to the whisper cmd, allowing biasing for certain vocab.
  - MacOS: Default to the `aac_at` (AudioToolbox) encoder for AAC audio.
