@@ -34,13 +34,15 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo " - video:"
   for track, v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height, v.sar.num, v.sar.den)
+    var sar: AVRational
+    discard av_reduce(addr sar.num, addr sar.den, v.sar.num, v.sar.den, high(int32))
 
     echo &"   - track {track}:"
     echo &"     - codec: {$avcodec_get_name(v.codecId)}"
     echo &"     - fps: {v.avg_rate}"
     echo &"     - resolution: {v.width}x{v.height}"
     echo &"     - aspect ratio: {ratioWidth}:{ratioHeight}"
-    echo &"     - pixel aspect ratio: {v.sar}"
+    echo &"     - pixel aspect ratio: {sar}"
     if v.duration != 0.0:
       echo &"     - duration: {v.duration}"
     echo &"     - pix fmt: {v.pix_fmt}"
@@ -91,12 +93,14 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo " - image:"
   for track, i in fileInfo.i:
     let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height, i.sar.num, i.sar.den)
+    var sar: AVRational
+    discard av_reduce(addr sar.num, addr sar.den, i.sar.num, i.sar.den, high(int32))
 
     echo &"   - track {track}:"
     echo &"     - codec: {$avcodec_get_name(i.codecId)}"
     echo &"     - resolution: {i.width}x{i.height}"
     echo &"     - aspect ratio: {ratioWidth}:{ratioHeight}"
-    echo &"     - pixel aspect ratio: {i.sar}"
+    echo &"     - pixel aspect ratio: {sar}"
     echo &"     - pix fmt: {i.pix_fmt}"
 
     if i.color_range == 1:
@@ -128,12 +132,14 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
   for v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height, v.sar.num, v.sar.den)
+    var sar: AVRational
+    discard av_reduce(addr sar.num, addr sar.den, v.sar.num, v.sar.den, high(int32))
     varr.add( %* {
       "codec": $avcodec_get_name(v.codecId),
       "fps": $v.avg_rate,
       "resolution": [v.width, v.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
-      "pixel_aspect_ratio": $v.sar,
+      "pixel_aspect_ratio": $sar,
       "duration": v.duration,
       "pix_fmt": $v.pix_fmt,
       "color_range": v.color_range,
@@ -155,11 +161,13 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
   for i in fileInfo.i:
     let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height, i.sar.num, i.sar.den)
+    var sar: AVRational
+    discard av_reduce(addr sar.num, addr sar.den, i.sar.num, i.sar.den, high(int32))
     iarr.add( %* {
       "codec": $avcodec_get_name(i.codecId),
       "resolution": [i.width, i.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
-      "pixel_aspect_ratio": $i.sar,
+      "pixel_aspect_ratio": $sar,
       "pix_fmt": $i.pix_fmt,
       "color_range": i.color_range,
       "color_space": i.color_space,

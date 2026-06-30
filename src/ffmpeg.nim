@@ -15,7 +15,7 @@ proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rationa
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
 proc av_cmp_q(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
-proc av_reduce(dst_num, dst_den: ptr cint, num, den, max: int64): cint {.importc,
+proc av_reduce*(dst_num, dst_den: ptr cint, num, den, max: int64): cint {.importc,
   header: "<libavutil/rational.h>".}
 
 func `+`*(a, b: AVRational): AVRational = av_add_q(a, b)
