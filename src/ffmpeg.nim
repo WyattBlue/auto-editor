@@ -333,9 +333,6 @@ proc avcodec_free_context*(avctx: ptr ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_get_name*(id: AVCodecID): cstring {.importc,
     header: "<libavcodec/avcodec.h>".}
-proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
-    nb_channels: cint, channel_layout: uint64): cstring {.importc,
-    header: "<libavutil/channel_layout.h>".}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 
@@ -350,7 +347,7 @@ proc av_codec_is_decoder*(codec: ptr AVCodec): cint {.importc,
     header: "<libavcodec/codec.h>".}
 proc avcodec_get_supported_config*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
   config: AVCodecConfig, flags: cuint, out_configs: ptr pointer,
-  out_num_configs: ptr cint): cint {.importc, header: "<libavcodec/codec.h>".}
+  out_num_configs: ptr cint): cint {.importc, header: "<libavcodec/avcodec.h>".}
 
 const FF_COMPLIANCE_STRICT*: cint = 1
 const FF_COMPLIANCE_NORMAL*: cint = 0
@@ -406,7 +403,11 @@ proc `=destroy`*(layout: var AVChannelLayout) =
   av_channel_layout_uninit(addr layout)
 
 proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
-  discard av_channel_layout_copy(addr dest, unsafeAddr src)
+  # Take ownership of src's bits: Nim won't destroy a moved-from src, so a
+  # deep copy here would leak a custom-order layout's heap map (and its
+  # ENOMEM result would go unchecked). uninit frees dest's old map first.
+  av_channel_layout_uninit(addr dest)
+  copyMem(addr dest, unsafeAddr src, sizeof(AVChannelLayout))
 
 type
   # https://ffmpeg.org/doxygen/8.0/structAVFrame.html
@@ -509,8 +510,6 @@ proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
     options: ptr ptr AVDictionary): cint {.importc,
-    header: "<libavcodec/avcodec.h>".}
-proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
@@ -756,7 +755,6 @@ type
     `type`*: AVMediaType
     w, h: cint
     sample_aspect_ratio*: AVRational
-    channel_layout*: uint64
     sample_rate*: cint
     format*: cint
     time_base*: AVRational
