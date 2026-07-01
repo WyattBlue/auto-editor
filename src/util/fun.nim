@@ -80,7 +80,14 @@ func toTimecode*(secs: float, fmt: Code): string =
     sign = "-"
     seconds = -seconds
 
-  let totalSeconds = seconds
+  # Quantize to the format's precision before splitting into h/m/s, so a
+  # seconds field that would format as 60 carries into the minute
+  # (59.9996 -> 00:01:00.000, not 00:00:60.000).
+  let quantum = case fmt
+    of standard: 1000.0
+    of ass: 100.0
+    of display: 1.0
+  let totalSeconds = round(seconds * quantum) / quantum
   let mFloat = totalSeconds / 60.0
   let hFloat = mFloat / 60.0
 
