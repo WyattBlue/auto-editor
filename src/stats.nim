@@ -57,8 +57,8 @@ func round(a: f64): int64 =
   int64(math.round(a))
 
 func allCuts(tl: v3, inLen: int64): seq[int64] =
-  # Calculate cuts
-  let tb = tl.tb
+  # Cuts are measured in source-domain ticks: clip.offset is stored divided
+  # by speed, and a clip covers dur*speed source ticks.
   var clipSpans: seq[(int64, int64)] = @[]
 
   for clip in tl.a[0]:
@@ -68,20 +68,18 @@ func allCuts(tl: v3, inLen: int64): seq[int64] =
       if effect.kind in [actSpeed, actVarispeed]:
         speed *= effect.val
     let oldOffset = clip.offset.f64 * speed
-    clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.f64)))
+    clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.f64 * speed)))
 
   var cutLens: seq[int64] = @[]
-  var i = 0
-  while i < len(clipSpans) - 1:
-    if i == 0 and clipSpans[i][0] != 0:
-      cutLens.add(clipSpans[i][0])
+  if clipSpans.len > 0 and clipSpans[0][0] > 0:
+    cutLens.add(clipSpans[0][0])
 
+  for i in 0 ..< len(clipSpans) - 1:
     let cutLen = clipSpans[i + 1][0] - clipSpans[i][1]
     if cutLen > 0:
       cutLens.add(cutLen)
-    i += 1
 
-  if clipSpans.len > 0 and clipSpans[^1][1] < round(inLen / tb):
+  if clipSpans.len > 0:
     let trailingCut = inLen - clipSpans[^1][1]
     if trailingCut > 0:
       cutLens.add(trailingCut)

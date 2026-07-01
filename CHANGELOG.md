@@ -17,3 +17,4 @@
  - kdenlive export: `varispeed` clips now get timewarp producers like `speed` clips instead of playing 1x from the wrong source position.
  - kdenlive export: timewarp producers now span the warped source length instead of the timeline length, so sped-up clips near the end of the source no longer freeze.
  - `subdump` now dumps every subtitle stream instead of only the first.
+ - `--stats`/`--preview` cut statistics: the trailing cut and single-clip leading cuts are now counted, and sped-up clips no longer skew the numbers.
