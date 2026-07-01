@@ -866,7 +866,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, libvpl, whisper, lame, opus, dav1d, x264, zlib, vpx, svtav1, x265]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, libvpl, whisper, lame, opus, dav1d, x264, zlib, vpx, svtav1, x265]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:
