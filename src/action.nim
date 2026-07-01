@@ -670,8 +670,15 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         raise newException(ActionParseError, "Invalid float value: " & parts[1])
     )
     case effectType
-    of "speed": return Action(kind: actSpeed, val: effectVal)
-    of "varispeed": return Action(kind: actVarispeed, val: effectVal)
+    of "speed", "varispeed":
+      # `not (a and b)` instead of `<= or >=` so NaN fails the check too;
+      # speed <= 0 makes the renderer's atempo decomposition loop forever.
+      if not (effectVal > 0.0 and effectVal < 99999.0):
+        raise newException(ActionParseError,
+          effectType & " must be in range (0, 99999)")
+      if effectType == "speed":
+        return Action(kind: actSpeed, val: effectVal)
+      return Action(kind: actVarispeed, val: effectVal)
     of "brighthue":
       return Action(kind: actLuv, brighthue: effectVal,
         contrast: luvContrastId, saturation: luvSaturationId)

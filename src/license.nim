@@ -14,8 +14,10 @@ proc validateKey*(val: string): (bool, string) =
   if parts.len != 2:
     return (false, "bfmt")
 
-  let payloadBytes = b64urlDecode(parts[0])
-  let sigBytes = b64urlDecode(parts[1])
+  let (payloadBytes, sigBytes) = (
+    try: (b64urlDecode(parts[0]), b64urlDecode(parts[1]))
+    except ValueError: return (false, "bfmt")
+  )
 
   if sigBytes.len != EdSignatureSize:
     return (false, "Bad signature length")

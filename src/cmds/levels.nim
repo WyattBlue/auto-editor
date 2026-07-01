@@ -68,10 +68,34 @@ proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32, 
         inc i
 
     case paramName:
-      of "stream": stream = parseInt(value).int16
-      of "width": width = parseInt(value).int32
-      of "blur": blur = parseInt(value).int32
-      of "pixel-black": pixelBlack = parseFloat(value).float32
+      of "stream":
+        let n = (
+          try: parseInt(value)
+          except ValueError: error &"Invalid stream: {value}"
+        )
+        if n < 0 or n > 1000: error &"Invalid stream: {value}"
+        stream = n.int16
+      of "width":
+        let n = (
+          try: parseInt(value)
+          except ValueError: error &"Invalid width: {value}"
+        )
+        if n < 1 or n > high(int32): error &"Invalid width: {value}"
+        width = n.int32
+      of "blur":
+        let n = (
+          try: parseInt(value)
+          except ValueError: error &"Invalid blur: {value}"
+        )
+        if n < 0 or n > high(int32): error &"Invalid blur: {value}"
+        blur = n.int32
+      of "pixel-black":
+        let f = (
+          try: parseFloat(value)
+          except ValueError: error &"Invalid pixel-black: {value}"
+        )
+        if f < 0.0 or f > 1.0: error &"pixel-black must be in range [0, 1]"
+        pixelBlack = f.float32
       of "pattern": pattern = value
       of "ignore-case":
         case value

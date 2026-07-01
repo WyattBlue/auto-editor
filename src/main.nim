@@ -108,8 +108,10 @@ proc parseResolution(val, opt: string): (int32, int32) =
     error &"'{val}': --{opt} takes two numbers"
 
   var a, b: int
-  discard parseSaturatedNatural(vals[0], a)
-  discard parseSaturatedNatural(vals[1], b)
+  let s0 = vals[0].strip()
+  let s1 = vals[1].strip()
+  if parseSaturatedNatural(s0, a) != s0.len or parseSaturatedNatural(s1, b) != s1.len:
+    error &"'{val}': --{opt} takes two numbers"
   if a < 1 or b < 1:
     error &"--{opt} must be positive"
   if a > high(int32) or b > high(int32):
@@ -352,7 +354,11 @@ proc parseLabeledFlag(key: string): tuple[matched: bool, kind: string, label: in
     else: return (false, "", 0)
   let suffix = key[ci + 1 .. ^1]
   var n: int
-  if suffix.len == 0 or parseInt(suffix, n) != suffix.len:
+  let parsedLen = (
+    try: parseInt(suffix, n)
+    except ValueError: 0
+  )
+  if suffix.len == 0 or parsedLen != suffix.len:
     error &"Invalid label in {key}: expected an integer after ':'"
   if kind == "edit" and n == 0:
     error "--edit:0 is invalid (label 0 is reserved for silent; use --when:0 to act on silent sections)"
@@ -476,8 +482,9 @@ judge making cuts.
       args.videoBitrate = parseBitrate(key)
     of "crf":
       var val: int
-      discard parseSaturatedNatural(key, val)
-      if val >= 65: error "constant rate factor is too high: " & key
+      if key.len == 0 or parseSaturatedNatural(key, val) != key.len:
+        error "invalid constant rate factor: " & key
+      if val > 63: error "constant rate factor is too high: " & key
       args.crf = val.int8
     of "vprofile":
       args.vprofile = key

@@ -7,7 +7,7 @@ import ../vendor/tinyre/tinyre
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
     stream: int16): (int32, seq[bool]) {.raises: [].} =
 
-  if stream >= container.subtitle.len:
+  if stream < 0 or stream >= container.subtitle.len:
     return (stream, @[])
 
   let

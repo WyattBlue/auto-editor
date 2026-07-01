@@ -105,6 +105,8 @@ proc parseNorm*(norm: string): Norm =
   var lexer = initLexer("--audio-normalize", norm)
   var parser = initParser(lexer)
   let expressions: seq[Expr] = parser.parse()
+  if expressions.len == 0:
+    error "--audio-normalize: expression is empty"
   let expr = expressions[^1]
   if expr.kind != ExprList:
     error "Should never happen"
@@ -296,6 +298,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if not isKey:
             argPos += 1
 
+        if stream < 0:
+          error "motion: 'all' stream is not supported"
         result.orWithThreshold(motion(bar, container, input, tb, stream, width, blur), threshold)
         return result
       of "blackdetect":
@@ -315,6 +319,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if not isKey:
             argPos += 1
 
+        if stream < 0:
+          error "blackdetect: 'all' stream is not supported"
         result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
       of "subtitle", "regex":
@@ -335,6 +341,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if not isKey:
             argPos += 1
 
+        if stream < 0:
+          error "subtitle: 'all' stream is not supported"
         let regexPattern = re(pattern, flags)
         let (ret, val) = subtitle(container, tb, regexPattern, stream)
         if ret != -1:
@@ -367,6 +375,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         if pattern == "":
           error "word: value required"
+        if stream < 0:
+          error "word: 'all' stream is not supported"
 
         pattern = "\\b" & pattern & "\\b"
         if ignoreCase:
@@ -401,6 +411,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
     var lexer = initLexer("--edit", editStr)
     var parser = initParser(lexer)
     let expressions: seq[Expr] = parser.parse()
+    if expressions.len == 0:
+      error "--edit: expression is empty"
     let expr = expressions[^1]
     if expr.kind != ExprList:
       error "Should never happen"

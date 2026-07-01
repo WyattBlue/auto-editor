@@ -48,11 +48,20 @@ proc main*(cArgs: seq[string]) =
     of "output":
       output = key
     of "queue":
-      queue = parseInt(key)
+      queue = (
+        try: parseInt(key)
+        except ValueError: error &"Invalid --queue: {key}"
+      )
     of "prompt":
       prompt = key
     of "threads":
-      threads = parseInt(key).cint
+      let n = (
+        try: parseInt(key)
+        except ValueError: error &"Invalid --threads: {key}"
+      )
+      if n < 1 or n > 1024:
+        error &"--threads must be in range [1, 1024], got: {key}"
+      threads = n.cint
     of "threshold":
       threshold = parseThres(key).toFloat32
     expecting = ""
