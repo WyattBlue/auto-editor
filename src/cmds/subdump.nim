@@ -44,6 +44,9 @@ proc main*(args: seq[string]) =
       var cues: seq[JsonNode] = @[]
       var codecCtx = initDecoder(formatCtx.streams[s].codecpar)
       var subtitle: AVSubtitle
+      # The previous stream's loop left the demuxer at EOF.
+      if av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD) < 0:
+        error "Could not seek to start of file"
       while av_read_frame(formatCtx, container.packet) >= 0:
         defer: av_packet_unref(container.packet)
 
