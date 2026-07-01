@@ -104,7 +104,10 @@ proc parseNorm*(norm: string): Norm =
 
   var lexer = initLexer("--audio-normalize", norm)
   var parser = initParser(lexer)
-  let expressions: seq[Expr] = parser.parse()
+  let expressions: seq[Expr] = (
+    try: parser.parse()
+    except ValueError as e: error &"--audio-normalize: {e.msg}"
+  )
   if expressions.len == 0:
     error "--audio-normalize: expression is empty"
   let expr = expressions[^1]
@@ -410,7 +413,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
   proc evalEditString(editStr: string): seq[bool] =
     var lexer = initLexer("--edit", editStr)
     var parser = initParser(lexer)
-    let expressions: seq[Expr] = parser.parse()
+    let expressions: seq[Expr] = (
+      try: parser.parse()
+      except ValueError as e: error &"--edit: {e.msg}"
+    )
     if expressions.len == 0:
       error "--edit: expression is empty"
     let expr = expressions[^1]

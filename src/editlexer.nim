@@ -111,7 +111,8 @@ proc getNextToken(self: var Lexer): Token =
   return Token(kind: Eof)
 
 proc initParser*(lexer: var Lexer): Parser =
-  return Parser(lexer: lexer, currentToken: lexer.getNextToken())
+  result = Parser(lexer: lexer)
+  result.currentToken = result.lexer.getNextToken()
 
 proc eat(self: var Parser) =
   self.currentToken = self.lexer.getNextToken()
@@ -135,6 +136,9 @@ proc list(self: var Parser): Expr =
 
   while self.currentToken.kind != Rparen and self.currentToken.kind != Eof:
     elements.add(self.expr())
+
+  if self.currentToken.kind == Eof:
+    raise newException(ValueError, "Missing closing parenthesis")
 
   let endPos = self.currentToken.to
   self.eat()
@@ -201,9 +205,12 @@ proc parse*(self: var Parser): seq[Expr] =
     let expr = self.expr()
     tokens.add(expr)
 
-  # If we have multiple tokens at the top level, wrap them in a list
-  if tokens.len > 1:
-    tokens.delete(0) # Delete extra Symbol
-    result.add(Expr(kind: ExprList, elements: tokens, `from`: 0, to: uint32(self.lexer.text.len)))
-  else:
-    result = tokens
+  if tokens.len == 0:
+    return @[]
+
+  # A bare atom (`audio`, `1`) or several top-level exprs (`or audio:3%
+  # motion:6%`) are an implicit call form; evaluators expect a list.
+  if tokens.len > 1 or tokens[0].kind != ExprList:
+    return @[Expr(kind: ExprList, elements: tokens, `from`: 0,
+        to: uint32(self.lexer.text.len))]
+  return tokens
