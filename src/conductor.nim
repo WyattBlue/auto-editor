@@ -271,7 +271,7 @@ proc editMedia*(args: var mainArgs) =
         if i == 0 and args.frameRate == AVRational(num: 0, den: 0):
           if container.video.len > 0:
             let avgFr = container.video[0].avg_frame_rate
-            if avgFr.num > 0 and avgFr.den > 0:
+            if avgFr.isValid:
               tb = makeSaneTimebase(avgFr)
 
         var labels = interpretEdit(args, container, args.inputs[i], tb, bar)

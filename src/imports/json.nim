@@ -55,7 +55,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   if tbString == "":
     error "Expected 'timebase' key to exist"
   result.tb = try: toAVRational(tbString) except ValueError as e: error e.msg
-  if result.tb.num == 0 or result.tb.den == 0:
+  if not result.tb.isValid:
     error "Invalid timebase json value"
 
   let srVal = jsonNode{"samplerate"}.getInt(0)
@@ -134,7 +134,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   if tbString == "":
     error "Expected 'tb' key to exist"
   let tb = try: toAVRational(tbString) except ValueError as e: error e.msg
-  if tb.num == 0 or tb.den == 0:
+  if not tb.isValid:
     error "Invalid timebase json value"
 
   let clipsNode = jsonNode{"clips"}

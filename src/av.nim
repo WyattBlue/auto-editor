@@ -393,9 +393,9 @@ proc startEncoding*(self: var OutputContainer) =
 
 proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders
-  if ctx.time_base.num == 0 or ctx.time_base.den == 0:
+  if not ctx.time_base.isValid:
     if ctx.codec_type == AVMEDIA_TYPE_VIDEO:
-      if ctx.framerate.num == 0 or ctx.framerate.den == 0:
+      if not ctx.framerate.isValid:
         ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
       else:
         ctx.time_base = av_inv_q(ctx.framerate)
@@ -443,7 +443,7 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
 
   # Rebase packet time
   let dst = stream.time_base
-  if packet.time_base.num == 0 or packet.time_base.den == 0:
+  if not packet.time_base.isValid:
     packet.time_base = dst
   elif packet.time_base == dst:
     discard

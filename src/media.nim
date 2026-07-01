@@ -92,7 +92,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
 
       let ctxSAR = codecCtx.sample_aspect_ratio
       let sar =
-        if ctxSAR.num == 0 or ctxSAR.den == 0: AVRational(num: 1, den: 1)
+        if not ctxSAR.isValid: AVRational(num: 1, den: 1)
         else: ctxSAR
 
       let newStream = VideoStream(

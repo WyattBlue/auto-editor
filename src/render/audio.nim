@@ -140,7 +140,7 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   # Convert sample position to time and seek
   let sampleRate = stream.codecpar.sample_rate
   let timeBase = stream.time_base
-  if sampleRate <= 0 or timeBase.num == 0:
+  if sampleRate <= 0 or not timeBase.isValid:
     error "Invalid stream time base or sample rate"
   let startTimeInSeconds = start.float / sampleRate.float
   let startPts = int64(startTimeInSeconds * timeBase.den.float / timeBase.num.float)
@@ -608,8 +608,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   let sr = tl.sr
   let fadeSamples = max(1, int(audioFadeMs / 1000.0 * sr.float64))
 
-  if tb.num == 0:
-    error "Timeline timebase has zero numerator"
+  if not tb.isValid:
+    error "Invalid timeline timebase"
 
   # Collect all unique audio sources from specified layers.
   # Audio's getter calls av_seek_frame / av_read_frame on its container, so it
