@@ -154,6 +154,9 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
           lang = ['u', 'n', 'd', '\0'], layout = tl.layout)
       let encoder = aEncCtx.codec
       checkAudioCtx(aEncCtx, tl.sr)
+      # avcodec_open2 configures the encoder from bit_rate; set after and it's ignored.
+      if args.audioBitrate >= 0:
+        aEncCtx.bit_rate = args.audioBitrate
       aEncCtx.open()
 
       # Update stream parameters after opening encoder for formats like AAC in MKV
@@ -162,7 +165,6 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
         error "Could not update stream parameters after opening encoder"
 
       if args.audioBitrate >= 0:
-        aEncCtx.bit_rate = args.audioBitrate
         debug &"audio bitrate: {aEncCtx.bit_rate}"
       else:
         debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
@@ -183,6 +185,9 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
             lang = tl.langs[tl.v.len + i], layout = tl.layout)
         let encoder = aEncCtx.codec
         checkAudioCtx(aEncCtx, tl.sr)
+        # avcodec_open2 configures the encoder from bit_rate; set after and it's ignored.
+        if args.audioBitrate >= 0:
+          aEncCtx.bit_rate = args.audioBitrate
         aEncCtx.open()
 
         # Update stream parameters after opening encoder for formats like AAC in MKV
@@ -191,7 +196,6 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
           error "Could not update stream parameters after opening encoder"
 
         if args.audioBitrate >= 0:
-          aEncCtx.bit_rate = args.audioBitrate
           debug &"audio bitrate: {aEncCtx.bit_rate}"
         else:
           debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
