@@ -312,7 +312,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
 
   let pending = jobs.peek()
   if pending > 0:
-    stderr.writeLine(&"finishing {pending} queued segment(s)...")
+    stderr.writeLine(&"\nFinishing {pending} queued segment(s)...")
   jobs.send(Job(samples: @[]))  # sentinel
   joinThread(worker)
   jobs.close()

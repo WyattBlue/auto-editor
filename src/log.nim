@@ -128,23 +128,26 @@ proc conwrite*(msg: string) {.raises: [].} =
 proc debug*(msg: string) =
   if isDebug:
     conwrite ""
-    if not noColor:
-      stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
-    else:
+    if noColor:
       stderr.writeLine(&"Debug: {msg}")
+    else:
+      stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
 
 proc warning*(msg: string) =
   if not quiet:
     conwrite ""
-    stderr.write(&"Warning! {msg}\n")
+    if noColor:
+      stderr.write(&"Warning! {msg}\n")
+    else:
+      stderr.styledWriteLine(fgYellow, "Warning! ", msg, resetStyle)
 
 proc error*(msg: string) {.noreturn.} =
   conwrite ""
   try:
-    if not noColor:
-      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
-    else:
+    if noColor:
       stderr.writeLine(&"Error! {msg}")
+    else:
+      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   except IOError:
     discard
   quit(1)
