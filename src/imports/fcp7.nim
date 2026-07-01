@@ -1,6 +1,6 @@
 import std/[strutils, streams, tables, uri, xmlparser, xmltree]
 
-import ../[action, av, log, timeline]
+import ../[action, av, ffmpeg, log, timeline]
 import ../util/[color, rational]
 
 func uriToPath(uri: string): string =
@@ -20,10 +20,9 @@ func uriToPath(uri: string): string =
 
 func readTbNtsc(tb: int, ntsc: bool): AVRational =
   if ntsc:
-    if tb == 24: return AVRational(num: 24000, den: 1001)
-    if tb == 30: return AVRational(num: 30000, den: 1001)
-    if tb == 60: return AVRational(num: 60000, den: 1001)
-    return AVRational(num: (tb * 999).cint, den: 1000)
+    # ntsc scales the timebase by 1000/1001 (30 -> 29.97002997...), per the
+    # chart in Apple's FCP7 XML docs; see the link in exports/fcp7.nim.
+    return tb.int64 * AVRational(num: 1000, den: 1001)
   return AVRational(num: tb.cint, den: 1)
 
 func readFilters(filterNode: XmlNode): float =
