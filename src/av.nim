@@ -122,7 +122,7 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   if videoStreamIndex != -1:
     let video = container.video[0]
-    if video.duration == AV_NOPTS_VALUE or video.time_base == AV_NOPTS_VALUE:
+    if video.duration == AV_NOPTS_VALUE or not video.time_base.isValid:
       return AVRational(num: 0, den: 1)
     else:
       return video.duration * video.time_base

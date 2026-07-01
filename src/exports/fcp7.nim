@@ -32,7 +32,8 @@ func setTbNtsc(tb: AVRational): (int64, string) =
   if ctb notin [24'i64, 30, 60] and tb == ctb * AVRational(num: 1000, den: 1001):
     return (ctb, "TRUE")
 
-  return (tb.int64, "FALSE")
+  # Last resort for a non-integer, non-NTSC rate: truncate to a whole timebase.
+  return (int64(tb.num div tb.den), "FALSE")
 
 
 func elem(tag, text: string): XmlNode =

@@ -311,7 +311,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   )
 
   let inaccurateDur = (
-    if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base != AV_NOPTS_VALUE:
+    if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base.isValid:
       float(audioStream.duration) * float(audioStream.time_base * tb)
     else:
       container.duration * float(tb)

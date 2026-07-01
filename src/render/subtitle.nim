@@ -49,7 +49,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
         continue
 
       let cueStart = packet.pts
-      let hasDur = packet.duration != AV_NOPTS_VALUE and packet.duration > 0
+      let hasDur = packet.duration > 0
       let cueEnd = (if hasDur: cueStart + packet.duration else: cueStart)
 
       # Packets arrive in pts order, so once a cue starts at/after the window, done.

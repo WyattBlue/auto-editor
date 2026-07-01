@@ -205,7 +205,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   )
 
   let inaccurateDur = (
-    if videoStream.duration != AV_NOPTS_VALUE and videoStream.time_base != AV_NOPTS_VALUE:
+    if videoStream.duration != AV_NOPTS_VALUE and videoStream.time_base.isValid:
       float(videoStream.duration) * float(videoStream.time_base * tb)
     else:
       container.duration * float(tb)

@@ -2,10 +2,9 @@ type AVRational* {.importc, completeStruct, header: "<libavutil/rational.h>", by
   num*: cint
   den*: cint
 
-# Implicit AVRational->int64 coercion; relied on by comparisons like
-# `time_base == AV_NOPTS_VALUE` (no textual call site, so it reads as unused).
-converter toInt64*(r: AVRational): int64 =
-  (r.num div r.den).int64
+func isValid*(r: AVRational): bool =
+  ## A usable time base: positive and non-degenerate.
+  r.num > 0 and r.den > 0
 
 func toAVRational*(num: int): AVRational =
   AVRational(num: num.cint, den: 1)

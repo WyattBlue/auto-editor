@@ -29,7 +29,8 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
     defer: av_packet_unref(packet)
 
     if packet.stream_index == s:
-      if packet.pts == AV_NOPTS_VALUE or packet.duration == AV_NOPTS_VALUE:
+      # Duration 0 means unknown; an empty span can't mark a frame anyway.
+      if packet.pts == AV_NOPTS_VALUE or packet.duration <= 0:
         continue
 
       let
