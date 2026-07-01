@@ -1,5 +1,5 @@
 import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
-import ../[action, timeline]
+import ../[action, media, timeline]
 import ../util/fun
 
 proc genUuid*(): string =
@@ -106,9 +106,11 @@ proc kdenliveWrite*(output: string, tl: v3) =
       uniquePaths.add(p)
 
   var sourceIds = initTable[string, string]()
+  var pathDuration = initTable[string, float64]()
   var sourceId = 4
   for path in uniquePaths:
     sourceIds[path] = $sourceId
+    pathDuration[path] = initMediaInfo(path).duration
     inc sourceId
 
   var clipPlaylists: seq[XmlNode] = @[]
@@ -127,7 +129,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
   for i, clip in clips:
     let effectGroup = tl.effects[clip.effects]
     for effect in effectGroup:
-      if effect.kind == actSpeed:
+      if effect.kind in [actSpeed, actVarispeed]:
         warpedClips.add(i)
         break
 
@@ -137,13 +139,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
       let clip = clips[clipIdx]
       let path = $clip.src[]
 
-      let prod = newElement("producer")
-      prod.attrs = {
-        "id": &"producer{producers}",
-        "in": "00:00:00.000",
-        "out": globalOut
-      }.toXmlAttributes()
-
       let effectGroup = tl.effects[clip.effects]
       var speedVal = 1.0
       var warpPitch = false
@@ -152,6 +147,16 @@ proc kdenliveWrite*(output: string, tl: v3) =
           speedVal = effect.val
           warpPitch = effect.kind == actSpeed
           break
+
+      let prod = newElement("producer")
+      prod.attrs = {
+        "id": &"producer{producers}",
+        "in": "00:00:00.000",
+        # A timewarp producer is as long as the warped source, not the
+        # timeline; clamping to timeline length freezes any clip whose warped
+        # source position lies past it.
+        "out": toTimecode(pathDuration[path] / speedVal, standard)
+      }.toXmlAttributes()
 
       var prodProp = newElement("property")
       prodProp.attrs = {"name": "resource"}.toXmlAttributes()
@@ -453,10 +458,12 @@ proc kdenliveWrite*(output: string, tl: v3) =
         })
         var clipProd = ""
 
+        # Must match the warpedClips predicate above, or entry producer
+        # numbering drifts out of sync with the created producers.
         let effectGroup = tl.effects[clip.effects]
         var hasSpeed = false
         for effect in effectGroup:
-          if effect.kind == actSpeed:
+          if effect.kind in [actSpeed, actVarispeed]:
             hasSpeed = true
             break
 
