@@ -19,3 +19,4 @@
  - `subdump` now dumps every subtitle stream instead of only the first.
  - `--stats`/`--preview` cut statistics: the trailing cut and single-clip leading cuts are now counted, and sped-up clips no longer skew the numbers.
  - AVI (and other pts-less/DTS-only sources) no longer render as black video, and seeks in sources whose timebase numerator isn't 1 land on the right frame.
+ - An option missing its value (e.g. `-o --edit audio`) now errors instead of silently dropping the option

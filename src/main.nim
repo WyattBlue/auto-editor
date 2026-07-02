@@ -410,22 +410,35 @@ judge making cuts.
   var expecting: string = ""
   var expectingLabel: int = 1  # label for a pending "edit"/"when" value (plain --edit => 1)
 
+  func isKnownOption(key: string): bool =
+    for opt in mainOptions:
+      for name in opt.names.split(", "):
+        if key == name.strip():
+          return true
+    false
+
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
-    # Generic `--edit:N` / `-e:N` / `--when:N` / `-w:N`. Plain `--edit` and the
-    # named `--when-*` aliases have no `:` suffix, so they fall through to
-    # genCliMacro below (which sets `expecting` to "edit"/"when-normal"/... ).
-    let lf = parseLabeledFlag(key)
-    if lf.matched:
-      expecting = lf.kind
-      expectingLabel = lf.label
-      continue
-    if genCliMacro(key, args, mainOptions):
-      continue
-    if key in ["-h", "--help"]:
+    if expecting == "":
+      # Generic `--edit:N` / `-e:N` / `--when:N` / `-w:N`. Plain `--edit` and the
+      # named `--when-*` aliases have no `:` suffix, so they fall through to
+      # genCliMacro below (which sets `expecting` to "edit"/"when-normal"/... ).
+      let lf = parseLabeledFlag(key)
+      if lf.matched:
+        expecting = lf.kind
+        expectingLabel = lf.label
+        continue
+      if genCliMacro(key, args, mainOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp()
+      if key.startsWith("--"):
+        error &"Unknown option: {key}"
+    elif key in ["-h", "--help"]:
       printHelp()
-    if key.startsWith("--"):
-      error &"Unknown option: {key}"
+    elif key.startsWith("--") or isKnownOption(key) or
+        parseLabeledFlag(key).matched:
+      error &"--{expecting} needs argument, got option: {key}"
     case expecting
     of "":
       args.inputs.add key
@@ -524,7 +537,7 @@ judge making cuts.
     expectingLabel = 1
 
   if expecting != "":
-    error &"{cmdLineParams[^1]} needs argument."
+    error &"--{expecting} needs argument."
 
   if showVersion:
     echo version
