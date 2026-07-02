@@ -168,9 +168,7 @@ proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: Medi
       if dur == 0:
         continue
 
-      if not (clips.len > 0 and clips[^1].start == start):
-        clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
-
+      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
       start += dur
       i += 1
 
@@ -209,9 +207,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
       if dur == 0:
         continue
 
-      if not (clips.len > 0 and clips[^1].start == timelineStart):
-        clips.add Clip(src: src, start: timelineStart, dur: dur, offset: offset, effects: e)
-
+      clips.add Clip(src: src, start: timelineStart, dur: dur, offset: offset, effects: e)
       timelineStart += dur
 
   if mi.v.len > 0:
@@ -256,28 +252,27 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
       if dur == 0:
         continue
 
-      if not (clips.len > 0 and clips[^1].start == start):
-        var effectIndex: int
-        if chunk[2] == 1.0:
-          effectIndex = effects.find(aNil)
-          if effectIndex == -1:
-            effects.add aNil
-            effectIndex = effects.len - 1
-        else:
-          let a = (
-            try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
-            except ActionParseError: error "Too many actions"
-          )
-          effectIndex = effects.find(a)
-          if effectIndex == -1:
-            effects.add a
-            effectIndex = effects.len - 1
+      var effectIndex: int
+      if chunk[2] == 1.0:
+        effectIndex = effects.find(aNil)
+        if effectIndex == -1:
+          effects.add aNil
+          effectIndex = effects.len - 1
+      else:
+        let a = (
+          try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
+          except ActionParseError: error "Too many actions"
+        )
+        effectIndex = effects.find(a)
+        if effectIndex == -1:
+          effects.add a
+          effectIndex = effects.len - 1
 
-        if effectIndex > int64(high(uint32)):
-          error "'Number of actions' limit for timeline reached."
-        let e = uint32(effectIndex)
-        clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
-        clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+      if effectIndex > int64(high(uint32)):
+        error "'Number of actions' limit for timeline reached."
+      let e = uint32(effectIndex)
+      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
+      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
 
       start += dur
       i += 1
