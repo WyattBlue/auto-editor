@@ -1,4 +1,4 @@
-import std/[algorithm, os, sets, tables, xmltree]
+import std/[os, tables, xmltree]
 import std/[strformat, strutils]
 from std/math import round
 
@@ -107,11 +107,18 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   var projName: string
 
   var ptrToMi = initTable[ptr string, MediaInfo]()
-  var i = 0
+  var ptrToId = initTable[ptr string, string]()
 
-  for ptrSrc in tl.uniqueSources:
-    let mi = initMediaInfo(ptrSrc[])
-    ptrToMi[ptrSrc] = mi
+  var sources: seq[MediaInfo]
+  for track in tl.v & tl.a:
+    for clip in track:
+      if clip.src != nil and clip.src notin ptrToMi:
+        let mi = initMediaInfo(clip.src[])
+        ptrToMi[clip.src] = mi
+        ptrToId[clip.src] = "r" & $(sources.len * 2 + 2)
+        sources.add mi
+
+  for i, mi in sources:
 
     # An asset's duration is that of the source media itself, not the
     # (shorter) edited timeline. Clips reference positions in the source.
@@ -144,8 +151,6 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
 
     r2.add mediaRep
     resources.add r2
-
-    i += 1
 
   let lib = <>library()
   let evt = <>event(name = group_name)
@@ -208,14 +213,14 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   elif tl.a.len > 0 and tl.a[0].len > 0:
     clips = tl.a[0]
 
-  var allRefs: seq[string] = @["r2"]
   if resolve:
-    for i in 1 ..< tl.a.len:
-      allRefs.add("r" & $((i + 1) * 2))
-
-  for myRef in allRefs.reversed:
-    for clip in clips:
-      makeClip(myRef, clip)
+    for i in countdown(tl.a.len - 1, 1):
+      for clip in tl.a[i]:
+        if clip.src != nil:
+          makeClip(ptrToId[clip.src], clip)
+  for clip in clips:
+    if clip.src != nil:
+      makeClip(ptrToId[clip.src], clip)
 
   if output == "-":
     echo $fcpxml
