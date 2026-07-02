@@ -87,8 +87,9 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   if resArray.len >= 2:
     let w = resArray[0].getInt()
     let h = resArray[1].getInt()
-    if w < 0 or w > high(int32).int or h < 0 or h > high(int32).int:
-      error "Invalid resolution json value"
+    if w < 2 or w > high(int32).int or h < 2 or h > high(int32).int or
+        ((w or h) and 1) != 0:
+      error "Resolution must be even and >= 2"
     result.res = (w.int32, h.int32)
   else:
     error "Expected two elements in 'resolution' key"

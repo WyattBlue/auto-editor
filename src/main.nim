@@ -112,8 +112,8 @@ proc parseResolution(val, opt: string): (int32, int32) =
   let s1 = vals[1].strip()
   if parseSaturatedNatural(s0, a) != s0.len or parseSaturatedNatural(s1, b) != s1.len:
     error &"'{val}': --{opt} takes two numbers"
-  if a < 1 or b < 1:
-    error &"--{opt} must be positive"
+  if a < 2 or b < 2 or ((a or b) and 1) != 0:
+    error &"--{opt} must be even and >= 2"
   if a > high(int32) or b > high(int32):
     error &"--{opt} got an invalid/too high number"
   return (a.int32, b.int32)
