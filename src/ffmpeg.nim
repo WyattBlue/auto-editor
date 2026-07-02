@@ -553,6 +553,7 @@ proc av_make_error_string*(errbuf: cstring, errbuf_size: csize_t,
 proc av_err2str*(errnum: cint): string =
   var errbuf = newString(AV_ERROR_MAX_STRING_SIZE)
   discard av_make_error_string(errbuf.cstring, AV_ERROR_MAX_STRING_SIZE.csize_t, errnum)
+  errbuf.setLen(errbuf.cstring.len)
   return errbuf
 
 # Audio FIFO function declarations
