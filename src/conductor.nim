@@ -342,10 +342,10 @@ proc editMedia*(args: var mainArgs) =
 
         if not tlInitialized:
           mi = inputMi
-          tlV3 = initLinearTimeline(addr args.inputs[i], tb, bg, mi, actionMap, actionIndex)
+          tlV3 = initLinearTimeline(interner.intern(args.inputs[i]), tb, bg, mi, actionMap, actionIndex)
           tlInitialized = true
         else:
-          appendLinearTimeline(tlV3, addr args.inputs[i], inputMi, actionIndex)
+          appendLinearTimeline(tlV3, interner.intern(args.inputs[i]), inputMi, actionIndex)
 
       applyAdds(tlV3, args, interner)
       tlV3.applyArgs(args)
@@ -420,6 +420,8 @@ proc editMedia*(args: var mainArgs) =
         clips2.add(clip)
 
     let unique = tlV3.uniqueSources()
+    if unique.len > 1:
+      error "clip-sequence export only supports one input source"
     var src: ptr string
     for u in unique:
       src = u
