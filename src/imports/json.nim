@@ -8,10 +8,14 @@ proc parseActionOrErr(val: string): Action {.raises: [].} =
   except ActionParseError as e: error e.msg
 
 proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip {.raises: [].} =
-  let srcVal = node{"src"}.getStr("")
-  if srcVal == "":
-    error "Invalid src json value"
-  result.src = interner.intern(srcVal)
+  let srcNode = node{"src"}
+  if srcNode != nil and srcNode.kind == JNull:
+    result.src = nil # synthesized base clip: a render canvas with no media
+  else:
+    let srcVal = srcNode.getStr("")
+    if srcVal == "":
+      error "Invalid src json value"
+    result.src = interner.intern(srcVal)
 
   result.start = node{"start"}.getBiggestInt(-1)
   result.dur = node{"dur"}.getBiggestInt(-1)

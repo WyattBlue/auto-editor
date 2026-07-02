@@ -15,7 +15,9 @@ func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
     var trackArray = newJArray()
     for clip in track:
       var clipObj = newJObject()
-      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
+      # A synthesized base clip (audio-only timeline that gained overlays)
+      # has no media; null keeps it importable.
+      clipObj["src"] = (if clip.src != nil: %clip.src[] else: newJNull())
       clipObj["start"] = %clip.start
       clipObj["dur"] = %clip.dur
       clipObj["offset"] = %clip.offset
