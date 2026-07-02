@@ -438,7 +438,7 @@ type
     color_trc*: AVColorTransferCharacteristic
     colorspace*: AVColorSpace
     chroma_location: AVChromaLocation
-    best_effort_timestamp: int64
+    best_effort_timestamp*: int64
     metadata*: ptr AVDictionary
     decode_error_flags*: cint
     hw_frames_ctx: pointer

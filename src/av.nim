@@ -510,10 +510,15 @@ func canonicalName*(codec: ptr AVCodec): string =
   return $avcodec_get_name(codec.id)
 
 func time*(frame: ptr AVFrame, tb: AVRational): float64 =
-  # `tb` should be AVStream.time_base
-  if frame.pts == AV_NOPTS_VALUE:
+  # `tb` should be AVStream.time_base. Decoded frames from pts-less
+  # containers (AVI) carry their dts-derived timestamp in
+  # best_effort_timestamp; frames we build ourselves only set pts.
+  let ts =
+    if frame.pts != AV_NOPTS_VALUE: frame.pts
+    else: frame.best_effort_timestamp
+  if ts == AV_NOPTS_VALUE:
     return -1.0
-  return float(frame.pts) * float(tb.num) / float(tb.den)
+  return float(ts) * float(tb.num) / float(tb.den)
 
 func dialogue*(assText: string): string =
   let textLen = assText.len

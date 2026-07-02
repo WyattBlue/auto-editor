@@ -454,7 +454,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       # inf/nan from a divide-by-zero.
       let srcFps = float(stream.avg_frame_rate)
       let fps = if srcFps > 0.0: srcFps else: float(targetFps)
-      st.tou = int(float(stream.time_base.den) / fps)
+      # ticks/frame = (1/fps) / (num/den); num is 1 for mp4-style timebases
+      # but e.g. 1001 for AVI's 1001/30000.
+      st.tou = int(float(stream.time_base.den) /
+                   (float(stream.time_base.num) * fps))
 
       if args.noSeek:
         st.kfFrames = @[]
