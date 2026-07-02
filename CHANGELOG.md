@@ -22,3 +22,4 @@
  - An option missing its value (e.g. `-o --edit audio`) now errors instead of silently dropping the option
  - kdenlive and ShotCut exports: MLT `out` points are inclusive, so every clip was one frame too long, repeating a frame at each cut and drifting the timeline +1 frame per clip. Clips now end on their true last frame.
  - `--export resolve` with multiple multi-track sources no longer fails: every source's `*_tracks` folder is now created, not just the first's.
+ - Effects no longer compound on repeated source frames (slow motion, or a lower-fps source in a higher-fps timeline), which made the video visibly pulse; animated effects now also keep progressing on repeated frames instead of freezing.

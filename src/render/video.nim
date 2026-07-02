@@ -1382,8 +1382,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           frame = av_frame_clone(nullFrame)
 
       for obj in objList:
-        # Reuse the fully-processed frame from the previous timeline iteration
-        # when this frame maps to the same source frame.
+        # Reuse the decoded frame from the previous timeline iteration when
+        # this frame maps to the same source frame.
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
           av_frame_free(addr frame)
           frame = av_frame_clone(lastProcessedFrame)
@@ -1410,16 +1410,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr frame)
         frame = scaleGraph.pull()
 
-      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
-        frame = applyEffects(frame, objList[0].effects, objList[0].local, objList[0].dur)
-
-      frame = finalizeFrame(frame, index)
-
-      # Update cache for frame reuse BEFORE yielding (which will unref the frame)
+      # Cache the pre-effects frame: effects are per-timeline-frame (animated
+      # via `local`) and would compound when a source frame repeats.
       if objList.len > 0:
         av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
+
+      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
+        frame = applyEffects(frame, objList[0].effects, objList[0].local, objList[0].dur)
+
+      frame = finalizeFrame(frame, index)
 
       yield (frame, index)
 
