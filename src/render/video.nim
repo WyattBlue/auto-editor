@@ -108,7 +108,7 @@ type SrcState = ref object
   hasSeekFrame: bool          # whether seekFrame holds a pending marker
   isStill: bool               # single-frame image source (logo/watermark)
 
-proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: int): KeyframeIndex =
+proc buildKeyframeIndex(stream: ptr AVStream, fps: float, defaultInterval: int): KeyframeIndex =
   ## Build a keyframe index from the stream's index entries.
   result.frames = @[]
   result.hasIndex = false
@@ -125,7 +125,7 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: 
   for i in 0 ..< count:
     let entry = avformat_index_get_entry(stream, i)
     if entry != nil and entry.isKeyframe and entry.timestamp != AV_NOPTS_VALUE:
-      let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
+      let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * fps))
 
       # Be a bit conservative by adding video_deplay (the worst-case DTS/PTS gap), even
       # if some formats use PTS.
@@ -464,7 +464,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         st.hasKfIndex = false
         st.kfInterval = high(int)
       else:
-        let kf = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
+        let kf = buildKeyframeIndex(stream, fps, defaultInterval)
         st.kfFrames = kf.frames
         st.kfInterval = kf.avgInterval
         st.hasKfIndex = kf.hasIndex
@@ -557,9 +557,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
   var lastFrameIndex = -1
-  let isNonlinear = tl.isNonlinear
+  let isLinear = tl.isLinear
 
-  debug &"isNonlinear: {isNonlinear}"
+  debug &"isLinear: {isLinear}"
 
   # Find the closest keyframe at or before targetFrame for backward seeking.
   # A backward seek only ever targets a frame we have already decoded past, so
@@ -1027,7 +1027,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let looping = firstIsLoop(obj.effects)
     var loopBase = st.loopBase
     var target = obj.index - loopBase
-    if isNonlinear and target < 0:
+    if not isLinear and target < 0:
       loopBase = 0
       target = obj.index
 
@@ -1054,7 +1054,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         st.lastSeekTarget = seekTarget
       frameIndex = min(seekTarget, target - 1)
 
-    let srcTb = myStream.avg_frame_rate
+    # avg_frame_rate can be 0/0 (no declared frame rate); fall back to the
+    # timeline rate so frameIndex never comes from NaN (matches st.tou above).
+    let srcTb =
+      if myStream.avg_frame_rate.isValid: myStream.avg_frame_rate else: targetFps
     var didDecode = false
     while frameIndex < target:
       if target - frameIndex > st.kfInterval and frameIndex > seekThreshold:
@@ -1304,8 +1307,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let sourceFramePos =
               if obj.src == nil: 0
               else:
-                let srcTb = myCache.cns[obj.src].video[0].avg_frame_rate
-                int(round(float(timelinePos) * srcTb.float / tl.tb.float))
+                let rate = myCache.cns[obj.src].video[0].avg_frame_rate
+                # 0/0 (no declared frame rate) would make the index NaN; map 1:1.
+                if rate.isValid:
+                  int(round(float(timelinePos) * rate.float / tl.tb.float))
+                else:
+                  int(timelinePos)
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
               local: int(index - obj.start), dur: int(obj.dur),
@@ -1363,8 +1370,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         yield (frame, index)
         continue
 
-      if isNonlinear:
+      if not isLinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
+        av_frame_free(addr frame)
         frame = av_frame_clone(nullFrame)
       else:
         # Always start with a fresh frame to avoid reusing encoder-unref'd frames

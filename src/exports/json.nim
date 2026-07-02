@@ -61,7 +61,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
   var tlJson: JsonNode
 
   if `export` == "v1" or `export` == "v2":
-    if tlV3.isNonlinear:
+    if not tlV3.isLinear:
       error "No chunks available for export"
 
     var source: string = ""

@@ -407,7 +407,7 @@ proc editMedia*(args: var mainArgs) =
   args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
 
   if args.`export` == "clip-sequence":
-    if tlV3.isNonlinear:
+    if not tlV3.isLinear:
       error "Timeline too complex to use clip-sequence export"
 
     func appendFilename(path, val: string): string =

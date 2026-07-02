@@ -72,8 +72,8 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
 
-func isNonlinear*(self: v3): bool =
-  return self.clips2.len == 0 and not self.timelineIsEmpty
+func isLinear*(self: v3): bool =
+  return self.clips2.len > 0 or self.timelineIsEmpty
 
 proc chunkify(arr: seq[int], effects: seq[Actions]): seq[(int64, int64, int, Actions)] =
   if arr.len == 0:
