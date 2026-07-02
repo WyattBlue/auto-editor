@@ -90,9 +90,10 @@ proc getNextToken(self: var Lexer): Token =
           self.text[writePos] = self.`char`
         writePos += 1
         self.advance()
+      if self.`char` != '"':
+        raise newException(ValueError, "Unterminated string literal")
       let `to` = writePos
-      if self.`char` == '"':
-        self.advance()
+      self.advance()
       return Token(kind: Sym, `from`: `from`, to: `to`)
 
     if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 < uint32(
@@ -103,10 +104,17 @@ proc getNextToken(self: var Lexer): Token =
       return Token(kind: Num, `from`: `from`, to: self.pos)
 
     let `from` = self.pos
+    var writePos = self.pos
     while self.`char` notin "'.()[]{}=\",:;\0 \t\n\r\x0b\x0c":
+      # `\"` is a literal quote; other backslashes stay literal.
+      if self.`char` == '\\' and self.pos + 1 < uint32(self.text.len) and
+          self.text[self.pos + 1] == '"':
+        self.advance()
+      self.text[writePos] = self.`char`
+      writePos += 1
       self.advance()
 
-    return Token(kind: Sym, `from`: `from`, to: self.pos)
+    return Token(kind: Sym, `from`: `from`, to: writePos)
 
   return Token(kind: Eof)
 
@@ -118,11 +126,9 @@ proc eat(self: var Parser) =
   self.currentToken = self.lexer.getNextToken()
 
 proc peek(self: var Parser): Token =
-  let savedPos = self.lexer.pos
-  let savedChar = self.lexer.`char`
-  result = self.lexer.getNextToken()
-  self.lexer.pos = savedPos
-  self.lexer.`char` = savedChar
+  # Lex from a copy: string tokens unescape self.text in place.
+  var tmp = self.lexer
+  result = tmp.getNextToken()
 
 # Forward declaration
 proc expr(self: var Parser): Expr

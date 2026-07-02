@@ -103,9 +103,11 @@ proc parseNorm*(norm: string): Norm =
     return Norm(kind: nkNull)
 
   var lexer = initLexer("--audio-normalize", norm)
-  var parser = initParser(lexer)
+  var parser: Parser
   let expressions: seq[Expr] = (
-    try: parser.parse()
+    try:
+      parser = initParser(lexer) # lexes the first token, so it can raise too
+      parser.parse()
     except ValueError as e: error &"--audio-normalize: {e.msg}"
   )
   if expressions.len == 0:
@@ -184,9 +186,10 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
   ## callers can avoid fetching streams no editing method will look at. Subtitle
   ## methods read the subtitle stream, so they report neither.
   var lexer = initLexer("--edit", edit)
-  var parser = initParser(lexer)
+  var parser: Parser
   let expressions =
     try:
+      parser = initParser(lexer)
       parser.parse()
     except CatchableError:
       return (true, true) # Malformed; interpretEdit will report the real error.
@@ -412,9 +415,11 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
   proc evalEditString(editStr: string): seq[bool] =
     var lexer = initLexer("--edit", editStr)
-    var parser = initParser(lexer)
+    var parser: Parser
     let expressions: seq[Expr] = (
-      try: parser.parse()
+      try:
+        parser = initParser(lexer) # lexes the first token, so it can raise too
+        parser.parse()
       except ValueError as e: error &"--edit: {e.msg}"
     )
     if expressions.len == 0:
