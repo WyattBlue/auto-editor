@@ -1,7 +1,5 @@
 import std/[json, os, sets, tables]
 from std/math import round, hypot, ceil, sin, cos, PI
-when defined(windows):
-  import std/strutils
 
 import ../[action, ffmpeg, log, media, timeline]
 import ../util/[color, fun, rational]
@@ -22,13 +20,6 @@ recovers auto-editor's (already sped-up) `clip.dur`.
 # Premiere's sentinel keyframe position, "start of time" (-100 hours).
 const POS = -10800000.0
 
-
-proc pathToUri(a: string): string =
-  let absPath = a.absolutePath()
-  when defined(windows):
-    "file:///" & absPath.replace('\\', '/')
-  else:
-    "file://" & absPath
 
 proc rationalTime(rate, value: float): JsonNode =
   %*{"OTIO_SCHEMA": "RationalTime.1", "rate": rate, "value": value}

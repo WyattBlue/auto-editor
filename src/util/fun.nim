@@ -1,4 +1,4 @@
-import std/[base64, strutils, strformat]
+import std/[base64, os, strutils, strformat]
 from std/math import gcd, `mod`, round, trunc, pow
 
 import ../log
@@ -126,6 +126,22 @@ func agSplitFile*(path: string): tuple[dir, name, ext: string] =
     result.ext = substr(path, dotPos)
   else:
     result.name = path
+
+proc pathToUri*(path: string): string =
+  ## file:// URL for a path. Bytes outside the RFC 3986 path set (spaces,
+  ## '#', '%', non-ASCII, ...) are percent-encoded.
+  var absPath = path.absolutePath()
+  when defined(windows):
+    absPath = absPath.replace('\\', '/')
+    result = "file:///"
+  else:
+    result = "file://"
+  for c in absPath:
+    if c in {'a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_', '~', '/', ':'}:
+      result.add c
+    else:
+      result.add '%'
+      result.add toHex(ord(c), 2)
 
 const
   commonAspectRatios = [

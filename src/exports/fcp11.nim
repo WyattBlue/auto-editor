@@ -1,5 +1,4 @@
-import std/[os, tables, xmltree]
-import std/[strformat, strutils]
+import std/[strformat, strutils, tables, xmltree]
 from std/math import round
 
 import ../[action, ffmpeg, log, media, timeline]
@@ -43,15 +42,6 @@ func makeName(mi: MediaInfo, tb: AVRational): string =
   if mi.getRes() == (3840'i32, 2160'i32) and tb ~= AVRational(num: 24000, den: 1001):
     return "FFVideoFormat3840x2160p2398"
   return "FFVideoFormatRateUndefined"
-
-proc pathToUri(a: string): string =
-  let absPath = a.absolutePath()
-
-  when defined(windows):
-    let normalizedPath = absPath.replace('\\', '/')
-    return "file:///" & normalizedPath
-  else:
-    return "file://" & absPath
 
 proc parseSMPTE*(val: string, fps: AVRational): int =
   if val.len == 0:
