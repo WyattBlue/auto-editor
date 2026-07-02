@@ -279,6 +279,9 @@ proc parseKeyframes*(spec: string): seq[float32] {.raises: [ActionParseError].} 
       result.add parseFloat(part).float32
     except ValueError:
       raise newException(ActionParseError, "Invalid float value:" & part)
+  # The packed action form stores the keyframe count in a single byte.
+  if result.len > 255:
+    raise newException(ActionParseError, "Too many keyframes (max 255)")
 
 func sampleKf*(kf: seq[float32], p: float32): float32 =
   ## Piecewise-linear sample of keyframes at progress p in [0, 1].
@@ -323,6 +326,8 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
       vals[i] = parseInt(raw)
     except ValueError:
       raise newException(ActionParseError, name & ": invalid integer: " & ctx)
+    if vals[i] < low(int32).int or vals[i] > high(int32).int:
+      raise newException(ActionParseError, name & ": value out of range: " & ctx)
     seen[i] = true
 
   for idx in 1 ..< parts.len:
@@ -462,10 +467,15 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "drawbox requires x:y:w:h:color")
     var coords: array[4, int32]
     for idx in 0 ..< 4:
-      try:
-        coords[idx] = int32(parseInt(parts[idx + 1]))
-      except ValueError:
-        raise newException(ActionParseError, "Invalid integer value")
+      let n = (
+        try:
+          parseInt(parts[idx + 1])
+        except ValueError:
+          raise newException(ActionParseError, "Invalid integer value")
+      )
+      if n < low(int32).int or n > high(int32).int:
+        raise newException(ActionParseError, "drawbox value out of range: " & parts[idx + 1])
+      coords[idx] = int32(n)
     if coords[2] <= 0 or coords[3] <= 0:
       raise newException(ActionParseError, "drawbox width and height must be positive")
     let col = (
@@ -987,7 +997,16 @@ when not defined(nimscript):
   proc newActions*(list: openArray[Action]): Actions =
     if list.len == 0: return aNil
     var total = 0
-    for a in list: total += actionByteSize(a)
+    for a in list:
+      # Keyframe counts are packed into one byte; a wrapped count would
+      # misalign every later field on decode.
+      let maxKf = case a.kind
+        of actPos: max(a.pxKf.len, max(a.pyKf.len, a.pscaleKf.len))
+        of actZoom, actBlur, actOpacity, actBrightness, actVolume: a.kf.len
+        else: 0
+      if maxKf > 255:
+        raise newException(ActionParseError, "Too many keyframes (max 255)")
+      total += actionByteSize(a)
     if total > 65535:
       raise newException(ActionParseError, "atf-8 buffer overflow: too many actions")
     let p = alloc(sizeof(uint16) + total)

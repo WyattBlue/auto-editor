@@ -119,7 +119,7 @@ proc conwrite*(msg: string) {.raises: [].} =
         wasmProgressWrite(("  " & msg).cstring)
       else:
         let columns = terminalWidth()
-        let buffer: string = " ".repeat(columns - msg.len - 3)
+        let buffer: string = " ".repeat(max(0, columns - msg.len - 3))
         stdout.write("  " & msg & buffer & "\r")
       stdout.flushFile()
     except IOError:

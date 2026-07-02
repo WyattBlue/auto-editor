@@ -62,7 +62,7 @@ proc parseNat(val: string): int32 =
     try: parseInt(val)
     except ValueError: error &"Invalid natural: {val}"
   )
-  if n < 0: error &"Invalid natural: {val}"
+  if n < 0 or n > high(int32).int: error &"Invalid natural: {val}"
   result = int32(n)
 
 proc parseStream(val: string): int16 =
