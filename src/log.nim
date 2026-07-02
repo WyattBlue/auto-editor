@@ -166,5 +166,6 @@ proc intern*(interner: var StringInterner, s: string): ptr string {.raises: [].}
 
 proc cleanup*(interner: var StringInterner) =
   for ptrStr in interner.values:
+    `=destroy`(ptrStr[])
     dealloc(ptrStr)
   interner.clear()
