@@ -150,19 +150,9 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   if not tb.isValid:
     error "Invalid timebase json value"
 
-  let clipsNode = jsonNode{"clips"}
-  if clipsNode != nil and clipsNode.kind == JArray:
-    for chunkNode in clipsNode:
-      if chunkNode.kind == JArray and chunkNode.len >= 3:
-        let start: int64 = chunkNode[0].getBiggestInt()
-        let `end`: int64 = chunkNode[1].getBiggestInt()
-        if start < 0 or `end` <= start:
-          error "Invalid clip: start must come before end"
-        let effIdx = chunkNode[2].getBiggestInt()
-        if effIdx < 0 or effIdx > high(uint32).int64:
-          error "Invalid effect index"
-        clips.add Clip2(start: start, `end`: `end`, effect: uint32(effIdx))
-
+  # De-duplication moves entries, so remember where each file index landed;
+  # clip references are remapped through indexMap below.
+  var indexMap: seq[uint32]
   let effectsNode = jsonNode{"effects"}
   if effectsNode != nil and effectsNode.kind == JArray:
     for effectNode in effectsNode:
@@ -182,9 +172,24 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
       else:
         error "effects must be a list of lists"
 
-      let effectIndex = effects.find(group)
+      var effectIndex = effects.find(group)
       if effectIndex == -1:
         effects.add(group)
+        effectIndex = effects.len - 1
+      indexMap.add uint32(effectIndex)
+
+  let clipsNode = jsonNode{"clips"}
+  if clipsNode != nil and clipsNode.kind == JArray:
+    for chunkNode in clipsNode:
+      if chunkNode.kind == JArray and chunkNode.len >= 3:
+        let start: int64 = chunkNode[0].getBiggestInt()
+        let `end`: int64 = chunkNode[1].getBiggestInt()
+        if start < 0 or `end` <= start:
+          error "Invalid clip: start must come before end"
+        let effIdx = chunkNode[2].getBiggestInt()
+        if effIdx < 0 or effIdx >= indexMap.len:
+          error "Invalid effect index"
+        clips.add Clip2(start: start, `end`: `end`, effect: indexMap[effIdx])
 
   let mi = (
     try: initMediaInfo(input)
