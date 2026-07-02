@@ -130,13 +130,24 @@ proc parseSampleRate(val: string): cint =
     error "Samplerate must be positive"
 
 proc parseFrameRate(val: string): AVRational =
-  if val == "ntsc": AVRational(num: 30000, den: 1001)
-  elif val == "ntsc_film": AVRational(num: 24000, den: 1001)
-  elif val == "pal": AVRational(num: 25, den: 1)
-  elif val == "film": AVRational(num: 24, den: 1)
-  else:
+  case val
+  of "ntsc": return AVRational(num: 30000, den: 1001)
+  of "ntsc_film": return AVRational(num: 24000, den: 1001)
+  of "pal": return AVRational(num: 25, den: 1)
+  of "film": return AVRational(num: 24, den: 1)
+  else: discard
+
+  result = (
     try: toAVRational(val)
     except ValueError as e: error e.msg
+  )
+  if result == AVRational(num: 2997, den: 100):
+    warning "29.97 is not the NTSC rate; use `-r ntsc` for 30000/1001"
+  elif result == AVRational(num: 2997, den: 125) or
+      result == AVRational(num: 1199, den: 50):
+    warning &"{val} is not the NTSC film rate; use `-r ntsc_film` for 24000/1001"
+  elif result == AVRational(num: 2997, den: 50):
+    warning "59.94 is not the NTSC rate; use `-r 60000/1001`"
 
 when not defined(emscripten):
   proc wantStreams(args: mainArgs): (bool, bool) =
