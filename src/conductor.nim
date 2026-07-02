@@ -90,6 +90,8 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
   value: int, maxLen: int) =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
+  if start >= stop:
+    error &"Invalid range: start (frame {start}) must come before stop (frame {stop})"
   let cappedStop: int = min(stop, len)
   if cappedStop > actionIndex.len:
     actionIndex.setLen(cappedStop)

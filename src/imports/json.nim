@@ -152,6 +152,8 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
       if chunkNode.kind == JArray and chunkNode.len >= 3:
         let start: int64 = chunkNode[0].getBiggestInt()
         let `end`: int64 = chunkNode[1].getBiggestInt()
+        if start < 0 or `end` <= start:
+          error "Invalid clip: start must come before end"
         let effIdx = chunkNode[2].getBiggestInt()
         if effIdx < 0 or effIdx > high(uint32).int64:
           error "Invalid effect index"
@@ -205,6 +207,8 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
       error "Invalid chunk structure"
     let start: int64 = chunkNode[0].getBiggestInt()
     let `end`: int64 = chunkNode[1].getBiggestInt()
+    if start < 0 or `end` <= start:
+      error "Invalid chunk: start must come before end"
     let speed = chunkNode[2].getFloat()
     chunks.add (start, `end`, speed)
 
