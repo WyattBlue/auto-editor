@@ -55,6 +55,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   mlt.add(playlistBin)
 
   let global_out = toTimecode(float(tl.len / tl.tb), Code.standard)
+  let global_last = toTimecode(float((tl.len - 1) / tl.tb), Code.standard)
 
   let producer = newElement("producer")
   producer.attrs = {"id": "bg"}.toXmlAttributes()
@@ -73,7 +74,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   entry.attrs = {
     "producer": "bg",
     "in": "00:00:00.000",
-    "out": global_out
+    "out": global_last
   }.toXmlAttributes()
   entry.add(newText("1"))
   playlist.add(entry)
@@ -91,6 +92,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   for clip in layer:
     let src = clip.src[]
     let length = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
+    let lastFrame = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
 
     let effectGroup = tl.effects[clip.effects]
 
@@ -116,7 +118,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     if speedVal != 1.0:
       # Create producer with timewarp for speed effects
       let producer = newElement("producer")
-      producer.attrs = {"id": tagName, "out": length}.toXmlAttributes()
+      producer.attrs = {"id": tagName, "out": lastFrame}.toXmlAttributes()
       producer.addProp("length", length)
       producer.addProp("eof", "pause")
       producer.addProp("resource", &"{speedVal}:{src}")
@@ -140,7 +142,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     else:
       # Create chain without speed effects
       let chain = newElement("chain")
-      chain.attrs = {"id": tagName, "out": length}.toXmlAttributes()
+      chain.attrs = {"id": tagName, "out": lastFrame}.toXmlAttributes()
       chain.addProp("length", length)
       chain.addProp("eof", "pause")
       chain.addProp("resource", src)
@@ -166,7 +168,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
   for i, clip in layer:
     let in_time = to_timecode(float(clip.offset / tb), Code.standard)
-    let out_time = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
+    let out_time = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
 
     let playlist_entry = newElement("entry")
     playlist_entry.attrs = {
@@ -182,7 +184,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   tractor.attrs = {
     "id": "tractor0",
     "in": "00:00:00.000",
-    "out": global_out
+    "out": global_last
   }.toXmlAttributes()
 
   tractor.addProp("shotcut", "1")

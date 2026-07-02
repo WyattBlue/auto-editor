@@ -440,19 +440,18 @@ proc kdenliveWrite*(output: string, tl: v3) =
     inc chains
 
   var groups: seq[JsonNode] = @[]
-  var groupCounter = 0
   producers = 1
 
   for clip in clips:
     var groupChildren: seq[JsonNode] = @[]
     let `in` = toTimecode((clip.offset.float / tb.float), standard)
-    let `out` = toTimecode(((clip.offset + clip.dur).float / tb.float), standard)
+    let `out` = toTimecode(((clip.offset + clip.dur - 1).float / tb.float), standard)
     let path = $clip.src[]
 
     for i, playlist in clipPlaylists:
       if i mod 2 == 0:
         groupChildren.add(%*{
-          "data": &"{i div 2}:{clip.start + groupCounter}",
+          "data": &"{i div 2}:{clip.start}",
           "leaf": "clip",
           "type": "Leaf"
         })
@@ -493,7 +492,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
         playlist.add(entry)
 
     groups.add(%*{"children": groupChildren, "type": "Normal"})
-    inc groupCounter
 
   # default sequence tractor
   let sequence = newElement("tractor")
