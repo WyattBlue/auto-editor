@@ -135,8 +135,12 @@ proc pullTransient*(graph: Graph): ptr AVFrame =
     av_frame_unref(graph.recvFrame)
 
   let ret = av_buffersink_get_frame(graph.nodes[^1], graph.recvFrame)
-  if ret < 0:
+  if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
     return nil
+  if ret < 0:
+    # A mid-stream filter error is not "done"; treating it as EOF would
+    # silently truncate the stream being drained.
+    error &"Error pulling frame from filter graph: {av_err2str(ret)}"
   return graph.recvFrame
 
 proc flush*(graph: Graph) =

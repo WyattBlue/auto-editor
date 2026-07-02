@@ -459,7 +459,9 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   if av_packet_ref(self.packet, addr packet) < 0:
     error "Failed to reference packet"
 
-  discard av_interleaved_write_frame(self.formatCtx, self.packet)
+  let ret = av_interleaved_write_frame(self.formatCtx, self.packet)
+  if ret < 0:
+    error &"Could not write packet (disk full?): {av_err2str(ret)}"
 
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
@@ -481,7 +483,9 @@ iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr
     yield packet # Nim requres iterator yield values
 
 proc close*(outputCtx: ptr AVFormatContext) =
-  discard av_write_trailer(outputCtx)
+  let ret = av_write_trailer(outputCtx)
+  if ret < 0:
+    error &"Could not finalize output (disk full?): {av_err2str(ret)}"
 
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
     discard avio_closep(addr outputCtx.pb)

@@ -435,7 +435,8 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   for (outStream, cachedPkt) in imageStreams:
     if cachedPkt != nil and av_packet_ref(outPacket, cachedPkt) >= 0:
       outPacket.stream_index = outStream.index
-      discard av_interleaved_write_frame(output.formatCtx, outPacket)
+      if av_interleaved_write_frame(output.formatCtx, outPacket) < 0:
+        error "Could not write embedded image packet"
       av_packet_unref(outPacket)
 
   # Process subtitle streams

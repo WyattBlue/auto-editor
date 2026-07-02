@@ -265,6 +265,12 @@ iterator peaks*(processor: var AudioProcessor, container: InputContainer,
       let (lo, hi) = processor.`iterator`.readPeaks()
       yield (firstSamplePos + bucketIdx * spb, lo, hi)
       bucketIdx += 1
+    # The tail may be shorter than a full chunk; hasChunk skips it, but it
+    # still covers the last timeline frame.
+    if av_audio_fifo_size(processor.`iterator`.fifo) > 0:
+      let (lo, hi) = processor.`iterator`.readPeaks()
+      yield (firstSamplePos + bucketIdx * spb, lo, hi)
+      bucketIdx += 1
 
 iterator loudness*(processor: var AudioProcessor, container: InputContainer): Unorm16 =
   var frame = av_frame_alloc()
@@ -290,6 +296,9 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): Un
   if processor.`iterator` != nil:
     processor.`iterator`.flushResampler()
     while processor.`iterator`.hasChunk():
+      yield processor.`iterator`.readChunk()
+    # Same partial-tail handling as above.
+    if av_audio_fifo_size(processor.`iterator`.fifo) > 0:
       yield processor.`iterator`.readChunk()
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,

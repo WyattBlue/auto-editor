@@ -155,9 +155,10 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
     a.oc.segStartMs = job.startMs
     if a.debug:
       stderr.writeLine(&"transcribing {job.samples.len} samples at {job.startMs} ms")
-    discard ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
-      a.language.cstring, a.translate, a.threads, a.prompt.cstring,
-      a.maxLen, segCb, a.oc)
+    if ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
+        a.language.cstring, a.translate, a.threads, a.prompt.cstring,
+        a.maxLen, segCb, a.oc) != 0:
+      stderr.writeLine(&"whisper failed on segment at {job.startMs} ms; skipping")
 
 proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     model, language: string, translate: bool, format, output: string,

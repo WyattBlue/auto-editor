@@ -251,5 +251,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
   for packet in encoderCtx.encode(nil, packet):
     packet.stream_index = outputStream.index
     av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
-    discard av_interleaved_write_frame(outputCtx, packet)
+    ret = av_interleaved_write_frame(outputCtx, packet)
+    if ret < 0:
+      error &"Error writing packet: {ret}"
     av_packet_unref(packet)

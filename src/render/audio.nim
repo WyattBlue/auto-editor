@@ -171,99 +171,114 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   var totalSamples = 0
   var samplesProcessed = 0
 
+  # Shared by the demux loop and the end-of-stream decoder drain below.
+  template processFrame() =
+    let channels = frame.ch_layout.nb_channels
+    # `result` was sized from the stream's declared layout; a mid-stream
+    # channel change (e.g. AAC PCE) would overrun it in the copies below.
+    if channels != getter.channels:
+      error "Audio channel count changed mid-stream"
+    let samples = frame.nb_samples
+
+    # Convert frame PTS to sample position
+    let frameSamplePos = if frame.pts != AV_NOPTS_VALUE:
+      int64(frame.pts.float * timeBase.num.float / timeBase.den.float *
+          sampleRate.float)
+    else:
+      samplesProcessed.int64
+
+    # If this frame is before our target start, skip it
+    if frameSamplePos + samples.int64 <= start.int64:
+      samplesProcessed += samples
+      continue
+
+    # Calculate how many samples to skip in this frame
+    let samplesSkippedInFrame = max(0, start - frameSamplePos.int)
+    let samplesInFrame = samples - samplesSkippedInFrame
+    let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
+
+    # Process audio samples based on format
+    if frame.format == AV_SAMPLE_FMT_S16.cint:
+      # Interleaved 16-bit
+      let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
+      let sourceOffset = samplesSkippedInFrame * channels
+      let destOffset = totalSamples * channels
+      let bytesToCopy = samplesToProcess * channels * sizeof(int16)
+      copyMem(addr result[destOffset], addr audioData[sourceOffset], bytesToCopy)
+
+    elif frame.format == AV_SAMPLE_FMT_S16P.cint:
+      # Planar 16-bit
+      for i in 0..<samplesToProcess:
+        let frameIndex = samplesSkippedInFrame + i
+        let resultIndex = (totalSamples + i) * channels
+        for ch in 0 ..< channels:
+          if frame.data[ch] != nil:
+            let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+            result[resultIndex + ch] = channelData[frameIndex]
+
+    elif frame.format == AV_SAMPLE_FMT_FLT.cint:
+      # Interleaved float
+      let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
+      for i in 0..<samplesToProcess:
+        let frameIndex = samplesSkippedInFrame + i
+        let resultIndex = (totalSamples + i) * channels
+        for ch in 0 ..< channels:
+          # Convert float to 16-bit int with proper clamping
+          let floatSample = audioData[frameIndex * channels + ch]
+          let clampedSample = max(-1.0, min(1.0, floatSample))
+          result[resultIndex + ch] = int16(clampedSample * 32767.0)
+
+    elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
+      # Planar float
+      for i in 0..<samplesToProcess:
+        let frameIndex = samplesSkippedInFrame + i
+        let resultIndex = (totalSamples + i) * channels
+        for ch in 0 ..< channels:
+          if frame.data[ch] != nil:
+            let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
+            # Convert float to 16-bit int with proper clamping
+            let floatSample = channelData[frameIndex]
+            let clampedSample = max(-1.0, min(1.0, floatSample))
+            result[resultIndex + ch] = int16(clampedSample * 32767.0)
+
+    elif frame.format == AV_SAMPLE_FMT_S32.cint:
+      # Interleaved 32-bit
+      let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
+      for i in 0..<samplesToProcess:
+        let frameIndex = samplesSkippedInFrame + i
+        let resultIndex = (totalSamples + i) * channels
+        for ch in 0 ..< channels:
+          result[resultIndex + ch] = int16(ashr(audioData[frameIndex * channels + ch], 16))
+
+    elif frame.format == AV_SAMPLE_FMT_S32P.cint:
+      # Planar 32-bit
+      for i in 0..<samplesToProcess:
+        let frameIndex = samplesSkippedInFrame + i
+        let resultIndex = (totalSamples + i) * channels
+        for ch in 0 ..< channels:
+          if frame.data[ch] != nil:
+            let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
+            result[resultIndex + ch] = int16(ashr(channelData[frameIndex], 16))
+    else:
+      error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
+
+    totalSamples += samplesToProcess
+    samplesProcessed += samples
+
   while av_read_frame(container.formatContext, packet) >= 0 and totalSamples < targetSamples:
     defer: av_packet_unref(packet)
 
     if packet.stream_index == stream.index:
       if avcodec_send_packet(decoderCtx, packet) >= 0:
         while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
-          let channels = frame.ch_layout.nb_channels
-          let samples = frame.nb_samples
+          processFrame()
 
-          # Convert frame PTS to sample position
-          let frameSamplePos = if frame.pts != AV_NOPTS_VALUE:
-            int64(frame.pts.float * timeBase.num.float / timeBase.den.float *
-                sampleRate.float)
-          else:
-            samplesProcessed.int64
 
-          # If this frame is before our target start, skip it
-          if frameSamplePos + samples.int64 <= start.int64:
-            samplesProcessed += samples
-            continue
-
-          # Calculate how many samples to skip in this frame
-          let samplesSkippedInFrame = max(0, start - frameSamplePos.int)
-          let samplesInFrame = samples - samplesSkippedInFrame
-          let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
-
-          # Process audio samples based on format
-          if frame.format == AV_SAMPLE_FMT_S16.cint:
-            # Interleaved 16-bit
-            let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
-            let sourceOffset = samplesSkippedInFrame * channels
-            let destOffset = totalSamples * channels
-            let bytesToCopy = samplesToProcess * channels * sizeof(int16)
-            copyMem(addr result[destOffset], addr audioData[sourceOffset], bytesToCopy)
-
-          elif frame.format == AV_SAMPLE_FMT_S16P.cint:
-            # Planar 16-bit
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * channels
-              for ch in 0 ..< channels:
-                if frame.data[ch] != nil:
-                  let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-                  result[resultIndex + ch] = channelData[frameIndex]
-
-          elif frame.format == AV_SAMPLE_FMT_FLT.cint:
-            # Interleaved float
-            let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * channels
-              for ch in 0 ..< channels:
-                # Convert float to 16-bit int with proper clamping
-                let floatSample = audioData[frameIndex * channels + ch]
-                let clampedSample = max(-1.0, min(1.0, floatSample))
-                result[resultIndex + ch] = int16(clampedSample * 32767.0)
-
-          elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
-            # Planar float
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * channels
-              for ch in 0 ..< channels:
-                if frame.data[ch] != nil:
-                  let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
-                  # Convert float to 16-bit int with proper clamping
-                  let floatSample = channelData[frameIndex]
-                  let clampedSample = max(-1.0, min(1.0, floatSample))
-                  result[resultIndex + ch] = int16(clampedSample * 32767.0)
-
-          elif frame.format == AV_SAMPLE_FMT_S32.cint:
-            # Interleaved 32-bit
-            let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * channels
-              for ch in 0 ..< channels:
-                result[resultIndex + ch] = int16(ashr(audioData[frameIndex * channels + ch], 16))
-
-          elif frame.format == AV_SAMPLE_FMT_S32P.cint:
-            # Planar 32-bit
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * channels
-              for ch in 0 ..< channels:
-                if frame.data[ch] != nil:
-                  let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
-                  result[resultIndex + ch] = int16(ashr(channelData[frameIndex], 16))
-          else:
-            error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
-
-          totalSamples += samplesToProcess
-          samplesProcessed += samples
+  # Flush the decoder: CAP_DELAY decoders may hold the tail frames.
+  if totalSamples < targetSamples:
+    discard avcodec_send_packet(decoderCtx, nil)
+    while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
+      processFrame()
 
 proc createFilterGraph(effects: openArray[Action], sr: cint, layout: ref AVChannelLayout):
   (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
