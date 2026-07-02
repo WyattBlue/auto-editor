@@ -181,6 +181,9 @@ proc expr(self: var Parser): Expr =
         # Check if this argument is followed by = (assignment syntax)
         if self.currentToken.kind == Equal:
           self.eat()
+          if self.currentToken.kind notin {Num, Sym, Lparen}:
+            let key = self.lexer.text[arg.`from`.int ..< arg.to.int]
+            raise newException(ValueError, "'" & key & "=' is missing a value")
           let equalExpr = Expr(kind: ExprSym, `from`: self.currentToken.`from` - 1,
               to: self.currentToken.`from`)
           let value = self.expr()

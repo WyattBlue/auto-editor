@@ -33,11 +33,11 @@ proc parseExportString*(exportStr: string): (string, string, string) =
       break
 
     var paramStart = i
-    while i < paramsStr.len and paramsStr[i] != '=':
+    while i < paramsStr.len and paramsStr[i] notin {'=', ','}:
       inc i
 
-    if i >= paramsStr.len:
-      break
+    if i >= paramsStr.len or paramsStr[i] == ',':
+      error &"--export: expected 'key=value', got '{paramsStr[paramStart ..< i]}'"
 
     let paramName = paramsStr[paramStart..i-1]
     inc i

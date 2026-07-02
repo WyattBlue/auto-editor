@@ -222,6 +222,11 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
 proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb: AVRational, bar: Bar): seq[uint8] =
 
   proc editEval(expr: Expr, text: string): seq[bool] =
+    if expr.kind in {ExprSym, ExprNum}:
+      # A bare method inside an operator, e.g. `(or audio motion)`: invoke it
+      # with its default arguments.
+      return editEval(Expr(kind: ExprList, elements: @[expr],
+        `from`: expr.`from`, to: expr.to), text)
     if expr.kind != ExprList or expr.elements.len == 0:
       error "Bad kind"
 
