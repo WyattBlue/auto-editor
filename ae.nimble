@@ -439,7 +439,7 @@ Cflags: -I${{includedir}}
 proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
   let cmakeBuildDir = buildPath / "pkg" / package.name
   mkDir(cmakeBuildDir)
-  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+  let memArg = if kind == wasm64: " -m64" else: ""
 
   let sourceDir = absolutePath(".")
   withDir cmakeBuildDir:
@@ -463,7 +463,7 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
           &"\"-DCMAKE_CXX_FLAGS=-msimd128 -mrelaxed-simd{memArg}\"",
         ]
         if kind == wasm64:
-          args.add "\"-DCMAKE_EXE_LINKER_FLAGS=-sMEMORY64=1\""
+          args.add "\"-DCMAKE_EXE_LINKER_FLAGS=-m64\""
       of "libsvtav1":
         args &= @[
           "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
@@ -518,10 +518,10 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   ]
   if kind == wasm32 or kind == wasm64:
     mesonArgs.add "-Denable_asm=false"
-    let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+    let memArg = if kind == wasm64: " -m64" else: ""
     mesonArgs.add &"-Dc_args=\"-matomics -mbulk-memory -msimd128 -mrelaxed-simd{memArg}\""
     if kind == wasm64:
-      mesonArgs.add "-Dc_link_args=\"-sMEMORY64=1\""
+      mesonArgs.add "-Dc_link_args=\"-m64\""
     let bits = (if kind == wasm64: "64" else: "32")
     mesonArgs.add &"--cross-file={root}/scripts/wasm{bits}-emcc.txt"
   elif kind == gccWin:
@@ -549,7 +549,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
 
   let isWasm = kind == wasm32 or kind == wasm64
   let cmakePrefix = if isWasm: "emcmake cmake" else: "cmake"
-  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+  let memArg = if kind == wasm64: " -m64" else: ""
 
   let sourceDir = absolutePath("source")
   let pkgDir = buildPath / "pkg"
@@ -581,7 +581,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
     commonArgs.add(&"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory -msimd128 -mrelaxed-simd -pthread{memArg}\"")
     commonArgs.add(&"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory -msimd128 -mrelaxed-simd -pthread{memArg}\"")
     if kind == wasm64:
-      commonArgs.add("\"-DCMAKE_EXE_LINKER_FLAGS=-sMEMORY64=1\"")
+      commonArgs.add("\"-DCMAKE_EXE_LINKER_FLAGS=-m64\"")
 
   if kind == llvmWin:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
@@ -652,14 +652,14 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
   let sourceDir = absolutePath(".")
   let autoBuildDir = buildPath / "pkg" / package.name
   mkDir(autoBuildDir)
-  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
-  let ldFlags = if kind == wasm64: "-sMEMORY64=1" else: ""
+  let memArg = if kind == wasm64: " -m64" else: ""
+  let ldFlags = if kind == wasm64: "-m64" else: ""
   let x264Host = if kind == wasm64: "x86_64-gnu" else: "i686-gnu"
   withDir autoBuildDir:
     case package.name
     of "x264":
       if not fileExists("config.mak"):
-        exec &"""CFLAGS="-matomics -mbulk-memory -msimd128 -mrelaxed-simd{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-interlaced --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+        exec &"""CFLAGS="-matomics -mbulk-memory -msimd128 -mrelaxed-simd{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-interlaced --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-pthread" """
         # x264 has no wasm asm, so the C path is all we get. Its configure
         # force-appends -fno-tree-vectorize last, which suppresses LLVM
         # autovectorization. Rewrite it in-place to enable wasm SIMD and
@@ -676,7 +676,7 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
     of "zlib":
       # zlib ships a hand-written configure (not autotools): it reads CFLAGS
       # and LDFLAGS from the *environment*, not as positional args, so the
-      # flags must be exported. Without -sMEMORY64=1 reaching the compiler it
+      # flags must be exported. Without -m64 reaching the compiler it
       # silently emits wasm32 objects that can't link into the wasm64 build.
       # It also hard-codes AR=libtool whenever the build host is macOS,
       # ignoring emconfigure's AR=emar (native libtool can't archive wasm
@@ -1043,7 +1043,7 @@ Cflags: -I${{includedir}}
 """)
 
   let arch = if kind == wasm64: "x86_64" else: "x86_32"
-  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+  let memArg = if kind == wasm64: " -m64" else: ""
 
   let ffmpegBuildDir = buildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDir)

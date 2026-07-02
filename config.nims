@@ -56,13 +56,23 @@ else:
     switch("passL", "-sEXPORT_NAME=AutoEditor")
     switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS,ENV]")
     switch("passL", "-sENVIRONMENT=web,worker")
+    # emscripten 6.0.2 dropped mainScriptUrlOrBlob from the default incoming
+    # API, but the site's worker loader (runner.js) sets it to spawn pthreads.
+    # `+=` is silently ineffective for this setting, so restate the full
+    # 6.0.2 default list plus mainScriptUrlOrBlob.
+    switch("passL", "-sINCOMING_MODULE_JS_API=ENVIRONMENT,arguments,canvas," &
+      "dynamicLibraries,elementPointerLock,instantiateWasm,locateFile," &
+      "monitorRunDependencies,noExitRuntime,noInitialRun,onAbort,onExit," &
+      "onRuntimeInitialized,postRun,preInit,preRun,print,printErr,setStatus," &
+      "statusMessage,stderr,stdin,stdout,thisProgram,wasm,websocket," &
+      "mainScriptUrlOrBlob")
     switch("passL", "-lworkerfs.js")
 
     when hostCPU == "wasm32":
       switch("passL", "-sMAXIMUM_MEMORY=4294967296")
     else:
-      switch("passC", "-sMEMORY64=1")
-      switch("passL", "-sMEMORY64=1")
+      switch("passC", "-m64")
+      switch("passL", "-m64")
       switch("passL", "-sMAXIMUM_MEMORY=17179869184")  # 16 GiB
 
 # See for details: https://simonbyrne.github.io/notes/fastmath/
