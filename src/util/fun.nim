@@ -274,7 +274,9 @@ proc smoothing*(val: var seq[bool], mincut, minclip: int) =
           startP = j
           active = true
 
-        if j == len(prev) - 1 and j - startP < minclip:
+        # j is the run's last index here (inclusive), not one-past like the
+        # interior case below, so the run length needs the +1.
+        if j == len(prev) - 1 and j - startP + 1 < minclip:
           for i in startP ..< prev.len:
             next[i] = false
       elif active:
@@ -292,7 +294,7 @@ proc smoothing*(val: var seq[bool], mincut, minclip: int) =
           startP = j
           active = true
 
-        if j == len(prev) - 1 and j - startP < mincut:
+        if j == len(prev) - 1 and j - startP + 1 < mincut:
           for i in startP ..< prev.len:
             next[i] = true
       elif active:
