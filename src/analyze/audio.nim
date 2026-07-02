@@ -74,8 +74,10 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
-  # Pre-allocate buffer for reading chunks
-  result.maxBufferSize = int(result.exactSize)
+  # Pre-allocate buffer for reading chunks. Rounding error accumulation means
+  # a chunk can be up to ceil(exactSize) samples (truncating here made 29.97fps
+  # @ 48kHz read 1602 samples into a 1601-sample buffer).
+  result.maxBufferSize = int(ceil(result.exactSize))
   let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount,
                              result.maxBufferSize.cint, result.targetFormat, 0)
   if ret < 0:
@@ -114,7 +116,7 @@ proc hasChunk(iter: AudioIterator): bool =
 proc readChunk(iter: AudioIterator): Unorm16 =
   # Calculate chunk size with accumulated error
   let sizeWithError = iter.exactSize + iter.accumulatedError
-  let currentSize = round(sizeWithError).int
+  let currentSize = min(round(sizeWithError).int, iter.maxBufferSize)
   iter.accumulatedError = sizeWithError - float64(currentSize)
 
   let samples = cast[ptr UncheckedArray[int16]](iter.readBuffer)
@@ -197,7 +199,7 @@ proc readChunk(iter: AudioIterator): Unorm16 =
 
 proc readPeaks(iter: AudioIterator): tuple[lo, hi: float32] =
   let sizeWithError = iter.exactSize + iter.accumulatedError
-  let currentSize = round(sizeWithError).int
+  let currentSize = min(round(sizeWithError).int, iter.maxBufferSize)
   iter.accumulatedError = sizeWithError - float64(currentSize)
 
   let samples = cast[ptr UncheckedArray[int16]](iter.readBuffer)
