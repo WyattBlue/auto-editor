@@ -99,20 +99,24 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   let vNode = jsonNode{"v"}
   if vNode != nil and vNode.kind == JArray:
     for trackNode in vNode:
+      # An empty layer is malformed: downstream indexing (base layer,
+      # stream mapping) assumes every layer holds at least one clip.
+      if trackNode.kind != JArray or trackNode.len == 0:
+        error "'v' layers must be non-empty arrays"
       var track: seq[Clip]
-      if trackNode.kind == JArray:
-        for videoNode in trackNode:
-          track.add(parseClip(videoNode, interner, result.effects))
+      for videoNode in trackNode:
+        track.add(parseClip(videoNode, interner, result.effects))
       result.v.add track
 
   # Parse audio tracks
   let aNode = jsonNode{"a"}
   if aNode != nil and aNode.kind == JArray:
     for trackNode in aNode:
+      if trackNode.kind != JArray or trackNode.len == 0:
+        error "'a' layers must be non-empty arrays"
       var track: seq[Clip]
-      if trackNode.kind == JArray:
-        for audioNode in trackNode:
-          track.add(parseClip(audioNode, interner, result.effects))
+      for audioNode in trackNode:
+        track.add(parseClip(audioNode, interner, result.effects))
       result.a.add track
 
   let langsNode = jsonNode{"langs"}
