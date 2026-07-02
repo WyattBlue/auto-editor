@@ -302,6 +302,16 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
           av_frame_unref(outFrame)
     av_packet_unref(pkt)
 
+  # Flush the decoder first: delay codecs (AAC/MP3) still hold the last frames,
+  # which carry the end of the final utterance.
+  discard avcodec_send_packet(dec, nil)
+  while avcodec_receive_frame(dec, frame) >= 0:
+    discard av_buffersrc_write_frame(srcCtx, frame)
+    av_frame_unref(frame)
+    while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
+      gateFrame(outFrame)
+      av_frame_unref(outFrame)
+
   # Drain the resampler, enqueue whatever utterance was in progress, then let the
   # worker finish the whole backlog (Ctrl-C included) before we tear anything down.
   discard av_buffersrc_write_frame(srcCtx, nil)
