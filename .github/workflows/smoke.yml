@@ -24,8 +24,6 @@ on:
       - '.github/workflows/build.yml'
     branches:
       - master
-env:
-  AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
 jobs:
   check:
     runs-on: macos-latest
@@ -125,6 +123,8 @@ jobs:
       - name: Test
         run: nimble test
       - name: e2e Test
+        env:
+          AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
         run: python3 -m pip install av numpy && python3 tests/test.py
 
   windows:
@@ -185,6 +185,8 @@ jobs:
           token: ${{ secrets.TESTS_TOKEN }}
           path: tests
       - name: e2e Test
+        env:
+          AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
         run: python -m pip install av numpy && python tests/test.py
 
   windows-arm:
@@ -207,9 +209,9 @@ jobs:
       - name: Install llvm-mingw
         run: |
           sudo apt-get install -y build-essential pkg-config git meson
-          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20260311/llvm-mingw-20260311-ucrt-ubuntu-22.04-aarch64.tar.xz
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-aarch64.tar.xz
           tar xf llvm-mingw.tar.xz
-          echo "$PWD/llvm-mingw-20260311-ucrt-ubuntu-22.04-aarch64/bin" >> $GITHUB_PATH
+          echo "$PWD/llvm-mingw-20260616-ucrt-ubuntu-22.04-aarch64/bin" >> $GITHUB_PATH
           echo "DISABLE_VPX=1" >> $GITHUB_ENV
           echo "DISABLE_SVTAV1=1" >> $GITHUB_ENV
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
@@ -248,5 +250,7 @@ jobs:
           token: ${{ secrets.TESTS_TOKEN }}
           path: tests
       - name: e2e Test
+        env:
+          AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
         run: python -m pip install av numpy && python tests/test.py --no-failfast
 
