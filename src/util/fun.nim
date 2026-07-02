@@ -242,8 +242,11 @@ func toTb*(val: PackedInt, tb: float64): int =
   return int(val.getNumber)
 
 proc smoothing*(val: var seq[bool], mincut, minclip: int) =
-  var prev: seq[bool]
-  while prev != val:
+  # A lone run shorter than both minclip and mincut flips forever (all-true
+  # -> all-false -> all-true); checking two states back exits that 2-cycle.
+  var prev, prev2: seq[bool]
+  while prev != val and prev2 != val:
+    prev2 = prev
     prev = val
     var next = prev
     var startP = 0

@@ -325,6 +325,9 @@ func stem(path: string): string =
   agSplitFile(path).name
 
 func makeSaneTimebase*(tb: AVRational): AVRational =
+  # A 0/0 rate (no declared fps) is NaN as a float; av_d2q(NaN) is degenerate.
+  if not tb.isValid:
+    return AVRational(num: 30, den: 1)
   let tbFloat = round(tb.float64, 2)
 
   let ntsc60 = AVRational(num: 60000, den: 1001)
