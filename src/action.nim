@@ -835,7 +835,11 @@ when not defined(nimscript):
       let base = cast[ptr UncheckedArray[uint8]](int(a) + sizeof(uint16))
       var i = 0
       while i < n:
+        # The bytes come from our own pack (newActions), so the kind byte is
+        # always a declared ActionKind despite the enum's reserved holes.
+        {.push warning[HoleEnumConv]: off.}
         let kind = ActionKind((base[i] and 0x7f'u8).int)
+        {.pop.}
         case kind
         of actInvert, actHflip, actVflip, actLoop, actErosion:
           yield Action(kind: kind)
