@@ -142,7 +142,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
         audioChannels = audioChannels, duration = fraction(assetDur))
 
     let mediaRep = newElement("media-rep")
-    mediaRep.attrs = {"kind": "original-media", "src": mi.path.pathToUri()}.toXmlAttributes
+    mediaRep.attrs = {"kind": "original-media", "src": mi.path.absPath.pathToUri()}.toXmlAttributes
 
     r2.add mediaRep
     resources.add r2

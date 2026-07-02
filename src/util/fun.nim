@@ -127,16 +127,23 @@ func agSplitFile*(path: string): tuple[dir, name, ext: string] =
   else:
     result.name = path
 
-proc pathToUri*(path: string): string =
+type AbsPath* = distinct string
+  ## A filesystem path known to be absolute. `absPath` is the only
+  ## constructor, so consumers can rely on the invariant (and stay `func`).
+
+proc absPath*(path: string): AbsPath = AbsPath(path.absolutePath())
+func `$`*(path: AbsPath): string {.borrow.}
+
+func pathToUri*(path: AbsPath): string {.raises: [].} =
   ## file:// URL for a path. Bytes outside the RFC 3986 path set (spaces,
   ## '#', '%', non-ASCII, ...) are percent-encoded.
-  var absPath = path.absolutePath()
+  var p = $path
   when defined(windows):
-    absPath = absPath.replace('\\', '/')
+    p = p.replace('\\', '/')
     result = "file:///"
   else:
     result = "file://"
-  for c in absPath:
+  for c in p:
     if c in {'a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_', '~', '/', ':'}:
       result.add c
     else:

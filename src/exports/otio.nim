@@ -289,7 +289,7 @@ proc mediaRef(mi: MediaInfo, rate, availDur: float): JsonNode =
         "start_time": rationalTime(rate, 0.0)
       },
       "available_image_bounds": nil,
-      "target_url": mi.path.pathToUri()
+      "target_url": mi.path.absPath.pathToUri()
     }
   }
 

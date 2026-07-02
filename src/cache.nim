@@ -16,10 +16,11 @@ func codecOf(T: typedesc): CacheCodec =
   elif T is float32: ccFloat32
   else: {.error: "cache: unsupported element type".}
 
-proc procTag(path: string, tb: AVRational, kind, args: string): string =
-  let modTime = getLastModificationTime(path).toUnix().int
-  let (_, name, ext) = agSplitFile(path)
-  let key = &"{name}{ext}:{modTime:x}:{tb}:{args}"
+proc procTag(path: AbsPath, tb: AVRational, kind, args: string): string =
+  let info = getFileInfo($path)
+  let mtime = info.lastWriteTime
+  let key = &"{$path}:{mtime.toUnix():x}.{mtime.nanosecond:x}:" &
+    &"{info.size:x}:{tb}:{args}"
   var ctx: sha1
   ctx.init()
   ctx.update(key)
@@ -65,12 +66,12 @@ proc loadCache[T](filename: string): seq[T] =
 # Non-generic so `version` (referenced via the `&` macro) binds; it won't
 # inside a generic proc body.
 proc cacheDir(): string = getTempDir() / &"ae-{version}"
-proc cacheFilePath(path: string, tb: AVRational, kind, args: string): string =
+proc cacheFilePath(path: AbsPath, tb: AVRational, kind, args: string): string =
   cacheDir() / &"{procTag(path, tb, kind, args)}.bin"
 
 proc readCache*[T](path: string, tb: AVRational, kind, args: string): Option[seq[T]] =
   try:
-    return some(loadCache[T](cacheFilePath(path, tb, kind, args)))
+    return some(loadCache[T](cacheFilePath(path.absPath, tb, kind, args)))
   except Exception:
     return none(seq[T])
 
@@ -113,7 +114,7 @@ proc writeCache*[T](data: seq[T], tb: AVRational, path, kind, args: string) =
     discard
 
   try:
-    saveCache(cacheFilePath(path, tb, kind, args), data)
+    saveCache(cacheFilePath(path.absPath, tb, kind, args), data)
   except Exception as e:
     error &"Cache write failed: {e.msg}"
 
