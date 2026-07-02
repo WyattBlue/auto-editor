@@ -39,18 +39,27 @@ proc saveCache[T](filename: string, data: seq[T]) =
     fs.writeData(unsafeAddr data[0], data.len * sizeof(T))
 
 proc loadCache[T](filename: string): seq[T] =
-  let fs = newFileStream(filename, fmRead)
-  if fs == nil:
+  var f: File
+  if not open(f, filename):
     raise newException(IOError, "")
-  defer: fs.close()
+  defer: f.close()
 
-  if fs.readUint8() != uint8(codecOf(T)):
+  var header {.noinit.}: array[5, byte] # codec byte + int32 length
+  if f.readBuffer(addr header[0], 5) != 5:
+    raise newException(IOError, "cache truncated")
+  if header[0] != uint8(codecOf(T)):
     raise newException(IOError, "cache codec mismatch")
-  let length = fs.readInt32().int
+  var length32: int32
+  copyMem(addr length32, addr header[1], 4)
+  let length = length32.int
+  # Untrusted length: newSeq on a corrupt value is an uncatchable RangeDefect
+  # or a giant allocation.
+  if length < 0 or length.int64 * sizeof(T) != f.getFileSize() - 5:
+    raise newException(IOError, "cache length corrupt")
   result = newSeq[T](length)
   if length > 0:
     let want = length * sizeof(T)
-    if fs.readData(addr result[0], want) != want:
+    if f.readBuffer(addr result[0], want) != want:
       raise newException(IOError, "cache truncated")
 
 # Non-generic so `version` (referenced via the `&` macro) binds; it won't

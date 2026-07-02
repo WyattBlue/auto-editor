@@ -37,11 +37,14 @@ proc main*(args: seq[string]) =
   try:
     for (kind, path) in walkDir(cacheDir):
       if kind == pcFile:
+        let (_, key, ext) = agSplitFile(path)
+        # Only .bin files with the 16-char hash prefix are cache entries.
+        if ext != ".bin" or key.len < 16:
+          continue
         let size = getFileSize(path)
         totalSize += size
         let (sizeNum, sizeUnit) = formatBytes(size)
 
-        let (_, key, _) = agSplitFile(path)
         let hashPart = key[0 ..< 16]
         let restPart = key[16 .. ^1]
 
