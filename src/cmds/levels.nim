@@ -207,7 +207,7 @@ proc main*(strArgs: seq[string]) =
 
   elif editMethod == "motion":
     if container.video.len == 0:
-      error "No audio stream"
+      error "No video stream"
     if container.video.len <= userStream:
       error &"Video stream out of range: {userStream}"
 
