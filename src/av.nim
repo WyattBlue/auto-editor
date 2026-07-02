@@ -107,18 +107,19 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   if audioStreamIndex != -1:
     let packet = ffmpeg.av_packet_alloc()
-    var biggestPts = 0'i64
+    var biggestEnd = 0'i64
 
     while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
-      if packet.stream_index == audioStreamIndex:
-        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggestPts:
-          biggestPts = packet.pts
+      if packet.stream_index == audioStreamIndex and packet.pts != ffmpeg.AV_NOPTS_VALUE:
+        let endPts = packet.pts + max(packet.duration, 0)
+        if endPts > biggestEnd:
+          biggestEnd = endPts
       ffmpeg.av_packet_unref(packet)
 
     if packet != nil:
       ffmpeg.av_packet_free(addr packet)
 
-    return biggestPts * formatCtx.streams[audioStreamIndex].time_base
+    return biggestEnd * formatCtx.streams[audioStreamIndex].time_base
 
   if videoStreamIndex != -1:
     let video = container.video[0]
