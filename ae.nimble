@@ -305,12 +305,19 @@ proc download(package: Package) =
     except OSError:
       echo &"Failed to download {package.name} from {package.sourceUrl}"
       quit(1)
-    let filename = "ffmpeg_sources" / package.location
-    let hash = getFileHash(filename)
-    if package.sha256 != hash:
-      echo &"{filename}\nsha256 hash of {package.name} tarball do not match!"
-      echo &"Expected: {package.sha256}\nGot: {hash}"
-      quit(1)
+
+  # Verify every run, not only after a fresh download: the tarball may come
+  # from the CI cache or be left over from a previous hash-rejected run.
+  let filename = "ffmpeg_sources" / package.location
+  let hash = getFileHash(filename)
+  if package.sha256 != hash:
+    # Remove the tarball (or the next run trusts it via fileExists) and any
+    # tree extracted from it (or extract() skips it via dirExists).
+    rmFile(package.location)
+    rmDir(package.name)
+    echo &"{filename}\nsha256 hash of {package.name} tarball do not match!"
+    echo &"Expected: {package.sha256}\nGot: {hash}"
+    quit(1)
 
 proc extract(package: Package) =
   if not dirExists(package.name):
