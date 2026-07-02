@@ -217,6 +217,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
   if mi.v.len > 0:
     if tl.v.len == 0:
       tl.v.add @[]
+      tl.langs.insert(mi.v[0].lang, 0)
     for clip in clips:
       var videoClip = clip
       videoClip.stream = 0
