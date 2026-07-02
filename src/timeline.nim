@@ -340,18 +340,18 @@ func makeSaneTimebase*(tb: AVRational): AVRational =
   return av_d2q(tbFloat, 1000000)
 
 proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
-  var dirExists = false
+  var createdDirs = initHashSet[string]()
   var cache = initTable[string, MediaInfo]()
 
   proc makeTrack(i: int32, path: string): MediaInfo =
     let folder: string = path.parentDir / (path.stem & "_tracks")
-    if not dirExists:
+    if folder notin createdDirs:
       try:
         createDir(folder)
       except OSError:
         removeDir(folder)
         createDir(folder)
-      dirExists = true
+      createdDirs.incl folder
 
     let newtrack: string = folder / (path.stem & "_" & $i & ".wav")
     if newtrack notin cache:
