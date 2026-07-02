@@ -163,7 +163,16 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): Unorm16
       prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
       currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
 
-    copyMem(currentFrame, filteredFrame.data[0], totalPixels)
+    # linesize includes alignment padding (e.g. width 400 -> stride 416), so
+    # a flat copy of width*height bytes drifts rows; copy row by row.
+    let stride = filteredFrame.linesize[0].int
+    let rowBytes = filteredFrame.width.int
+    if stride == rowBytes:
+      copyMem(currentFrame, filteredFrame.data[0], totalPixels)
+    else:
+      for y in 0 ..< filteredFrame.height.int:
+        copyMem(addr currentFrame[y * rowBytes],
+          cast[pointer](cast[int](filteredFrame.data[0]) + y * stride), rowBytes)
 
     var value: Unorm16 = toUnorm16(0.0'f32)
     if not firstTime:
