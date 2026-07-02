@@ -79,8 +79,8 @@ proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises: [IOError].} =
     raise newException(IOError, "Could not find stream information")
 
 proc open*(filename: string): InputContainer {.raises: [IOError].} =
-  result.packet = av_packet_alloc()
   result.formatContext = openFormatCtx(filename.cstring)
+  result.packet = av_packet_alloc()
   for i in 0 ..< result.formatContext.nb_streams:
     let stream: ptr AVStream = result.formatContext.streams[i]
     case stream.codecpar.codecType
@@ -283,11 +283,17 @@ proc addStreamFromTemplate*(self: var OutputContainer,
     error &"Format '{formatName}' does not support codec '{codecName}'"
 
   let stream: ptr AVStream = avformat_new_stream(format, codec)
+  if stream == nil:
+    error "Could not allocate output stream"
   self.streams.add stream
   let ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    error "Could not allocate codec context"
+  defer: avcodec_free_context(addr ctx)
 
   # Reset the codec tag assuming we are remuxing.
-  discard avcodec_parameters_to_context(ctx, streamT.codecpar)
+  if avcodec_parameters_to_context(ctx, streamT.codecpar) < 0:
+    error "Could not copy codec parameters"
   ctx.codec_tag = 0
 
   # Some formats want stream headers to be separate
