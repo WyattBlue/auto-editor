@@ -1028,7 +1028,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let looping = firstIsLoop(obj.effects)
     var loopBase = st.loopBase
     var target = obj.index - loopBase
-    if not isLinear and target < 0:
+    if target < 0:
+      # The request precedes the completed loops: a looping overlay restarted
+      # (e.g. follow-base=0 in a later section). Re-anchor at zero; linear
+      # timelines hit this too, not just nonlinear ones.
       loopBase = 0
       target = obj.index
 
