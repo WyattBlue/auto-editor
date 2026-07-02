@@ -28,7 +28,7 @@ when defined(debug) and not defined(emscripten) and not defined(windows):
 
 proc printHelp() {.noreturn.} =
   let termWidth = max(terminalWidth(), 40)
-  let optWidth = min(32, termWidth div 3)
+  let optWidth = clamp(termWidth div 3, 15, 32)
   let helpWidth = termWidth - optWidth - 4
 
   echo "Usage: [file | url ...] [options]\n"

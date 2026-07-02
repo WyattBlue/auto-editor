@@ -4,7 +4,7 @@ import ../util/[fun, term]
 
 proc printHelp*(usage: string, opts: seq[OptDef]) {.noreturn.} =
   let termWidth = max(terminalWidth(), 40)
-  let optWidth = min(32, termWidth div 3)
+  let optWidth = clamp(termWidth div 3, 15, 32)
   let helpWidth = termWidth - optWidth - 4
 
   echo "Usage: " & usage & "\n"
