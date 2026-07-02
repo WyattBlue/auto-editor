@@ -7,10 +7,10 @@ var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 when defined(danger) or defined(release):
-  switch("define", "flto")
+  switch("panics", "on")
+when defined(flto):
   switch("passC", "-flto")
   switch("passL", "-flto")
-  switch("panics", "on")
 
 when defined(dynamic):
   let ffmpegCflags = gorgeEx("pkg-config --cflags libavutil", "")
