@@ -1047,11 +1047,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       if seekTarget < 0 or seekTarget > target:
         let indexInfo = if st.hasKfIndex: &"{st.kfFrames.len} indexed" else: "no index"
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
-      if st.lastSeekTarget != seekTarget:
-        debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
-        myCache.cns[obj.src].seek(seekTarget * st.tou, stream = myStream)
-        avcodec_flush_buffers(st.decoder)
-        st.lastSeekTarget = seekTarget
+      debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
+      myCache.cns[obj.src].seek(seekTarget * st.tou, stream = myStream)
+      avcodec_flush_buffers(st.decoder)
+      st.lastSeekTarget = seekTarget
       frameIndex = min(seekTarget, target - 1)
 
     # avg_frame_rate can be 0/0 (no declared frame rate); fall back to the
