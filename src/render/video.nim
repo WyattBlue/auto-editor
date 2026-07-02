@@ -344,8 +344,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     firstSrc = tl.v[0][0].src
 
   for src in tl.uniqueSources:
-    if src notin myCache.cns:
-      myCache.cns[src] = av.open(src[])
+    # getContainer turns a missing/unreadable source (e.g. `add:gone.mp4`)
+    # into a clean error instead of an unhandled IOError.
+    discard myCache.getContainer(src)
 
     # Per-source state with mutable-decode defaults. Decoding always begins on a
     # keyframe, so frame 0 is always a valid seek point (observedKeyframes starts

@@ -13,7 +13,10 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     return
 
   # Open source container for each remux operation
-  let srcContainer = av.open(sourcePath)
+  let srcContainer = (
+    try: av.open(sourcePath)
+    except IOError as e: error e.msg
+  )
   defer: srcContainer.close()
 
   let formatCtx = srcContainer.formatContext

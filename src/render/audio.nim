@@ -110,7 +110,10 @@ func channels(self: Getter): cint =
 
 proc newGetter(path: string, stream: int32, rate: cint): Getter =
   result = new(Getter)
-  result.container = av.open(path)
+  result.container = (
+    try: av.open(path)
+    except IOError as e: error e.msg
+  )
   result.stream = result.container.audio[stream]
   result.container.setActiveStream(result.stream.index)
   result.rate = rate

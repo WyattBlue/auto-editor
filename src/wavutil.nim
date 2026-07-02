@@ -104,7 +104,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
   var container: InputContainer
   try:
     container = av.open(inputPath)
-  except OSError as e:
+  except IOError as e:
     error e.msg
   defer: container.close()
 

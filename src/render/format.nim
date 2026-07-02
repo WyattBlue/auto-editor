@@ -230,7 +230,10 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
         if cache != nil:
           srcContainer = cache.getContainer(firstClip.src)
         else:
-          srcContainer = av.open(sourcePath)
+          srcContainer = (
+            try: av.open(sourcePath)
+            except IOError as e: error e.msg
+          )
           ownsContainer = true
         if streamIdx >= srcContainer.subtitle.len:
           error &"Subtitle stream {streamIdx} not found in {sourcePath}"

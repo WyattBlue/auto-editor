@@ -1,4 +1,4 @@
-import ./[av, ffmpeg]
+import ./[av, ffmpeg, log]
 import ./util/[lang, rational]
 
 type
@@ -143,6 +143,9 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       )
 
 proc initMediaInfo*(path: string): MediaInfo =
-  let formatCtx = av.openFormatCtx(path)
+  let formatCtx = (
+    try: av.openFormatCtx(path)
+    except IOError as e: error e.msg
+  )
   result = initMediaInfo(formatCtx, path)
   avformat_close_input(addr formatCtx)

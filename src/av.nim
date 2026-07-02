@@ -229,7 +229,10 @@ proc close*(cache: MediaCache) =
 
 proc getContainer*(cache: MediaCache, src: ptr string): InputContainer =
   if src notin cache.cns:
-    cache.cns[src] = open(src[])
+    cache.cns[src] = (
+      try: open(src[])
+      except IOError as e: error e.msg
+    )
   return cache.cns[src]
 
 type OutputContainer* = object
