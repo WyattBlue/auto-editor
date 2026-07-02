@@ -12,6 +12,7 @@ const invMax32 = 1.0'f32 / 65535.0'f32
 const invMax64 = 1.0'f64 / 65535.0'f64
 
 converter toUnorm16*(f: float32): Unorm16 =
+  if f != f: return Unorm16(0)  # NaN passes min/max; uint16(NaN) is UB
   let c = max(0.0'f32, min(1.0'f32, f))
   Unorm16(uint16(c * 65535.0'f32 + 0.5'f32))
 
@@ -52,6 +53,7 @@ const sinvMax32 = 1.0'f32 / 32767.0'f32
 const sinvMax64 = 1.0'f64 / 32767.0'f64
 
 converter toSnorm16*(f: float32): Snorm16 =
+  if f != f: return Snorm16(0)  # NaN passes min/max; int16(NaN) is UB
   let c = max(-1.0'f32, min(1.0'f32, f))
   Snorm16(int16(round(c * 32767.0'f32)))
 

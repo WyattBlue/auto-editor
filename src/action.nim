@@ -409,11 +409,12 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         except ValueError:
           raise newException(ActionParseError, "Invalid float value:" & parts[idx])
       )
-    if vals[0] < 0.0 or vals[0] > 1.0:
+    # `not (a and b)` so NaN fails the checks too; uint16(NaN) is UB.
+    if not (vals[0] >= 0.0 and vals[0] <= 1.0):
       raise newException(ActionParseError, "duck amount must be in [0.0, 1.0]")
-    if vals[1] < 0.0 or vals[1] > 1.0:
+    if not (vals[1] >= 0.0 and vals[1] <= 1.0):
       raise newException(ActionParseError, "duck threshold must be in [0.0, 1.0]")
-    if vals[2] < 0.0 or vals[2] > 65535.0 or vals[3] < 0.0 or vals[3] > 65535.0:
+    if not (vals[2] >= 0.0 and vals[2] <= 65535.0 and vals[3] >= 0.0 and vals[3] <= 65535.0):
       raise newException(ActionParseError, "duck attack/release must be in [0, 65535] ms")
     return Action(kind: actDuck, duckAmount: toUnorm16(vals[0]),
       duckThresh: toUnorm16(vals[1]), duckAttack: uint16(vals[2]),
