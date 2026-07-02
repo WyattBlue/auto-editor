@@ -23,3 +23,4 @@
  - kdenlive and ShotCut exports: MLT `out` points are inclusive, so every clip was one frame too long, repeating a frame at each cut and drifting the timeline +1 frame per clip. Clips now end on their true last frame.
  - `--export resolve` with multiple multi-track sources no longer fails: every source's `*_tracks` folder is now created, not just the first's.
  - Effects no longer compound on repeated source frames (slow motion, or a lower-fps source in a higher-fps timeline), which made the video visibly pulse; animated effects now also keep progressing on repeated frames instead of freezing.
+ - Final Cut Pro / Resolve export: drop-frame source timecodes (29.97/59.94 with a ";" separator) are now converted correctly; asset start points were ~108 frames per hour late.

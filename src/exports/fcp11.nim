@@ -48,6 +48,7 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
     return 0
 
   try:
+    let isDrop = ';' in val
     let parts = val.replace(";", ":").split(":")
     if len(parts) != 4:
       raise newException(ValueError, "Invalid SMPTE format")
@@ -65,7 +66,11 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
     if frames >= timecodeFps:
       raise newException(ValueError, &"Frame count {frames} exceeds timecode fps {timecodeFps}")
 
-    return (hours * 3600 + minutes * 60 + seconds) * timecodeFps + frames
+    result = (hours * 3600 + minutes * 60 + seconds) * timecodeFps + frames
+    if isDrop and fps.num mod fps.den != 0:
+      let d = timecodeFps div 15
+      let totalMinutes = hours * 60 + minutes
+      result -= d * (totalMinutes - totalMinutes div 10)
   except ValueError as e:
     error(&"Cannot parse SMPTE timecode '{val}': {e.msg}")
 
