@@ -931,7 +931,7 @@ task makewin, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists(winBuildPath):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger --passL:-static --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger -d:flto --passL:-static --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--out:auto-editor.exe src/main.nim"
@@ -966,7 +966,7 @@ task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
   if not dirExists(winArmBuildPath):
     echo "FFmpeg for Windows ARM64 not found. Run 'nimble makeffwinarm' first."
   else:
-    exec "nim c -d:danger --passL:-static --os:windows --cpu:arm64 --cc:clang " &
+    exec "nim c -d:danger -d:flto --passL:-static --os:windows --cpu:arm64 --cc:clang " &
          "--clang.exe:aarch64-w64-mingw32-clang " &
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
          "--out:auto-editor.exe src/main.nim"
@@ -1006,7 +1006,7 @@ task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf tool
   if not dirExists(armv7BuildPath):
     echo "FFmpeg for Linux ARMv7 not found. Run 'nimble makeffarmv7' first."
   else:
-    exec "nim c -d:danger --passL:-static --os:linux --cpu:arm --cc:gcc " &
+    exec "nim c -d:danger -d:flto --passL:-static --os:linux --cpu:arm --cc:gcc " &
          "--gcc.exe:arm-linux-gnueabihf-gcc " &
          "--gcc.linkerexe:arm-linux-gnueabihf-gcc " &
          "--passC:-march=armv7-a --passC:-mfpu=neon-vfpv3 --passC:-mfloat-abi=hard " &
@@ -1071,7 +1071,7 @@ task makewasm, "Compile to wasm32 (requires emscripten, wabt)":
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:wasm32 " &
+    exec "nim c -d:danger -d:flto -d:emscripten --threads:on --os:linux --cpu:wasm32 " &
         "--out:docs/src/auto-editor-web.js src/main.nim"
     stripProgram(wasm32)
 
@@ -1080,6 +1080,6 @@ task makewasm64, "Compile to wasm64 (requires emscripten, wabt)":
   if not dirExists("build_wasm64"):
     echo "FFmpeg for wasm64 not found. Run 'nimble makeffwasm64' first."
   else:
-    exec "nim c -d:danger -d:emscripten --threads:on --os:linux --cpu:wasm64 " &
+    exec "nim c -d:danger -d:flto -d:emscripten --threads:on --os:linux --cpu:wasm64 " &
          "--out:docs/src/auto-editor-web64.js src/main.nim"
     stripProgram(wasm64)
