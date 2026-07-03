@@ -15,6 +15,7 @@ tests
 *https*
 *.v3
 *.srt
+*_tracks
 
 # OS Files
 .DS_Store

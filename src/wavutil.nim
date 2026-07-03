@@ -224,28 +224,31 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
   except Exception as e:
     error &"Error during resampler flush: {e.msg}"
 
-  # Process any remaining buffered samples (pad with silence if needed)
   let remainingSamples = av_audio_fifo_size(audioBuffer.fifo)
   if remainingSamples > 0:
-    let silenceSamples = frameSize - remainingSamples
-    if silenceSamples > 0:
-      var silenceFrame = av_frame_alloc()
-      if silenceFrame != nil:
-        silenceFrame.format = encoderCtx.sample_fmt.cint
-        discard av_channel_layout_copy(addr silenceFrame.ch_layout, addr encoderCtx.ch_layout)
-        silenceFrame.sample_rate = encoderCtx.sample_rate
-        silenceFrame.nb_samples = silenceSamples
+    var tailFrame = av_frame_alloc()
+    if tailFrame == nil:
+      error "Could not allocate frame"
+    defer: av_frame_free(addr tailFrame)
+    tailFrame.format = encoderCtx.sample_fmt.cint
+    discard av_channel_layout_copy(addr tailFrame.ch_layout, addr encoderCtx.ch_layout)
+    tailFrame.sample_rate = encoderCtx.sample_rate
+    tailFrame.nb_samples = remainingSamples
+    if av_frame_get_buffer(tailFrame, 0) < 0:
+      error "Could not allocate frame buffer"
+    if av_audio_fifo_read(audioBuffer.fifo,
+        cast[ptr pointer](addr tailFrame.data[0]), remainingSamples) != remainingSamples:
+      error "Could not read final samples"
+    tailFrame.pts = currentPts
+    currentPts += remainingSamples
 
-        if av_frame_get_buffer(silenceFrame, 0) >= 0:
-          discard av_samples_set_silence(addr silenceFrame.data[0], 0, silenceSamples,
-                                        encoderCtx.ch_layout.nb_channels,
-                                        encoderCtx.sample_fmt)
-
-          discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx,
-            outputStream,
-            audioBuffer, currentPts, silenceFrame)
-
-        av_frame_free(addr silenceFrame)
+    for outPacket in encoderCtx.encode(tailFrame, packet):
+      outPacket.stream_index = outputStream.index
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+      ret = av_interleaved_write_frame(outputCtx, outPacket)
+      if ret < 0:
+        error &"Error writing packet: {ret}"
+      av_packet_unref(outPacket)
 
   # Flush encoder
   for packet in encoderCtx.encode(nil, packet):
