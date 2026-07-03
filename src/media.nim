@@ -67,8 +67,11 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
     let stream = formatContext.streams[i]
     let codecParameters = stream.codecpar
     var codecCtx = avcodec_alloc_context3(nil)
-    discard avcodec_parameters_to_context(codecCtx, codecParameters)
+    if codecCtx == nil:
+      error "Could not allocate codec context"
     defer: avcodec_free_context(addr codecCtx)
+    if avcodec_parameters_to_context(codecCtx, codecParameters) < 0:
+      error "Could not copy codec parameters for stream " & $i
 
     let metadata = cast[ptr AVDictionary](stream.metadata)
     let entry = av_dict_get(metadata, "language", nil, 0)
