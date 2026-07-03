@@ -59,9 +59,15 @@ proc checkpoint*(t: var Throttle, outputSec: float) =
     if t.cachedMs >= needMs:
       return
     while true:
-      t.cachedMs =
+      let permit =
         try: parseInt(strip(readFile(t.path)))
-        except CatchableError: high(int)   # unreadable -> don't block (no deadlock)
+        except CatchableError: -1
+      if permit < 0:
+        # Unreadable (missing, or caught mid-rename): let this frame through
+        # rather than risk a deadlock, but don't cache the failure — the next
+        # checkpoint must re-read the file so throttling can resume.
+        return
+      t.cachedMs = permit
       if t.cachedMs >= needMs:
         break
       sleep(50)
