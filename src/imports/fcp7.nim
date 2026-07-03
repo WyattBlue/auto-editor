@@ -6,7 +6,11 @@ import ../util/[color, rational]
 func uriToPath(uri: string): string =
   var path = uri
   if path.startsWith("file://localhost/"):
-    path = path[16..^1]
+    # Windows-style: file://localhost/C:/... -> C:/...
+    if path.len > 18 and path[18] == ':':
+      path = path[17..^1]
+    else:
+      path = path[16..^1]
   elif path.startsWith("file://"):
     # Windows-style: file:///C:/... -> C:/...
     if path.len > 9 and path[9] == ':':
