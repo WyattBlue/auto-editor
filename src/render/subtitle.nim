@@ -24,7 +24,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
   # timelineTb is the frame rate, so one frame lasts 1/timelineTb seconds.
   let frameTb = av_inv_q(timelineTb)
 
-  for clip in layer:
+  for clipIdx, clip in layer:
     if clip.stream >= srcContainer.subtitle.len:
       continue
 
@@ -37,7 +37,9 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     let clipEndSrc = av_rescale_q(clip.offset + clip.dur, frameTb, srcTb)
 
     # Seek backward so a cue already on screen at the cut-in is read too.
-    if clipStartSrc > 0:
+    # A later clip needs the seek even at source position 0, since the
+    # previous clip's loop advanced the demuxer.
+    if clipIdx > 0 or clipStartSrc > 0:
       srcContainer.seek(clipStartSrc, backward = true, stream = stream)
 
     var packet = av_packet_alloc()

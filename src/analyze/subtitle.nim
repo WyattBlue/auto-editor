@@ -22,6 +22,11 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
 
   let subtitleStream: AVStream = container.subtitle[stream][]
 
+  # Rewind so a shared container can be re-read for additional streams. Ignore
+  # failure: sidecar subtitle demuxers (e.g. srt) can't seek, but those
+  # containers are freshly opened and already at the start.
+  discard av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
+
   var length = 0
   var spans: seq[(int, int)] = @[]
   var subtitle: AVSubtitle

@@ -44,6 +44,8 @@ proc blackdetect*(bar: Bar, container: InputContainer, path: string, tb: AVRatio
     error &"blackdetect: video stream '{stream}' does not exist."
 
   let videoStream: ptr AVStream = container.video[stream]
+  # Rewind so a shared container can be re-read for additional streams.
+  container.seek(0)
 
   var processor = VideoProcessor(
     formatCtx: container.formatContext,
