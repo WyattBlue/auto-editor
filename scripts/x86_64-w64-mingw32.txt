@@ -1,8 +1,8 @@
 [binaries]
-c = 'x86_64-w64-mingw32-gcc'
-cpp = 'x86_64-w64-mingw32-g++'
-ar = 'x86_64-w64-mingw32-ar'
-strip = 'x86_64-w64-mingw32-strip'
+c = 'x86_64-w64-mingw32-clang'
+cpp = 'x86_64-w64-mingw32-clang++'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
 pkgconfig = 'pkg-config'
 
 [host_machine]

@@ -29,11 +29,11 @@ let
   wa64BuildPath = absolutePath("build_wasm64")
   ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
 
-type CrossKind = enum native, gccWin, llvmWin, armv7, wasm32, wasm64
+type CrossKind = enum native, winX64, winArm, armv7, wasm32, wasm64
 
 proc stripProgram(kind: CrossKind = native) =
   let file = (
-    if kind == gccWin or kind == llvmWin: "auto-editor.exe"
+    if kind == winX64 or kind == winArm: "auto-editor.exe"
     elif kind == wasm32: "docs/src/auto-editor-web.wasm"
     elif kind == wasm64: "docs/src/auto-editor-web64.wasm"
     else: "auto-editor"
@@ -42,9 +42,7 @@ proc stripProgram(kind: CrossKind = native) =
   case kind
   of wasm32, wasm64:
     exec "wasm-strip " & file
-  of gccWin:
-    exec "x86_64-w64-mingw32-strip -s " & file
-  of llvmWin:
+  of winX64, winArm:
     exec "llvm-strip -s " & file
   of armv7:
     exec "arm-linux-gnueabihf-strip -s " & file
@@ -243,12 +241,12 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   result = @[]
   let isMacNative = defined(macosx) and kind == native
   let isWasm = kind == wasm32 or kind == wasm64
-  if kind != armv7 and kind != llvmWin and not isMacNative and not isWasm:
+  if kind != armv7 and kind != winArm and not isMacNative and not isWasm:
     result.add nvheaders
   # AMD AMF: x86_64 Windows and Linux only
-  if kind == gccWin or (kind == native and not isMacNative and hostCPU == "amd64"):
+  if kind == winX64 or (kind == native and not isMacNative and hostCPU == "amd64"):
     result.add amfheaders
-  if enableVpl and kind != llvmWin and kind != armv7 and not isWasm:
+  if enableVpl and kind != winArm and kind != armv7 and not isWasm:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -369,10 +367,13 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     # the build dir and re-installs don't produce a hybrid BSD/GNU archive.
     cmakeArgs.add(&"-DCMAKE_OUTPUT_DIRECTORY={cmakeBuildDir}/Bin")
 
-  if kind == gccWin:
+  if kind == winX64:
     let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
-  elif kind == llvmWin:
+    if package.name == "whisper":
+      # llvm-mingw has no libgomp; ggml falls back to its own threadpool
+      cmakeArgs.add("-DGGML_OPENMP=OFF")
+  elif kind == winArm:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
@@ -420,8 +421,8 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
       let libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lc++"
     else:
       let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
-      # OpenMP is disabled for Windows ARM cross-compile; native Linux uses libgomp
-      let libsPrivate = if kind == llvmWin: "-lpthread -lm -lstdc++"
+      # OpenMP is disabled for Windows cross-compiles; native Linux uses libgomp
+      let libsPrivate = if kind in {winX64, winArm}: "-lpthread -lm -lstdc++"
                         else: "-lgomp -lpthread -lm -lstdc++"
     writeFile(pcFile, &"""prefix={buildPath}
 exec_prefix=${{prefix}}
@@ -524,9 +525,9 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
       mesonArgs.add "-Dc_link_args=\"-m64\""
     let bits = (if kind == wasm64: "64" else: "32")
     mesonArgs.add &"--cross-file={root}/scripts/wasm{bits}-emcc.txt"
-  elif kind == gccWin:
+  elif kind == winX64:
     mesonArgs.add &"--cross-file={root}/scripts/x86_64-w64-mingw32.txt"
-  elif kind == llvmWin:
+  elif kind == winArm:
     mesonArgs.add &"--cross-file={root}/scripts/aarch64-w64-mingw32.txt"
   elif kind == armv7:
     mesonArgs.add &"--cross-file={root}/scripts/arm-linux-gnueabihf.txt"
@@ -565,7 +566,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   ]
   let isLinuxAarch64 = hostOS == "linux" and hostCPU == "arm64"
 
-  if hostCPU != "amd64" or kind == llvmWin or isWasm:
+  if hostCPU != "amd64" or kind == winArm or isWasm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
@@ -583,11 +584,11 @@ proc x265Build(buildPath: string, kind: CrossKind) =
     if kind == wasm64:
       commonArgs.add("\"-DCMAKE_EXE_LINKER_FLAGS=-m64\"")
 
-  if kind == llvmWin:
+  if kind == winArm:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
-  elif kind == gccWin:
+  elif kind == winX64:
     let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
 
@@ -632,8 +633,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   else:
     let arCommand = (
       case kind
-      of llvmWin: "llvm-ar"
-      of gccWin: "x86_64-w64-mingw32-ar"
+      of winArm, winX64: "llvm-ar"
       of wasm32, wasm64: "emar"
       else: "ar"
     )
@@ -694,8 +694,8 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
 
 proc ffmpegSetup(buildPath: string): seq[Package] =
   let kind =
-    if buildPath.endsWith("_winarm"): llvmWin
-    elif buildPath.endsWith("_win"): gccWin
+    if buildPath.endsWith("_winarm"): winArm
+    elif buildPath.endsWith("_win"): winX64
     elif buildPath.endsWith("_armv7"): armv7
     elif buildPath.endsWith("_wasm64"): wasm64
     elif buildPath.endsWith("_wasm"): wasm32
@@ -738,7 +738,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
               if not fileExists("Makefile") or package.name == "x264":
                 var args = package.buildArguments
                 var envPrefix = ""
-                if kind == llvmWin:
+                if kind == winArm:
                   if package.name == "libvpx":
                     args.add("--target=arm64-win64-gcc")
                   else:
@@ -758,12 +758,12 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
                   envPrefix = "CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ AR=arm-linux-gnueabihf-ar STRIP=arm-linux-gnueabihf-strip RANLIB=arm-linux-gnueabihf-ranlib "
                   if package.name == "libvpx":
                     envPrefix &= "CROSS=arm-linux-gnueabihf- "
-                elif kind == gccWin:
+                elif kind == winX64:
                   if package.name == "libvpx":
                     args.add("--target=x86_64-win64-gcc")
                   else:
                     args.add("--host=x86_64-w64-mingw32")
-                  envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+                  envPrefix = "CC=x86_64-w64-mingw32-clang CXX=x86_64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
                 if package.name != "x264":
                   args.add "--disable-shared"
                 let cmd = &"{envPrefix}{sourceDir}/configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
@@ -811,7 +811,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   if not isCrossWasm:
     if isMacNative:
       enableEncoders.add "aac_at,alac_at,h264_videotoolbox,hevc_videotoolbox,prores_videotoolbox".split(",")
-    elif kind != armv7 and kind != llvmWin:
+    elif kind != armv7 and kind != winArm:
       enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
     if enableVpl:
       enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
@@ -847,7 +847,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       commonFlags &= &"  {package.ffFlag} \\\n"
 
   if not isCrossWasm:
-    if defined(arm) or defined(arm64) or kind == llvmWin or kind == armv7:
+    if defined(arm) or defined(arm64) or kind == winArm or kind == armv7:
       commonFlags &= "  --enable-neon \\\n"
 
     if isMacNative:
@@ -855,7 +855,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       commonFlags &= "  --enable-audiotoolbox \\\n"
       commonFlags &= "  --enable-avfoundation \\\n"
       commonFlags &= "  --enable-indev=avfoundation \\\n"
-    elif kind != armv7 and kind != llvmWin:
+    elif kind != armv7 and kind != winArm:
       commonFlags &= "  --enable-nvenc \\\n"
       commonFlags &= "  --enable-ffnvcodec \\\n"
 
@@ -920,7 +920,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   let ffmpegBuildDirWin = winBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWin)
   withDir ffmpegBuildDirWin:
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{winBuildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-clang CXX=x86_64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{winBuildPath}" \
       --pkg-config=pkg-config \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{winBuildPath}/include" \
@@ -929,20 +929,21 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, gccWin))
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winX64))
     makeInstall()
 
-task makewin, "Cross-compile to Windows (requires mingw-w64)":
+task makewin, "Cross-compile to Windows (requires llvm-mingw)":
   echo "Cross-compiling for Windows (64-bit)..."
 
   if not dirExists(winBuildPath):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger -d:flto --passL:-static --os:windows --cpu:amd64 --cc:gcc " &
-         "--gcc.exe:x86_64-w64-mingw32-gcc " &
-         "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
+    # llvm-mingw, not gcc-mingw: gcc ICEs under LTO (GCC PR97822, open in 13-16)
+    exec "nim c -d:danger -d:flto --passL:-static --os:windows --cpu:amd64 --cc:clang " &
+         "--clang.exe:x86_64-w64-mingw32-clang " &
+         "--clang.linkerexe:x86_64-w64-mingw32-clang " &
          "--out:auto-editor.exe src/main.nim"
-    stripProgram(gccWin)
+    stripProgram(winX64)
 
 task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   setupDeps()
@@ -964,7 +965,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
       --arch=aarch64 \
       --target-os=mingw32 \
       --cross-prefix=aarch64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, llvmWin))
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winArm))
     makeInstall()
 
 task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
@@ -977,7 +978,7 @@ task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
          "--clang.exe:aarch64-w64-mingw32-clang " &
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
          "--out:auto-editor.exe src/main.nim"
-    stripProgram(llvmWin)
+    stripProgram(winArm)
 
 task makeffarmv7, "Build FFmpeg for Linux ARMv7 cross-compilation":
   setupDeps()

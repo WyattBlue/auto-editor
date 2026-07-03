@@ -121,10 +121,13 @@ jobs:
         with:
           nim-version: "stable"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install mingw-w64
+      - name: Install llvm-mingw
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 mingw-w64-x86-64-dev build-essential pkg-config nasm git
+          sudo apt-get install -y build-essential pkg-config nasm git
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz
+          tar xf llvm-mingw.tar.xz
+          echo "$PWD/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin" >> $GITHUB_PATH
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile

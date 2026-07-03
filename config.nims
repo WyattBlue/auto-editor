@@ -133,7 +133,9 @@ if not defined(dynamic) and enableWhisper:
       switch("passL", "-lggml-metal")
     switch("passL", "-framework Accelerate")
     switch("passL", "-framework Metal -framework MetalKit -framework Foundation")
-  elif not (hostOS == "windows" and hostCPU == "arm64") and not defined(emscripten):
+  elif hostOS != "windows" and not defined(emscripten):
+    # Windows builds use llvm-mingw (no libgomp); ggml is built with
+    # GGML_OPENMP=OFF there and uses its own threadpool.
     switch("passL", "-lgomp")
 
 if not defined(dynamic):
