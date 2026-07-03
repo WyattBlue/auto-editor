@@ -23,6 +23,9 @@ proc readSamplesFromBuffer(buffer: var AudioBuffer,
   if av_audio_fifo_size(buffer.fifo) < buffer.frameSize:
     return false
 
+  if av_frame_make_writable(outputFrame) < 0:
+    error "Could not make frame writable"
+
   let samplesRead = av_audio_fifo_read(buffer.fifo, cast[ptr pointer](
       addr outputFrame.data[0]), buffer.frameSize)
   if samplesRead != buffer.frameSize:
