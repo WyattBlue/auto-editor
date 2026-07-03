@@ -377,6 +377,10 @@ proc editMedia*(args: var mainArgs) =
     fcp7WriteXml(tlName, output, false, tlV3)
     return
   of "resolve-fcp7":
+    # Resolve reads only a file's first audio stream from FCP7 XML
+    # (sourcetrack/trackindex is not honored across streams), so split
+    # multi-track audio into per-stream wavs like the fcpxml resolve export.
+    tlV3.setStreamTo0(interner)
     fcp7WriteXml(tlName, output, true, tlV3)
     return
   of "final-cut-pro":

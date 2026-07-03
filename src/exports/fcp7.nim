@@ -117,6 +117,9 @@ proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
 
 proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
+  # Ids must be unique across every audio track (a per-track j would repeat
+  # them, making <link> refs ambiguous); audio continues after the video ids.
+  var nextId = (if tl.v.len > 0: tl.v[0].len else: 0)
   for t, alayer in tl.a.pairs:
     let track = newElement("track")
     for j, aclip in alayer.pairs:
@@ -127,7 +130,8 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       let inVal = $aclip.offset
       let outVal = $(aclip.offset + aclip.dur)
 
-      let clipItemNum = if mi.v.len == 0: j + 1 else: alayer.len + 1 + j
+      nextId += 1
+      let clipItemNum = nextId
 
       let clipitem = newElement("clipitem")
       clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
@@ -142,7 +146,9 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
 
       let sourcetrack = newElement("sourcetrack")
       sourcetrack.add elem("mediatype", "audio")
-      sourcetrack.add elem("trackindex", $(t + 1))
+      # The clip's stream within its own file: after setStreamTo0 every
+      # track points at a single-stream wav, not the t-th stream of one file.
+      sourcetrack.add elem("trackindex", $(aclip.stream + 1))
       clipitem.add sourcetrack
 
       if mi.v.len > 0:
