@@ -1,5 +1,6 @@
 import std/[sets, strformat, tables]
 from std/math import round, hypot, ceil, floor
+from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, dnorm16, rational]
@@ -562,26 +563,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   debug &"isLinear: {isLinear}"
 
-  # Find the closest keyframe at or before targetFrame for backward seeking.
-  # A backward seek only ever targets a frame we have already decoded past, so
-  # every keyframe up to the current position has been observed -- and, having
-  # been demuxed, is now in the container's seek index.
-
-  # Upfront `keyframeIndices` is unreliable since sparsely-cued containers can
-  # report just a single keyframe.
-  proc findBestKeyframe(src: ptr string, targetFrame: int): int =
-    let kfs = srcs[src].observedKeyframes
-    var lo = 0
-    var hi = kfs.high
-    result = 0 # frame 0 is always a valid seek point
-    while lo <= hi:
-      let mid = (lo + hi) div 2
-      if kfs[mid] <= targetFrame:
-        result = kfs[mid]
-        lo = mid + 1
-      else:
-        hi = mid - 1
-
   proc keyOverBg(frame0: ptr AVFrame, effect: Action): ptr AVFrame =
     var frame = frame0
     let w = frame.width
@@ -1047,7 +1028,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     var seekFrame = st.seekFrame
     var hasSeekFrame = st.hasSeekFrame
     if frameIndex > target:
-      let seekTarget = findBestKeyframe(obj.src, target)
+      # Seek to the largest observed keyframe <= target. A backward seek only
+      # ever targets a frame we have already decoded past, so every keyframe up
+      # to here has been observed (upfront `keyframeIndices` is unreliable:
+      # sparsely-cued containers can report just a single keyframe).
+      # observedKeyframes is kept strictly ascending, so upperBound-1 is the
+      # floor; frame 0 is always a valid seek point.
+      let idx = upperBound(st.observedKeyframes, target) - 1
+      let seekTarget = if idx >= 0: st.observedKeyframes[idx] else: 0
       if seekTarget < 0 or seekTarget > target:
         let indexInfo = if st.hasKfIndex: &"{st.kfFrames.len} indexed" else: "no index"
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
