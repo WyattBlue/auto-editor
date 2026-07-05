@@ -5,19 +5,15 @@ description: Transcribe a media file's speech to text or subtitles with auto-edi
 
 # Transcribe & edit by speech
 
-auto-editor wraps whisper.cpp to transcribe audio, and can cut a timeline based
-on subtitle content via `--edit subtitle`/`word`.
+auto-editor wraps whisper.cpp to transcribe audio, and can cut a timeline based on subtitle content via `--edit subtitle`/`word`.
 
 ## Transcribe — `auto-editor whisper`
 
-```bash
+```
 auto-editor whisper <file> <model> [options]
 ```
 
-`<model>` is a path to a `ggml` whisper model (download from
-<https://huggingface.co/ggerganov/whisper.cpp>), e.g. `ggml-small.en.bin`,
-`ggml-medium.en.bin`, `ggml-large-v3.bin`. Only the first audio stream is used;
-it's resampled to 16 kHz first. The transcript prints to stdout by default.
+`<model>` is a path to a `ggml` whisper model e.g. `ggml-small.en.bin`, `ggml-medium.en.bin`, `ggml-large-v3.bin`. Only the first audio stream is used; it's resampled to 16 kHz first. The transcript prints to stdout by default.
 
 ```bash
 auto-editor whisper example.mp4 ggml-medium.en.bin                      # plain text → stdout
@@ -39,10 +35,17 @@ an `.srt` first and feed it in.
 
 | Method | Active when… | Args (defaults) |
 |---|---|---|
-| `subtitle` / `regex` | `pattern` (regex) matches a line | `pattern` required, `stream=0`, `ignore-case=#f` |
+| `subtitle` / `regex` | `pattern` (regex) matches a line | `pattern=""` (empty matches every line), `stream=0`, `ignore-case=#f` |
 | `word` | `value` appears as a whole word | `value` required, `stream=0`, `ignore-case=#t` |
 
+`pattern` is optional for `subtitle`/`regex`: with none, the empty regex matches
+every subtitle line, so `--edit subtitle` keeps all sections that have a subtitle
+(i.e. cut everything with no speech). `word`, by contrast, requires a `value`.
+
 ```bash
+# Keep only sections that have any subtitle (cut the silent gaps between speech)
+auto-editor talk.mkv --edit subtitle
+
 # Keep only sections where "introduction" is spoken
 auto-editor lecture.mp4 --edit word:introduction
 
