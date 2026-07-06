@@ -134,12 +134,10 @@ let nvheaders = Package(
   sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz",
   sha256: "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116",
 )
-# AMD AMF SDK headers (header-only); the runtime is loaded from the driver.
-# FFmpeg 8.1 requires AMF_VERSION >= 1.4.36.0.
 let amfheaders = Package(
   name: "amf-headers",
-  sourceUrl: "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.4.36.tar.gz",
-  sha256: "240a42033babc7920e5476506d5ac0c5628f67908833168e746406808d0ef146",
+  sourceUrl: "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.5.2.tar.gz",
+  sha256: "8a70b6dc85261e6e6e57769bd81ac1e09c0a4c96bbd5e358ffbc2dee51e8e50a",
   ffFlag: "--enable-amf",
 )
 let libvpl = Package(
@@ -270,7 +268,7 @@ func dirName(package: Package): string =
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "amf-headers":
-    return "AMF-1.4.36"
+    return "AMF-1.5.2"
   if package.name == "whisper":
     return "whisper.cpp-1.8.7"
 
