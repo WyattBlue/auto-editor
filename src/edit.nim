@@ -54,7 +54,9 @@ proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
     result = parseFloat(val)
   except ValueError:
     error &"Invalid number: {val}"
-  if result < min or result > max:
+  # `not (>= and <=)` instead of `< or >` so NaN is rejected too; it would
+  # otherwise flow into unchecked float->int conversions downstream.
+  if not (result >= min and result <= max):
     error &"value {result} is outside range [{min}, {max}]"
 
 proc parseNat(val: string): int32 =
@@ -294,6 +296,11 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
         return result
       of "motion":
         threshold = defaultMotionThres
+        var
+          x: float32 = 0.0
+          y: float32 = 0.0
+          w: float32 = 1.0
+          h: float32 = 1.0
         let argOrder = argOrderOf("motion")
 
         for expr in node[1 ..< node.len]:
@@ -304,6 +311,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           of 1: stream = parseStream(val)
           of 2: width = parseNat(val)
           of 3: blur = parseNat(val)
+          of 4: x = parseFloatInRange(val, 0.0, 1.0)
+          of 5: y = parseFloatInRange(val, 0.0, 1.0)
+          of 6: w = parseFloatInRange(val, 0.0, 1.0)
+          of 7: h = parseFloatInRange(val, 0.0, 1.0)
           else: error "Too many args"
 
           if not isKey:
@@ -311,7 +322,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         if stream < 0:
           error "motion: 'all' stream is not supported"
-        result.orWithThreshold(motion(bar, container, input, tb, stream, width, blur), threshold)
+        result.orWithThreshold(
+          motion(bar, container, input, tb, stream, width, blur, x, y, w, h), threshold)
         return result
       of "blackdetect":
         threshold = defaultBlackThres

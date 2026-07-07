@@ -139,7 +139,8 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
         yield filteredFrame
         av_frame_unref(filteredFrame)
 
-iterator motionness*(processor: var VideoProcessor, width, blur: int32): Unorm16 =
+iterator motionness*(processor: var VideoProcessor, width, blur: int32,
+    x: float32 = 0.0, y: float32 = 0.0, w: float32 = 1.0, h: float32 = 1.0): Unorm16 =
   var totalPixels: int = 0
   var firstTime: bool = true
   var prevIndex: int64 = -1
@@ -152,7 +153,16 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): Unorm16
     if currentFrame != nil:
       dealloc(currentFrame)
 
-  let filter = &"scale={width}:-1,format=gray,gblur=sigma={blur}"
+  var filter = &"scale={width}:-1,format=gray,gblur=sigma={blur}"
+  if x != 0.0 or y != 0.0 or w != 1.0 or h != 1.0:
+    # Crop before scaling so the analyzed region gets the full `width` resolution.
+    let iw = processor.codecCtx.width
+    let ih = processor.codecCtx.height
+    let cw = max(1'i32, int32(round(iw.float32 * w)))
+    let ch = max(1'i32, int32(round(ih.float32 * h)))
+    let cx = clamp(int32(round(iw.float32 * x)), 0'i32, iw - cw)
+    let cy = clamp(int32(round(ih.float32 * y)), 0'i32, ih - ch)
+    filter = &"crop={cw}:{ch}:{cx}:{cy}," & filter
   for filteredFrame in processor.videoPipeline(filter):
     let frameTime = (filteredFrame.pts * processor.formatCtx.streams[
         processor.videoIndex].time_base).float64
@@ -194,8 +204,8 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): Unorm16
     prevIndex = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-  stream, width, blur: int32): seq[Unorm16] =
-  let cacheArgs = &"{stream},{width},{blur}"
+  stream, width, blur: int32, x, y, w, h: float32): seq[Unorm16] =
+  let cacheArgs = &"{stream},{width},{blur},{x},{y},{w},{h}"
   if not noCache:
     let cacheData = readCache[Unorm16](path, tb, "motion", cacheArgs)
     if cacheData.isSome:
@@ -224,7 +234,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   bar.start(inaccurateDur, "Analyzing motion")
 
   var i: float = 0
-  for value in processor.motionness(width, blur):
+  for value in processor.motionness(width, blur, x, y, w, h):
     result.add value
     bar.tick(i)
     i += 1

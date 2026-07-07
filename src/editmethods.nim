@@ -38,10 +38,15 @@ const editMethodDefs*: seq[EditMethodDef] = @[
     params: @[p("threshold", "Unorm16", "0.02"),
               p("stream", "Natural", "0"),
               p("width", "Natural", "400"),
-              p("blur", "Natural", "9")],
+              p("blur", "Natural", "9"),
+              p("x", "Float", "0"),
+              p("y", "Float", "0"),
+              p("w", "Float", "1"),
+              p("h", "Float", "1")],
     help: "Scale the video to `width` pixels, convert to grayscale, apply a " &
           "Gaussian blur of `blur` amount, then compare the difference with " &
-          "the previous frame."),
+          "the previous frame. `x`, `y`, `w`, `h` restrict the analysis to a " &
+          "region of the frame, as fractions [0-1] of its size."),
   EditMethodDef(names: @["blackdetect"], media: emVideo,
     params: @[p("threshold", "Unorm16", "0.98"),
               p("stream", "Natural", "0"),

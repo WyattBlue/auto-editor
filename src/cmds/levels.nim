@@ -7,20 +7,34 @@ import ./help
 
 import ../vendor/tinyre/tinyre
 
-proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32, bool) =
+proc parseUnitFloat(name, value: string): float32 =
+  let f = (
+    try: parseFloat(value)
+    except ValueError: error &"Invalid {name}: {value}"
+  )
+  # `not (>= and <=)` so NaN is rejected too.
+  if not (f >= 0.0 and f <= 1.0): error &"{name} must be in range [0, 1]"
+  result = f.float32
+
+proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32,
+    bool, float32, float32, float32, float32) =
   var
     stream: int16 = 0
     pattern = ""
     width: int32 = 400
     blur: int32 = 9
     pixelBlack: float32 = 0.10
+    x: float32 = 0.0
+    y: float32 = 0.0
+    w: float32 = 1.0
+    h: float32 = 1.0
 
   let colonPos = editStr.find(':')
   let kind = if colonPos == -1: editStr else: editStr[0 ..< colonPos]
   var ignoreCase = kind == "word"  # word matches case-insensitively by default
 
   if colonPos == -1:
-    return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase)
+    return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase, x, y, w, h)
 
   let paramsStr = editStr[colonPos+1..^1]
 
@@ -89,13 +103,11 @@ proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32, 
         )
         if n < 0 or n > high(int32): error &"Invalid blur: {value}"
         blur = n.int32
-      of "pixel-black":
-        let f = (
-          try: parseFloat(value)
-          except ValueError: error &"Invalid pixel-black: {value}"
-        )
-        if f < 0.0 or f > 1.0: error &"pixel-black must be in range [0, 1]"
-        pixelBlack = f.float32
+      of "pixel-black": pixelBlack = parseUnitFloat("pixel-black", value)
+      of "x": x = parseUnitFloat("x", value)
+      of "y": y = parseUnitFloat("y", value)
+      of "w": w = parseUnitFloat("w", value)
+      of "h": h = parseUnitFloat("h", value)
       of "pattern": pattern = value
       of "ignore-case":
         case value
@@ -109,7 +121,7 @@ proc parseEdit(editStr: string): (string, string, int16, int32, int32, float32, 
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase)
+  return (kind, pattern, stream, width, blur, pixelBlack, ignoreCase, x, y, w, h)
 
 
 proc main*(strArgs: seq[string]) =
@@ -153,17 +165,19 @@ proc main*(strArgs: seq[string]) =
 
   av_log_set_level(AV_LOG_QUIET)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, pattern, userStream, width, blur, pixelBlack, ignoreCase) = parseEdit(edit)
+  let (editMethod, pattern, userStream, width, blur, pixelBlack, ignoreCase,
+    x, y, w, h) = parseEdit(edit)
 
   if editMethod notin ["audio", "motion", "blackdetect", "subtitle", "word", "regex"]:
     error &"Unknown editing method: {editMethod}"
   if userStream < 0:
     error "Stream must be positive"
 
+  # Must stay in sync with the cacheArgs formats in src/analyze/*.nim.
   let cacheArgs =
     if editMethod == "audio": $userStream
     elif editMethod == "blackdetect": &"{userStream},{pixelBlack}"
-    else: &"{userStream},{width},{blur}"
+    else: &"{userStream},{width},{blur},{x},{y},{w},{h}"
 
   template emit(u: Unorm16) =
     if display == "d16": echo uint16(u) else: echo u
@@ -219,7 +233,7 @@ proc main*(strArgs: seq[string]) =
       videoIndex: videoStream.index,
     )
 
-    for u in processor.motionness(width, blur):
+    for u in processor.motionness(width, blur, x, y, w, h):
       emit u
       data.add u
     echo ""
