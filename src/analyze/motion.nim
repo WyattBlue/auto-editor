@@ -140,7 +140,14 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
         av_frame_unref(filteredFrame)
 
 iterator motionness*(processor: var VideoProcessor, width, blur: int32,
-    x: float32 = 0.0, y: float32 = 0.0, w: float32 = 1.0, h: float32 = 1.0): Unorm16 =
+    rect: Unorm24x4): Unorm16 =
+  if width < 1:
+    error "motion: width must be greater than 0"
+  if blur < 0:
+    error "motion: blur must be greater than or equal to 0"
+  let (x, y, w, h) = unpackUnorm24x4(rect)
+  if not(w > 0.0'f32 and h > 0.0'f32):
+    error "motion: w and h must be greater than 0"
   var totalPixels: int = 0
   var firstTime: bool = true
   var prevIndex: int64 = -1
@@ -204,8 +211,8 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
     prevIndex = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-  stream, width, blur: int32, x, y, w, h: float32): seq[Unorm16] =
-  let cacheArgs = &"{stream},{width},{blur},{x},{y},{w},{h}"
+  stream, width, blur: int32, rect: Unorm24x4): seq[Unorm16] =
+  let cacheArgs = &"{stream},{width},{blur},{rect}"
   if not noCache:
     let cacheData = readCache[Unorm16](path, tb, "motion", cacheArgs)
     if cacheData.isSome:
@@ -234,7 +241,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   bar.start(inaccurateDur, "Analyzing motion")
 
   var i: float = 0
-  for value in processor.motionness(width, blur, x, y, w, h):
+  for value in processor.motionness(width, blur, rect):
     result.add value
     bar.tick(i)
     i += 1

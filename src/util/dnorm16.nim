@@ -1,6 +1,8 @@
 import std/[math, strutils]
 
 type Unorm16* = distinct uint16
+type Unorm24* = distinct uint32
+type Unorm24x4* = array[3, uint32]
 
 func `==`*(a, b: Unorm16): bool {.borrow.}
 func `<=`*(a, b: Unorm16): bool {.borrow.}
@@ -10,6 +12,8 @@ func high*(T: typedesc[Unorm16]): Unorm16 = Unorm16(high(uint16))
 
 const invMax32 = 1.0'f32 / 65535.0'f32
 const invMax64 = 1.0'f64 / 65535.0'f64
+const unorm24Max = 0xFFFFFF'u32
+const unorm24InvMax32 = 1.0'f32 / unorm24Max.float32
 
 converter toUnorm16*(f: float32): Unorm16 =
   if f != f: return Unorm16(0)  # NaN passes min/max; uint16(NaN) is UB
@@ -18,6 +22,38 @@ converter toUnorm16*(f: float32): Unorm16 =
 
 converter toFloat32*(u: Unorm16): float32 = uint16(u).float32 * invMax32
 func toFloat64*(u: Unorm16): float64 = uint16(u).float64 * invMax64
+
+func toUnorm24*(f: float32): Unorm24 =
+  if f != f: return Unorm24(0)
+  let c = max(0.0'f32, min(1.0'f32, f)).float64
+  Unorm24(uint32(round(c * unorm24Max.float64)))
+
+func toFloat32*(u: Unorm24): float32 = uint32(u).float32 * unorm24InvMax32
+
+func packUnorm24x4*(x, y, w, h: float32): Unorm24x4 =
+  let
+    ux = uint32(toUnorm24(x))
+    uy = uint32(toUnorm24(y))
+    uw = uint32(toUnorm24(w))
+    uh = uint32(toUnorm24(h))
+
+  [
+    ux or ((uy and 0x0000FF'u32) shl 24),
+    (uy shr 8) or ((uw and 0x00FFFF'u32) shl 16),
+    (uw shr 16) or (uh shl 8),
+  ]
+
+func unpackUnorm24x4*(r: Unorm24x4): tuple[x, y, w, h: float32] =
+  let
+    ux = r[0] and unorm24Max
+    uy = ((r[0] shr 24) or ((r[1] and 0x0000FFFF'u32) shl 8)) and unorm24Max
+    uw = ((r[1] shr 16) or ((r[2] and 0x000000FF'u32) shl 16)) and unorm24Max
+    uh = (r[2] shr 8) and unorm24Max
+  (Unorm24(ux).toFloat32, Unorm24(uy).toFloat32,
+   Unorm24(uw).toFloat32, Unorm24(uh).toFloat32)
+
+func `$`*(r: Unorm24x4): string =
+  r[0].toHex(8) & "," & r[1].toHex(8) & "," & r[2].toHex(8)
 
 const halfUnorm16* = toUnorm16(0.5'f32)
 

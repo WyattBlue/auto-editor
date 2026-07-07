@@ -167,6 +167,7 @@ proc main*(strArgs: seq[string]) =
   let chunkDuration: float64 = av_inv_q(tb)
   let (editMethod, pattern, userStream, width, blur, pixelBlack, ignoreCase,
     x, y, w, h) = parseEdit(edit)
+  let rect = packUnorm24x4(x, y, w, h)
 
   if editMethod notin ["audio", "motion", "blackdetect", "subtitle", "word", "regex"]:
     error &"Unknown editing method: {editMethod}"
@@ -177,7 +178,7 @@ proc main*(strArgs: seq[string]) =
   let cacheArgs =
     if editMethod == "audio": $userStream
     elif editMethod == "blackdetect": &"{userStream},{pixelBlack}"
-    else: &"{userStream},{width},{blur},{x},{y},{w},{h}"
+    else: &"{userStream},{width},{blur},{rect}"
 
   template emit(u: Unorm16) =
     if display == "d16": echo uint16(u) else: echo u
@@ -233,7 +234,7 @@ proc main*(strArgs: seq[string]) =
       videoIndex: videoStream.index,
     )
 
-    for u in processor.motionness(width, blur, x, y, w, h):
+    for u in processor.motionness(width, blur, rect):
       emit u
       data.add u
     echo ""

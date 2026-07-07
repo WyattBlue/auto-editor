@@ -322,8 +322,9 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         if stream < 0:
           error "motion: 'all' stream is not supported"
+        let rect = packUnorm24x4(x, y, w, h)
         result.orWithThreshold(
-          motion(bar, container, input, tb, stream, width, blur, x, y, w, h), threshold)
+          motion(bar, container, input, tb, stream, width, blur, rect), threshold)
         return result
       of "blackdetect":
         threshold = defaultBlackThres
