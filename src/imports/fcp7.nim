@@ -88,7 +88,7 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     var endVal = 0i64
     var inVal = 0i64
     var fileNode: XmlNode = nil
-    var filterNode: XmlNode = nil
+    var speed = 1.0
 
     for ci in trackChild:
       if ci.kind != xnElement: continue
@@ -97,14 +97,18 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
       of "end": endVal = parseInt(ci.innerText.strip())
       of "in": inVal = parseInt(ci.innerText.strip())
       of "file": fileNode = ci
-      of "filter": filterNode = ci
+      # A clipitem can carry several <filter>s (Opacity, Motion, Time Remap);
+      # only the Time Remap one yields a non-default speed, so keep that one
+      # regardless of sibling order rather than letting the last filter win.
+      of "filter":
+        let s = readFilters(ci)
+        if s != 1.0: speed = s
       else: discard
 
     if fileNode == nil: continue
     let srcPtr = resolveFile(fileNode, sources, interner)
     if srcPtr == nil: continue
 
-    let speed = if filterNode != nil: readFilters(filterNode) else: 1.0
     let dur = endVal - startVal
     let e = getEffect(speed, effects)
     result.add Clip(src: srcPtr, start: startVal, dur: dur, offset: inVal, effects: e, stream: 0)
