@@ -31,7 +31,7 @@ proc main*(cArgs: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("<file|:mic> <model> [options]", whisperOptions)
     if key.startsWith("--"):
-      error &"Unknown option: {key}"
+      error &"Unknown option: {key}{optionDidYouMean(key, whisperOptions)}"
     case expecting:
     of "":
       if inputPath == "":

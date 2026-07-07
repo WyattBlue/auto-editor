@@ -1,4 +1,5 @@
 import std/[macros, strformat, strutils]
+import ./util/suggest
 
 type CmdDef* = object
   name*: string
@@ -256,6 +257,14 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
   OptDef(names: "-V, -v, --version", c: cMis, kind: Flag, datum: "showVersion",
     help: "Show info about this program or option"),
 ]
+
+func optionNames*(opts: seq[OptDef]): seq[string] =
+  for opt in opts:
+    for name in opt.names.split(", "):
+      result.add name.strip()
+
+func optionDidYouMean*(key: string, opts: seq[OptDef]): string =
+  didYouMean(key, optionNames(opts))
 
 proc zshcomplete*() =
   echo "#compdef auto-editor"

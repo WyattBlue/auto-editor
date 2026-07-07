@@ -1,5 +1,5 @@
 import std/[math, strutils, options]
-import ./util/[dnorm16, color]
+import ./util/[dnorm16, color, suggest]
 
 template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
   var temp = val
@@ -199,6 +199,17 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
   ActionDef(name: "confine", flags: {afVideo}, argSpec: "[x:y:w:h[:radius][:feather][:invert]]",
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
 ]
+
+const actionNames* = block:
+  var names: seq[string]
+  for a in actionDefs:
+    names.add a.name
+  names
+
+func actionDidYouMean*(val: string): string =
+  let colon = val.find(':')
+  let name = if colon == -1: val else: val[0 ..< colon]
+  didYouMean(name, actionNames)
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
 const animScalar* = block:
@@ -616,7 +627,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len > idx:
       if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
-        raise newException(ActionParseError, "Unknown action: " & val)
+        raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
       hasE = true
       curve = parseEasing(parts[idx])
       if parts.len == idx + 2:
@@ -649,7 +660,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len >= 3:
       if not parts[2].startsWith("ease=") or parts.len > 4:
-        raise newException(ActionParseError, "Unknown action: " & val)
+        raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
       hasE = true
       curve = parseEasing(parts[2])
       if parts.len == 4:
@@ -705,7 +716,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         contrast: luvContrastId, saturation: effectVal)
     else: discard
 
-  raise newException(ActionParseError, "Unknown action: " & val)
+  raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
 
 func easeSuffix(a: Action): string =
   ## The trailing ":ease=..." for an animated action, or "" if it has none.

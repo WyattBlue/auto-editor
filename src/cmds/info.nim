@@ -309,7 +309,7 @@ proc main*(args: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", infoOptions)
     if key.startsWith("--"):
-      error &"Unknown option: {key}"
+      error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
 
     case expecting
     of "":

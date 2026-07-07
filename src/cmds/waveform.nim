@@ -21,7 +21,7 @@ proc main*(strArgs: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("<file> [options]", waveformOptions)
     if key.startsWith("--"):
-      error &"Unknown option: {key}"
+      error &"Unknown option: {key}{optionDidYouMean(key, waveformOptions)}"
 
     case expecting
     of "":

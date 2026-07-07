@@ -433,7 +433,7 @@ judge making cuts.
       if key in ["-h", "--help"]:
         printHelp()
       if key.startsWith("--"):
-        error &"Unknown option: {key}"
+        error &"Unknown option: {key}{optionDidYouMean(key, mainOptions)}"
     elif key in ["-h", "--help"]:
       printHelp()
     elif key.startsWith("--") or isKnownOption(key) or

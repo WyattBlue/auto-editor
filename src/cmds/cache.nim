@@ -23,7 +23,7 @@ proc main*(args: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("[clean | clear]", cacheOptions)
     if key.startsWith("-"):
-      error "Unknown option: " & key
+      error "Unknown option: " & key & optionDidYouMean(key, cacheOptions)
     positionals.add key
 
   let cacheDir = getTempDir() / &"ae-{version}"

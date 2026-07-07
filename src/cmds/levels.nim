@@ -126,7 +126,7 @@ proc main*(strArgs: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("<file> [options]", levelsOptions)
     if key.startsWith("--"):
-      error &"Unknown option: {key}"
+      error &"Unknown option: {key}{optionDidYouMean(key, levelsOptions)}"
 
     case expecting
     of "":

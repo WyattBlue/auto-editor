@@ -12,7 +12,7 @@ proc main*(args: seq[string]) =
     if key in ["-h", "--help"]:
       printHelp("[options]", completionOptions)
     if key.startsWith("-"):
-      error &"Unknown option: {key}"
+      error &"Unknown option: {key}{optionDidYouMean(key, completionOptions)}"
 
     case expecting
     of "shell": shell = key
