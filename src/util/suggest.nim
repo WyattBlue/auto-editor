@@ -1,19 +1,16 @@
 when not defined(emscripten) and not defined(nimscript):
-  import std/[editdistance, strutils]
+  import std/[editdistance]
 
 func didYouMean*(input: string, choices: openArray[string]): string =
   when defined(emscripten) or defined(nimscript):
-    discard input
-    discard choices
     ""
   else:
     var
       best = ""
       bestDist = high(int)
-    let needle = input.toLowerAscii()
 
     for choice in choices:
-      let dist = editDistance(needle, choice.toLowerAscii())
+      let dist = editDistance(input, choice)
       if dist < bestDist:
         best = choice
         bestDist = dist
@@ -21,7 +18,7 @@ func didYouMean*(input: string, choices: openArray[string]): string =
     if best == "" or bestDist == 0:
       return ""
 
-    let limit = max(2, needle.len div 3)
+    let limit = max(3, input.len div 3)
     if bestDist <= limit:
       "\nDid you mean " & best & "?"
     else:
