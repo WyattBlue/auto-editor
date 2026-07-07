@@ -49,7 +49,8 @@ func packRGB(c: RGBColor): uint32 =
 
 # Effects `confine` restricts to a region (adjustment effects only; geometry
 # effects like zoom/rotate/pos are intentionally left full-frame).
-const confinable = {actBlur, actBrightness, actLuv, actInvert, actErosion, actAberration}
+const confinable = {actBlur, actBrightness, actLuv, actInvert, actErosion,
+  actAberration, actPixelate}
 
 func maskGray(a: Action): string =
   ## geq luma expression (0..255) for the matte: opaque inside the shape, black
@@ -968,6 +969,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # Base layer: nothing below to reveal, so flatten the masked-out area
           # over the timeline background.
           frame = overBg(frame)
+      of actPixelate:
+        # Mosaic censor. Clamp the block to the frame so pixelize can't reject a
+        # block larger than the plane; 1x1 blocks are a no-op.
+        let w = min(effect.pixW.int, frame.width)
+        let h = min(effect.pixH.int, frame.height)
+        if w <= 1 and h <= 1:
+          continue
+        runFx(fxId(actPixelate, frame, i0 = w.int32, i1 = h.int32)):
+          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+          let filt = fxGraph.add("pixelize", &"width={w}:height={h}")
+          let bufferSink = fxGraph.add("buffersink")
+          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
       of actConfine:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset

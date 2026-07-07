@@ -426,6 +426,9 @@ auto-editor video.mp4 -w:1 varispeed:0.75
 
 # Fast silent sections with reduced volume
 auto-editor video.mp4 -w:0 speed:6,volume:0.4
+
+# Censor a face/plate: pixelate only a rectangular region
+auto-editor video.mp4 -w:1 confine:400:300:200:80,pixelate:24
 ```
 
 ## See Also

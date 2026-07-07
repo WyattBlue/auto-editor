@@ -16,8 +16,8 @@ type
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
-    actErosion, actChoke, actAberration, actMask, actConfine
-    # Can add 87 more [V] actions
+    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate
+    # Can add 86 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -85,6 +85,8 @@ type
       mInvert*: bool         # swap inside/outside
       mFeather*: uint8       # soft-edge width in px (0 = hard edge)
       mX*, mY*, mW*, mH*: int32
+    of actPixelate:
+      pixW*, pixH*: uint16   # mosaic block size in px (square when equal)
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -197,7 +199,9 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
   ActionDef(name: "mask", flags: {afVideo}, argSpec: "x:y:w:h[:radius][:feather][:invert]",
     help: "Cut the picture to a rounded-rectangle or ellipse, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."),
   ActionDef(name: "confine", flags: {afVideo}, argSpec: "[x:y:w:h[:radius][:feather][:invert]]",
-    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
+    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
+  ActionDef(name: "pixelate", flags: {afVideo}, argSpec: "[w[:h]]", range: rng(1.0, 1024.0, each = true),
+    help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
 ]
 
 const actionNames* = block:
@@ -537,6 +541,22 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "choke must be in [1, 16]")
     return Action(kind: actChoke, chokeN: uint8(n))
 
+  # pixelate: bare = 16px blocks; pixelate:n = n square; pixelate:w:h = rectangular.
+  if parts[0] == "pixelate" and parts.len <= 3:
+    var wh = [16, 16]
+    for idx in 1 ..< parts.len:
+      let n = (
+        try:
+          parseInt(parts[idx])
+        except ValueError:
+          raise newException(ActionParseError, "Invalid integer value: " & parts[idx])
+      )
+      if n < 1 or n > 1024:
+        raise newException(ActionParseError, "pixelate block size must be in [1, 1024]")
+      if parts.len == 2: wh = [n, n]  # single value = square blocks
+      else: wh[idx - 1] = n
+    return Action(kind: actPixelate, pixW: uint16(wh[0]), pixH: uint16(wh[1]))
+
   # aberration: per-channel chromatic split. Positional shorthand (no '=') is the
   # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
   # explicit per-channel form, which starts every channel at 0.
@@ -809,6 +829,9 @@ when not defined(nimscript):
     of actMask: maskStr(act, "mask")
     of actConfine:
       if act.mReset: "confine" else: maskStr(act, "confine")
+    of actPixelate:
+      if act.pixW == act.pixH: "pixelate:" & $int(act.pixW)
+      else: "pixelate:" & $int(act.pixW) & ":" & $int(act.pixH)
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -827,6 +850,7 @@ when not defined(nimscript):
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
     of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
+    of actPixelate: 5           # header + 2x uint16 (block w, h)
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -919,6 +943,12 @@ when not defined(nimscript):
             mReset: (flags and 0x2'u8) != 0, mInvert: (flags and 0x1'u8) != 0,
             mFeather: feather, mX: x, mY: y, mW: w, mH: h)
           i += 23
+        of actPixelate:
+          var w, h: uint16
+          copyMem(addr w, addr base[i + 1], sizeof(uint16))
+          copyMem(addr h, addr base[i + 3], sizeof(uint16))
+          yield Action(kind: actPixelate, pixW: w, pixH: h)
+          i += 5
         of actAberration:
           yield Action(kind: actAberration,
             abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
@@ -1077,6 +1107,10 @@ when not defined(nimscript):
         base.writeAt(i, 15, a.mH)
         base.writeAt(i, 19, a.mRadius)
         i += 23
+      of actPixelate:
+        base.writeAt(i, 1, a.pixW)
+        base.writeAt(i, 3, a.pixH)
+        i += 5
       of actAberration:
         base.writeAt(i, 1, a.abRh)
         base.writeAt(i, 2, a.abRv)
