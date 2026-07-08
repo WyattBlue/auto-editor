@@ -2,7 +2,6 @@
 title: whisper
 ---
 
-# whisper
 `whisper` transcribes the audio of a media file using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) `ggml` models. It is useful both on its own and for generating subtitles that `--edit subtitle` can then cut on.
 
 Usage:

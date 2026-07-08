@@ -2,7 +2,6 @@
 title: info
 ---
 
-## info
 `info` is a utility program that displays media information relevant to auto-editor.
 
 Here is an example. Note that you can use multiple files at once.

@@ -1,8 +1,6 @@
 ---
-title: Auto-Editor - Docs
+title: The Docs
 ---
-
-# The Docs
 
 ## General
  * [Cookbook](./cookbook)

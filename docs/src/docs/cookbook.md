@@ -1,8 +1,6 @@
 ---
-title: Auto-Editor - Cookbook
+title: Cookbook
 ---
-
-# Cookbook
 
 Short, practical recipes for getting started with auto-editor. Each one is a
 command you can copy, paste, and tweak. Replace `video.mp4` with your own file.

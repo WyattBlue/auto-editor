@@ -2,37 +2,33 @@
 title: Range Syntax
 ---
 
-# Range Syntax
 ## How Do I Cut the Beginning or End Segment in My Video?
 
 Range syntax is useful for making manual edits in addition to automatic edits. Here's how you cut out the first and last 30 seconds:
 ```sh
-auto-editor video.mp4 --cut-out start,30sec -30sec,end
+auto-editor video.mp4 --cut start,30sec -30sec,end
 ```
 
 You can also guarantee those sections would be included, regardless of loudness with:
 ```sh
-auto-editor video.mp4 --add-in start,30sec -30sec,end
+auto-editor video.mp4 --keep start,30sec -30sec,end
 ```
 
 ## How Range Syntax Works
-The `--add-in`, `--cut-out`, `--set-speed`, and `--set-action` options all use time range syntax.
+The `--keep`, `--cut`, `--set-speed`, and `--set-action` options all use time range syntax.
 
 It describes two numbers, the start and end point, separated by a singe comma `,`. The start number is inclusive, while the end number is exclusive.
 
 ```sh
 # This will cut out the first frame: frame 0
-auto-editor example.mp4 --cut-out 0,1
+auto-editor example.mp4 --cut 0,1
 
 # This will cut out five frames: frames 0, 1, 2, 3, 4
 # frame 5 will still exist because the end point is exclusive
-auto-editor example.mp4 --cut-out 0,5
+auto-editor example.mp4 --cut 0,5
 
 # Cuts out 60 frames
-auto-editor example.mp4 --cut-out 10,70
-
-# No frame will be cut here
-auto-editor example.mp4 --cut-out 0,0
+auto-editor example.mp4 --cut 10,70
 ```
 
 ## Variables
@@ -42,13 +38,13 @@ Time range syntax allows two variables: `start` and `end`
 
 ```sh
 # This will cut out everything in the beginning
-auto-editor example.mp4 --cut-out start,300
+auto-editor example.mp4 --cut start,300
 
 # This will keep everything besides the beginning, overriding other edits
-auto-editor example.mp4 --add-in 300,end
+auto-editor example.mp4 --keep 300,end
 
 # This will cut out everything
-auto-editor example.mp4 --cut-out start,end
+auto-editor example.mp4 --cut start,end
 ```
 
 ## Units
@@ -56,16 +52,9 @@ The default unit is the timeline's timebase. Since specifying the range in this 
 
 ```sh
 # Cut out the first 10 seconds.
-auto-editor example.mp4 --cut-out start,10secs
+auto-editor example.mp4 --cut start,10secs
 ```
 You can also use `s`, `sec`, `second`, or `seconds`, depending on your preference.
-
-## Multiple Ranges
-All options discussed here support specifying multiple ranges at the same time. Overlapping ranges are allowed.
-
-```sh
-auto-editor example.mp4 --cut-out 0,20 45,60, 234,452
-```
 
 ## Negative Indexes
 Negative numbers can be used to count down starting from the end.

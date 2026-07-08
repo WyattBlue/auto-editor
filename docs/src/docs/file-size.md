@@ -2,8 +2,6 @@
 title: How to Shrink File Size
 ---
 
-# How to Shrink File Size
-
 ## Auto-Editor Makes Files That Are Too Big!
 This is generally good since auto-editor tries to preserve video quality as much as possible. However, there are tricks you can use to shrink file size with little to no quality loss.
 

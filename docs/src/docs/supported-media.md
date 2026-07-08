@@ -2,13 +2,13 @@
 title: Supported Media
 ---
 
-# Supported Media
 Auto-Editor supports a wide range of media formats thanks to ffmpeg. Listed below is what is and is not allowed.
 
 ## What's allowed
  * Media with only audio streams
  * Media with only video streams
  * Media with video, audio, subtile, embedded images, and data streams
+ * Media with over 1000 streams
 
 ## What isn't
  * Media with only subtitle/data streams.

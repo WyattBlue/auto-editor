@@ -2,8 +2,6 @@
 title: Audio Normalizing
 ---
 
-# Audio Normalizing
-
 Audio normalization adjusts audio levels for consistent loudness — useful when combining sources at different volumes, or meeting a platform's loudness target.
 
 Auto-Editor supports two kinds: **peak** scales by the highest amplitude (simple, fast, preserves dynamic range); **ebu** (EBU R128) analyzes perceived loudness over time to meet broadcast standards.

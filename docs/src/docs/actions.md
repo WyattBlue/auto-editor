@@ -2,8 +2,6 @@
 title: Actions
 ---
 
-# Actions
-
 Actions define what auto-editor does to different parts of your media. By default, inactive (silent) sections are cut out and active (loud) sections are kept unchanged. Actions give you fine-grained control over this behavior.
 
 ## Basic Syntax

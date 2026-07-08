@@ -1,8 +1,6 @@
 ---
-title: Auto-Editor - Install
+title: Installing Auto-Editor
 ---
-
-# Installing Auto-Editor
 
 ## Method 1 (Recommended)
 Get the official binary, available on Windows, MacOS, and Linux.

@@ -58,13 +58,15 @@ html, p, h1, h2, h3, h4, html, blockquote {
 }
 
 h1 {
-  line-height: 1.125;
+  line-height: 1.06;
   word-break: break-word;
   text-align: center;
-  font-size: 2.5rem;
+  font-size: 2.8rem;
   font-weight: bold;
   color: #323232;
-  @media (max-width: 55em) { font-size: 2rem }
+  margin-bottom: 0.2em;
+  letter-spacing: -1px;
+  @media (max-width: 55em) { font-size: 2.3rem }
   @media (prefers-color-scheme: dark) { color: #F9F7F7 }
 }
 

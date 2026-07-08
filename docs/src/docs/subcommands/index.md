@@ -2,7 +2,6 @@
 title: Subcommands
 ---
 
-# Subcommands
 Commands (or subcommands) are auxiliary programs that offer additional functionality. They have their own options, separate from the main auto-editor cli.
 
 * [cache](./cache)
