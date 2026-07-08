@@ -120,7 +120,7 @@ auto-editor "https://www.youtube.com/watch?v=kcs82HnguGc"
 ```
 
 ## See Also
-- [How To Shrink File Size](./file-size)
+- [How to Shrink File Size](./file-size)
 - [All the Options (and What They Do)](/ref/options)
 
 <a class="next" href="./actions">Next: Actions Cookbook</a>

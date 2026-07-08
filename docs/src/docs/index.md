@@ -8,7 +8,7 @@ title: Auto-Editor - Docs
  * [Cookbook](./cookbook)
  * [Actions Cookbook](./actions)
  * [Audio Normalizing](./anorm)
- * [How To Shrink File Size](./file-size)
+ * [How to Shrink File Size](./file-size)
  * [Subcommands](./subcommands)
  * [Supported Media](./supported-media)
  * [Range Syntax](./range-syntax)
