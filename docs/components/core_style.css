@@ -15,6 +15,32 @@
   --charcoal-1000: #131417;
 
   --flow-space: 1.25rem;
+
+  /* Syntax-highlight token colors for hunim's build-time hl-* spans. Anchored on
+     the brand blue, tuned to read on the light (#F9F5F5) code background; the
+     dark overrides below suit the dark (#323232) one. */
+  --hl-keyword: #0573D9;
+  --hl-string: #0E7C86;
+  --hl-number: #B45309;
+  --hl-comment: #787A7D;
+  --hl-operator: #45474A;
+  --hl-escape: #C0208A;
+  --hl-preprocessor: #7C3AED;
+  --hl-regex: #C0208A;
+  --hl-program: #0573D9;
+  --hl-option: #0E7C86;
+  @media (prefers-color-scheme: dark) {
+    --hl-keyword: #63C0F4;
+    --hl-string: #5FD0DA;
+    --hl-number: #F0A868;
+    --hl-comment: #AAACAF;
+    --hl-operator: #C9CBCE;
+    --hl-escape: #F58FC2;
+    --hl-preprocessor: #C4A2F0;
+    --hl-regex: #F58FC2;
+    --hl-program: #63C0F4;
+    --hl-option: #5FD0DA;
+  }
 }
 
 html {
@@ -201,6 +227,18 @@ pre {
     color: #F9F7F7;
   }
 }
+
+/* Build-time syntax-highlight tokens (hunim wraps code in hl-* spans). */
+pre code .hl-keyword      { color: var(--hl-keyword) }
+pre code .hl-string       { color: var(--hl-string) }
+pre code .hl-escape       { color: var(--hl-escape) }
+pre code .hl-number       { color: var(--hl-number) }
+pre code .hl-comment      { color: var(--hl-comment); font-style: italic }
+pre code .hl-operator     { color: var(--hl-operator) }
+pre code .hl-preprocessor { color: var(--hl-preprocessor) }
+pre code .hl-regex        { color: var(--hl-regex) }
+pre code .hl-program      { color: var(--hl-program); font-weight: 600 }
+pre code .hl-option       { color: var(--hl-option) }
 
 blockquote {
   padding: 0 10px;
