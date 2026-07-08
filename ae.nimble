@@ -157,9 +157,9 @@ let libvpl = Package(
 )
 let lame = Package(
   name: "lame",
-  sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
-  sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
-  buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest", "--disable-dependency-tracking"],
+  sourceUrl: "https://github.com/basswood-io/lamer/archive/refs/tags/v3.100.1.tar.gz",
+  sha256: "943eac863ff803b5a698cec0bdc483ce9081b1e74ca8978e94daafb44522c946",
+  buildSystem: "make",
   ffFlag: "--enable-libmp3lame",
 )
 let opus = Package(
@@ -271,6 +271,10 @@ func dirName(package: Package): string =
     return "AMF-1.5.2"
   if package.name == "whisper":
     return "whisper.cpp-1.8.7"
+  if package.name == "lame" and package.sourceUrl.contains("basswood-io/lamer"):
+    var version = package.location.replace(".tar.gz", "")
+    version.removePrefix("v")
+    return "lamer-" & version
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -690,6 +694,33 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
         exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory -msimd128 -mrelaxed-simd{memArg}" LDFLAGS="{ldFlags}" """
       makeInstall()
 
+proc makeBuild(buildPath: string, kind: CrossKind) =
+  var envPrefix = ""
+  case kind
+  of winX64:
+    envPrefix = "CC=x86_64-w64-mingw32-clang AR=llvm-ar RANLIB=llvm-ranlib "
+  of winArm:
+    envPrefix = "CC=aarch64-w64-mingw32-clang AR=llvm-ar RANLIB=llvm-ranlib "
+  of armv7:
+    envPrefix = "CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar RANLIB=arm-linux-gnueabihf-ranlib "
+  of wasm32, wasm64:
+    envPrefix = "CC=emcc AR=emar RANLIB=emranlib "
+  of native:
+    discard
+
+  let picFlag = if kind == winX64 or kind == winArm: "" else: " PIC=1"
+  let wasmCflags =
+    case kind
+    of wasm32:
+      " CFLAGS=\"-matomics -mbulk-memory -msimd128 -mrelaxed-simd\""
+    of wasm64:
+      " CFLAGS=\"-matomics -mbulk-memory -msimd128 -mrelaxed-simd -m64\" LDFLAGS=\"-m64\""
+    else:
+      ""
+  exec &"{envPrefix}make clean"
+  exec &"{envPrefix}make lib DECODER=0{picFlag}{wasmCflags}"
+  exec &"{envPrefix}make install DECODER=0{picFlag}{wasmCflags} PREFIX=\"{buildPath}\""
+
 proc ffmpegSetup(buildPath: string): seq[Package] =
   let kind =
     if buildPath.endsWith("_winarm"): winArm
@@ -719,6 +750,8 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
           mesonBuild(package, buildPath, kind)
         elif package.buildSystem == "x265":
           x265Build(buildPath, kind)
+        elif package.buildSystem == "make":
+          makeBuild(buildPath, kind)
         elif isWasm:
           autoconfBuildWasm(package, buildPath, kind)
         else:
@@ -1026,20 +1059,6 @@ proc buildFFmpegForWasm(buildPath: string, kind: CrossKind) =
   mkDir(buildPath)
 
   let packages = ffmpegSetup(buildPath)
-
-  # lame ships no .pc file; create one so FFmpeg's configure can find it
-  mkDir(buildPath / "lib" / "pkgconfig")
-  writeFile(buildPath / "lib" / "pkgconfig" / "mp3lame.pc", &"""prefix={buildPath}
-exec_prefix=${{prefix}}
-libdir=${{prefix}}/lib
-includedir=${{prefix}}/include
-
-Name: mp3lame
-Description: MPEG Layer 3 audio codec
-Version: 3.100
-Libs: -L${{libdir}} -lmp3lame
-Cflags: -I${{includedir}}
-""")
 
   let arch = if kind == wasm64: "x86_64" else: "x86_32"
   let memArg = if kind == wasm64: " -m64" else: ""
