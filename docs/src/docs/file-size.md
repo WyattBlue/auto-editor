@@ -11,12 +11,12 @@ This is generally good since auto-editor tries to preserve video quality as much
 Change the video bitrate to a lower value. By default, the video bitrate is set to `auto`, which lets the encoder choose. The encoder might set a bitrate too high for your liking, so you can set it manually based on the file size you expect.
 
 Assuming the video is 2 minutes, the file size will be about 27600k (2 * 60 * 230), not including audio size.
-```
+```sh
 auto-editor my-video.mp4 -b:v 230k
 ```
 
 Examples:
-```
+```sh
 auto-editor my-huge-h264-video.mp4 -b:v 10M  # Maximum quality, big file size
 auto-editor my-h264-video.mp4 -b:v auto  # Let ffmpeg chose, efficient and good looking quality
 auto-editor i-want-this-tiny.mp4 -b:v 125k  # Set bitrate to 125 kilobytes, quality may vary
@@ -49,14 +49,14 @@ The table below compares different video codecs:
 Due to copyright and patent law affecting software makers, auto-editor does not bundle hevc software encoders, but you can re-encode your videos if you have your own ffmpeg installed.
 
 Example:
-```
+```sh
 ffmpeg -i my-video.mp4 -c:a copy -c:v hevc -b:v 0 my-video-h265.mp4
 ```
 
 ## Tips for libx264
 You can use these options with auto-editor:
 
-```
+```sh
 auto-editor input.mp4 -c:v libx264 -preset medium
 ```
 

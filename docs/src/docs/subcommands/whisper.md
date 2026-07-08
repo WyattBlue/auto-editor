@@ -21,7 +21,7 @@ Example:
 ```
 
 By default the transcript is written to stdout as plain text. Use `--output` to write to a file and `--format` to choose the representation:
-```
+```sh
 auto-editor whisper example.mp4 ggml-medium.en.bin --format srt -o out.srt
 ```
 

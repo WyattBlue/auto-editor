@@ -9,13 +9,13 @@ The `cache` command stores the `audio` and `motion` levels, saving time at the c
 ## Examples
 To list the cache files:
 
-```
+```sh
 auto-editor cache
 ```
 
 To remove the cache files:
 
-```
+```sh
 auto-editor cache clear
 ```
 

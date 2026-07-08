@@ -4,7 +4,7 @@
  - [Hunim](https://github.com/basswood-io/hunim)
  - rsync and ssh (for deployment)
 
-```
+```sh
 # Run local
 hunim server
 

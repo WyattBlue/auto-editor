@@ -10,7 +10,7 @@ Actions define what auto-editor does to different parts of your media. By defaul
 
 Actions are specified using the `--when-inactive` and `--when-active` options:
 
-```bash
+```sh
 # Cut inactive sections (default behavior)
 auto-editor video.mp4 --when-inactive cut
 
@@ -42,7 +42,7 @@ Define extra classes with `--edit:N EXPR` (where `N` is `2`–`255`) and give ea
 its own action with `--when:N ACTION`. Where two classes overlap, the **higher
 label wins**, so later/larger labels layer on top of the basic silent/active split.
 
-```bash
+```sh
 # Cut silence and keep speech as usual, but additionally speed up the loud parts
 auto-editor video.mp4 --edit:2 audio:-12dB --when:2 speed:1.5
 
@@ -56,7 +56,7 @@ auto-editor video.mp4 -e:2 motion:0.02 -w:2 zoom:2
 
 Do nothing. Keep the section unchanged.
 
-```bash
+```sh
 # Keep everything, even silent sections
 auto-editor video.mp4 --when-inactive nil
 ```
@@ -65,7 +65,7 @@ auto-editor video.mp4 --when-inactive nil
 
 Remove the section completely from the output.
 
-```bash
+```sh
 # Remove inactive sections (default behavior)
 auto-editor video.mp4 --when-inactive cut
 
@@ -77,7 +77,7 @@ auto-editor video.mp4 --when-active cut
 
 Change the playback speed while preserving pitch using time-stretching.
 
-```bash
+```sh
 # Speed up inactive sections to 8x (preserving pitch)
 auto-editor video.mp4 -w:0 speed:8
 
@@ -90,7 +90,7 @@ auto-editor video.mp4 -w:1 speed:0.5
 Change the playback speed by varying pitch, like analog tape or vinyl.
 - **Value range:** 0.2 to 100.0
 
-```bash
+```sh
 # Speed up inactive sections with pitch variation
 auto-editor video.mp4 -w:0 varispeed:2
 
@@ -105,7 +105,7 @@ Adjust the audio volume level.
 - **0.5** = half volume (-6dB)
 - **2.0** = double volume (+6dB)
 
-```bash
+```sh
 # Reduce silent section volume to 20%
 auto-editor video.mp4 -w:0 volume:0.2
 
@@ -124,7 +124,7 @@ positional args, `deesser:intensity[:max[:freq]]`, each in the range 0.0 to 1.0:
 - **max** — caps the maximum reduction (default 0.5)
 - **freq** — split frequency (default 0.5)
 
-```bash
+```sh
 # De-ess active (spoken) sections
 auto-editor video.mp4 -w:1 deesser:0.5
 
@@ -136,7 +136,7 @@ auto-editor video.mp4 -w:1 deesser:0.8:0.7:0.4
 
 Invert all pixels in the video section.
 
-```bash
+```sh
 auto-editor video.mp4 -w:0 invert
 ```
 
@@ -146,7 +146,7 @@ Zoom in or out by a factor.
 - **Value range:** greater than 0.0, up to 100.0
 - **1.0** = no zoom
 
-```bash
+```sh
 # Zoom in 2x on active sections
 auto-editor video.mp4 -w:1 zoom:2
 
@@ -163,7 +163,7 @@ filled with the background color. The rotated picture is then fit into the outpu
 `--resolution` as usual, so pair `rotate:90` with a matching `--resolution` for a
 true portrait output. For a continuous rotation, use [`spin`](#spin) instead.
 
-```bash
+```sh
 # Turn the picture upside-down
 auto-editor video.mp4 -w:1 rotate:180
 
@@ -179,7 +179,7 @@ the ramp effects below, `rotate` is not affected by `ease`.
 Spin the picture continuously, `spin:deg/rate`: start at `deg` and turn at `rate`
 degrees per second (negative `rate` spins counter-clockwise).
 
-```bash
+```sh
 # Spin at 120 degrees/second (one full turn every 3 seconds)
 auto-editor video.mp4 -w:1 spin:0/120
 
@@ -193,7 +193,7 @@ layer (see [`add`](#add)) the exposed corners are left **transparent**, so only
 the picture shows over the layers below; otherwise they are filled with the
 background color.
 
-```bash
+```sh
 # Spin a logo overlay over the video
 auto-editor video.mp4 -w:1 add:./logo.png,spin:0/-30
 ```
@@ -210,7 +210,7 @@ Draw a filled rectangle onto the picture. Takes five positional args,
 - **w**, **h** — the width and height, in pixels (both must be positive).
 - **color** — an RGB color, either a name (`red`) or a hex value (`#ff0000`).
 
-```bash
+```sh
 # Cover the top-left corner with a 400x200 red box
 auto-editor video.mp4 -w:1 drawbox:100:100:400:200:red
 
@@ -246,7 +246,7 @@ Overlay an image or video on top of the matched sections, `add:path` or
   aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
   (e.g. `0..600`), so the overlay animates across the section.
 
-```bash
+```sh
 # Overlay a logo scaled to fit and centered over every kept (normal) section
 auto-editor video.mp4 -w:1 add:./logo.png
 
@@ -291,7 +291,7 @@ output stays audio-only.
 
 You can combine multiple actions using commas. Actions are applied in the order specified.
 
-```bash
+```sh
 # Speed up AND reduce volume
 auto-editor video.mp4 -w:0 speed:3,volume:0.5
 
@@ -314,7 +314,7 @@ described above.)
 `pos` is animatable too: each of its `x`, `y`, and `scale` fields takes its own
 ramp, so an overlay can slide and resize across the section.
 
-```bash
+```sh
 # Slowly zoom in from 1x to 1.5x across the section (Ken Burns)
 auto-editor video.mp4 -w:1 zoom:1..1.5
 
@@ -335,7 +335,7 @@ The ramp reaches `to` on the section's last frame.
 A ramp can have more than two points — list them with `..` and the value is
 interpolated piecewise between them, evenly spread across the section:
 
-```bash
+```sh
 # Zoom in then back out
 auto-editor video.mp4 -w:1 zoom:1..1.5..1
 
@@ -348,7 +348,7 @@ auto-editor video.mp4 -w:1 opacity:0..1..1..0
 By default a ramp is linear and spans the whole section. Attach an easing curve
 with `:ease=`:
 
-```bash
+```sh
 auto-editor video.mp4 -w:1 zoom:1..1.5:ease=inout
 ```
 
@@ -357,7 +357,7 @@ auto-editor video.mp4 -w:1 zoom:1..1.5:ease=inout
 - **duration** — optional; e.g. `2sec` or a bare frame count. Once it elapses,
   the value holds at its end. Omitted, the animation spans the whole section.
 
-```bash
+```sh
 # Ease in over the first 2 seconds, then hold
 auto-editor video.mp4 -w:1 opacity:0..1:ease=in:2sec
 ```
@@ -366,7 +366,7 @@ You can also write the curve as a standalone `ease:` token. It applies to every
 animated action that follows it (until another `ease` overrides it), which is
 handy for giving several effects the same curve:
 
-```bash
+```sh
 # Both zoom and brightness ease out
 auto-editor video.mp4 -w:1 ease:out,zoom:1..1.3,brightness:0..0.3
 ```
@@ -375,7 +375,7 @@ auto-editor video.mp4 -w:1 ease:out,zoom:1..1.3,brightness:0..0.3
 
 Use `--set-action` to apply an action to a specific time range, overriding the default actions:
 
-```bash
+```sh
 # Keep a section unchanged from 0 to 5 seconds
 auto-editor video.mp4 --set-action nil,0,5sec
 
@@ -388,36 +388,36 @@ The format is `ACTION,START,END` where `ACTION` can be any action or comma-separ
 ## Common Use Cases
 
 ### Fast-Forward Through Silence
-```bash
+```sh
 auto-editor video.mp4 -w:0 speed:8
 ```
 
 ### Subtle Speed Variations
-```bash
+```sh
 # Slightly slow down normal sections for emphasis
 auto-editor video.mp4 -w:1 speed:0.9
 ```
 
 ### Duck Audio During Silence
-```bash
+```sh
 # Keep silent sections but reduce volume
 auto-editor video.mp4 -w:0 volume:0.3
 ```
 
 ### Podcast Editing
-```bash
+```sh
 # Cut silence, slightly speed up speech
 auto-editor podcast.mp3 -w:0 cut -w:1 speed:1.15
 ```
 
 ### Music Editing
-```bash
+```sh
 # Keep everything but boost quiet parts
 auto-editor song.mp3 -w:0 volume:1.8 -w:1 volume:1.0
 ```
 
 ### Creative Effects
-```bash
+```sh
 # Nightcore effect: speed up and pitch up
 auto-editor video.mp4 -w:1 varispeed:1.25
 

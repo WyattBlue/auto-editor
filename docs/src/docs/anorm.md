@@ -12,7 +12,7 @@ Auto-Editor supports two kinds: **peak** scales by the highest amplitude (simple
 
 Example:
 
-```
+```sh
 auto-editor --audio-normalize peak:-3  # set max peak to -3dB
 ```
 
@@ -20,7 +20,7 @@ auto-editor --audio-normalize peak:-3  # set max peak to -3dB
 
 Example:
 
-```
+```sh
 auto-editor --audio-normalize ebu  # use default values
 auto-editor --audio-normalize ebu:i=-16  # set integrated loudness target
 auto-editor --audio-normalize "ebu:i=-5,lra=20,gain=5,tp=-1"  # customize all parameters
