@@ -155,10 +155,10 @@ let libvpl = Package(
   ],
   ffFlag: "--enable-libvpl",
 )
-let lame = Package(
-  name: "lame",
-  sourceUrl: "https://github.com/basswood-io/lamer/archive/refs/tags/v3.100.1.tar.gz",
-  sha256: "943eac863ff803b5a698cec0bdc483ce9081b1e74ca8978e94daafb44522c946",
+let lamer = Package(
+  name: "lamer",
+  sourceUrl: "https://github.com/basswood-io/lamer/archive/refs/tags/v3.101.0.tar.gz",
+  sha256: "81839b16fdc401e20b73389d05f32a7656008f43bcb960feff290d6f08fc109e",
   buildSystem: "make",
   ffFlag: "--enable-libmp3lame",
 )
@@ -248,7 +248,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add libvpl
   if enableWhisper:
     result.add whisper
-  result &= [lame, opus, dav1d, x264, zlib]
+  result &= [lamer, opus, dav1d, x264, zlib]
   if not disableVpx:
     result.add vpx
   if not disableSvtAv1:
@@ -271,10 +271,8 @@ func dirName(package: Package): string =
     return "AMF-1.5.2"
   if package.name == "whisper":
     return "whisper.cpp-1.8.7"
-  if package.name == "lame" and package.sourceUrl.contains("basswood-io/lamer"):
-    var version = package.location.replace(".tar.gz", "")
-    version.removePrefix("v")
-    return "lamer-" & version
+  if package.name == "lamer":
+    return "lamer-3.101.0"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -687,7 +685,6 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
         exec &"""CFLAGS="-matomics -mbulk-memory -msimd128 -mrelaxed-simd{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --static --uname=Linux """
       makeInstall()
     else:
-      # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
       let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
       if not fileExists("Makefile"):
         let args = (package.buildArguments & extraArgs).join(" ")
@@ -718,8 +715,8 @@ proc makeBuild(buildPath: string, kind: CrossKind) =
     else:
       ""
   exec &"{envPrefix}make clean"
-  exec &"{envPrefix}make lib DECODER=0{picFlag}{wasmCflags}"
-  exec &"{envPrefix}make install DECODER=0{picFlag}{wasmCflags} PREFIX=\"{buildPath}\""
+  exec &"{envPrefix}make lib{picFlag}{wasmCflags}"
+  exec &"{envPrefix}make install{picFlag}{wasmCflags} PREFIX=\"{buildPath}\""
 
 proc ffmpegSetup(buildPath: string): seq[Package] =
   let kind =
@@ -904,7 +901,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, libvpl, whisper, lame, opus, dav1d, x264, zlib, vpx, svtav1, x265]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:
