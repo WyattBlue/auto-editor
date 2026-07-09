@@ -1,22 +1,6 @@
 import std/[macros, strformat, strutils]
 import ./util/suggest
 
-type CmdDef* = object
-  name*: string
-  help*: string
-
-const commands*: seq[CmdDef] = @[
-  CmdDef(name: "cache", help: ""),
-  CmdDef(name: "desc", help: "Display a media file's description metadata"),
-  CmdDef(name: "info", help: "Retrieve information and properties about media files\nUsage: <file> [options] | -encoders <ext> | -decoders <ext>"),
-  CmdDef(name: "levels", help: "Display loudness over time"),
-  CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out"),
-  CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface"),
-  CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]"),
-] & (
-  when defined(emscripten): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells")]
-)
-
 type Categories* = enum
   cNone cEdit cTl cUrl cDis cCon cVid cAud cMis
 
@@ -258,6 +242,24 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
     help: "Show info about this program or option"),
 ]
 
+type CmdDef* = object
+  name*: string
+  help*: string
+  opts*: seq[OptDef]
+  files*: bool = true # Whether shell completion should offer filenames.
+
+const commands*: seq[CmdDef] = @[
+  CmdDef(name: "cache", help: "", opts: cacheOptions, files: false),
+  CmdDef(name: "desc", help: "Display a media file's description metadata", opts: descOptions),
+  CmdDef(name: "info", help: "Retrieve information and properties about media files\nUsage: <file> [options] | -encoders <ext> | -decoders <ext>", opts: infoOptions),
+  CmdDef(name: "levels", help: "Display loudness over time", opts: levelsOptions),
+  CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out", opts: subdumpOptions),
+  CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface", opts: waveformOptions),
+  CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]", opts: whisperOptions),
+] & (
+  when defined(emscripten): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells", opts: completionOptions, files: false)]
+)
+
 func optionNames*(opts: seq[OptDef]): seq[string] =
   for opt in opts:
     for name in opt.names.split(", "):
@@ -266,20 +268,9 @@ func optionNames*(opts: seq[OptDef]): seq[string] =
 func optionDidYouMean*(key: string, opts: seq[OptDef]): string =
   didYouMean(key, optionNames(opts))
 
-proc zshcomplete*() =
-  echo "#compdef auto-editor"
-  echo ""
-  echo "_auto-editor() {"
-  echo "  local -a subcommands options"
-  echo "  subcommands=("
-  for cmd in commands:
-    if cmd.help != "":
-      echo "    '" & cmd.name & ":" & cmd.help.replace("'", "'\\''") & "'"
-    else:
-      echo "    '" & cmd.name & "'"
-  echo "  )"
-  echo "  options=("
-  for opt in mainOptions:
+proc writeZshOptions(name: string, opts: seq[OptDef]) =
+  echo "  " & name & "=("
+  for opt in opts:
     if opt.hidden:
       continue
     let desc = if opt.help != "": opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:") else: ""
@@ -290,17 +281,40 @@ proc zshcomplete*() =
       else:
         echo "    '" & n & "'"
   echo "  )"
+
+proc zshcomplete*() =
+  var locals = @["subcommands", "options"]
+  for cmd in commands:
+    locals.add cmd.name & "_options"
+
+  echo "#compdef auto-editor"
+  echo ""
+  echo "_auto-editor() {"
+  echo "  local -a " & locals.join(" ")
+  echo "  subcommands=("
+  for cmd in commands:
+    if cmd.help != "":
+      echo "    '" & cmd.name & ":" & cmd.help.replace("'", "'\\''") & "'"
+    else:
+      echo "    '" & cmd.name & "'"
+  echo "  )"
+  writeZshOptions("options", mainOptions)
+  for cmd in commands:
+    writeZshOptions(cmd.name & "_options", cmd.opts)
   echo """
   if (( CURRENT == 2 )); then
     _describe 'command' subcommands
     _describe 'option' options
     _files
   else
-    case "$words[2]" in
-      cache)
-        # No file completion for cache command
-        ;;
-      *)
+    case "$words[2]" in"""
+  for cmd in commands:
+    echo "      " & cmd.name & ")"
+    echo "        _describe 'option' " & cmd.name & "_options"
+    if cmd.files:
+      echo "        _files"
+    echo "        ;;"
+  echo """      *)
         _describe 'option' options
         _files
         ;;
