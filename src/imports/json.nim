@@ -225,10 +225,16 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     try: initMediaInfo(input)
     except IOError as e: error e.msg
   )
-  let tb = (
-    if mi.v.len > 0: makeSaneTimebase(mi.v[0].avgRate)
-    else: AVRational(num: 30, den: 1)
-  )
+  var tb: AVRational
+  let tbString = jsonNode{"timebase"}.getStr("")
+  if tbString != "":
+    tb = try: toAVRational(tbString) except ValueError as e: error e.msg
+    if not tb.isValid:
+      error "Invalid timebase json value"
+  elif mi.v.len > 0:
+    tb = makeSaneTimebase(mi.v[0].avgRate)
+  else:
+    tb = AVRational(num: 30, den: 1)
   result = toNonLinear(ptrInput, tb, mi, chunks)
 
 proc readJson*(jsonStr: string, interner: var StringInterner): v3 =

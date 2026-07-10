@@ -30,7 +30,12 @@ func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
 
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
-  return %* {"version": "1", "source": self.source, "chunks": jsonChunks}
+  return %* {
+    "version": "1",
+    "source": self.source,
+    "timebase": $self.tb.num & "/" & $self.tb.den,
+    "chunks": jsonChunks,
+  }
 
 func `%`(self: v2): JsonNode =
   let jsonClips = self.clips.mapIt(%[%it.start, %it.`end`, %it.`effect`])
@@ -88,7 +93,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
 
         chunks.add (clip2.start, clip2.`end`, speed)
 
-      tlJson = %v1(source: source, chunks: chunks)
+      tlJson = %v1(source: source, chunks: chunks, tb: tb)
   else:
     tlJson = %tlV3
 

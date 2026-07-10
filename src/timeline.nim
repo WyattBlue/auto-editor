@@ -7,6 +7,7 @@ import ./util/[color, fun, lang, rational]
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
   source*: string
+  tb*: AVRational
 
 type Clip2* = object
   start*: int64
