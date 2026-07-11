@@ -409,6 +409,8 @@ judge making cuts.
   var showVersion: bool = false
   var expecting: string = ""
   var expectingLabel: int = 1  # label for a pending "edit"/"when" value (plain --edit => 1)
+  var parseOptions = true
+  var positionalStart = int.high  # index of first input after `--`
 
   func isKnownOption(key: string): bool =
     for opt in mainOptions:
@@ -419,21 +421,26 @@ judge making cuts.
 
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
+    if parseOptions and expecting == "" and key == "--":
+      parseOptions = false
+      positionalStart = args.inputs.len
+      continue
     if expecting == "":
       # Generic `--edit:N` / `-e:N` / `--when:N` / `-w:N`. Plain `--edit` and the
       # named `--when-*` aliases have no `:` suffix, so they fall through to
       # genCliMacro below (which sets `expecting` to "edit"/"when-normal"/... ).
-      let lf = parseLabeledFlag(key)
-      if lf.matched:
-        expecting = lf.kind
-        expectingLabel = lf.label
-        continue
-      if genCliMacro(key, args, mainOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp()
-      if key.startsWith("--"):
-        error &"Unknown option: {key}{optionDidYouMean(key, mainOptions)}"
+      if parseOptions:
+        let lf = parseLabeledFlag(key)
+        if lf.matched:
+          expecting = lf.kind
+          expectingLabel = lf.label
+          continue
+        if genCliMacro(key, args, mainOptions):
+          continue
+        if key in ["-h", "--help"]:
+          printHelp()
+        if key.startsWith("--"):
+          error &"Unknown option: {key}{optionDidYouMean(key, mainOptions)}"
     elif key in ["-h", "--help"]:
       printHelp()
     elif key.startsWith("--") or isKnownOption(key) or
@@ -572,6 +579,8 @@ judge making cuts.
       if dirExists(myInput):
         error "Input must be a file or a URL, not a directory."
       if myInput.startsWith("-"):
+        if i >= positionalStart:
+          error &"Input file doesn't exist: {myInput}"
         error &"Option/Input file doesn't exist: {myInput}"
       error &"Input file must have an extension: {myInput}"
 
