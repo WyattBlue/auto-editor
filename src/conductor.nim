@@ -9,6 +9,7 @@ import util/[color, bar, fun, lang, rules, rational]
 import imports/[fcp7, json]
 import exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
 import render/format
+import render/subtitle
 import stats
 
 
@@ -443,6 +444,40 @@ proc editMedia*(args: var mainArgs) =
       makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar, cache)
   else:
     makeMedia(args, tlV3, output, rule, bar)
+
+  # Retiming embedded subtitles is handled by makeMedia. Also retime every
+  # subtitle-only sibling of each original media input into its own sidecar.
+  for input in args.inputs:
+    let (inputDir, inputName, _) = agSplitFile(input)
+    var inputLayer: seq[Clip]
+    let baseLayer =
+      if tlV3.v.len > 0: tlV3.v[0]
+      elif tlV3.a.len > 0: tlV3.a[0]
+      else: @[]
+    for clip in baseLayer:
+      if clip.src != nil and clip.src[] == input:
+        inputLayer.add clip
+
+    if inputLayer.len == 0:
+      continue
+
+    for sibling in walkFiles((inputDir / inputName) & ".*"):
+      if sibling == input:
+        continue
+      var sidecar: InputContainer
+      try:
+        sidecar = av.open(sibling)
+      except IOError:
+        continue
+      let isSubtitleOnly = sidecar.subtitle.len > 0 and
+        sidecar.video.len == 0 and sidecar.audio.len == 0
+      sidecar.close()
+      if not isSubtitleOnly:
+        continue
+
+      let (subDir, subName, subExt) = agSplitFile(sibling)
+      makeAlteredSubtitle(sibling, (subDir / subName) & "_ALTERED" & subExt,
+        inputLayer, tlV3.tb)
 
   bar.destroy()
 

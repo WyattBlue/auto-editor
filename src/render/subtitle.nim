@@ -86,3 +86,27 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
 
       output.mux(outPacket)
       av_packet_unref(addr outPacket)
+
+proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
+    timelineTb: AVRational) =
+  ## Write every subtitle stream in a sidecar file, retimed to `layer`.
+  let source = (
+    try: av.open(sourcePath)
+    except IOError as e: error e.msg
+  )
+  defer: source.close()
+
+  var output = openWrite(outputPath)
+  var outputStreams: seq[ptr AVStream]
+  for sourceStream in source.subtitle:
+    outputStreams.add output.addStreamFromTemplate(sourceStream)
+  # The muxer may finalize stream time bases while writing its header.
+  output.startEncoding()
+
+  for i, outputStream in outputStreams:
+    var subtitleLayer = layer
+    for clip in subtitleLayer.mitems:
+      clip.stream = i.int16
+    remuxSubtitles(sourcePath, subtitleLayer, outputStream, output, timelineTb)
+
+  output.close()
