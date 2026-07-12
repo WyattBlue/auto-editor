@@ -54,6 +54,18 @@ auto-editor video.mp4 --edit audio:threshold=6%
 auto-editor video.mp4 --edit audio:-18dB
 ```
 
+To analyze one channel instead of the loudest sample across all channels, use
+its layout name:
+
+```sh
+auto-editor video.mp4 --edit audio:channel=left
+```
+
+Channel names are layout-aware (`left`, `right`, `center`, `lfe`,
+`back-left`, and so on). A mono channel acts as left, right, and center. With
+`stream=all`, streams without the requested channel are skipped as long as at
+least one stream contains it.
+
 ## Cut by motion instead of sound
 
 Useful for screen recordings or silent footage — drop the still parts:

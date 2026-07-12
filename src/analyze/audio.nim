@@ -47,6 +47,7 @@ type
     accumulatedError: float64
     sampleRate: cint
     channelCount: cint
+    selectedChannel: int
     targetFormat: AVSampleFormat
     readBuffer: ptr uint8
     maxBufferSize: int
@@ -55,13 +56,61 @@ type
     `iterator`*: AudioIterator
     codecCtx*: ptr AVCodecContext
     audioIndex*: cint
+    channel*: int = -1
     chunkDuration*: float64
 
+const audioChannelNames* = [
+  ("left", "FL"), ("right", "FR"), ("center", "FC"), ("lfe", "LFE"),
+  ("back-left", "BL"), ("back-right", "BR"),
+  ("front-left-of-center", "FLC"), ("front-right-of-center", "FRC"),
+  ("back-center", "BC"), ("side-left", "SL"), ("side-right", "SR"),
+  ("top-center", "TC"), ("top-front-left", "TFL"),
+  ("top-front-center", "TFC"), ("top-front-right", "TFR"),
+  ("top-back-left", "TBL"), ("top-back-center", "TBC"),
+  ("top-back-right", "TBR"), ("stereo-left", "DL"),
+  ("stereo-right", "DR"), ("wide-left", "WL"), ("wide-right", "WR"),
+  ("surround-direct-left", "SDL"), ("surround-direct-right", "SDR"),
+  ("lfe-2", "LFE2"), ("top-side-left", "TSL"),
+  ("top-side-right", "TSR"), ("bottom-front-center", "BFC"),
+  ("bottom-front-left", "BFL"), ("bottom-front-right", "BFR"),
+]
+
+func audioChannelCode*(name: string): string {.raises: [].} =
+  for (friendly, code) in audioChannelNames:
+    if name == friendly:
+      return code
+
+func resolveAudioChannel*(layout: ptr AVChannelLayout, name: string): int {.raises: [].} =
+  ## Resolve a friendly semantic name to its interleaved channel index.
+  ## A mono signal is treated as left, right, and center.
+  if name == "all":
+    return -1
+  if layout.nb_channels == 1 and name in ["left", "right", "center"]:
+    return 0
+  let code = audioChannelCode(name)
+  if code == "":
+    return -2
+  result = av_channel_layout_index_from_string(layout, code.cstring).int
+
+func resolveAudioChannelOrDefault*(layout: ptr AVChannelLayout,
+    name: string): int {.raises: [].} =
+  ## Supply conventional positions when a raw format has only a channel count.
+  result = resolveAudioChannel(layout, name)
+  if result < -1 and layout.order == 0 and layout.nb_channels > 0:
+    let code = audioChannelCode(name)
+    if code == "":
+      return
+    var fallback: AVChannelLayout
+    {.cast(noSideEffect).}:
+      av_channel_layout_default(addr fallback, layout.nb_channels)
+    result = av_channel_layout_index_from_string(addr fallback, code.cstring).int
+
 proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
-    chunkDuration: float64): AudioIterator =
+    chunkDuration: float64, channel = -1): AudioIterator =
   result = AudioIterator()
   result.sampleRate = sampleRate
   result.channelCount = channelLayout.nb_channels
+  result.selectedChannel = channel
   result.targetFormat = AV_SAMPLE_FMT_S16
   result.exactSize = chunkDuration * float64(sampleRate)
   result.accumulatedError = 0.0
@@ -126,6 +175,17 @@ proc readChunk(iter: AudioIterator): Unorm16 =
   let totalSamples = samplesRead * iter.channelCount
 
   var maxAbs: int32 = 0
+  if iter.selectedChannel >= 0:
+    var i = iter.selectedChannel
+    while i < totalSamples:
+      let v = abs(int32(samples[i]))
+      if v > maxAbs:
+        maxAbs = v
+        if maxAbs >= 32767:
+          break
+      i += iter.channelCount
+    return toUnorm16(float32(maxAbs) / 32767.0'f32)
+
   when defined(arm64) or defined(aarch64):
     # Four independent accumulators hide the latency of the abs/max chain.
     var v0 = neonDup16(0'i16)
@@ -246,7 +306,7 @@ iterator peaks*(processor: var AudioProcessor, container: InputContainer,
   for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
     if processor.`iterator` == nil:
       processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        addr decodedFrame.ch_layout, processor.chunkDuration)
+        addr decodedFrame.ch_layout, processor.chunkDuration, processor.channel)
       spb = round(processor.chunkDuration * float64(decodedFrame.sample_rate)).int64
       let tb = audioStream.time_base
       let pts = (if decodedFrame.pts == AV_NOPTS_VALUE: 0'i64 else: decodedFrame.pts)
@@ -286,7 +346,7 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): Un
   for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
     if processor.`iterator` == nil:
       processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        addr decodedFrame.ch_layout, processor.chunkDuration)
+        addr decodedFrame.ch_layout, processor.chunkDuration, processor.channel)
 
     processor.`iterator`.writeFrame(decodedFrame)
 
@@ -302,9 +362,10 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): Un
       yield processor.`iterator`.readChunk()
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int16): seq[Unorm16] =
+    stream: int16, channel = -1): seq[Unorm16] =
+  let cacheArgs = $stream & ":" & $channel
   if not noCache:
-    let cacheData = readCache[Unorm16](path, tb, "audio", $stream)
+    let cacheData = readCache[Unorm16](path, tb, "audio", cacheArgs)
     if cacheData.isSome:
       return cacheData.get()
 
@@ -318,6 +379,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   var processor = AudioProcessor(
     codecCtx: initDecoder(audioStream.codecpar),
     audioIndex: audioStream.index,
+    channel: channel,
     chunkDuration: av_inv_q(tb),
   )
 
@@ -339,4 +401,4 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   bar.`end`()
 
   if not noCache:
-    writeCache(result, tb, path, "audio", $stream)
+    writeCache(result, tb, path, "audio", cacheArgs)

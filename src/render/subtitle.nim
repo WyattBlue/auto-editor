@@ -13,13 +13,12 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     return
 
   # Open source container for each remux operation
-  let srcContainer = (
+  var srcContainer = (
     try: av.open(sourcePath)
     except IOError as e: error e.msg
   )
   defer: srcContainer.close()
 
-  let formatCtx = srcContainer.formatContext
   let outTb = outputStream.time_base
   # timelineTb is the frame rate, so one frame lasts 1/timelineTb seconds.
   let frameTb = av_inv_q(timelineTb)
@@ -28,9 +27,9 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     if clip.stream >= srcContainer.subtitle.len:
       continue
 
-    let streamIndex = srcContainer.subtitle[clip.stream].index
-    let stream = formatCtx.streams[streamIndex]
-    let srcTb = stream.time_base
+    var streamIndex = srcContainer.subtitle[clip.stream].index
+    var stream = srcContainer.formatContext.streams[streamIndex]
+    var srcTb = stream.time_base
 
     # The clip selects source interval [clipStartSrc, clipEndSrc) in source ticks.
     let clipStartSrc = av_rescale_q(clip.offset, frameTb, srcTb)
@@ -40,14 +39,29 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     # A later clip needs the seek even at source position 0, since the
     # previous clip's loop advanced the demuxer.
     if clipIdx > 0 or clipStartSrc > 0:
-      srcContainer.seek(clipStartSrc, backward = true, stream = stream)
+      let ret = av_seek_frame(srcContainer.formatContext, stream.index,
+        clipStartSrc, AVSEEK_FLAG_BACKWARD)
+      if ret < 0:
+        # Text sidecars such as SRT are commonly non-seekable. Reopening puts
+        # the demuxer at the beginning; scanning forward below is slower but
+        # preserves cues that overlap the clip boundary.
+        srcContainer.close()
+        srcContainer = (
+          try: av.open(sourcePath)
+          except IOError as e: error e.msg
+        )
+        if clip.stream >= srcContainer.subtitle.len:
+          continue
+        streamIndex = srcContainer.subtitle[clip.stream].index
+        stream = srcContainer.formatContext.streams[streamIndex]
+        srcTb = stream.time_base
 
     var packet = av_packet_alloc()
     if packet == nil:
       error "Could not allocate subtitle packet"
     defer: av_packet_free(addr packet)
 
-    while av_read_frame(formatCtx, packet) >= 0:
+    while av_read_frame(srcContainer.formatContext, packet) >= 0:
       defer: av_packet_unref(packet)
 
       if packet.stream_index != streamIndex or packet.pts == AV_NOPTS_VALUE:

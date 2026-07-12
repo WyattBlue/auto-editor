@@ -275,6 +275,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
         return not editEval(node[1], text)
       of "audio":
         stream = -1 # Set to "all" by default
+        var channel = "all"
         let argOrder = argOrderOf("audio")
 
         for expr in node[1 ..< node.len]:
@@ -283,16 +284,38 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = parseStream(val)
+          of 2: channel = val
           else: error "Too many args"
 
           if not isKey:
             argPos += 1
 
+        if channel != "all" and audioChannelCode(channel) == "":
+          error &"audio: unknown channel '{channel}'."
+
+        func streamChannel(i: int16): int {.raises: [].} =
+          let audioStream = container.audio[i]
+          resolveAudioChannelOrDefault(addr audioStream.codecpar.ch_layout, channel)
+
         if stream == -1:
+          var matched = false
           for i in 0 ..< container.audio.len:
-            result.orWithThreshold(audio(bar, container, input, tb, i.int16), threshold)
+            let channelIndex = streamChannel(i.int16)
+            if channelIndex >= -1:
+              result.orWithThreshold(
+                audio(bar, container, input, tb, i.int16, channelIndex), threshold)
+              matched = true
+          if not matched:
+            error &"audio: channel '{channel}' does not exist in any audio stream."
         else:
-          result.orWithThreshold(audio(bar, container, input, tb, stream), threshold)
+          if stream >= container.audio.len:
+            error &"audio: audio stream '{stream}' does not exist."
+          let channelIndex = streamChannel(stream)
+          if channelIndex < -1:
+            let layout = $addr container.audio[stream].codecpar.ch_layout
+            error &"audio: channel '{channel}' does not exist in stream {stream} ({layout})."
+          result.orWithThreshold(
+            audio(bar, container, input, tb, stream, channelIndex), threshold)
         return result
       of "motion":
         threshold = defaultMotionThres

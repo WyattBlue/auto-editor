@@ -31,9 +31,12 @@ func p(name, typ: string, default = ""): EditParam =
 const editMethodDefs*: seq[EditMethodDef] = @[
   EditMethodDef(names: @["audio"], media: emAudio,
     params: @[p("threshold", "Unorm16", "0.04"),
-              p("stream", "(U Natural 'all)", "all")],
+              p("stream", "(U Natural 'all)", "all"),
+              p("channel", "Symbol", "all")],
     help: "Do a one-pass audio filter based on the loudest sample in a " &
-          "timebase section, divided by the max value a sample can be."),
+          "timebase section, divided by the max value a sample can be. " &
+          "`channel` selects a named channel such as `left`, `right`, or " &
+          "`center`; `all` analyzes every channel."),
   EditMethodDef(names: @["motion"], media: emVideo,
     params: @[p("threshold", "Unorm16", "0.02"),
               p("stream", "Natural", "0"),

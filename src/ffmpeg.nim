@@ -94,7 +94,7 @@ type
     value*: cstring
 
   AVChannelLayout* {.importc, completeStruct, header: "<libavutil/channel_layout.h>".} = object
-    order: cint
+    order*: cint
     nb_channels*: cint
     u_mask: uint64
     opaque: pointer
@@ -368,9 +368,13 @@ proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
 
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
+func av_channel_layout_index_from_string*(ch_layout: ptr AVChannelLayout,
+    name: cstring): cint {.importc, header: "<libavutil/channel_layout.h>",
+    raises: [].}
 
 proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout,
-    nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
+    nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>",
+    raises: [].}
 proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
     char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_copy*(dst, src: ptr AVChannelLayout): cint {.importc,
@@ -844,4 +848,3 @@ proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
     header: "<libswscale/swscale.h>".}
 proc sws_scale_frame*(c: ptr SwsContext, dst, src: ptr AVFrame): cint {.importc,
     header: "<libswscale/swscale.h>".}
-
