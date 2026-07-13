@@ -310,10 +310,6 @@ type
 proc av_log_set_callback*(callback: AVLogCallback) {.importc, header: "<libavutil/log.h>".}
 proc av_log_default_callback*(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}
 
-proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples: cint,
-                            nb_channels: cint,
-                                sample_fmt: AVSampleFormat): cint {.importc,
-    header: "<libavutil/samplefmt.h>".}
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
     fmt: pointer, options: pointer): cint {.importc,
     header: "<libavformat/avformat.h>".}
@@ -479,9 +475,6 @@ proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/pack
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
-proc av_new_packet*(pkt: ptr AVPacket, size: cint): cint {.importc,
-    header: "<libavcodec/packet.h>".}
-
 let AV_PKT_DATA_DISPLAYMATRIX* {.importc, header: "<libavcodec/packet.h>".}: cint
 proc av_packet_side_data_get*(sd: ptr AVPacketSideData, nb_sd: cint,
     `type`: cint): ptr AVPacketSideData {.importc, header: "<libavcodec/packet.h>".}
@@ -497,8 +490,6 @@ proc avcodec_receive_frame*(avctx: ptr AVCodecContext,
 proc av_read_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc.}
 proc av_frame_alloc*(): ptr AVFrame {.importc, header: "<libavutil/frame.h>".}
 proc av_frame_free*(frame: ptr ptr AVFrame) {.importc,
-    header: "<libavutil/frame.h>".}
-proc av_frame_ref*(dst: ptr AVFrame, src: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_unref*(frame: ptr AVFrame) {.importc,
     header: "<libavutil/frame.h>".}
@@ -574,11 +565,6 @@ proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer,
     header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc.}
 
-proc av_get_bytes_per_sample*(sample_fmt: AVSampleFormat): cint {.importc.}
-proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
-    nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc,
-    header: "<libavutil/samplefmt.h>".}
-
 # Audio sample allocation and conversion utilities
 proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint,
     nb_channels: cint, nb_samples: cint, sample_fmt: AVSampleFormat,
@@ -590,10 +576,6 @@ type SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
 
 # SwrContext option setting
 proc av_opt_set_int*(obj: pointer, name: cstring, val: int64,
-    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
-proc av_opt_set_sample_fmt*(obj: pointer, name: cstring, fmt: AVSampleFormat,
-    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
-proc av_opt_set_chlayout*(obj: pointer, name: cstring, layout: ptr AVChannelLayout,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 proc av_opt_set*(obj: pointer, name: cstring, val: cstring,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
