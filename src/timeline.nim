@@ -134,18 +134,10 @@ func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
   let offset = int64(ceil(float64(startFrame) / speed))
   (offset, int64(ceil(float64(endFrame) / speed)) - offset)
 
-proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
-  effects: seq[Actions], actionIndex: seq[int]): v3 =
-  var clips: seq[Clip] = @[]
-  var i: int64 = 0
-  var start: int64 = 0
-  var dur: int64
-  var offset: int64
-
-  let pseudoChunks = chunkify(actionIndex, effects)
-  var clips2: seq[Clip2]
-
-  for chunk in pseudoChunks:
+proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
+    start: int64): tuple[clips: seq[Clip], clips2: seq[Clip2]] =
+  var timelineStart = start
+  for chunk in chunkify(actionIndex, effects):
     let actionGroup = chunk[3]
     var speed = 1.0
     if actionGroup.isCut:
@@ -160,62 +152,37 @@ proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: Medi
       error "'Number of actions' limit for timeline reached."
     let e = uint32(effectIndex)
 
-    # Always add to clips2, even for cuts (no holes)
-    clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+    result.clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
 
-    # Make clips (skip cuts for actual output clips)
     if speed != 99999.0:
-      (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
+      let (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
       if dur == 0:
         continue
 
-      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
-      start += dur
-      i += 1
-
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(),
-    templateFile: src)
-  mutHelper(result, mi, clips)
-
-proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionIndex: seq[int]) =
-  let startOffset = tl.len
-  var clips: seq[Clip] = @[]
-  var timelineStart: int64 = startOffset
-  var dur: int64
-  var offset: int64
-
-  let pseudoChunks = chunkify(actionIndex, tl.effects)
-
-  for chunk in pseudoChunks:
-    let actionGroup = chunk[3]
-    var speed = 1.0
-    if actionGroup.isCut:
-      speed = 99999.0
-    else:
-      for action in actionGroup:
-        if action.kind in [actSpeed, actVarispeed]:
-          speed *= action.val
-
-    let effectIndex = chunk[2]
-    if effectIndex > int64(high(uint32)):
-      error "'Number of actions' limit for timeline reached."
-    let e = uint32(effectIndex)
-
-    tl.clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
-
-    if speed != 99999.0:
-      (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
-      if dur == 0:
-        continue
-
-      clips.add Clip(src: src, start: timelineStart, dur: dur, offset: offset, effects: e)
+      result.clips.add Clip(src: src, start: timelineStart, dur: dur,
+        offset: offset, effects: e)
       timelineStart += dur
+
+proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor,
+    mi: MediaInfo,
+  effects: seq[Actions], actionIndex: seq[int]): v3 =
+  let built = linearClips(src, effects, actionIndex, 0)
+
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: built.clips2,
+      res: mi.getRes(),
+    templateFile: src)
+  mutHelper(result, mi, built.clips)
+
+proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
+    actionIndex: seq[int]) =
+  let built = linearClips(src, tl.effects, actionIndex, tl.len)
+  tl.clips2.add built.clips2
 
   if mi.v.len > 0:
     if tl.v.len == 0:
       tl.v.add @[]
       tl.langs.insert(mi.v[0].lang, 0)
-    for clip in clips:
+    for clip in built.clips:
       var videoClip = clip
       videoClip.stream = 0
       tl.v[0].add videoClip
@@ -224,7 +191,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
     if tl.a.len <= i:
       tl.a.add @[]
       tl.langs.add mi.a[i].lang
-    for clip in clips:
+    for clip in built.clips:
       var audioClip = clip
       audioClip.stream = i.int16
       tl.a[i].add audioClip
@@ -232,62 +199,15 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
   for i in 0 ..< mi.s.len:
     while tl.s.len <= i:
       tl.s.add @[]
-    for clip in clips:
+    for clip in built.clips:
       var subtitleClip = clip
       subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
 
-proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
-    chunks: seq[(int64, int64, float64)]): v3 {.raises: [].} =
-  var clips: seq[Clip] = @[]
-  var clips2: seq[Clip2] = @[]
-  var effects: seq[Actions] = @[]
-  var i: int64 = 0
-  var start: int64 = 0
-  var dur: int64
-  var offset: int64
-
-  for chunk in chunks:
-    if chunk[2] > 0.0 and chunk[2] < 99999.0:
-      (offset, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
-      if dur == 0:
-        continue
-
-      var effectIndex: int
-      if chunk[2] == 1.0:
-        effectIndex = effects.find(aNil)
-        if effectIndex == -1:
-          effects.add aNil
-          effectIndex = effects.len - 1
-      else:
-        let a = (
-          try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
-          except ActionParseError: error "Too many actions"
-        )
-        effectIndex = effects.find(a)
-        if effectIndex == -1:
-          effects.add a
-          effectIndex = effects.len - 1
-
-      if effectIndex > int64(high(uint32)):
-        error "'Number of actions' limit for timeline reached."
-      let e = uint32(effectIndex)
-      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
-      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
-
-      start += dur
-      i += 1
-
-  result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
-  result.res = mi.getRes()
-  mutHelper(result, mi, clips)
-
-proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
-  clips2: seq[Clip2], effects: seq[Actions]): v3 =
+proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
+    clips2: seq[Clip2], effects: seq[Actions]): v3 =
   var clips: seq[Clip] = @[]
   var start: int64 = 0
-  var dur: int64
-  var offset: int64
 
   for clip2 in clips2:
     let effectGroup = effects[clip2.effect]
@@ -298,17 +218,48 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
       if effect.kind == actSpeed or effect.kind == actVarispeed:
         speed *= effect.val
 
-    (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
+    let (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
     if dur == 0:
       continue
 
-    clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: clip2.effect))
+    clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
+        effects: clip2.effect))
 
     start += dur
 
   result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
   result.res = mi.getRes()
   mutHelper(result, mi, clips)
+
+proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
+    chunks: seq[(int64, int64, float64)]): v3 {.raises: [].} =
+  var clips2: seq[Clip2] = @[]
+  var effects: seq[Actions] = @[]
+
+  for chunk in chunks:
+    if chunk[2] > 0.0 and chunk[2] < 99999.0:
+      let (_, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
+      if dur == 0:
+        continue
+
+      let action = if chunk[2] == 1.0:
+          aNil
+        else:
+          try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
+          except ActionParseError: error "Too many actions"
+      var effectIndex = effects.find(action)
+      if effectIndex == -1:
+        effects.add action
+        effectIndex = effects.len - 1
+      if effectIndex > int64(high(uint32)):
+        error "'Number of actions' limit for timeline reached."
+      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: uint32(effectIndex))
+
+  initNonLinear(src, tb, mi, clips2, effects)
+
+proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
+  clips2: seq[Clip2], effects: seq[Actions]): v3 =
+  initNonLinear(src, tb, mi, clips2, effects)
 
 proc applyArgs*(tl: var v3, args: mainArgs) =
   if args.sampleRate != -1:
