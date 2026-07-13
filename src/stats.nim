@@ -7,7 +7,8 @@ import ./util/[fun, rational]
 
 type f64 = float64
 
-func timeFrame(title: string, ticks: int64, tb: f64, per: string = ""): string =
+func timeFrame[T: int64 | f64](title: string, ticks: T, tb: f64,
+    per: string = ""): string =
   let tc = toTimecode(ticks.f64 / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -15,19 +16,11 @@ func timeFrame(title: string, ticks: int64, tb: f64, per: string = ""): string =
 
   let titlePart = alignLeft(title & ":", tp)
   let tcPart = alignLeft(tc, tcp)
-  let ticksPart = alignLeft(&"({ticks})", 6)
-
-  return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
-
-func timeFrame(title: string, ticks, tb: f64, per: string = ""): string =
-  let tc = toTimecode(ticks / tb, Code.ass)
-  let tp = (if tc.startsWith("-"): 9 else: 10)
-  let tcp = (if tc.startsWith("-"): 12 else: 11)
-  let endStr = (if per == "": "" else: " " & alignLeft(per, 7))
-
-  let titlePart = alignLeft(title & ":", tp)
-  let tcPart = alignLeft(tc, tcp)
-  let ticksPart = alignLeft(&"({ticks:.2f})", 6)
+  let ticksPart = alignLeft(
+    when T is int64: &"({ticks})"
+    else: &"({ticks:.2f})",
+    6,
+  )
 
   return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
