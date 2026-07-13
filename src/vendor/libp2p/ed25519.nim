@@ -7,19 +7,10 @@
 
 {.push raises: [].}
 
-import ./[constants, results]
+import ./constants
 
 import nimcrypto/[hash, sha2]
 import nimcrypto/utils as ncrutils
-
-func ctEqual(a, b: openArray[byte]): bool =
-  ## Constant-time equality check (replaces stew/ctops CT.isEqual).
-  var res = 0'u
-  var count = min(a.len, b.len)
-  while count > 0:
-    dec(count)
-    res = res or (uint(a[count]) xor uint(b[count]))
-  (res == 0'u)
 
 # This workaround needed because of some bugs in Nim Static[T].
 export hash, sha2
@@ -33,26 +24,15 @@ proc safeConvert*[T: SomeInteger](value: SomeOrdinal): T =
     {.error: "Source and target types have an incompatible range low..high".}
 
 const
-  EdPrivateKeySize* = 64 ## Size in octets (bytes) of serialized ED25519 private key.
   EdPublicKeySize* = 32 ## Size in octets (bytes) of serialized ED25519 public key.
   EdSignatureSize* = 64 ## Size in octets (bytes) of serialized ED25519 signature.
 
 type
-  EdPrivateKey* = object
-    data*: array[EdPrivateKeySize, byte]
-
   EdPublicKey* = object
     data*: array[EdPublicKeySize, byte]
 
   EdSignature* = object
     data*: array[EdSignatureSize, byte]
-
-  EdKeyPair* = object
-    seckey*: EdPrivateKey
-    pubkey*: EdPublicKey
-
-  EdError* = enum
-    EdIncorrectError
 
 proc `-`(x: uint32): uint32 {.inline.} =
   result = (0xFFFF_FFFF'u32 - x) + 1'u32
@@ -1592,83 +1572,6 @@ proc checkScalar*(scalar: openArray[byte]): uint32 =
     c = -1
   result = NEQ(z, 0'u32) and LT0(c)
 
-proc getPublicKey*(key: EdPrivateKey): EdPublicKey =
-  ## Calculate and return ED25519 public key from private key ``key``.
-  copyMem(addr result.data[0], unsafeAddr key.data[32], 32)
-
-proc toBytes*(key: EdPrivateKey, data: var openArray[byte]): int =
-  ## Serialize ED25519 `private key` ``key`` to raw binary form and store it
-  ## to ``data``.
-  ##
-  ## Procedure returns number of bytes (octets) needed to store
-  ## ED25519 private key.
-  result = len(key.data)
-  if len(data) >= result:
-    copyMem(addr data[0], unsafeAddr key.data[0], len(key.data))
-
-proc toBytes*(key: EdPublicKey, data: var openArray[byte]): int =
-  ## Serialize ED25519 `public key` ``key`` to raw binary form and store it
-  ## to ``data``.
-  ##
-  ## Procedure returns number of bytes (octets) needed to store
-  ## ED25519 public key.
-  result = len(key.data)
-  if len(data) >= result:
-    copyMem(addr data[0], unsafeAddr key.data[0], len(key.data))
-
-proc toBytes*(sig: EdSignature, data: var openArray[byte]): int =
-  ## Serialize ED25519 `signature` ``sig`` to raw binary form and store it
-  ## to ``data``.
-  ##
-  ## Procedure returns number of bytes (octets) needed to store
-  ## ED25519 signature.
-  result = len(sig.data)
-  if len(data) >= result:
-    copyMem(addr data[0], unsafeAddr sig.data[0], len(sig.data))
-
-proc getBytes*(key: EdPrivateKey): seq[byte] =
-  @(key.data) ## Serialize ED25519 `private key` and return it.
-
-proc getBytes*(key: EdPublicKey): seq[byte] =
-  @(key.data) ## Serialize ED25519 `public key` and return it.
-
-proc getBytes*(sig: EdSignature): seq[byte] =
-  @(sig.data) ## Serialize ED25519 `signature` and return it.
-
-proc `==`*(eda, edb: EdPrivateKey): bool =
-  ## Compare ED25519 `private key` objects for equality.
-  result = ctEqual(eda.data, edb.data)
-
-proc `==`*(eda, edb: EdPublicKey): bool =
-  ## Compare ED25519 `public key` objects for equality.
-  result = ctEqual(eda.data, edb.data)
-
-proc `==`*(eda, edb: EdSignature): bool =
-  ## Compare ED25519 `signature` objects for equality.
-  result = ctEqual(eda.data, edb.data)
-
-proc `$`*(key: EdPrivateKey): string =
-  ## Return string representation of ED25519 `private key`.
-  ncrutils.toHex(key.data)
-
-proc `$`*(key: EdPublicKey): string =
-  ## Return string representation of ED25519 `private key`.
-  ncrutils.toHex(key.data)
-
-proc `$`*(sig: EdSignature): string =
-  ## Return string representation of ED25519 `signature`.
-  ncrutils.toHex(sig.data)
-
-proc init*(key: var EdPrivateKey, data: openArray[byte]): bool =
-  ## Initialize ED25519 `private key` ``key`` from raw binary
-  ## representation ``data``.
-  ##
-  ## Procedure returns ``true`` on success.
-  let length = EdPrivateKeySize
-  if len(data) >= length:
-    copyMem(addr key.data[0], unsafeAddr data[0], length)
-    result = true
-
 proc init*(key: var EdPublicKey, data: openArray[byte]): bool =
   ## Initialize ED25519 `public key` ``key`` from raw binary
   ## representation ``data``.
@@ -1695,67 +1598,6 @@ proc init*(key: var EdPublicKey, data: string): bool =
   ##
   ## Procedure returns ``true`` on success.
   init(key, ncrutils.fromHex(data))
-
-
-proc init*(
-    t: typedesc[EdPrivateKey], data: openArray[byte]
-): Result[EdPrivateKey, EdError] =
-  ## Initialize ED25519 `private key` from raw binary representation ``data``
-  ## and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
-
-proc init*(
-    t: typedesc[EdPublicKey], data: openArray[byte]
-): Result[EdPublicKey, EdError] =
-  ## Initialize ED25519 `public key` from raw binary representation ``data``
-  ## and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
-
-proc init*(
-    t: typedesc[EdSignature], data: openArray[byte]
-): Result[EdSignature, EdError] =
-  ## Initialize ED25519 `signature` from raw binary representation ``data``
-  ## and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
-
-proc init*(t: typedesc[EdPrivateKey], data: string): Result[EdPrivateKey, EdError] =
-  ## Initialize ED25519 `private key` from hexadecimal string representation
-  ## ``data`` and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
-
-proc init*(t: typedesc[EdPublicKey], data: string): Result[EdPublicKey, EdError] =
-  ## Initialize ED25519 `public key` from hexadecimal string representation
-  ## ``data`` and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
-
-proc init*(t: typedesc[EdSignature], data: string): Result[EdSignature, EdError] =
-  ## Initialize ED25519 `signature` from hexadecimal string representation
-  ## ``data`` and return constructed object.
-  var res: t
-  if not init(res, data):
-    err(EdIncorrectError)
-  else:
-    ok(res)
 
 
 proc verify*[T: byte | char](
