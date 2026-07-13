@@ -135,7 +135,7 @@ func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
   (offset, int64(ceil(float64(endFrame) / speed)) - offset)
 
 proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
-    start: int64): tuple[clips: seq[Clip], clips2: seq[Clip2]] =
+    start: int64, clips2: var seq[Clip2]): seq[Clip] {.inline.} =
   var timelineStart = start
   for chunk in chunkify(actionIndex, effects):
     let actionGroup = chunk[3]
@@ -152,37 +152,37 @@ proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
       error "'Number of actions' limit for timeline reached."
     let e = uint32(effectIndex)
 
-    result.clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+    clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
 
     if speed != 99999.0:
       let (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
       if dur == 0:
         continue
 
-      result.clips.add Clip(src: src, start: timelineStart, dur: dur,
+      result.add Clip(src: src, start: timelineStart, dur: dur,
         offset: offset, effects: e)
       timelineStart += dur
 
 proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor,
     mi: MediaInfo,
   effects: seq[Actions], actionIndex: seq[int]): v3 =
-  let built = linearClips(src, effects, actionIndex, 0)
+  var clips2: seq[Clip2]
+  let clips = linearClips(src, effects, actionIndex, 0, clips2)
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: built.clips2,
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2,
       res: mi.getRes(),
     templateFile: src)
-  mutHelper(result, mi, built.clips)
+  mutHelper(result, mi, clips)
 
 proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
     actionIndex: seq[int]) =
-  let built = linearClips(src, tl.effects, actionIndex, tl.len)
-  tl.clips2.add built.clips2
+  let clips = linearClips(src, tl.effects, actionIndex, tl.len, tl.clips2)
 
   if mi.v.len > 0:
     if tl.v.len == 0:
       tl.v.add @[]
       tl.langs.insert(mi.v[0].lang, 0)
-    for clip in built.clips:
+    for clip in clips:
       var videoClip = clip
       videoClip.stream = 0
       tl.v[0].add videoClip
@@ -191,7 +191,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
     if tl.a.len <= i:
       tl.a.add @[]
       tl.langs.add mi.a[i].lang
-    for clip in built.clips:
+    for clip in clips:
       var audioClip = clip
       audioClip.stream = i.int16
       tl.a[i].add audioClip
@@ -199,7 +199,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
   for i in 0 ..< mi.s.len:
     while tl.s.len <= i:
       tl.s.add @[]
-    for clip in built.clips:
+    for clip in clips:
       var subtitleClip = clip
       subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
@@ -233,12 +233,14 @@ proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
 
 proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 {.raises: [].} =
+  var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
   var effects: seq[Actions] = @[]
+  var start: int64 = 0
 
   for chunk in chunks:
     if chunk[2] > 0.0 and chunk[2] < 99999.0:
-      let (_, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
+      let (offset, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
       if dur == 0:
         continue
 
@@ -253,9 +255,14 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
         effectIndex = effects.len - 1
       if effectIndex > int64(high(uint32)):
         error "'Number of actions' limit for timeline reached."
-      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: uint32(effectIndex))
+      let e = uint32(effectIndex)
+      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
+      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+      start += dur
 
-  initNonLinear(src, tb, mi, clips2, effects)
+  result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
+  result.res = mi.getRes()
+  mutHelper(result, mi, clips)
 
 proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
   clips2: seq[Clip2], effects: seq[Actions]): v3 =
