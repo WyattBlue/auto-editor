@@ -100,6 +100,8 @@ const subdumpOptions*: seq[OptDef] = @[
 const waveformOptions*: seq[OptDef] = @[
   OptDef(names: "--stream", datum: "stream", metavar: "NAT",
     help: "Set which audio stream to analyze (default 0)"),
+  OptDef(names: "--channel", datum: "channel", metavar: "NAME",
+    help: "Set one or more comma-separated audio channels to draw"),
   OptDef(names: "--samples-per-bucket", datum: "samples-per-bucket", metavar: "NAT",
     help: "Number of audio samples per drawn bucket (default 256)"),
   OptDef(names: "--start-sample", datum: "start-sample", metavar: "NAT",
