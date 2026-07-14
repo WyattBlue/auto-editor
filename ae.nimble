@@ -178,8 +178,8 @@ let vpx = Package(
 )
 let dav1d = Package(
   name: "dav1d",
-  sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.bz2",
-  sha256: "e099f53253f6c247580c554d53a13f1040638f2066edc3c740e4c2f15174ce22",
+  sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.4/dav1d-1.5.4.tar.bz2",
+  sha256: "2abfb0c89212e6e4733a54e0ae509ec00a5b845a6360946f918806e14aedb011",
   buildSystem: "meson",
   ffFlag: "--enable-libdav1d",
 )
