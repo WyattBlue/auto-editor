@@ -69,7 +69,13 @@ proc main*(cArgs: seq[string]) =
   if inputPath == "":
     error "A media file is needed"
   if model == "":
-    error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp"
+    error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp\n" &
+      "Or use 'apple' for the built-in macOS 26+ transcriber"
+  if model == "apple":
+    if translate:
+      error "--translate is not supported with the apple model"
+    if prompt != "":
+      error "--prompt is not supported with the apple model"
 
   let isMic = (inputPath == ":mic")
   # Install early so Ctrl-C is graceful even during the (slow) model load.

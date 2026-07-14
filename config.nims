@@ -99,9 +99,9 @@ if not defined(dynamic):
       switch("passL", "-lvpl")
 
 when hostOS == "macosx":
+  let (osVer, osVerCode) = gorgeEx("sw_vers -productVersion", "")
+  let majorVer = osVer.strip().split(".")[0]
   if defined(dynamic):
-    let (osVer, _) = gorgeEx("sw_vers -productVersion", "")
-    let majorVer = osVer.strip().split(".")[0]
     switch("passC", "-mmacosx-version-min=" & majorVer & ".0")
     switch("passL", "-mmacosx-version-min=" & majorVer & ".0")
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
@@ -109,6 +109,26 @@ when hostOS == "macosx":
   when not defined(dynamic):
     switch("passL", "-lavdevice")
     switch("passL", "-framework AVFoundation -framework Foundation -framework CoreGraphics")
+  when not defined(emscripten):
+    # Apple SpeechAnalyzer backend for `whisper <file> apple` (macOS 26+ only).
+    let osMajor = (
+      try: parseInt(majorVer)
+      except ValueError: 0
+    )
+    if osVerCode == 0 and osMajor >= 26:
+      # Deployment target 14 (matching the C side) so release binaries still
+      # launch on pre-26 macOS; the shim weak-links Speech's new symbols.
+      let shim = gorgeEx("[ build/lib/libae_speech.a -nt src/ae_speech.swift ] || " &
+        "(mkdir -p build/lib && swiftc -O -parse-as-library -emit-library -static " &
+        "-target $(uname -m)-apple-macos14.0 " &
+        "-o build/lib/libae_speech.a src/ae_speech.swift)")
+      if shim.exitCode == 0:
+        switch("define", "appleSpeech")
+        switch("passL", "./build/lib/libae_speech.a")
+        switch("passL", "-L/usr/lib/swift")
+        switch("passL", "-framework Speech -framework AVFoundation -framework Foundation")
+      else:
+        echo "warning: skipping Apple speech shim: " & shim.output
 elif hostOS == "windows":
   switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
 elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):

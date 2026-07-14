@@ -89,6 +89,18 @@ else:
     maxLen: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
   proc ae_whisper_free(ctx: WhisperCtx) = discard
 
+# Apple SpeechAnalyzer backend (src/ae_speech.swift), selected with model "apple".
+when defined(appleSpeech):
+  proc ae_speech_init(locale: cstring): WhisperCtx {.importc, cdecl.}
+  proc ae_speech_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
+    splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, cdecl.}
+  proc ae_speech_free(ctx: WhisperCtx) {.importc, cdecl.}
+else:
+  proc ae_speech_init(locale: cstring): WhisperCtx = nil
+  proc ae_speech_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
+    splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
+  proc ae_speech_free(ctx: WhisperCtx) = discard
+
 const
   Rate = 16000               # whisper's sample rate; the graph resamples to it
   WinSize = 480              # 30ms analysis window, matching auto-editor's chunking
@@ -133,6 +145,7 @@ type
     startMs: int64
   WorkerArgs = object
     wctx: WhisperCtx
+    apple: bool
     oc: ptr OutCtx
     jobs: ptr Channel[Job]
     language: string
@@ -155,10 +168,16 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
     a.oc.segStartMs = job.startMs
     if a.debug:
       stderr.writeLine(&"transcribing {job.samples.len} samples at {job.startMs} ms")
-    if ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
-        a.language.cstring, a.translate, a.threads, a.prompt.cstring,
-        a.maxLen, segCb, a.oc) != 0:
-      stderr.writeLine(&"whisper failed on segment at {job.startMs} ms; skipping")
+    let rc =
+      if a.apple:
+        ae_speech_run(a.wctx, addr job.samples[0], job.samples.len.cint,
+          a.maxLen, segCb, a.oc)
+      else:
+        ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
+          a.language.cstring, a.translate, a.threads, a.prompt.cstring,
+          a.maxLen, segCb, a.oc)
+    if rc != 0:
+      stderr.writeLine(&"transcription failed on segment at {job.startMs} ms; skipping")
 
 proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     model, language: string, translate: bool, format, output: string,
@@ -167,13 +186,28 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   ## Read `audioStream` from the open `fmtCtx` (a file or the live mic) until it
   ## ends or `stop[]` is set, transcribing each detected speech segment. Output
   ## goes to `output` ("-" = stdout).
-  let wctx = ae_whisper_init(model.cstring, 1, (if debug: 1.cint else: 0.cint))
-  if wctx == nil:
-    when defined(whisper):
-      error &"Could not load whisper model: {model}"
+  let useApple = model == "apple"
+  var wctx: WhisperCtx
+  if useApple:
+    when defined(appleSpeech):
+      # Blocks while downloading the system model on first use.
+      if language == "auto":
+        stderr.writeLine("Apple speech cannot auto-detect language; assuming en_US (set --language to override)")
+      let locale = (if language == "auto": "en_US" else: language)
+      wctx = ae_speech_init(locale.cstring)
+      if wctx == nil:
+        error &"Apple speech init failed. It needs macOS 26+ at runtime, a supported " &
+          &"language (got: {locale}), and network access for the first-run model download"
     else:
-      error "This build of auto-editor has no whisper support"
-  defer: ae_whisper_free(wctx)
+      error "The 'apple' model needs a build made on macOS 26 or later"
+  else:
+    wctx = ae_whisper_init(model.cstring, 1, (if debug: 1.cint else: 0.cint))
+    if wctx == nil:
+      when defined(whisper):
+        error &"Could not load whisper model: {model}"
+      else:
+        error "This build of auto-editor has no whisper support"
+  defer: (if useApple: ae_speech_free(wctx) else: ae_whisper_free(wctx))
 
   let outFile = if output == "-": stdout
     else: (try: open(output, fmWrite) except IOError: error &"Could not open output: {output}")
@@ -278,7 +312,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   let pkt = av_packet_alloc()
   defer: av_packet_free(addr pkt)
 
-  var wargs = WorkerArgs(wctx: wctx, oc: addr oc, jobs: addr jobs,
+  var wargs = WorkerArgs(wctx: wctx, apple: useApple, oc: addr oc, jobs: addr jobs,
     language: language, translate: (if translate: 1.cint else: 0.cint),
     threads: threads, prompt: prompt,
     maxLen: (if splitWords: 1.cint else: 0.cint), debug: debug)
