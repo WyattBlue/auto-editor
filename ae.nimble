@@ -140,6 +140,12 @@ let amfheaders = Package(
   sha256: "8a70b6dc85261e6e6e57769bd81ac1e09c0a4c96bbd5e358ffbc2dee51e8e50a",
   ffFlag: "--enable-amf",
 )
+let alsa = Package(
+  name: "alsa-lib",
+  sourceUrl: "https://www.alsa-project.org/files/pub/lib/alsa-lib-1.2.14.tar.bz2",
+  sha256: "be9c88a0b3604367dd74167a2b754a35e142f670292ae47a2fdef27a2ee97a32",
+  buildArguments: @["--disable-python"],
+)
 let libvpl = Package(
   name: "libvpl",
   sourceUrl: "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
@@ -244,6 +250,8 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   # AMD AMF: x86_64 Windows and Linux only
   if kind == winX64 or (kind == native and not isMacNative and hostCPU == "amd64"):
     result.add amfheaders
+  if kind == armv7 or (kind == native and defined(linux)):
+    result.add alsa
   if enableVpl and kind != winArm and kind != armv7 and not isWasm:
     result.add libvpl
   if enableWhisper:
@@ -839,6 +847,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
 
   let isCrossWasm = kind == wasm32 or kind == wasm64
   let isMacNative = defined(macosx) and kind == native
+  let isWindows = kind in [winX64, winArm] or (defined(windows) and kind == native)
+  let isLinux = kind == armv7 or (defined(linux) and kind == native)
 
   if not isCrossWasm:
     if isMacNative:
@@ -887,9 +897,15 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       commonFlags &= "  --enable-audiotoolbox \\\n"
       commonFlags &= "  --enable-avfoundation \\\n"
       commonFlags &= "  --enable-indev=avfoundation \\\n"
-    elif kind != armv7 and kind != winArm:
-      commonFlags &= "  --enable-nvenc \\\n"
-      commonFlags &= "  --enable-ffnvcodec \\\n"
+    else:
+      if isWindows:
+        commonFlags &= "  --enable-indev=dshow \\\n"
+      elif isLinux:
+        commonFlags &= "  --enable-alsa \\\n"
+        commonFlags &= "  --enable-indev=alsa \\\n"
+      if kind != armv7 and kind != winArm:
+        commonFlags &= "  --enable-nvenc \\\n"
+        commonFlags &= "  --enable-ffnvcodec \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags
@@ -905,7 +921,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

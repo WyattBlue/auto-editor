@@ -84,6 +84,9 @@ when defined(gcc):
 
 if not defined(dynamic):
   # Core FFmpeg libraries
+  when defined(macosx) or defined(windows) or
+      (defined(linux) and not defined(emscripten)):
+    switch("passL", "-lavdevice")
   switch("passL", "-lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil")
   # Codec libraries
   switch("passL", "-lmp3lame -lopus -lx264 -ldav1d -lz")
@@ -107,7 +110,6 @@ when hostOS == "macosx":
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
   switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreAudio -framework CoreVideo")
   when not defined(dynamic):
-    switch("passL", "-lavdevice")
     switch("passL", "-framework AVFoundation -framework Foundation -framework CoreGraphics")
   when not defined(emscripten):
     # Apple SpeechAnalyzer backend for `whisper <file> apple` (macOS 26+ only).
@@ -130,8 +132,9 @@ when hostOS == "macosx":
       else:
         echo "warning: skipping Apple speech shim: " & shim.output
 elif hostOS == "windows":
-  switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
+  switch("passL", "-lpthread -lbcrypt -lsetupapi -lpsapi -lole32 -lstrmiids -luuid -loleaut32 -lshlwapi")
 elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):
+  switch("passL", "-lasound")
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")
     switch("passL", "-L./build/lib64")

@@ -2,7 +2,7 @@ import std/[os, strformat, strutils]
 import ../[av, cli, ffmpeg, log, transcribe]
 import ../util/[dnorm16, fun]
 import ./help
-when defined(macosx):
+when defined(macosx) or defined(windows):
   import ../mic
 
 var ctrlcStop = false
@@ -99,21 +99,42 @@ proc main*(cArgs: seq[string]) =
   var input: InputContainer
 
   if isMic:
-    when defined(macosx):
-      let (devName, warnMsg) = chooseMicDevice()
-      if devName == "":
-        error "No microphone found"
-      if warnMsg != "":
-        warning warnMsg
+    when defined(macosx) or defined(windows) or
+        (defined(linux) and not defined(emscripten)):
+      var formatName, deviceName, displayName, sourceName: string
+      when defined(macosx):
+        let (devName, warnMsg) = chooseMicDevice()
+        formatName = "avfoundation"
+        deviceName = devName
+        displayName = devName
+        sourceName = ":" & devName
+      elif defined(windows):
+        formatName = "dshow"
+      elif defined(linux):
+        formatName = "alsa"
+        deviceName = "default"
+        displayName = "default"
+        sourceName = "default"
 
       avdevice_register_all()
-      let avf = av_find_input_format("avfoundation")
-      if avf == nil:
-        error "Could not find avfoundation input device"
-      # ":<name>" selects audio only (empty video field); avfoundation matches
-      # the name against each device's localizedName.
-      if avformat_open_input(addr fmtCtx, (":" & devName).cstring, avf, nil) < 0:
-        error &"Could not open microphone \"{devName}\""
+      let inputFormat = av_find_input_format(formatName.cstring)
+      if inputFormat == nil:
+        error &"Could not find {formatName} input device"
+
+      when defined(windows):
+        let (devName, description, warnMsg) = chooseMicDevice(inputFormat)
+        deviceName = devName
+        displayName = description
+        sourceName = "audio=" & devName
+
+      when defined(macosx) or defined(windows):
+        if deviceName == "":
+          error "No microphone found"
+        if warnMsg != "":
+          warning warnMsg
+
+      if avformat_open_input(addr fmtCtx, sourceName.cstring, inputFormat, nil) < 0:
+        error &"Could not open microphone \"{displayName}\""
       if avformat_find_stream_info(fmtCtx, nil) < 0:
         error "Could not read microphone stream info"
       for i in 0 ..< fmtCtx.nb_streams.int:
@@ -122,9 +143,9 @@ proc main*(cArgs: seq[string]) =
           break
       if audioStream == nil:
         error "Microphone has no audio stream"
-      stderr.writeLine(&"Listening on \"{devName}\"... (press Ctrl-C to stop)")
+      stderr.writeLine(&"Listening on \"{displayName}\"... (press Ctrl-C to stop)")
     else:
-      error "Microphone capture (:mic) is only supported on macOS"
+      error "Microphone capture (:mic) is not supported on this platform"
   else:
     input = (try: av.open(inputPath) except: error "Invalid media file")
     if input.audio.len == 0:

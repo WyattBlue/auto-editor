@@ -1,6 +1,6 @@
-import std/strformat
-
 when defined(macosx):
+  import std/strformat
+
   type AudioObjectPropertyAddress {.importc, header: "<CoreAudio/CoreAudio.h>", bycopy.} = object
     mSelector: uint32
     mScope: uint32
@@ -92,6 +92,37 @@ when defined(macosx):
     let name = deviceName(fallback)
     return (name, &"No USB microphone found, using \"{name}\"")
 
-else:
-  proc chooseMicDevice*(): tuple[name: string, warning: string] =
-    ("", "Microphone capture (:mic) is only supported on macOS")
+elif defined(windows):
+  import std/strutils
+  import ./ffmpeg
+
+  proc chooseMicDevice*(inputFormat: pointer): tuple[name, description, warning: string] =
+    ## DirectShow has no special name for the default capture device, so ask
+    ## libavdevice for its audio sources. Prefer a USB microphone when one is
+    ## identifiable, then fall back to the first audio capture device.
+    var devices: ptr AVDeviceInfoList
+    if avdevice_list_input_sources(inputFormat, nil, nil, addr devices) < 0 or
+        devices == nil:
+      return
+    defer: avdevice_free_list_devices(addr devices)
+
+    var fallback: ptr AVDeviceInfo
+    for i in 0 ..< devices.nb_devices.int:
+      let device = devices.devices[i]
+      var hasAudio = false
+      for j in 0 ..< device.nb_media_types.int:
+        if device.media_types[j] == AVMEDIA_TYPE_AUDIO:
+          hasAudio = true
+          break
+      if not hasAudio:
+        continue
+      if fallback == nil:
+        fallback = device
+      let description = $device.device_description
+      if description.toLowerAscii.contains("usb"):
+        return ($device.device_name, description, "")
+
+    if fallback != nil:
+      let description = $fallback.device_description
+      return ($fallback.device_name, description,
+              "No USB microphone found, using \"" & description & "\"")

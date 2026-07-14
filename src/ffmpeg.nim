@@ -315,7 +315,24 @@ proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
     header: "<libavformat/avformat.h>".}
 proc av_find_input_format*(short_name: cstring): pointer {.importc,
     header: "<libavformat/avformat.h>".}
+
+type
+  AVDeviceInfo* {.importc, header: "<libavdevice/avdevice.h>", bycopy.} = object
+    device_name*: cstring
+    device_description*: cstring
+    media_types*: ptr UncheckedArray[AVMediaType]
+    nb_media_types*: cint
+  AVDeviceInfoList* {.importc, header: "<libavdevice/avdevice.h>", bycopy.} = object
+    devices*: ptr UncheckedArray[ptr AVDeviceInfo]
+    nb_devices*: cint
+    default_device*: cint
+
 proc avdevice_register_all*() {.importc, header: "<libavdevice/avdevice.h>".}
+proc avdevice_list_input_sources*(device: pointer, device_name: cstring,
+    device_options: pointer, device_list: ptr ptr AVDeviceInfoList): cint {.importc,
+    header: "<libavdevice/avdevice.h>".}
+proc avdevice_free_list_devices*(device_list: ptr ptr AVDeviceInfoList) {.importc,
+    header: "<libavdevice/avdevice.h>".}
 proc avformat_find_stream_info*(ic: ptr AVFormatContext,
     options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,
