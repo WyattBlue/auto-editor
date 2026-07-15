@@ -1,7 +1,65 @@
 import std/[math, options, strformat]
 
+when defined(emscripten) or defined(amd64) or defined(i386):
+  import std/bitops
+
 import ../[av, cache, ffmpeg, log]
 import ../util/[bar, rational, dnorm16]
+
+when defined(arm64) or defined(aarch64):
+  type Vec8x16 {.importc: "uint8x16_t", header: "<arm_neon.h>".} = object
+
+  proc neonLoad8(p: pointer): Vec8x16 {.importc: "vld1q_u8",
+      header: "<arm_neon.h>".}
+  proc neonEqual8(a, b: Vec8x16): Vec8x16 {.importc: "vceqq_u8",
+      header: "<arm_neon.h>".}
+  proc neonSumLong8(v: Vec8x16): uint16 {.importc: "vaddlvq_u8",
+      header: "<arm_neon.h>".}
+
+elif defined(emscripten):
+  type V128 {.importc: "v128_t", header: "<wasm_simd128.h>".} = object
+
+  proc wasmLoad(p: pointer): V128 {.importc: "wasm_v128_load",
+      header: "<wasm_simd128.h>".}
+  proc wasmEqual8(a, b: V128): V128 {.importc: "wasm_i8x16_eq",
+      header: "<wasm_simd128.h>".}
+  proc wasmBitmask8(v: V128): uint32 {.importc: "wasm_i8x16_bitmask",
+      header: "<wasm_simd128.h>".}
+
+elif defined(amd64) or defined(i386):
+  type M128i {.importc: "__m128i", header: "<emmintrin.h>".} = object
+
+  proc sseLoad(p: pointer): M128i {.importc: "_mm_loadu_si128",
+      header: "<emmintrin.h>".}
+  proc sseEqual8(a, b: M128i): M128i {.importc: "_mm_cmpeq_epi8",
+      header: "<emmintrin.h>".}
+  proc sseBitmask8(v: M128i): cint {.importc: "_mm_movemask_epi8",
+      header: "<emmintrin.h>".}
+
+proc countDifferentPixels(a, b: ptr UncheckedArray[uint8], len: int): int32 =
+  ## Count differing gray pixels using 16-byte vectors where available.
+  var i = 0
+  when defined(arm64) or defined(aarch64):
+    while i + 16 <= len:
+      let equalBytes = neonEqual8(neonLoad8(addr a[i]), neonLoad8(addr b[i]))
+      result += 16 - int32(neonSumLong8(equalBytes) div 255)
+      i += 16
+  elif defined(emscripten):
+    while i + 16 <= len:
+      let equalMask = wasmBitmask8(wasmEqual8(wasmLoad(addr a[i]),
+        wasmLoad(addr b[i])))
+      result += 16 - int32(countSetBits(equalMask))
+      i += 16
+  elif defined(amd64) or defined(i386):
+    while i + 16 <= len:
+      let equalMask = uint32(sseBitmask8(sseEqual8(sseLoad(addr a[i]),
+        sseLoad(addr b[i]))))
+      result += 16 - int32(countSetBits(equalMask))
+      i += 16
+
+  while i < len:
+    result += int32(ord(a[i] != b[i]))
+    inc i
 
 type VideoProcessor* = object
   formatCtx*: ptr AVFormatContext
@@ -194,10 +252,7 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
     var value: Unorm16 = toUnorm16(0.0'f32)
     if not firstTime:
       # Calculate motion by comparing with previous frame
-      var diffCount: int32 = 0
-      for i in 0 ..< totalPixels:
-        if prevFrame[i] != currentFrame[i]:
-          inc diffCount
+      let diffCount = countDifferentPixels(prevFrame, currentFrame, totalPixels)
 
       value = toUnorm16(float32(diffCount) / float32(totalPixels))
     else:
