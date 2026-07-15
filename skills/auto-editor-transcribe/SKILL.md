@@ -1,31 +1,60 @@
 ---
 name: auto-editor-transcribe
-description: Transcribe a media file's speech to text or subtitles with auto-editor's whisper subcommand, then edit by spoken content — cut to keep (or drop) sections whose subtitles match a word or regex. Use when someone wants a transcript/captions, or wants to cut a video based on what is said rather than on loudness.
+description: Transcribe a media file or live microphone to text or subtitles with auto-editor's whisper subcommand, then edit by spoken content — cut to keep (or drop) sections whose subtitles match a word or regex. Use when someone wants a transcript, captions, live speech transcription, or to cut a video based on what is said rather than on loudness.
 ---
 
 # Transcribe & edit by speech
 
-auto-editor wraps whisper.cpp to transcribe audio, and can cut a timeline based on subtitle content via `--edit subtitle`/`word`.
+Use auto-editor's whisper.cpp or Apple Speech backend to transcribe audio. Cut a timeline based on subtitle content with `--edit subtitle`/`word`.
 
 ## Transcribe — `auto-editor whisper`
 
 ```
-auto-editor whisper <file> <model> [options]
+auto-editor whisper <file|:mic> <model> [options]
 ```
 
-`<model>` is a path to a `ggml` whisper model e.g. `ggml-small.en.bin`, `ggml-medium.en.bin`, `ggml-large-v3.bin`. Only the first audio stream is used; it's resampled to 16 kHz first. The transcript prints to stdout by default.
+For whisper.cpp, set `<model>` to a `ggml` model path such as
+`ggml-small.en.bin`, `ggml-medium.en.bin`, or `ggml-large-v3.bin`. For Apple's
+built-in transcriber, use the magic model name `apple`; it requires a build made
+on macOS 26 or later and macOS 26 or later at runtime. Only the first audio
+stream of a file is used. Audio is resampled to 16 kHz, and text prints to stdout
+by default.
 
 ```bash
 auto-editor whisper example.mp4 ggml-medium.en.bin                      # plain text → stdout
 auto-editor whisper example.mp4 ggml-medium.en.bin --format srt -o out.srt
+auto-editor whisper example.mp4 apple --language en_US                  # macOS 26+
 ```
 
 Options: `--format text|srt|json`, `-o/--output FILE`, `-l/--language en`
 (default auto), `-tr/--translate` (→ English), `-sw/--split-words` (one word per
-token), `--queue SECS` (default 30), `--vad-model PATH`, `--threads N` (default 4).
+cue), `--queue SECS` (default 30), `--prompt TEXT`, `--threads N` (default 4),
+and `-t/--threshold THRES` (default 0.04).
 
-> The whisper filter must be built into the ffmpeg auto-editor uses; otherwise it
-> reports `Could not find whisper filter`.
+With the `apple` model, set `--language` to a supported language or locale.
+Apple speech cannot auto-detect language, so `auto` falls back to `en_US` with a
+warning. Do not pass `--translate` or `--prompt`; neither is supported. The first
+use of a language may download Apple's speech model and therefore needs network
+access.
+
+### Transcribe a live microphone
+
+Pass `:mic` instead of a file. Stop capture gracefully with Ctrl-C.
+
+```bash
+auto-editor whisper :mic ggml-medium.en.bin
+auto-editor whisper :mic apple --language en_US    # macOS 26+
+auto-editor whisper :mic ggml-medium.en.bin -o transcript.srt
+```
+
+Live capture supports macOS, Windows, and Linux:
+
+- macOS uses AVFoundation and prefers a USB microphone, then the system default.
+- Windows uses DirectShow and prefers a USB microphone, then the first audio capture device.
+- Linux uses the default ALSA input device.
+
+When `-o/--output` ends in `.srt`, `.json`, `.txt`, or `.text`, the output format is
+inferred unless `--format` is set explicitly.
 
 ## Edit by spoken content
 
