@@ -28,6 +28,22 @@ func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
       trackArray.add(clipObj)
     result.add(trackArray)
 
+func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode =
+  result = newJArray()
+  for track in tracks:
+    var arr = newJArray()
+    for t in track:
+      arr.add %*{
+        "kind": "dissolve",
+        "at": t.at,
+        "dur": t.dur,
+        "alignment": (case t.alignment
+          of taStart: "start"
+          of taCenter: "center"
+          of taEnd: "end")
+      }
+    result.add arr
+
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
   return %* {
@@ -49,7 +65,7 @@ func `%`(self: v2): JsonNode =
   }
 
 func `%`*(self: v3): JsonNode =
-  return %* {
+  result = %* {
     "version": "3",
     "templateFile": (if self.templateFile != nil: self.templateFile[] else: ""),
     "timebase": $self.tb.num & "/" & $self.tb.den,
@@ -61,11 +77,18 @@ func `%`*(self: v3): JsonNode =
     "v": tracksToJson(self.v, self.effects),
     "a": tracksToJson(self.a, self.effects),
   }
+  if self.vt.len > 0 or self.at.len > 0:
+    result["transitions"] = %*{
+      "v": transitionsToJson(self.vt),
+      "a": transitionsToJson(self.at)
+    }
 
 proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
   var tlJson: JsonNode
 
   if `export` == "v1" or `export` == "v2":
+    if tlV3.vt.len > 0 or tlV3.at.len > 0:
+      error `export` & " cannot represent transitions; use v3"
     if not tlV3.isLinear:
       error "No chunks available for export"
 

@@ -54,6 +54,30 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
   else:
     result.effects = uint32(effectIndex)
 
+proc parseTransition(node: JsonNode): Transition {.raises: [].} =
+  if node{"kind"}.getStr("") != "dissolve":
+    error "Unsupported transition kind"
+  result.kind = tkDissolve
+  result.at = node{"at"}.getBiggestInt(-1)
+  result.dur = node{"dur"}.getBiggestInt(-1)
+  if result.at < 0 or result.dur <= 0:
+    error "Invalid transition timing"
+  case node{"alignment"}.getStr("")
+  of "start": result.alignment = taStart
+  of "center": result.alignment = taCenter
+  of "end": result.alignment = taEnd
+  else: error "Invalid transition alignment"
+
+proc parseTransitions(node: JsonNode, trackCount: int): seq[seq[Transition]] {.raises: [].} =
+  if node == nil: return
+  if node.kind != JArray or node.len != trackCount:
+    error "Transition track count must match media track count"
+  for trackNode in node:
+    if trackNode.kind != JArray: error "Transition tracks must be arrays"
+    var track: seq[Transition]
+    for transitionNode in trackNode: track.add parseTransition(transitionNode)
+    result.add track
+
 proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
   let tbString = jsonNode{"timebase"}.getStr("")
   if tbString == "":
@@ -130,8 +154,15 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   while result.langs.len < result.v.len + result.a.len:
     result.langs.add ['u', 'n', 'd', '\0']
 
+  let transitions = jsonNode{"transitions"}
+  if transitions != nil:
+    if transitions.kind != JObject: error "'transitions' must be an object"
+    result.vt = parseTransitions(transitions{"v"}, result.v.len)
+    result.at = parseTransitions(transitions{"a"}, result.a.len)
+
   let tf = jsonNode{"templateFile"}.getStr("")
   result.templateFile = if tf != "": interner.intern(tf) else: result.firstSource
+  result.validateTransitions()
 
 
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =

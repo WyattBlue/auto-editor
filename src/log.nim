@@ -73,6 +73,8 @@ type mainArgs* = object
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
   adds*: seq[AddSpec]   # `add:` overlays (see AddSpec)
+  transition*: PackedInt = pack(false, 0) # 0 disables; otherwise dissolve duration
+  transitionMinCut*: PackedInt = pack(true, 1000) # 1 second
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"

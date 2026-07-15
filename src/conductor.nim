@@ -350,6 +350,10 @@ proc editMedia*(args: var mainArgs) =
 
       applyAdds(tlV3, args, interner)
       tlV3.applyArgs(args)
+      if args.transition.getNumber > 0:
+        tlV3.addDissolveTransitions(
+          toTb(args.transition, tlV3.tb.float).int64,
+          toTb(args.transitionMinCut, tlV3.tb.float).int64)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":
@@ -369,6 +373,10 @@ proc editMedia*(args: var mainArgs) =
   # imported from a file/stdin, which never pass through the CLI-level checks.
   if tlV3.uniqueSources().len > 1:
     requireLicense(args, "render or export a timeline with multiple sources")
+
+  if tlV3.hasTransitions and exportKind notin
+      ["default", "v3", "premiere", "resolve-fcp7", "premiere-otio"]:
+    error exportKind & " cannot represent transitions; use v3, FCP7, or OTIO"
 
   case exportKind:
   of "v1", "v2", "v3":

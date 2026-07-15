@@ -85,6 +85,19 @@ proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
     error "Invalid number: 'start'"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
+proc parseTransition(val: string): (PackedInt, PackedInt) =
+  result[1] = pack(true, 1000) # default minimum cut: one second
+  let parts = val.split(':')
+  if parts.len notin [2, 3] or parts[0] != "dissolve":
+    error "--transition expects dissolve:DURATION[:MIN-CUT]"
+  result[0] = parseTimeSimple(parts[1])
+  if result[0].getNumber <= 0:
+    error "--transition duration must be greater than zero"
+  if parts.len == 3:
+    result[1] = parseTimeSimple(parts[2])
+    if result[1].getNumber < 0:
+      error "--transition minimum cut duration cannot be negative"
+
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len < 2:
@@ -538,6 +551,8 @@ judge making cuts.
       args.margin = parseTwoLengths(key, expecting)
     of "smooth":
       args.smooth = parseTwoLengths(key, expecting)
+    of "transition":
+      (args.transition, args.transitionMinCut) = parseTransition(key)
     of "key":
       args.licenseKey = key
     expecting = ""

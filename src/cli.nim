@@ -137,6 +137,10 @@ Make sections 'smoother' by applying minimum cut and minimum clip rules. (defaul
 Examples:
   --smooth 0.2s,0.1s  # Set mincut to 0.2 seconds, minclip to 0.1 seconds.
   --smooth 0  # Turn off smoothing"""),
+  OptDef(names: "--transition", c: cEdit, datum: "transition",
+    metavar: "dissolve:DURATION[:MIN-CUT]", help: """
+Add linked video/audio cross-dissolves at cuts and fades at the timeline ends.
+Skip cuts whose removed source interval is shorter than MIN-CUT (default 1sec)."""),
   OptDef(names: "-o, --output", c: cEdit, datum: "output",
     metavar: "FILE", help: "Set the name/path of the new output file"),
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: "cut-out",

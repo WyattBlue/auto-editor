@@ -88,6 +88,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
 proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
     cache: MediaCache = nil) =
+  var renderTl = tl.bakeTransitions()
   var throttle = initThrottle()
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
@@ -133,8 +134,8 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   var videoFrameIter: iterator(): (ptr AVFrame, int64) = iterator(): (ptr AVFrame, int64) =
     return
 
-  if includeVideo and tl.v.len > 0 and tl.v[0].len > 0:
-    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args, cache)
+  if includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0:
+    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, renderTl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
@@ -173,7 +174,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize,
+      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], renderTl, frameSize,
           args.audioNormalize, cache)
       audioFrameIters.add(audioFrameIter)
   elif includeAudio:
@@ -204,7 +205,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl,
+        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, renderTl,
             frameSize, args.audioNormalize, cache)
         audioFrameIters.add(audioFrameIter)
 

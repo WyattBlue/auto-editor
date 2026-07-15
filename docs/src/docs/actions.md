@@ -303,6 +303,22 @@ auto-editor video.mp4 -w:0 speed:2,varispeed:1.5,volume:0.8
 
 ## Animations
 
+For transitions between clips, use the edit-point option instead of an action:
+
+```sh
+# Cross-dissolve cuts of at least 1 second; fade the timeline endpoints.
+auto-editor video.mp4 --transition dissolve:0.5sec
+
+# Override the minimum cut duration, or use :0 to include every eligible cut.
+auto-editor video.mp4 --transition dissolve:0.5sec:2sec
+auto-editor video.mp4 --transition dissolve:0.5sec:0
+```
+
+The transition is linked across the primary video and audio tracks. `opacity`
+and `volume` ramps remain useful when only one section or one media type should
+fade. The minimum-cut duration defaults to one second and affects internal cuts
+only; timeline start/end fades are unchanged.
+
 The animatable effects — `zoom`, `opacity`, `blur`, and `brightness` for video,
 plus `volume` for audio — accept a **ramp** instead of a single value, written
 `from..to`. The value is interpolated across the section, so the effect changes

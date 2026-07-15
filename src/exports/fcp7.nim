@@ -115,20 +115,46 @@ proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
 
   filedef.add mediadef
 
+proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
+    ntsc: string): XmlNode
+
 proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
+    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo],
+    timebase: int64, ntsc: string) =
   # Ids must be unique across every audio track (a per-track j would repeat
   # them, making <link> refs ambiguous); audio continues after the video ids.
   var nextId = (if tl.v.len > 0: tl.v[0].len else: 0)
   for t, alayer in tl.a.pairs:
     let track = newElement("track")
+    let transitions = (if t < tl.at.len: tl.at[t] else: @[])
+    let transitionLinks = transitionPlan(alayer, transitions)
     for j, aclip in alayer.pairs:
+      if transitionLinks[j].incoming >= 0:
+        let transition = transitions[transitionLinks[j].incoming]
+        if transition.alignment == taStart:
+          track.add dissolveItem(transition, "audio", timebase, ntsc)
       let mi = ptrToMi[aclip.src]
 
-      let startVal = $aclip.start
-      let endVal = $(aclip.start + aclip.dur)
-      let inVal = $aclip.offset
-      let outVal = $(aclip.offset + aclip.dur)
+      var startVal = $aclip.start
+      var endVal = $(aclip.start + aclip.dur)
+      var inFrame = aclip.offset
+      var outFrame = aclip.offset + aclip.dur
+      if transitionLinks[j].incoming >= 0:
+        let transition = transitions[transitionLinks[j].incoming]
+        if transition.alignment == taCenter:
+          startVal = "-1"
+          inFrame = max(0'i64, inFrame - transition.dur div 2)
+        elif transition.alignment == taStart:
+          startVal = "-1"
+      if transitionLinks[j].outgoing >= 0:
+        let transition = transitions[transitionLinks[j].outgoing]
+        if transition.alignment == taCenter:
+          endVal = "-1"
+          outFrame += transition.dur - transition.dur div 2
+        elif transition.alignment == taEnd:
+          endVal = "-1"
+      let inVal = $inFrame
+      let outVal = $outFrame
 
       nextId += 1
       let clipItemNum = nextId
@@ -167,6 +193,9 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
           break
 
       track.add clipitem
+      if transitionLinks[j].outgoing >= 0:
+        track.add dissolveItem(transitions[transitionLinks[j].outgoing],
+          "audio", timebase, ntsc)
     audio.add track
 
 type AudioTrackInfo = object
@@ -206,7 +235,7 @@ proc planPremiereAudio(tl: v3, ptrToMi: Table[ptr string, MediaInfo],
 
 proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo],
-    audioPlan: seq[AudioTrackInfo]) =
+    audioPlan: seq[AudioTrackInfo], timebase: int64, ntsc: string) =
   audio.add elem("numOutputChannels", "2")
   let aformat = newElement("format")
   let aschar = newElement("samplecharacteristics")
@@ -216,9 +245,15 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
   audio.add aformat
 
   let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
+  var transitionPlans = newSeq[seq[TransitionLink]](tl.a.len)
+  for i, layer in tl.a:
+    let transitions = (if i < tl.at.len: tl.at[i] else: @[])
+    transitionPlans[i] = transitionPlan(layer, transitions)
   for atrack in audioPlan:
     let alayer = tl.a[atrack.layerIdx]
     let track = newElement("track")
+    let transitions = (if atrack.layerIdx < tl.at.len: tl.at[atrack.layerIdx] else: @[])
+    let transitionLinks = transitionPlans[atrack.layerIdx]
     track.attrs = {
       "currentExplodedTrackIndex": $atrack.explodedIndex,
       "totalExplodedTrackCount": (if atrack.isStereo: "2" else: "1"),
@@ -229,12 +264,32 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       track.add elem("outputchannelindex", $(atrack.explodedIndex + 1))
 
     for j, aclip in alayer.pairs:
+      if transitionLinks[j].incoming >= 0:
+        let t = transitions[transitionLinks[j].incoming]
+        if t.alignment == taStart:
+          track.add dissolveItem(t, "audio", timebase, ntsc)
       let src = ptrToMi[aclip.src]
 
-      let startVal = $aclip.start
-      let endVal = $(aclip.start + aclip.dur)
-      let inVal = $aclip.offset
-      let outVal = $(aclip.offset + aclip.dur)
+      var startVal = $aclip.start
+      var endVal = $(aclip.start + aclip.dur)
+      var inFrame = aclip.offset
+      var outFrame = aclip.offset + aclip.dur
+      if transitionLinks[j].incoming >= 0:
+        let t = transitions[transitionLinks[j].incoming]
+        if t.alignment == taCenter:
+          startVal = "-1"
+          inFrame = max(0'i64, inFrame - t.dur div 2)
+        elif t.alignment == taStart:
+          startVal = "-1"
+      if transitionLinks[j].outgoing >= 0:
+        let t = transitions[transitionLinks[j].outgoing]
+        if t.alignment == taCenter:
+          endVal = "-1"
+          outFrame += t.dur - t.dur div 2
+        elif t.alignment == taEnd:
+          endVal = "-1"
+      let inVal = $inFrame
+      let outVal = $outFrame
 
       let clipitem = newElement("clipitem")
       clipitem.attrs = {
@@ -266,6 +321,9 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
           break
 
       track.add clipitem
+      if transitionLinks[j].outgoing >= 0:
+        track.add dissolveItem(transitions[transitionLinks[j].outgoing],
+          "audio", timebase, ntsc)
     audio.add track
 
 proc handlePath(src: string): string =
@@ -280,6 +338,34 @@ func isStillImage(mi: MediaInfo, tb: AVRational): bool =
   ## still image. Premiere holds these for a fixed length; given a blank
   ## `<duration>` it ignores the clip's in/out and falls back to a ~12h default.
   mi.v.len > 0 and int64(round(mi.duration * tb.float64)) <= 1
+
+proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
+    ntsc: string): XmlNode =
+  let before = case t.alignment
+    of taStart: 0'i64
+    of taCenter: t.dur div 2
+    of taEnd: t.dur
+  result = newElement("transitionitem")
+  let rate = newElement("rate")
+  rate.add elem("timebase", $timebase)
+  rate.add elem("ntsc", ntsc)
+  result.add rate
+  result.add elem("start", $(t.at - before))
+  result.add elem("end", $(t.at + t.dur - before))
+  result.add elem("alignment", case t.alignment
+    of taStart: "start-black"
+    of taCenter: "center"
+    of taEnd: "end-black")
+  let effect = newElement("effect")
+  let effectName = if mediaType == "video": "Cross Dissolve" else: "Cross Fade (0dB)"
+  effect.add elem("name", effectName)
+  effect.add elem("effectid", effectName)
+  effect.add elem("effecttype", "transition")
+  effect.add elem("mediatype", mediaType)
+  effect.add elem("startratio", "0")
+  effect.add elem("endratio", "1")
+  effect.add elem("reverse", "FALSE")
+  result.add effect
 
 proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   let (width, height) = tl.res
@@ -361,6 +447,8 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         continue
       let track = newElement("track")
       let trackStart = videoTrackStart[vIdx]
+      let transitions = (if vIdx < tl.vt.len: tl.vt[vIdx] else: @[])
+      let transitionLinks = transitionPlan(vlayer, transitions)
 
       for j, clip in vlayer.pairs:
         # An audio-only timeline that gained `add:` overlays has a synthesized
@@ -369,14 +457,34 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         if clip.src == nil:
           continue
 
+        if transitionLinks[j].incoming >= 0:
+          let t = transitions[transitionLinks[j].incoming]
+          if t.alignment == taStart:
+            track.add dissolveItem(t, "video", timebase, ntsc)
         let mi = ptrToMi[clip.src]
         let still = isStillImage(mi, tl.tb)
-        let startVal = $clip.start
-        let endVal = $(clip.start + clip.dur)
+        var startVal = $clip.start
+        var endVal = $(clip.start + clip.dur)
         # A still is the same frame at every offset, so read `dur` frames from 0;
         # real media keeps its true source in/out.
-        let inVal = (if still: "0" else: $clip.offset)
-        let outVal = (if still: $clip.dur else: $(clip.offset + clip.dur))
+        var inFrame = clip.offset
+        var outFrame = clip.offset + clip.dur
+        if transitionLinks[j].incoming >= 0:
+          let t = transitions[transitionLinks[j].incoming]
+          if t.alignment == taCenter:
+            startVal = "-1"
+            inFrame = max(0'i64, inFrame - t.dur div 2)
+          elif t.alignment == taStart:
+            startVal = "-1"
+        if transitionLinks[j].outgoing >= 0:
+          let t = transitions[transitionLinks[j].outgoing]
+          if t.alignment == taCenter:
+            endVal = "-1"
+            outFrame += t.dur - t.dur div 2
+          elif t.alignment == taEnd:
+            endVal = "-1"
+        let inVal = (if still: "0" else: $inFrame)
+        let outVal = (if still: $clip.dur else: $outFrame)
 
         let thisClipid = &"clipitem-{trackStart + j}"
         let clipitem = <>clipitem(id = thisClipid)
@@ -424,6 +532,9 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
             clipitem.add link
 
         track.add clipitem
+        if transitionLinks[j].outgoing >= 0:
+          track.add dissolveItem(transitions[transitionLinks[j].outgoing],
+            "video", timebase, ntsc)
       if track.len > 0:
         video.add track
 
@@ -432,9 +543,9 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   # Audio definitions and clips
   let audio = newElement("audio")
   if resolve:
-    resolveWriteAudio(audio, makeFiledef, tl, ptrToMi)
+    resolveWriteAudio(audio, makeFiledef, tl, ptrToMi, timebase, ntsc)
   else:
-    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi, audioPlan)
+    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi, audioPlan, timebase, ntsc)
 
   media.add audio
   sequence.add media
