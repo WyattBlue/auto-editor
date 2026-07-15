@@ -19,6 +19,40 @@ The result is written to `video_ALTERED.mp4`. To name it yourself, use `-o`:
 auto-editor video.mp4 -o trimmed.mp4
 ```
 
+## Record and edit a microphone
+
+Use `:mic` in place of an input file to capture from a microphone. Press
+Ctrl-C when you are done recording; auto-editor will then remove the quiet
+sections and write `mic_ALTERED.wav`:
+
+```sh
+auto-editor :mic
+```
+
+All normal editing and output options apply. For example:
+
+```sh
+auto-editor :mic --edit audio:threshold=6% -o trimmed.m4a
+```
+
+Use `--sample-rate` to resample the recording before it is edited:
+
+```sh
+auto-editor :mic --sample-rate 44.1kHz
+```
+
+Timeline and editor exports save the microphone capture as a lossless FLAC
+stream in `*_RECORDING.mka`. Use `-c:a` to choose a different codec supported
+by Matroska:
+
+```sh
+auto-editor :mic --export resolve -c:a opus -o interview.fcpxml
+```
+
+Live microphone capture is supported on macOS, Windows, and Linux. Timeline
+and editor exports keep the original capture in a sibling
+`*_RECORDING.mka` file so the exported project can still reference it.
+
 ## Look before you render
 
 See how much will be cut without producing a file yet:

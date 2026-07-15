@@ -2,6 +2,9 @@ import std/[options, os, parseutils, sequtils, strformat, strutils]
 when not defined(emscripten):
   import std/osproc
   import ./media
+  when defined(macosx) or defined(windows) or defined(linux):
+    import std/tempfiles
+    import ./[mic, wavutil]
   import cmds/completion
 
 when not defined(windows) and not defined(emscripten):
@@ -13,8 +16,14 @@ import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
 
+var micCaptureActive = false
+var stopMicCapture = false
+
 proc ctrlc() {.noconv.} =
-  error "Keyboard Interrupt"
+  if micCaptureActive:
+    stopMicCapture = true
+  else:
+    error "Keyboard Interrupt"
 
 setControlCHook(ctrlc)
 
@@ -31,7 +40,7 @@ proc printHelp() {.noreturn.} =
   let optWidth = clamp(termWidth div 3, 15, 32)
   let helpWidth = termWidth - optWidth - 4
 
-  echo "Usage: [file | url ...] [options]\n"
+  echo "Usage: [file | url ... | :mic] [options]\n"
   echo "Commands:"
   echo "  " & commands.mapIt(it.name).join(" ") & "\n"
   echo "Options:"
@@ -583,8 +592,59 @@ judge making cuts.
   if args.adds.len > 0:
     requireLicense(args, "use the `add` action")
 
+  var micTempPath = ""
+  defer:
+    if micTempPath != "" and fileExists(micTempPath):
+      removeFile(micTempPath)
+
   for i, myInput in args.inputs:
-    if myInput.startsWith("http://") or myInput.startsWith("https://"):
+    if myInput == ":mic":
+      when defined(macosx) or defined(windows) or
+          (defined(linux) and not defined(emscripten)):
+        if args.inputs.len != 1:
+          error "Microphone capture (:mic) cannot be combined with other inputs."
+        if args.output == "":
+          args.output = "mic_ALTERED.wav"
+        let outputExt = agSplitFile(args.output).ext.toLowerAscii
+        let keepRecording = args.`export` notin ["", "default", "clip-sequence"] or
+          outputExt in [".xml", ".fcpxml", ".mlt", ".kdenlive", ".otio",
+                        ".json", ".v1", ".v2", ".v3"]
+        var capturePath: string
+        if keepRecording:
+          if args.output == "-":
+            capturePath = "mic_RECORDING.mka"
+          else:
+            let (outDir, outName, _) = agSplitFile(args.output)
+            capturePath = (outDir / outName) & "_RECORDING.mka"
+        else:
+          let (tempFile, tempPath) = createTempFile("auto-editor-mic-", ".mka")
+          tempFile.close()
+          micTempPath = tempPath
+          capturePath = tempPath
+        let recordingCodec = resolveRecordingCodec(keepRecording,
+          args.audioCodec)
+        if recordingCodec != "auto":
+          validateAudioCodec(recordingCodec, capturePath)
+        stopMicCapture = false
+        micCaptureActive = true
+        if args.sampleRate > 0 or recordingCodec != "auto":
+          block:
+            let (rawFile, rawPath) = createTempFile("auto-editor-mic-raw-", ".mka")
+            rawFile.close()
+            defer:
+              if fileExists(rawPath):
+                removeFile(rawPath)
+            recordMic(rawPath, addr stopMicCapture)
+            micCaptureActive = false
+            transcodeAudio(rawPath, capturePath, 0, args.sampleRate,
+              recordingCodec)
+        else:
+          recordMic(capturePath, addr stopMicCapture)
+          micCaptureActive = false
+        args.inputs[i] = capturePath
+      else:
+        error "Microphone capture (:mic) is not supported on this platform."
+    elif myInput.startsWith("http://") or myInput.startsWith("https://"):
       when defined(emscripten):
         error "URL inputs are not supported in the wasm build."
       else:

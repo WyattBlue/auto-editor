@@ -7,6 +7,93 @@ type AudioBuffer = object
   fifo: ptr AVAudioFifo
   frameSize: cint
 
+func resolveRecordingCodec*(keepRecording: bool, audioCodec: string): string =
+  if not keepRecording: "auto"
+  elif audioCodec == "auto": "flac"
+  else: audioCodec
+
+func nearestRate(requested: cint, rates: openArray[cint]): cint =
+  result = rates[0]
+  var bestDistance = abs(result - requested)
+  for rate in rates:
+    let distance = abs(rate - requested)
+    if distance < bestDistance:
+      result = rate
+      bestDistance = distance
+
+proc selectEncoderRate(ctx: ptr AVCodecContext, requested: cint): cint =
+  var configPtr: pointer = nil
+  var num: cint = 0
+  discard avcodec_get_supported_config(ctx, nil, AV_CODEC_CONFIG_SAMPLE_RATE,
+      0.cuint, addr configPtr, addr num)
+
+  if configPtr != nil and num > 0:
+    let rates = cast[ptr UncheckedArray[cint]](configPtr)
+    result = rates[0]
+    var bestDistance = abs(result - requested)
+    for i in 0..<num:
+      if rates[i] == requested:
+        return requested
+      let distance = abs(rates[i] - requested)
+      if distance < bestDistance:
+        result = rates[i]
+        bestDistance = distance
+    return
+
+  # Some AAC encoders do not publish their supported-rate configuration.
+  if ctx.codec.id == ID_AAC:
+    const aacRates = [8000.cint, 11025, 12000, 16000, 22050, 24000,
+                      32000, 44100, 48000]
+    return nearestRate(requested, aacRates)
+  return requested
+
+proc selectEncoderLayout(ctx: ptr AVCodecContext,
+    inputLayout: ptr AVChannelLayout) =
+  var configPtr: pointer = nil
+  var num: cint = 0
+  discard avcodec_get_supported_config(ctx, nil, AV_CODEC_CONFIG_CHANNEL_LAYOUT,
+      0.cuint, addr configPtr, addr num)
+
+  if configPtr == nil or num <= 0:
+    discard av_channel_layout_copy(addr ctx.ch_layout, inputLayout)
+    return
+
+  let layouts = cast[ptr UncheckedArray[AVChannelLayout]](configPtr)
+  var selected = 0
+  var bestDistance = abs(layouts[0].nb_channels - inputLayout.nb_channels)
+  for i in 0..<num:
+    if av_channel_layout_compare(addr layouts[i], inputLayout) == 0:
+      selected = i
+      break
+    let distance = abs(layouts[i].nb_channels - inputLayout.nb_channels)
+    if distance < bestDistance:
+      selected = i
+      bestDistance = distance
+  discard av_channel_layout_copy(addr ctx.ch_layout, addr layouts[selected])
+
+proc checkAudioEncoder(codec: ptr AVCodec, format: ptr AVOutputFormat,
+    requestedName: string) =
+  if codec.`type` != AVMEDIA_TYPE_AUDIO:
+    error &"Encoder '{requestedName}' is not an audio encoder"
+  if avformat_query_codec(format, codec.id, FF_COMPLIANCE_NORMAL) == 0:
+    let formatName = if format.name != nil: $format.name else: "unknown"
+    let encoderName = if codec.name != nil: $codec.name else: requestedName
+    error &"Format '{formatName}' does not support codec '{encoderName}'"
+
+proc validateAudioCodec*(codecName, outputPath: string) =
+  let codec = initCodec(codecName)
+  if codec == nil:
+    error "Unknown encoder: " & codecName
+
+  let outputCtx: ptr AVFormatContext = nil
+  discard avformat_alloc_output_context2(addr outputCtx, nil, nil,
+      outputPath.cstring)
+  if outputCtx == nil:
+    error "Could not create output context"
+  defer: avformat_free_context(outputCtx)
+
+  checkAudioEncoder(codec, outputCtx.oformat, codecName)
+
 proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
     frameSize: cint): AudioBuffer =
   result.fifo = av_audio_fifo_alloc(sampleFmt, channels, frameSize * 2) # Buffer extra space
@@ -102,7 +189,8 @@ proc processAndEncodeFrame(
   return processedAny
 
 
-proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
+proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
+    sampleRate: cint = -1, codecName: string = "auto") =
   var ret: cint
   var container: InputContainer
   try:
@@ -128,9 +216,17 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
   defer:
     outputCtx.close()
 
-  let (encoder, encoderCtx) = initEncoder(outputCtx.oformat.audio_codec)
-  encoderCtx.sample_rate = decoderCtx.sample_rate
-  discard av_channel_layout_copy(addr encoderCtx.ch_layout, addr decoderCtx.ch_layout)
+  let (encoder, encoderCtx) =
+    if codecName != "auto": initEncoder(codecName)
+    elif sampleRate > 0: initEncoder(ID_PCM_S16LE)
+    else: initEncoder(outputCtx.oformat.audio_codec)
+  defer: avcodec_free_context(addr encoderCtx)
+  checkAudioEncoder(encoder, outputCtx.oformat, codecName)
+  let requestedRate = if sampleRate > 0: sampleRate else: decoderCtx.sample_rate
+  encoderCtx.sample_rate = selectEncoderRate(encoderCtx, requestedRate)
+  if encoderCtx.sample_rate != requestedRate:
+    debug &"{encoder.name}: snapping sample rate {requestedRate} -> {encoderCtx.sample_rate}"
+  selectEncoderLayout(encoderCtx, addr decoderCtx.ch_layout)
   encoderCtx.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
 
   if (outputCtx.oformat.flags and AVFMT_GLOBALHEADER) != 0:
@@ -138,7 +234,6 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
 
   if avcodec_open2(encoderCtx, encoder, nil) < 0:
     error "Could not open encoder"
-  defer: avcodec_free_context(addr encoderCtx)
 
   let frameSize: cint = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
   var audioBuffer = initAudioBuffer(

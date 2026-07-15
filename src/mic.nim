@@ -1,5 +1,7 @@
+import std/[os, strformat]
+import ./[av, ffmpeg, log]
+
 when defined(macosx):
-  import std/strformat
 
   type AudioObjectPropertyAddress {.importc, header: "<CoreAudio/CoreAudio.h>", bycopy.} = object
     mSelector: uint32
@@ -94,7 +96,6 @@ when defined(macosx):
 
 elif defined(windows):
   import std/strutils
-  import ./ffmpeg
 
   proc chooseMicDevice*(inputFormat: pointer): tuple[name, description, warning: string] =
     ## DirectShow has no special name for the default capture device, so ask
@@ -126,3 +127,104 @@ elif defined(windows):
       let description = $fallback.device_description
       return ($fallback.device_name, description,
               "No USB microphone found, using \"" & description & "\"")
+
+type MicInput* = object
+  formatContext*: ptr AVFormatContext
+  audioStream*: ptr AVStream
+  name*: string
+
+proc openMic*(): MicInput =
+  var formatName, deviceName, sourceName: string
+  when defined(macosx):
+    let (devName, warnMsg) = chooseMicDevice()
+    formatName = "avfoundation"
+    deviceName = devName
+    sourceName = ":" & devName
+  elif defined(windows):
+    formatName = "dshow"
+  elif defined(linux) and not defined(emscripten):
+    formatName = "alsa"
+    deviceName = "default"
+    sourceName = "default"
+  else:
+    error "Microphone capture (:mic) is not supported on this platform"
+
+  avdevice_register_all()
+  let inputFormat = av_find_input_format(formatName.cstring)
+  if inputFormat == nil:
+    error &"Could not find {formatName} input device"
+
+  when defined(windows):
+    let (devName, description, warnMsg) = chooseMicDevice(inputFormat)
+    deviceName = devName
+    result.name = description
+    sourceName = "audio=" & devName
+  else:
+    result.name = deviceName
+
+  when defined(macosx) or defined(windows):
+    if deviceName == "":
+      error "No microphone found"
+    if warnMsg != "":
+      warning warnMsg
+
+  if avformat_open_input(addr result.formatContext, sourceName.cstring,
+      inputFormat, nil) < 0:
+    error &"Could not open microphone \"{result.name}\""
+  if avformat_find_stream_info(result.formatContext, nil) < 0:
+    avformat_close_input(addr result.formatContext)
+    error "Could not read microphone stream info"
+  for i in 0 ..< result.formatContext.nb_streams.int:
+    if result.formatContext.streams[i].codecpar.codec_type == AVMEDIA_TYPE_AUDIO:
+      result.audioStream = result.formatContext.streams[i]
+      break
+  if result.audioStream == nil:
+    avformat_close_input(addr result.formatContext)
+    error "Microphone has no audio stream"
+
+proc close*(input: var MicInput) =
+  avformat_close_input(addr input.formatContext)
+
+proc recordMic*(outputPath: string, shouldStop: ptr bool) =
+  var input = openMic()
+  defer: input.close()
+
+  var output = av.openWrite(outputPath)
+  let outputStream = output.addStreamFromTemplate(input.audioStream)
+  outputStream.time_base = input.audioStream.time_base
+  output.startEncoding()
+  defer: output.close()
+
+  let packet = av_packet_alloc()
+  if packet == nil:
+    error "Could not allocate microphone packet"
+  defer: av_packet_free(addr packet)
+
+  var firstTs = AV_NOPTS_VALUE
+  var packetsWritten = 0
+  stderr.writeLine(&"Listening on \"{input.name}\"... (press Ctrl-C to stop)")
+  while not shouldStop[]:
+    let ret = av_read_frame(input.formatContext, packet)
+    if ret == AVERROR_EAGAIN:
+      sleep(5)
+      continue
+    if ret < 0:
+      if shouldStop[]:
+        break
+      error &"Could not read microphone: {av_err2str(ret)}"
+    if packet.stream_index == input.audioStream.index:
+      let ts = if packet.dts != AV_NOPTS_VALUE: packet.dts else: packet.pts
+      if firstTs == AV_NOPTS_VALUE and ts != AV_NOPTS_VALUE:
+        firstTs = ts
+      if firstTs != AV_NOPTS_VALUE:
+        if packet.pts != AV_NOPTS_VALUE: packet.pts -= firstTs
+        if packet.dts != AV_NOPTS_VALUE: packet.dts -= firstTs
+      packet.stream_index = 0
+      packet.time_base = input.audioStream.time_base
+      output.mux(packet[])
+      inc packetsWritten
+    av_packet_unref(packet)
+
+  stderr.writeLine("")
+  if packetsWritten == 0:
+    error "No microphone audio was captured"

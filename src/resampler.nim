@@ -1,6 +1,7 @@
 import std/strformat
 import log
 import ffmpeg
+import util/rational
 
 type AudioResampler* = object
   graph*: ptr AVFilterGraph
@@ -78,7 +79,9 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     let asink = avfilter_get_by_name("abuffersink")
 
     let inputFormatName = getFormatName(frame.format)
-    let extraArgs = (if frame.pts != AV_NOPTS_VALUE: &":time_base={frame.time_base}" else: "")
+    let extraArgs =
+      if frame.pts != AV_NOPTS_VALUE: ":time_base=" & $frame.time_base
+      else: ""
     let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={frame.ch_layout}{extraArgs}"
 
     var ret = avfilter_graph_create_filter(addr resampler.abuffer, abuffer, nil, abufferArgs.cstring, nil, resampler.graph)

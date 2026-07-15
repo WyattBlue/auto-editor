@@ -99,11 +99,14 @@ auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
 ## Recipes
 
 ```bash
+auto-editor :mic -w:1 deesser:0.8:0.7:0.4         # record, then clean up speech
 auto-editor podcast.mp3 -w:0 cut -w:1 speed:1.15      # cut silence, tighten speech
 auto-editor video.mp4 -w:0 volume:0.3                 # duck (not cut) the silence
 auto-editor video.mp4 -w:1 varispeed:1.25             # nightcore (speed + pitch up)
 auto-editor video.mp4 -w:0 speed:6,volume:0.4         # fast, quiet silent sections
 ```
+
+With `:mic`, press Ctrl-C to finish capture; actions are applied afterward.
 
 Full reference: <https://auto-editor.com/ref/actions.md>. For plain cutting / pace /
 edit methods, see the **auto-editor** skill.

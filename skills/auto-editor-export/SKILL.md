@@ -1,6 +1,6 @@
 ---
 name: auto-editor-export
-description: Export auto-editor's edit to a video editor (Premiere, DaVinci Resolve, Final Cut Pro, ShotCut, Kdenlive), to individual clips, or to auto-editor timeline files (.v1/.v2/.v3); and import timeline/XML files to render them. Use when someone wants an editor-ready project (XML/MLT/kdenlive), split clips, or to read/write timeline files instead of a finished video.
+description: Export auto-editor's edit or microphone recording to a video editor (Premiere, DaVinci Resolve, Final Cut Pro, ShotCut, Kdenlive), to individual clips, or to auto-editor timeline files (.v1/.v2/.v3); and import timeline/XML files to render them. Use when someone wants an editor-ready project, a preserved microphone source, split clips, or timeline files instead of a finished video.
 ---
 
 # Exporting & importing
@@ -32,6 +32,29 @@ auto-editor video.mp4 --export final-cut-pro
 auto-editor video.mp4 --export clip-sequence
 auto-editor video.mp4 --export v3 -o timeline.v3
 ```
+
+## Export a microphone recording
+
+Use `:mic` as the input and press Ctrl-C to finish capture. Editor and timeline
+exports keep a sibling `*_RECORDING.mka` source so the project remains usable:
+
+```bash
+auto-editor :mic --export resolve -o interview.fcpxml
+# writes interview.fcpxml and interview_RECORDING.mka
+```
+
+With `-c:a auto` (the default), persistent recordings use lossless FLAC.
+Choose another Matroska-supported encoder explicitly; unsupported encoders fail
+before capture. Encoder sample rates and channel layouts are negotiated during
+the recording transcode.
+
+```bash
+auto-editor :mic --export resolve -c:a opus -o interview.fcpxml
+auto-editor :mic --sample-rate 44.1kHz --export v3 -o interview.v3
+```
+
+Ordinary rendered outputs and `clip-sequence` use a temporary capture instead;
+their final audio codec still follows the output container and `-c:a`.
 
 ## Naming the timeline
 

@@ -2,7 +2,8 @@ import std/[os, strformat, strutils]
 import ../[av, cli, ffmpeg, log, transcribe]
 import ../util/[dnorm16, fun]
 import ./help
-when defined(macosx) or defined(windows):
+when defined(macosx) or defined(windows) or
+    (defined(linux) and not defined(emscripten)):
   import ../mic
 
 var ctrlcStop = false
@@ -101,49 +102,10 @@ proc main*(cArgs: seq[string]) =
   if isMic:
     when defined(macosx) or defined(windows) or
         (defined(linux) and not defined(emscripten)):
-      var formatName, deviceName, displayName, sourceName: string
-      when defined(macosx):
-        let (devName, warnMsg) = chooseMicDevice()
-        formatName = "avfoundation"
-        deviceName = devName
-        displayName = devName
-        sourceName = ":" & devName
-      elif defined(windows):
-        formatName = "dshow"
-      elif defined(linux):
-        formatName = "alsa"
-        deviceName = "default"
-        displayName = "default"
-        sourceName = "default"
-
-      avdevice_register_all()
-      let inputFormat = av_find_input_format(formatName.cstring)
-      if inputFormat == nil:
-        error &"Could not find {formatName} input device"
-
-      when defined(windows):
-        let (devName, description, warnMsg) = chooseMicDevice(inputFormat)
-        deviceName = devName
-        displayName = description
-        sourceName = "audio=" & devName
-
-      when defined(macosx) or defined(windows):
-        if deviceName == "":
-          error "No microphone found"
-        if warnMsg != "":
-          warning warnMsg
-
-      if avformat_open_input(addr fmtCtx, sourceName.cstring, inputFormat, nil) < 0:
-        error &"Could not open microphone \"{displayName}\""
-      if avformat_find_stream_info(fmtCtx, nil) < 0:
-        error "Could not read microphone stream info"
-      for i in 0 ..< fmtCtx.nb_streams.int:
-        if fmtCtx.streams[i].codecpar.codec_type == AVMEDIA_TYPE_AUDIO:
-          audioStream = fmtCtx.streams[i]
-          break
-      if audioStream == nil:
-        error "Microphone has no audio stream"
-      stderr.writeLine(&"Listening on \"{displayName}\"... (press Ctrl-C to stop)")
+      var micInput = openMic()
+      fmtCtx = micInput.formatContext
+      audioStream = micInput.audioStream
+      stderr.writeLine(&"Listening on \"{micInput.name}\"... (press Ctrl-C to stop)")
     else:
       error "Microphone capture (:mic) is not supported on this platform"
   else:

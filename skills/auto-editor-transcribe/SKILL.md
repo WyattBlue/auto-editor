@@ -47,6 +47,11 @@ auto-editor whisper :mic apple --language en_US    # macOS 26+
 auto-editor whisper :mic ggml-medium.en.bin -o transcript.srt
 ```
 
+This streams the microphone directly to transcription and does not save a
+media recording. To retain and edit the captured audio, use `auto-editor :mic`;
+editor and timeline exports save a sibling lossless-FLAC `_RECORDING.mka` by
+default.
+
 Live capture supports macOS, Windows, and Linux:
 
 - macOS uses AVFoundation and prefers a USB microphone, then the system default.
