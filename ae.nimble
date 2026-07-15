@@ -114,6 +114,7 @@ disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,
 disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
 
 disableDecoders &= ["h261", "opus"]  # We use libopus
+disableDecoders &= ["vp8", "vp9"]  # libvpx decodes instead: ~800KB smaller, adds alpha WebM
 
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff,vvc_qsv".split(",")
