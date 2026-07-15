@@ -6,6 +6,7 @@
 
 ## Features
  - Support the end-of-options marker (`--`) in the CLI.
+ - Added the `apple` transcription model to the `whisper` subcommand, using Apple's SpeechAnalyzer (macOS 26+ only).
  - Create retimed `_ALTERED` sibling subtitles.
  - Support named audio channel analysis with `--edit audio:channel=NAME`.
  - Preserve volume, de-essing, invert, flips, erosion, blur, color adjustments,
