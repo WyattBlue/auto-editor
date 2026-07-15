@@ -8,9 +8,12 @@
  - Support the end-of-options marker (`--`) in the CLI.
  - Create retimed `_ALTERED` sibling subtitles.
  - Support named audio channel analysis with `--edit audio:channel=NAME`.
+ - Preserve volume, de-essing, invert, flips, erosion, blur, color adjustments,
+   lens correction, drawbox, pixelation, and chromatic aberration actions in
+   Kdenlive and Shotcut exports.
 
 ## Performance
- -
+ - Vectorize motion pixel comparison with NEON, SSE2, and WebAssembly SIMD.
 
 ## Fixes
  -

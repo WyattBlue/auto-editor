@@ -1,4 +1,4 @@
-import std/[strformat, xmltree]
+import std/[strformat, strutils, xmltree]
 from std/math import log10
 
 import ../[action, ffmpeg, timeline]
@@ -19,6 +19,66 @@ func addProp(parent: XmlNode, name, value: string) =
   prop.attrs = {"name": name}.toXmlAttributes()
   prop.add(newText(value))
   parent.add(prop)
+
+proc addFilter(parent: XmlNode, service: string,
+    params: openArray[(string, string)] = [], shotcutFilter = "") =
+  let filter = newElement("filter")
+  filter.addProp("mlt_service", service)
+  if shotcutFilter.len > 0:
+    filter.addProp("shotcut:filter", shotcutFilter)
+  for (name, value) in params:
+    filter.addProp(name, value)
+  parent.add(filter)
+
+proc addActionFilters(parent: XmlNode, effects: Actions) =
+  for effect in effects:
+    case effect.kind
+    of actDeesser:
+      parent.addFilter("avfilter.deesser", [
+        ("av.i", $effect.intensity), ("av.m", $effect.maxd),
+        ("av.f", $effect.freq), ("av.s", "o")])
+    of actInvert: parent.addFilter("invert")
+    of actHflip: parent.addFilter("avfilter.hflip")
+    of actVflip: parent.addFilter("avfilter.vflip")
+    of actErosion: parent.addFilter("avfilter.erosion")
+    of actBlur:
+      if effect.kf.len > 0:
+        let sigma = $effect.kf[0]
+        parent.addFilter("avfilter.gblur", [
+          ("av.sigma", sigma), ("av.sigmaV", sigma),
+          ("av.steps", "1"), ("av.planes", "7")], "blur_gaussian_av")
+    of actBrightness:
+      if effect.kf.len > 0:
+        let expr = brightnessLutExpr(effect.kf[0])
+        parent.addFilter("avfilter.lutrgb", [
+          ("av.r", expr), ("av.g", expr), ("av.b", expr)])
+    of actLuv:
+      let expr = luvLutExprs(effect.brighthue, effect.contrast,
+        effect.saturation)
+      parent.addFilter("avfilter.lutyuv", [
+        ("av.y", expr.y), ("av.u", expr.u), ("av.v", expr.v)])
+    of actLens:
+      parent.addFilter("avfilter.lenscorrection", [
+        ("av.cx", "0.5"), ("av.cy", "0.5"),
+        ("av.k1", $effect.k1), ("av.k2", $effect.k2),
+        ("av.i", "0"), ("av.fc", "0x00000000")])
+    of actDrawbox:
+      parent.addFilter("avfilter.drawbox", [
+        ("av.x", $effect.dbX), ("av.y", $effect.dbY),
+        ("av.w", $effect.dbW), ("av.h", $effect.dbH),
+        ("av.color", effect.dbColor.toString.replace("#", "0x")),
+        ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
+    of actPixelate:
+      parent.addFilter("avfilter.pixelize", [
+        ("av.width", $effect.pixW), ("av.height", $effect.pixH),
+        ("av.mode", "avg"), ("av.planes", "7")])
+    of actAberration:
+      parent.addFilter("avfilter.rgbashift", [
+        ("av.rh", $effect.abRh), ("av.rv", $effect.abRv),
+        ("av.gh", $effect.abGh), ("av.gv", $effect.abGv),
+        ("av.bh", $effect.abBh), ("av.bv", $effect.abBv),
+        ("av.edge", if effect.abWrap: "wrap" else: "smear")])
+    else: discard
 
 proc shotcutWriteMlt*(output: string, tl: v3) =
   let mlt = newElement("mlt")
@@ -135,8 +195,11 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
         let filter = newElement("filter")
         let volumeDb = 20.0 * log10(volumeVal)
         filter.addProp("mlt_service", "volume")
+        filter.addProp("shotcut:filter", "audioGain")
         filter.addProp("level", $volumeDb)
         producer.add(filter)
+
+      producer.addActionFilters(effectGroup)
 
       mlt.add(producer)
     else:
@@ -154,8 +217,11 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
         let filter = newElement("filter")
         let volumeDb = 20.0 * log10(volumeVal)
         filter.addProp("mlt_service", "volume")
+        filter.addProp("shotcut:filter", "audioGain")
         filter.addProp("level", $volumeDb)
         chain.add(filter)
+
+      chain.addActionFilters(effectGroup)
 
       mlt.add(chain)
 
