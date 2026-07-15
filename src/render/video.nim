@@ -840,8 +840,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         runFx(fxId(actBrightness, frame, f0 = shift)):
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-          let lut = fxGraph.add("lutrgb",
-            &"r=val+{shift}:g=val+{shift}:b=val+{shift}")
+          let expr = brightnessLutExpr(b)
+          let lut = fxGraph.add("lutrgb", &"r={expr}:g={expr}:b={expr}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
@@ -855,11 +855,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let c = effect.contrast
         let s = effect.saturation
         runFx(fxId(actLuv, frame, f0 = b, f1 = c, f2 = s)):
-          let bShift = b * 255.0
+          let expr = luvLutExprs(b, c, s)
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
           let lut = fxGraph.add("lutyuv",
-            &"y=(val-128)*{c}+128+{bShift}:u=(val-128)*{s}+128:v=(val-128)*{s}+128")
+            &"y={expr.y}:u={expr.u}:v={expr.v}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()

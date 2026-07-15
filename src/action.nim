@@ -234,6 +234,18 @@ const
   luvContrastId* = 1.0'f32
   luvSaturationId* = 1.0'f32
 
+func brightnessLutExpr*(brightness: float32): string =
+  ## FFmpeg LUT expression used by the renderer and editor exports.
+  "val+" & $(brightness * 255.0'f32)
+
+func luvLutExprs*(brightness, contrast, saturation: float32):
+    tuple[y, u, v: string] =
+  ## Keep exported color adjustment math identical to the renderer.
+  let shift = brightness * 255.0'f32
+  result.y = "(val-128)*" & $contrast & "+128+" & $shift
+  result.u = "(val-128)*" & $saturation & "+128"
+  result.v = result.u
+
 func clipT*(local, animLen: int): float32 =
   ## Normalized time over an animation of `animLen` steps (frames or samples),
   ## reaching 1.0 on the last step and holding there once the animation

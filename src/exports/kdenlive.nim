@@ -1,6 +1,13 @@
 import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
+from std/math import log10
 import ../[action, media, timeline]
-import ../util/fun
+import ../util/[color, fun]
+
+proc addProp(parent: XmlNode, name, value: string) =
+  let prop = newElement("property")
+  prop.attrs = {"name": name}.toXmlAttributes()
+  prop.add(newText(value))
+  parent.add(prop)
 
 proc genUuid*(): string =
   var bytes: array[16, byte]
@@ -441,6 +448,84 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   var groups: seq[JsonNode] = @[]
   producers = 1
+  var filterId = 0
+
+  proc addFilter(parent: XmlNode, service: string,
+      params: openArray[(string, string)] = []) =
+    let filter = newElement("filter")
+    filter.attrs = {"id": &"filter{filterId}"}.toXmlAttributes()
+    inc filterId
+    filter.addProp("mlt_service", service)
+    filter.addProp("kdenlive_id", service)
+    filter.addProp("kdenlive:collapsed", "0")
+    for (name, value) in params:
+      filter.addProp(name, value)
+    parent.add(filter)
+
+  proc addAudioEffects(parent: XmlNode, effects: Actions) =
+    for effect in effects:
+      case effect.kind
+      of actVolume:
+        if effect.kf.len > 0:
+          let gain = effect.kf[0].float64
+          let db = (if gain <= 0.0: -100.0 else: max(-100.0, 20.0 * log10(gain)))
+          parent.addFilter("volume", [("level", $db)])
+      of actDeesser:
+        parent.addFilter("avfilter.deesser", [
+          ("av.i", $effect.intensity), ("av.m", $effect.maxd),
+          ("av.f", $effect.freq), ("av.s", "o")])
+      else: discard
+
+  proc addVideoEffects(parent: XmlNode, effects: Actions) =
+    for effect in effects:
+      case effect.kind
+      of actInvert: parent.addFilter("avfilter.negate")
+      of actHflip: parent.addFilter("avfilter.hflip")
+      of actVflip: parent.addFilter("avfilter.vflip")
+      of actErosion: parent.addFilter("avfilter.erosion")
+      of actBlur:
+        if effect.kf.len > 0:
+          let sigma = $effect.kf[0]
+          parent.addFilter("avfilter.gblur", [
+            ("av.sigma", sigma), ("av.sigmaV", sigma),
+            ("av.steps", "1"), ("av.planes", "7")])
+      of actBrightness:
+        if effect.kf.len > 0:
+          let expr = brightnessLutExpr(effect.kf[0])
+          parent.addFilter("avfilter.lutrgb", [
+            ("av.r", expr), ("av.g", expr), ("av.b", expr)])
+      of actLuv:
+        let expr = luvLutExprs(effect.brighthue, effect.contrast,
+          effect.saturation)
+        parent.addFilter("avfilter.lutyuv", [
+          ("av.y", expr.y), ("av.u", expr.u), ("av.v", expr.v)])
+      of actLens:
+        parent.addFilter("avfilter.lenscorrection", [
+          ("av.cx", "0.5"), ("av.cy", "0.5"),
+          ("av.k1", $effect.k1), ("av.k2", $effect.k2),
+          ("av.i", "0"), ("av.fc", "0x00000000")])
+      of actDrawbox:
+        let rect = &"{effect.dbX} {effect.dbY} {effect.dbW} {effect.dbH}"
+        parent.addFilter("avfilter.drawbox", [
+          ("kdenlive:fakerect", rect), ("av.x", $effect.dbX),
+          ("av.y", $effect.dbY), ("av.w", $effect.dbW),
+          ("av.h", $effect.dbH),
+          ("av.color", effect.dbColor.toString.replace("#", "0x")),
+          # Kdenlive declares thickness as a numeric animated parameter, so its
+          # UI rejects FFmpeg's otherwise-valid `fill` token. A thickness at
+          # least as large as the box fills it equivalently.
+          ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
+      of actPixelate:
+        parent.addFilter("avfilter.pixelize", [
+          ("av.width", $effect.pixW), ("av.height", $effect.pixH),
+          ("av.mode", "avg"), ("av.planes", "7")])
+      of actAberration:
+        parent.addFilter("avfilter.rgbashift", [
+          ("av.rh", $effect.abRh), ("av.rv", $effect.abRv),
+          ("av.gh", $effect.abGh), ("av.gv", $effect.abGv),
+          ("av.bh", $effect.abBh), ("av.bv", $effect.abBv),
+          ("av.edge", if effect.abWrap: "wrap" else: "smear")])
+      else: discard
 
   for clip in clips:
     var groupChildren: seq[JsonNode] = @[]
@@ -488,6 +573,12 @@ proc kdenliveWrite*(output: string, tl: v3) =
         entryProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
         entryProp.add(newText(sourceIds[path]))
         entry.add(entryProp)
+
+        let channelIdx = i div 2
+        if channelIdx < aChannels:
+          entry.addAudioEffects(effectGroup)
+        else:
+          entry.addVideoEffects(effectGroup)
 
         playlist.add(entry)
 
