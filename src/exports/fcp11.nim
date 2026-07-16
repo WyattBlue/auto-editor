@@ -221,12 +221,8 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   proc addTransition(t: Transition) =
     # A spine transition overlaps the edit point; the neighboring clips keep
     # their trimmed extents and the editor pulls handle media from the source.
-    let spanStart = t.at - (case t.alignment
-      of taStart: 0'i64
-      of taCenter: t.dur div 2
-      of taEnd: t.dur)
     let tr = newElement("transition")
-    tr.attrs = {"name": "Cross Dissolve", "offset": fraction(spanStart),
+    tr.attrs = {"name": "Cross Dissolve", "offset": fraction(t.spanStart),
       "duration": fraction(t.dur)}.toXmlAttributes
     if tl.v.len > 0:
       let fv = newElement("filter-video")

@@ -17,6 +17,12 @@ func gainToDb*(gain: float32): string =
 
 func isAnimated*(a: Action): bool = a.kf.len > 1
 
+func mltFadeAnim*(a, b: string, dur: int64): string =
+  ## Two-point linear fade ramp. A single-frame fade holds its start value;
+  ## two keys on the same frame would be resolved arbitrarily by MLT.
+  if dur <= 1: a
+  else: &"0={a};{dur - 1}={b}"
+
 func mltAnimValue*(a: Action, clipDur: int, fps: float64, asDb = false): string =
   ## An MLT property value for a scalar keyframe action: a plain value when
   ## static, otherwise an animation string "frame=value;..." with positions
@@ -31,9 +37,15 @@ func mltAnimValue*(a: Action, clipDur: int, fps: float64, asDb = false): string 
   let denom = max(1, clipDur - 1)
   var parts: seq[string]
   if not a.hasEase:
-    for i in 0 ..< a.kf.len:
-      let f = int(round(i.float / float(a.kf.len - 1) * denom.float))
-      parts.add &"{f}={fmtVal(a.kf[i])}"
+    if a.kf.len - 1 <= denom:
+      for i in 0 ..< a.kf.len:
+        let f = int(round(i.float / float(a.kf.len - 1) * denom.float))
+        parts.add &"{f}={fmtVal(a.kf[i])}"
+    else:
+      # More control points than frames would put several keys on one frame,
+      # and MLT's behavior for duplicate keys is undefined; sample per frame.
+      for f in 0 .. denom:
+        parts.add &"{f}={fmtVal(sampleKf(a.kf, f.float32 / denom.float32))}"
   else:
     let animLen =
       case a.easeDurUnit

@@ -386,17 +386,20 @@ proc addDissolveTransitions*(tl: var v3, requested: int64,
   for i in 0 ..< tl.a.len: tl.at[i] = build(tl.a[i])
   tl.validateTransitions()
 
+func spanStart*(t: Transition): int64 =
+  ## First timeline frame of the transition's span.
+  t.at - (case t.alignment
+    of taStart: 0'i64
+    of taCenter: t.dur div 2
+    of taEnd: t.dur)
+
 proc validateTransitions*(tl: v3) =
   proc validateTrack(clips: seq[Clip], transitions: seq[Transition]) =
     var priorEnd = low(int64)
     var priorAt = low(int64)
     var leftCursor, rightCursor = 0
     for t in transitions:
-      let before = case t.alignment
-        of taStart: 0'i64
-        of taCenter: t.dur div 2
-        of taEnd: t.dur
-      let spanStart = t.at - before
+      let spanStart = t.spanStart
       let spanEnd = spanStart + t.dur
       if t.dur <= 0 or spanStart < priorEnd or t.at < priorAt:
         error "Transitions must have positive, non-overlapping ranges"

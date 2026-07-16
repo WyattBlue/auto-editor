@@ -186,7 +186,9 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     if plan[i].outgoing >= 0:
       let t = transitions[plan[i].outgoing]
       if t.alignment == taCenter:
-        plans[i].entryOut -= t.dur div 2
+        # An imported timeline may give the incoming clip less source preroll
+        # than the dissolve half; clamp so source positions stay non-negative.
+        plans[i].entryOut -= min(t.dur div 2, layer[i + 1].offset)
         plans[i].postroll = t.dur - t.dur div 2
         plans[i].outCenter = plan[i].outgoing
       else:
@@ -196,20 +198,20 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     if fadeInDur > 0:
       let io = (tc(clip.offset), tc(clip.offset + fadeInDur - 1))
       if tl.v.len > 0:
-        parent.addFilter("brightness", [("level", &"0=0;{fadeInDur - 1}=1")],
-          "fadeInBrightness", io)
+        parent.addFilter("brightness",
+          [("level", mltFadeAnim("0", "1", fadeInDur))], "fadeInBrightness", io)
       if tl.a.len > 0:
-        parent.addFilter("volume", [("level", &"0=-60;{fadeInDur - 1}=0")],
-          "fadeInVolume", io)
+        parent.addFilter("volume",
+          [("level", mltFadeAnim("-60", "0", fadeInDur))], "fadeInVolume", io)
     if fadeOutDur > 0:
       let fadeStart = clip.offset + clip.dur - fadeOutDur
       let io = (tc(fadeStart), tc(clip.offset + clip.dur - 1))
       if tl.v.len > 0:
-        parent.addFilter("brightness", [("level", &"0=1;{fadeOutDur - 1}=0")],
-          "fadeOutBrightness", io)
+        parent.addFilter("brightness",
+          [("level", mltFadeAnim("1", "0", fadeOutDur))], "fadeOutBrightness", io)
       if tl.a.len > 0:
-        parent.addFilter("volume", [("level", &"0=0;{fadeOutDur - 1}=-60")],
-          "fadeOutVolume", io)
+        parent.addFilter("volume",
+          [("level", mltFadeAnim("0", "-60", fadeOutDur))], "fadeOutVolume", io)
 
   proc addSourceProducer(id: string, clip: Clip, srcEnd: int64,
       fadeInDur, fadeOutDur: int64) =
@@ -275,9 +277,9 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   for i, clip in layer:
     if plans[i].outCenter == -1: continue
     let t = transitions[plans[i].outCenter]
-    let h = t.dur div 2
-    let h2 = t.dur - h
     let next = layer[i + 1]
+    let h = min(t.dur div 2, next.offset)
+    let h2 = t.dur - t.dur div 2
 
     let tag = &"transition{i}"
     transitionTags[i] = tag
@@ -288,7 +290,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
     let tr = newElement("tractor")
     tr.attrs = {"id": tag, "in": "00:00:00.000",
-      "out": tc(t.dur - 1)}.toXmlAttributes()
+      "out": tc(h + h2 - 1)}.toXmlAttributes()
     tr.addProp("shotcut:transition", "lumaMix")
 
     var track = newElement("track")
@@ -305,7 +307,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     # Frames inside the sub-tractor carry 0-based positions. A transition
     # without explicit in/out computes its progress against the b-producer's
     # full source range instead, which breaks the fade ramp.
-    let trIo = {"in": "00:00:00.000", "out": tc(t.dur - 1)}.toXmlAttributes()
+    let trIo = {"in": "00:00:00.000", "out": tc(h + h2 - 1)}.toXmlAttributes()
     if tl.v.len > 0:
       let luma = newElement("transition")
       luma.attrs = trIo
@@ -342,11 +344,12 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
     if plans[i].outCenter != -1:
       let t = transitions[plans[i].outCenter]
+      let span = min(t.dur div 2, layer[i + 1].offset) + (t.dur - t.dur div 2)
       let trEntry = newElement("entry")
       trEntry.attrs = {
         "producer": transitionTags[i],
         "in": "00:00:00.000",
-        "out": tc(t.dur - 1)
+        "out": tc(span - 1)
       }.toXmlAttributes()
       main_playlist.add(trEntry)
 

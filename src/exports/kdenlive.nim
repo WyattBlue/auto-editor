@@ -118,10 +118,16 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var trackTractors: seq[XmlNode] = @[]
   var chains = 0
   var playlists = 0
-  var producers = 1
   let aChannels = tl.a.len
   let vChannels = tl.v.len
+  let nch = aChannels + vChannels
   var warpedClips: seq[int] = @[]
+
+  # Producer ids for warped clips are a pure function of the clip's index in
+  # warpedClips and the channel, so the creation loop and the entry
+  # references below cannot drift apart.
+  func warpedProducerId(w, channel: int): string =
+    &"producer{1 + w * nch + channel}"
 
   # Map (channel, source path) -> chain id, per-track type
   var audioChainOf = initTable[(int, string), int]()
@@ -136,8 +142,8 @@ proc kdenliveWrite*(output: string, tl: v3) =
         break
 
   # create all producers for warped clips
-  for clipIdx in warpedClips:
-    for i in 0 ..< (aChannels + vChannels):
+  for w, clipIdx in warpedClips:
+    for i in 0 ..< nch:
       let clip = clips[clipIdx]
       let path = $clip.src[]
 
@@ -152,7 +158,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
       let prod = newElement("producer")
       prod.attrs = {
-        "id": &"producer{producers}",
+        "id": warpedProducerId(w, i),
         "in": "00:00:00.000",
         # A timewarp producer is as long as the warped source, not the
         # timeline; clamping to timeline length freezes any clip whose warped
@@ -232,7 +238,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
         prod.add(prodProp)
 
       mlt.add(prod)
-      inc producers
 
   # create chains, playlists and tractors for audio channels
   for i, audio in tl.a:
@@ -547,7 +552,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var groupChildren = newSeq[seq[JsonNode]](clips.len)
   var warpedIdxOf = initTable[int, int]()
   for w, ci in warpedClips: warpedIdxOf[ci] = w
-  let nch = aChannels + vChannels
   var transitionId = 0
 
   for c in 0 ..< nch:
@@ -576,13 +580,16 @@ proc kdenliveWrite*(output: string, tl: v3) =
       if chPlan[ci].incoming >= 0:
         let t = chTransitions[chPlan[ci].incoming]
         if t.alignment == taCenter:
-          let h = t.dur div 2
+          # An imported timeline may give this clip less source preroll than
+          # the dissolve half; clamp so source positions stay non-negative.
+          let h = min(t.dur div 2, clip.offset)
+          let h2 = t.dur - t.dur div 2
           entryIn -= h
           tlStart -= h
           parity = 1 - parity
           let tr = newElement("transition")
           tr.attrs = {"id": &"mix{transitionId}", "in": tcf(t.at - h),
-            "out": tcf(t.at + (t.dur - h) - 1)}.toXmlAttributes()
+            "out": tcf(t.at + h2 - 1)}.toXmlAttributes()
           inc transitionId
           let service = (if isAudio: "mix" else: "luma")
           tr.addProp("mlt_service", service)
@@ -617,7 +624,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
       var clipProd: string
       if ci in warpedIdxOf:
-        clipProd = &"producer{1 + warpedIdxOf[ci] * nch + c}"
+        clipProd = warpedProducerId(warpedIdxOf[ci], c)
       else:
         let chainIdx = if isAudio: audioChainOf[(c, path)]
                        else: videoChainOf[(c - aChannels, path)]
@@ -634,19 +641,19 @@ proc kdenliveWrite*(output: string, tl: v3) =
       if isAudio:
         entry.addAudioEffects(effectGroup, int(clip.dur), `in`, `out`)
         if fadeInDur > 0:
-          entry.addFilter("volume", [("level", &"0=-60;{fadeInDur - 1}=0")],
+          entry.addFilter("volume", [("level", mltFadeAnim("-60", "0", fadeInDur))],
             (tcf(clip.offset), tcf(clip.offset + fadeInDur - 1)))
         if fadeOutDur > 0:
-          entry.addFilter("volume", [("level", &"0=0;{fadeOutDur - 1}=-60")],
+          entry.addFilter("volume", [("level", mltFadeAnim("0", "-60", fadeOutDur))],
             (tcf(clip.offset + clip.dur - fadeOutDur),
              tcf(clip.offset + clip.dur - 1)))
       else:
         entry.addVideoEffects(effectGroup, int(clip.dur), `in`, `out`)
         if fadeInDur > 0:
-          entry.addFilter("brightness", [("level", &"0=0;{fadeInDur - 1}=1")],
+          entry.addFilter("brightness", [("level", mltFadeAnim("0", "1", fadeInDur))],
             (tcf(clip.offset), tcf(clip.offset + fadeInDur - 1)))
         if fadeOutDur > 0:
-          entry.addFilter("brightness", [("level", &"0=1;{fadeOutDur - 1}=0")],
+          entry.addFilter("brightness", [("level", mltFadeAnim("1", "0", fadeOutDur))],
             (tcf(clip.offset + clip.dur - fadeOutDur),
              tcf(clip.offset + clip.dur - 1)))
 
