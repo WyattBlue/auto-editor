@@ -49,7 +49,12 @@ else:
     switch("passL", "-sALLOW_MEMORY_GROWTH=1")
     switch("passL", "-Wno-pthreads-mem-growth")
     switch("passL", "-sSTACK_SIZE=1048576")
-    switch("passL", "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
+    # Pre-create one worker beyond the reported core count for PROXY_TO_PTHREAD.
+    # Inference itself is capped by the app to leave one reported core for the
+    # surrounding runtime and its dedicated transcription thread.
+    switch("passL", "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1")
+    when not defined(danger) and not defined(release):
+      switch("passL", "-sPTHREAD_POOL_SIZE_STRICT=2")
     switch("passL", "-sPROXY_TO_PTHREAD=1")
     switch("passL", "-sEXIT_RUNTIME=1")
     switch("passL", "-sMODULARIZE=1")
