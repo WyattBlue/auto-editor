@@ -147,6 +147,7 @@ elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):
 if not defined(dynamic) and enableWhisper:
   switch("define", "whisper")
   switch("passL", "-lwhisper")
+  switch("passL", "-lparakeet")
   switch("passL", "-lggml-base")
   switch("passL", "-lggml")
   switch("passL", "-lggml-cpu")

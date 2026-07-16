@@ -8,6 +8,7 @@ type
 when defined(whisper):
   {.emit: """
 #include <whisper.h>
+#include <parakeet.h>
 #include <ggml.h>
 #include <ggml-backend.h>
 
@@ -75,6 +76,69 @@ int ae_whisper_run(void *ctx, const float *samples, int n_samples,
 void ae_whisper_free(void *ctx) {
     if (ctx) whisper_free((struct whisper_context *) ctx);
 }
+
+void *ae_parakeet_init(const char *model_path, int use_gpu, int verbose) {
+    if (!verbose) {
+        parakeet_log_set(ae_quiet_log, NULL);
+        ggml_log_set(ae_quiet_log, NULL);
+    }
+
+    static int loaded = 0;
+    if (!loaded) { ggml_backend_load_all(); loaded = 1; }
+
+    struct parakeet_context_params cp = parakeet_context_default_params();
+    cp.use_gpu = use_gpu != 0;
+    return parakeet_init_from_file_with_params(model_path, cp);
+}
+
+// Same contract as ae_whisper_run. Parakeet has no language/translate/prompt
+// knobs; each utterance is decoded independently. All t0/t1 are in 10ms mel
+// frames, same scale as whisper's centiseconds. With split_words, one callback
+// fires per word: tokens are grouped on is_word_start, with word times taken
+// from the TDT token durations (punctuation has no word-start marker, so it
+// attaches to the preceding word).
+int ae_parakeet_run(void *ctx, const float *samples, int n_samples,
+                    int n_threads, int split_words, ae_seg_cb on_segment, void *user) {
+    struct parakeet_context *c = (struct parakeet_context *) ctx;
+    struct parakeet_full_params p = parakeet_full_default_params(PARAKEET_SAMPLING_GREEDY);
+    p.n_threads = n_threads;
+
+    if (parakeet_full(c, p, samples, n_samples) != 0)
+        return -1;
+
+    int n = parakeet_full_n_segments(c);
+    for (int i = 0; i < n; i++) {
+        if (!split_words) {
+            const char *text = parakeet_full_get_segment_text(c, i);
+            int64_t t0 = parakeet_full_get_segment_t0(c, i) * 10;
+            int64_t t1 = parakeet_full_get_segment_t1(c, i) * 10;
+            on_segment(user, (char *) text, t0, t1);
+            continue;
+        }
+        int nt = parakeet_full_n_tokens(c, i);
+        char word[512]; int wlen = 0;
+        int64_t t0 = 0, t1 = 0;
+        for (int j = 0; j < nt; j++) {
+            parakeet_token_data td = parakeet_full_get_token_data(c, i, j);
+            if (td.is_word_start && wlen > 0) {
+                on_segment(user, word, t0 * 10, t1 * 10);
+                wlen = 0;
+            }
+            if (wlen == 0) t0 = td.t0;
+            const char *ts = parakeet_token_to_str(c, td.id);
+            wlen += parakeet_token_to_text(ts, wlen == 0, word + wlen, (int)sizeof(word) - wlen);
+            if (wlen > (int)sizeof(word) - 1) wlen = (int)sizeof(word) - 1;
+            t1 = td.t1;
+        }
+        if (wlen > 0)
+            on_segment(user, word, t0 * 10, t1 * 10);
+    }
+    return 0;
+}
+
+void ae_parakeet_free(void *ctx) {
+    if (ctx) parakeet_free((struct parakeet_context *) ctx);
+}
 """.}
 
   proc ae_whisper_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
@@ -82,12 +146,26 @@ void ae_whisper_free(void *ctx) {
     language: cstring, translate: cint, nThreads: cint, initialPrompt: cstring,
     maxLen: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, nodecl, cdecl.}
   proc ae_whisper_free(ctx: WhisperCtx) {.importc, nodecl, cdecl.}
+  proc ae_parakeet_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
+  proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
+    nThreads, splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, nodecl, cdecl.}
+  proc ae_parakeet_free(ctx: WhisperCtx) {.importc, nodecl, cdecl.}
 else:
   proc ae_whisper_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx = nil
   proc ae_whisper_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
     language: cstring, translate: cint, nThreads: cint, initialPrompt: cstring,
     maxLen: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
   proc ae_whisper_free(ctx: WhisperCtx) = discard
+  proc ae_parakeet_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx = nil
+  proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
+    nThreads, splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
+  proc ae_parakeet_free(ctx: WhisperCtx) = discard
+
+# Whisper and parakeet GGUFs share the same ggml magic, and a failed
+# whisper_init on a parakeet file leaks Metal buffers, so probing is not an
+# option — go by the conventional model file name (ggml-parakeet-*).
+func isParakeetModel*(model: string): bool =
+  "parakeet" in model.extractFilename.toLowerAscii
 
 # Apple SpeechAnalyzer backend (src/ae_speech.swift), selected with model "apple".
 when defined(appleSpeech):
@@ -146,6 +224,7 @@ type
   WorkerArgs = object
     wctx: WhisperCtx
     apple: bool
+    parakeet: bool
     oc: ptr OutCtx
     jobs: ptr Channel[Job]
     language: string
@@ -172,6 +251,9 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
       if a.apple:
         ae_speech_run(a.wctx, addr job.samples[0], job.samples.len.cint,
           a.maxLen, segCb, a.oc)
+      elif a.parakeet:
+        ae_parakeet_run(a.wctx, addr job.samples[0], job.samples.len.cint,
+          a.threads, a.maxLen, segCb, a.oc)
       else:
         ae_whisper_run(a.wctx, addr job.samples[0], job.samples.len.cint,
           a.language.cstring, a.translate, a.threads, a.prompt.cstring,
@@ -187,6 +269,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   ## ends or `stop[]` is set, transcribing each detected speech segment. Output
   ## goes to `output` ("-" = stdout).
   let useApple = model == "apple"
+  let useParakeet = not useApple and isParakeetModel(model)
   var wctx: WhisperCtx
   if useApple:
     when defined(appleSpeech):
@@ -200,6 +283,13 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
           &"language (got: {locale}), and network access for the first-run model download"
     else:
       error "The 'apple' model needs a build made on macOS 26 or later"
+  elif useParakeet:
+    wctx = ae_parakeet_init(model.cstring, 1, (if debug: 1.cint else: 0.cint))
+    if wctx == nil:
+      when defined(whisper):
+        error &"Could not load parakeet model: {model}"
+      else:
+        error "This build of auto-editor has no whisper support"
   else:
     wctx = ae_whisper_init(model.cstring, 1, (if debug: 1.cint else: 0.cint))
     if wctx == nil:
@@ -207,7 +297,10 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
         error &"Could not load whisper model: {model}"
       else:
         error "This build of auto-editor has no whisper support"
-  defer: (if useApple: ae_speech_free(wctx) else: ae_whisper_free(wctx))
+  defer:
+    if useApple: ae_speech_free(wctx)
+    elif useParakeet: ae_parakeet_free(wctx)
+    else: ae_whisper_free(wctx)
 
   let outFile = if output == "-": stdout
     else: (try: open(output, fmWrite) except IOError: error &"Could not open output: {output}")
@@ -312,7 +405,8 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   let pkt = av_packet_alloc()
   defer: av_packet_free(addr pkt)
 
-  var wargs = WorkerArgs(wctx: wctx, apple: useApple, oc: addr oc, jobs: addr jobs,
+  var wargs = WorkerArgs(wctx: wctx, apple: useApple, parakeet: useParakeet,
+    oc: addr oc, jobs: addr jobs,
     language: language, translate: (if translate: 1.cint else: 0.cint),
     threads: threads, prompt: prompt,
     maxLen: (if splitWords: 1.cint else: 0.cint), debug: debug)

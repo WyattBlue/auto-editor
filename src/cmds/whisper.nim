@@ -71,12 +71,20 @@ proc main*(cArgs: seq[string]) =
     error "A media file is needed"
   if model == "":
     error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp\n" &
+      "Parakeet models also work: https://huggingface.co/ggml-org/parakeet-GGUF\n" &
       "Or use 'apple' for the built-in macOS 26+ transcriber"
   if model == "apple":
     if translate:
       error "--translate is not supported with the apple model"
     if prompt != "":
       error "--prompt is not supported with the apple model"
+  elif isParakeetModel(model):
+    if translate:
+      error "--translate is not supported with parakeet models"
+    if prompt != "":
+      error "--prompt is not supported with parakeet models"
+    if language != "auto":
+      error "--language is not supported with parakeet models (they detect it themselves)"
 
   let isMic = (inputPath == ":mic")
   # Install early so Ctrl-C is graceful even during the (slow) model load.

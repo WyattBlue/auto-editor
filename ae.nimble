@@ -423,13 +423,13 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
     echo "Writing whisper.pc file"
     when defined(macosx) and hostCPU == "arm64":
-      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-blas -lggml-metal"
+      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas -lggml-metal"
       let libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lc++"
     elif defined(macosx):
-      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-blas"
+      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas"
       let libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lc++"
     else:
-      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
+      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu"
       # OpenMP is disabled for Windows cross-compiles; native Linux uses libgomp
       let libsPrivate = if kind in {winX64, winArm}: "-lpthread -lm -lstdc++"
                         else: "-lgomp -lpthread -lm -lstdc++"
@@ -511,7 +511,7 @@ includedir=${{prefix}}/include
 Name: whisper
 Description: whisper.cpp
 Version: 1.9.1
-Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu
+Libs: -L${{libdir}} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu
 Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
 """)

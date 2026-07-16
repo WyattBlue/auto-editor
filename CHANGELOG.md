@@ -12,9 +12,14 @@
  - Preserve volume, de-essing, invert, flips, erosion, blur, color adjustments,
    lens correction, drawbox, pixelation, and chromatic aberration actions in
    Kdenlive and Shotcut exports.
+ - Support NVIDIA Parakeet models in the `whisper` subcommand, including
+   `--split-words` with word timestamps from the TDT decoder. Models:
+   https://huggingface.co/ggml-org/parakeet-GGUF
+ - Upgrade whisper.cpp to v1.9.1.
 
 ## Performance
  - Vectorize motion pixel comparison with NEON, SSE2, and WebAssembly SIMD.
 
 ## Fixes
- -
+ - Fatal errors no longer dump a ggml backtrace after the error message when a
+   model fails to load; auto-editor now exits cleanly with code 1.
