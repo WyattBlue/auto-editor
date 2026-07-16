@@ -19,6 +19,24 @@ The result is written to `video_ALTERED.mp4`. To name it yourself, use `-o`:
 auto-editor video.mp4 -o trimmed.mp4
 ```
 
+## Smooth the cuts with dissolves
+
+Blend each kept section into the next instead of jump-cutting, with a fade in
+at the start and a fade out at the end:
+
+```sh
+auto-editor video.mp4 --transition dissolve:0.5sec
+```
+
+By default, cuts that removed less than a second of material stay hard so
+short silence trims don't stutter. Use `:0` to dissolve at every cut:
+
+```sh
+auto-editor video.mp4 --transition dissolve:0.5sec:0
+```
+
+Transitions survive editor exports too — see [Transitions](./transition).
+
 ## Record and edit a microphone
 
 Use `:mic` in place of an input file to capture from a microphone. Press

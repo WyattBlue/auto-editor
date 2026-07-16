@@ -303,7 +303,7 @@ auto-editor video.mp4 -w:0 speed:2,varispeed:1.5,volume:0.8
 
 ## Animations
 
-For transitions between clips, use the edit-point option instead of an action:
+For transitions between clips, use the [edit-point option](./transition) instead of an action:
 
 ```sh
 # Cross-dissolve cuts of at least 1 second; fade the timeline endpoints.

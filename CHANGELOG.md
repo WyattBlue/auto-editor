@@ -1,7 +1,7 @@
 # 31.2.1
 
 ## Major
- - Added first-class linked video/audio dissolve transitions with `--transition dissolve:DURATION[:MIN-CUT]`. Auto-Editor adds cross-dissolves at eligible cuts and fades at the timeline endpoints; cuts shorter than `MIN-CUT` are skipped (default: `1sec`).
+ - Added first-class linked video/audio dissolve transitions with `--transition dissolve:DURATION[:MIN-CUT]`. Auto-Editor adds cross-dissolves at eligible cuts and fades at the timeline endpoints; cuts shorter than `MIN-CUT` are skipped (default: `1sec`). Formats that cannot represent transitions (`v1`, `v2`, `clip-sequence`) drop them and keep the cuts.
  - The v3 timeline format can now store and render transitions, and every editor export preserves them natively: Premiere OTIO/FCP7 XML, Final Cut Pro and Resolve FCPXML (Cross Dissolve spine transitions), and Shotcut/Kdenlive MLT (same-track transitions/mixes plus edge fades).
 
 ## Features
