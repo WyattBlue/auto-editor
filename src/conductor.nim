@@ -375,7 +375,8 @@ proc editMedia*(args: var mainArgs) =
     requireLicense(args, "render or export a timeline with multiple sources")
 
   if tlV3.hasTransitions and exportKind notin
-      ["default", "v3", "premiere", "resolve-fcp7", "premiere-otio"]:
+      ["default", "v3", "premiere", "resolve-fcp7", "premiere-otio",
+       "shotcut", "kdenlive"]:
     error exportKind & " cannot represent transitions; use v3, FCP7, or OTIO"
 
   case exportKind:

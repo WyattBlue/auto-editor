@@ -115,6 +115,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
     inc sourceId
 
   var clipPlaylists: seq[XmlNode] = @[]
+  var trackTractors: seq[XmlNode] = @[]
   var chains = 0
   var playlists = 0
   var producers = 1
@@ -321,6 +322,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(track)
 
     mlt.add(tractor)
+    trackTractors.add(tractor)
 
   # create chains, playlists and tractors for video channels
   for i, video in tl.v:
@@ -395,6 +397,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(track)
 
     mlt.add(tractor)
+    trackTractors.add(tractor)
 
   # final chain for the project bin (one per unique source)
   for path in uniquePaths:
@@ -441,7 +444,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
     inc chains
 
   var groups: seq[JsonNode] = @[]
-  producers = 1
   var filterId = 0
 
   proc addFilter(parent: XmlNode, service: string,
@@ -535,62 +537,125 @@ proc kdenliveWrite*(output: string, tl: v3) =
           ("av.edge", if effect.abWrap: "wrap" else: "smear")])
       else: discard
 
-  for clip in clips:
-    var groupChildren: seq[JsonNode] = @[]
-    let `in` = toTimecode((clip.offset.float / tb.float), standard)
-    let `out` = toTimecode(((clip.offset + clip.dur - 1).float / tb.float), standard)
-    let path = $clip.src[]
+  template tcf(f: int64): string = toTimecode(f.float / tb.float, standard)
 
-    for i, playlist in clipPlaylists:
-      if i mod 2 == 0:
-        groupChildren.add(%*{
-          "data": &"{i div 2}:{clip.start}",
-          "leaf": "clip",
-          "type": "Leaf"
-        })
-        var clipProd = ""
+  # A centered dissolve becomes a Kdenlive same-track mix: the joined clips
+  # are extended to overlap, the incoming clip moves to the track's other
+  # sub-playlist (offset with a blank), and a luma/mix transition in the
+  # track's tractor composites the overlap. Start/end-aligned dissolves become
+  # fade filters on the entry.
+  var groupChildren = newSeq[seq[JsonNode]](clips.len)
+  var warpedIdxOf = initTable[int, int]()
+  for w, ci in warpedClips: warpedIdxOf[ci] = w
+  let nch = aChannels + vChannels
+  var transitionId = 0
 
-        # Must match the warpedClips predicate above, or entry producer
-        # numbering drifts out of sync with the created producers.
-        let effectGroup = tl.effects[clip.effects]
-        var hasSpeed = false
-        for effect in effectGroup:
-          if effect.kind in [actSpeed, actVarispeed]:
-            hasSpeed = true
-            break
+  for c in 0 ..< nch:
+    let isAudio = c < aChannels
+    var chTransitions: seq[Transition]
+    if isAudio:
+      if tl.at.len > 0: chTransitions = tl.at[0]
+    else:
+      if tl.vt.len > 0: chTransitions = tl.vt[0]
+    let chPlan = transitionPlan(clips, chTransitions)
+    var parity = 0
+    var cursors: array[2, int64]
 
-        if hasSpeed:
-          clipProd = &"producer{producers}"
-          inc producers
+    for ci, clip in clips:
+      let path = $clip.src[]
+      let `in` = tcf(clip.offset)
+      let `out` = tcf(clip.offset + clip.dur - 1)
+      let effectGroup = tl.effects[clip.effects]
+
+      var entryIn = clip.offset
+      var entryOut = clip.offset + clip.dur - 1
+      var tlStart = clip.start
+      var tlEnd = clip.start + clip.dur
+      var fadeInDur, fadeOutDur = 0'i64
+
+      if chPlan[ci].incoming >= 0:
+        let t = chTransitions[chPlan[ci].incoming]
+        if t.alignment == taCenter:
+          let h = t.dur div 2
+          entryIn -= h
+          tlStart -= h
+          parity = 1 - parity
+          let tr = newElement("transition")
+          tr.attrs = {"id": &"mix{transitionId}", "in": tcf(t.at - h),
+            "out": tcf(t.at + (t.dur - h) - 1)}.toXmlAttributes()
+          inc transitionId
+          let service = (if isAudio: "mix" else: "luma")
+          tr.addProp("mlt_service", service)
+          tr.addProp("kdenlive_id", service)
+          tr.addProp("a_track", "0")
+          tr.addProp("b_track", "1")
+          tr.addProp("kdenlive:mixcut", $h)
+          if isAudio:
+            tr.addProp("start", "-1")
+            tr.addProp("accepts_blanks", "1")
+          if parity == 0:
+            # The incoming clip landed on the lower sub-playlist, so the
+            # dissolve runs toward a_track instead of b_track.
+            tr.addProp("reverse", "1")
+          trackTractors[c].add(tr)
         else:
-          let channelIdx = i div 2
-          let chainIdx = if channelIdx < aChannels:
-                           audioChainOf[(channelIdx, path)]
-                         else:
-                           videoChainOf[(channelIdx - aChannels, path)]
-          clipProd = &"chain{chainIdx}"
-
-        let entry = newElement("entry")
-        entry.attrs = {
-          "producer": clipProd,
-          "in": `in`,
-          "out": `out`
-        }.toXmlAttributes()
-
-        var entryProp = newElement("property")
-        entryProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
-        entryProp.add(newText(sourceIds[path]))
-        entry.add(entryProp)
-
-        let channelIdx = i div 2
-        if channelIdx < aChannels:
-          entry.addAudioEffects(effectGroup, int(clip.dur), `in`, `out`)
+          fadeInDur = t.dur
+      if chPlan[ci].outgoing >= 0:
+        let t = chTransitions[chPlan[ci].outgoing]
+        if t.alignment == taCenter:
+          entryOut += t.dur - t.dur div 2
+          tlEnd = t.at + (t.dur - t.dur div 2)
         else:
-          entry.addVideoEffects(effectGroup, int(clip.dur), `in`, `out`)
+          fadeOutDur = t.dur
 
-        playlist.add(entry)
+      let playlist = clipPlaylists[2 * c + parity]
+      if tlStart > cursors[parity]:
+        let blank = newElement("blank")
+        blank.attrs = {"length": tcf(tlStart - cursors[parity])}.toXmlAttributes()
+        playlist.add(blank)
+      cursors[parity] = tlEnd
 
-    groups.add(%*{"children": groupChildren, "type": "Normal"})
+      var clipProd: string
+      if ci in warpedIdxOf:
+        clipProd = &"producer{1 + warpedIdxOf[ci] * nch + c}"
+      else:
+        let chainIdx = if isAudio: audioChainOf[(c, path)]
+                       else: videoChainOf[(c - aChannels, path)]
+        clipProd = &"chain{chainIdx}"
+
+      let entry = newElement("entry")
+      entry.attrs = {
+        "producer": clipProd,
+        "in": tcf(entryIn),
+        "out": tcf(entryOut)
+      }.toXmlAttributes()
+      entry.addProp("kdenlive:id", sourceIds[path])
+
+      if isAudio:
+        entry.addAudioEffects(effectGroup, int(clip.dur), `in`, `out`)
+        if fadeInDur > 0:
+          entry.addFilter("volume", [("level", &"0=-60;{fadeInDur - 1}=0")],
+            (tcf(clip.offset), tcf(clip.offset + fadeInDur - 1)))
+        if fadeOutDur > 0:
+          entry.addFilter("volume", [("level", &"0=0;{fadeOutDur - 1}=-60")],
+            (tcf(clip.offset + clip.dur - fadeOutDur),
+             tcf(clip.offset + clip.dur - 1)))
+      else:
+        entry.addVideoEffects(effectGroup, int(clip.dur), `in`, `out`)
+        if fadeInDur > 0:
+          entry.addFilter("brightness", [("level", &"0=0;{fadeInDur - 1}=1")],
+            (tcf(clip.offset), tcf(clip.offset + fadeInDur - 1)))
+        if fadeOutDur > 0:
+          entry.addFilter("brightness", [("level", &"0=1;{fadeOutDur - 1}=0")],
+            (tcf(clip.offset + clip.dur - fadeOutDur),
+             tcf(clip.offset + clip.dur - 1)))
+
+      playlist.add(entry)
+      groupChildren[ci].add(%*{
+        "data": &"{c}:{tlStart}", "leaf": "clip", "type": "Leaf"})
+
+  for children in groupChildren:
+    groups.add(%*{"children": children, "type": "Normal"})
 
   # default sequence tractor
   let sequence = newElement("tractor")

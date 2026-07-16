@@ -148,23 +148,80 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   playlist.add(entry)
   mlt.add(playlist)
 
-  var chains = 0
   var clipTagNames: seq[string] = @[]
 
   var layer: seq[Clip]
+  var transitions: seq[Transition]
   if tl.v.len > 0:
     layer = tl.v[0]
+    if tl.vt.len > 0: transitions = tl.vt[0]
   elif tl.a.len > 0:
     layer = tl.a[0]
+    if tl.at.len > 0: transitions = tl.at[0]
+  let plan = transitionPlan(layer, transitions)
 
-  for clip in layer:
+  template tc(f: int64): string = toTimecode(float(f / tb), Code.standard)
+
+  # A centered dissolve becomes a Shotcut same-track transition: the entries of
+  # the joined clips are trimmed back from the edit point, and a two-track
+  # sub-tractor plays clip A's tail against clip B's head with luma (video
+  # dissolve) and mix (audio crossfade) transitions. Start/end-aligned
+  # dissolves become fade filters on the clip itself.
+  type ClipPlan = object
+    entryIn, entryOut: int64   # source frames the plain entry still covers
+    postroll: int64            # extra source frames the chain must expose
+    fadeInDur, fadeOutDur: int64
+    outCenter: int             # centered transition leaving this clip, or -1
+
+  var plans = newSeq[ClipPlan](layer.len)
+  for i, clip in layer:
+    plans[i] = ClipPlan(entryIn: clip.offset,
+      entryOut: clip.offset + clip.dur - 1, outCenter: -1)
+    if plan[i].incoming >= 0:
+      let t = transitions[plan[i].incoming]
+      if t.alignment == taCenter:
+        plans[i].entryIn += t.dur - t.dur div 2
+      else:
+        plans[i].fadeInDur = t.dur
+    if plan[i].outgoing >= 0:
+      let t = transitions[plan[i].outgoing]
+      if t.alignment == taCenter:
+        plans[i].entryOut -= t.dur div 2
+        plans[i].postroll = t.dur - t.dur div 2
+        plans[i].outCenter = plan[i].outgoing
+      else:
+        plans[i].fadeOutDur = t.dur
+
+  proc addFadeFilters(parent: XmlNode, clip: Clip, fadeInDur, fadeOutDur: int64) =
+    if fadeInDur > 0:
+      let io = (tc(clip.offset), tc(clip.offset + fadeInDur - 1))
+      if tl.v.len > 0:
+        parent.addFilter("brightness", [("level", &"0=0;{fadeInDur - 1}=1")],
+          "fadeInBrightness", io)
+      if tl.a.len > 0:
+        parent.addFilter("volume", [("level", &"0=-60;{fadeInDur - 1}=0")],
+          "fadeInVolume", io)
+    if fadeOutDur > 0:
+      let fadeStart = clip.offset + clip.dur - fadeOutDur
+      let io = (tc(fadeStart), tc(clip.offset + clip.dur - 1))
+      if tl.v.len > 0:
+        parent.addFilter("brightness", [("level", &"0=1;{fadeOutDur - 1}=0")],
+          "fadeOutBrightness", io)
+      if tl.a.len > 0:
+        parent.addFilter("volume", [("level", &"0=0;{fadeOutDur - 1}=-60")],
+          "fadeOutVolume", io)
+
+  proc addSourceProducer(id: string, clip: Clip, srcEnd: int64,
+      fadeInDur, fadeOutDur: int64) =
+    ## A dedicated chain (or timewarp producer) for one use of a clip's
+    ## source. A tractor track sets in/out on the producer object itself
+    ## (unlike a playlist entry, which plays a cut), so a producer shared
+    ## between the main playlist and a transition track breaks playback —
+    ## every use gets its own copy, matching what Shotcut itself writes.
     let src = clip.src[]
-    let length = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
-    let lastFrame = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
-
     let effectGroup = tl.effects[clip.effects]
-    let inTc = to_timecode(float(clip.offset / tb), Code.standard)
-    let outTc = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
+    let inTc = tc(clip.offset)
+    let outTc = tc(clip.offset + clip.dur - 1)
 
     # Calculate combined speed from all speed/varispeed effects
     var speedVal = 1.0
@@ -177,42 +234,96 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
         speedVal *= effect.val
         lastSpeedWasVarispeed = true
 
-    let tagName = &"chain{chains}"
-    inc chains
-
+    var node: XmlNode
     if speedVal != 1.0:
       # Create producer with timewarp for speed effects
-      let producer = newElement("producer")
-      producer.attrs = {"id": tagName, "out": lastFrame}.toXmlAttributes()
-      producer.addProp("length", length)
-      producer.addProp("eof", "pause")
-      producer.addProp("resource", &"{speedVal}:{src}")
-      producer.addProp("warp_speed", $speedVal)
-      producer.addProp("warp_resource", src)
-      producer.addProp("mlt_service", "timewarp")
-      producer.addProp("shotcut:producer", "avformat")
+      node = newElement("producer")
+      node.attrs = {"id": id, "out": tc(srcEnd - 1)}.toXmlAttributes()
+      node.addProp("length", tc(srcEnd))
+      node.addProp("eof", "pause")
+      node.addProp("resource", &"{speedVal}:{src}")
+      node.addProp("warp_speed", $speedVal)
+      node.addProp("warp_resource", src)
+      node.addProp("mlt_service", "timewarp")
+      node.addProp("shotcut:producer", "avformat")
       if not lastSpeedWasVarispeed:
-        producer.addProp("warp_pitch", "1")
-      producer.addProp("shotcut:caption", &"{agSplitFile(src).name} ({speedVal}x)")
-
-      producer.addActionFilters(effectGroup, int(clip.dur), tb.float, inTc, outTc)
-
-      mlt.add(producer)
+        node.addProp("warp_pitch", "1")
+      node.addProp("shotcut:caption", &"{agSplitFile(src).name} ({speedVal}x)")
     else:
       # Create chain without speed effects
-      let chain = newElement("chain")
-      chain.attrs = {"id": tagName, "out": lastFrame}.toXmlAttributes()
-      chain.addProp("length", length)
-      chain.addProp("eof", "pause")
-      chain.addProp("resource", src)
-      chain.addProp("mlt_service", "avformat")
-      chain.addProp("caption", agSplitFile(src).name)
+      node = newElement("chain")
+      node.attrs = {"id": id, "out": tc(srcEnd - 1)}.toXmlAttributes()
+      node.addProp("length", tc(srcEnd))
+      node.addProp("eof", "pause")
+      node.addProp("resource", src)
+      node.addProp("mlt_service", "avformat")
+      node.addProp("caption", agSplitFile(src).name)
 
-      chain.addActionFilters(effectGroup, int(clip.dur), tb.float, inTc, outTc)
+    node.addActionFilters(effectGroup, int(clip.dur), tb.float, inTc, outTc)
+    node.addFadeFilters(clip, fadeInDur, fadeOutDur)
+    mlt.add(node)
 
-      mlt.add(chain)
-
+  for i, clip in layer:
+    let tagName = &"chain{i}"
+    addSourceProducer(tagName, clip, clip.offset + clip.dur + plans[i].postroll,
+      plans[i].fadeInDur, plans[i].fadeOutDur)
     clipTagNames.add(tagName)
+
+  # Sub-tractors for centered dissolves. Defined after the chains they play
+  # because the MLT XML parser cannot resolve forward references.
+  var transitionTags = newSeq[string](layer.len)
+  for i, clip in layer:
+    if plans[i].outCenter == -1: continue
+    let t = transitions[plans[i].outCenter]
+    let h = t.dur div 2
+    let h2 = t.dur - h
+    let next = layer[i + 1]
+
+    let tag = &"transition{i}"
+    transitionTags[i] = tag
+    let tagA = tag & "a"
+    let tagB = tag & "b"
+    addSourceProducer(tagA, clip, clip.offset + clip.dur + plans[i].postroll, 0, 0)
+    addSourceProducer(tagB, next, next.offset + next.dur, 0, 0)
+
+    let tr = newElement("tractor")
+    tr.attrs = {"id": tag, "in": "00:00:00.000",
+      "out": tc(t.dur - 1)}.toXmlAttributes()
+    tr.addProp("shotcut:transition", "lumaMix")
+
+    var track = newElement("track")
+    track.attrs = {"producer": tagA,
+      "in": tc(clip.offset + clip.dur - h),
+      "out": tc(clip.offset + clip.dur + h2 - 1)}.toXmlAttributes()
+    tr.add(track)
+    track = newElement("track")
+    track.attrs = {"producer": tagB,
+      "in": tc(next.offset - h),
+      "out": tc(next.offset + h2 - 1)}.toXmlAttributes()
+    tr.add(track)
+
+    # Frames inside the sub-tractor carry 0-based positions. A transition
+    # without explicit in/out computes its progress against the b-producer's
+    # full source range instead, which breaks the fade ramp.
+    let trIo = {"in": "00:00:00.000", "out": tc(t.dur - 1)}.toXmlAttributes()
+    if tl.v.len > 0:
+      let luma = newElement("transition")
+      luma.attrs = trIo
+      luma.addProp("a_track", "0")
+      luma.addProp("b_track", "1")
+      luma.addProp("factory", "loader")
+      luma.addProp("mlt_service", "luma")
+      tr.add(luma)
+    if tl.a.len > 0:
+      let mix = newElement("transition")
+      mix.attrs = trIo
+      mix.addProp("a_track", "0")
+      mix.addProp("b_track", "1")
+      mix.addProp("start", "-1")
+      mix.addProp("accepts_blanks", "1")
+      mix.addProp("mlt_service", "mix")
+      tr.add(mix)
+    mlt.add(tr)
 
   let main_playlist = newElement("playlist")
   main_playlist.attrs = {"id": "playlist0"}.toXmlAttributes()
@@ -220,16 +331,24 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   main_playlist.addProp("shotcut:name", "V1")
 
   for i, clip in layer:
-    let in_time = to_timecode(float(clip.offset / tb), Code.standard)
-    let out_time = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
+    if plans[i].entryOut >= plans[i].entryIn:
+      let playlist_entry = newElement("entry")
+      playlist_entry.attrs = {
+        "producer": clipTagNames[i],
+        "in": tc(plans[i].entryIn),
+        "out": tc(plans[i].entryOut)
+      }.toXmlAttributes()
+      main_playlist.add(playlist_entry)
 
-    let playlist_entry = newElement("entry")
-    playlist_entry.attrs = {
-      "producer": clipTagNames[i],
-      "in": in_time,
-      "out": out_time
-    }.toXmlAttributes()
-    main_playlist.add(playlist_entry)
+    if plans[i].outCenter != -1:
+      let t = transitions[plans[i].outCenter]
+      let trEntry = newElement("entry")
+      trEntry.attrs = {
+        "producer": transitionTags[i],
+        "in": "00:00:00.000",
+        "out": tc(t.dur - 1)
+      }.toXmlAttributes()
+      main_playlist.add(trEntry)
 
   mlt.add(main_playlist)
 
