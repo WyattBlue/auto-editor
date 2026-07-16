@@ -376,8 +376,8 @@ proc editMedia*(args: var mainArgs) =
 
   if tlV3.hasTransitions and exportKind notin
       ["default", "v3", "premiere", "resolve-fcp7", "premiere-otio",
-       "shotcut", "kdenlive"]:
-    error exportKind & " cannot represent transitions; use v3, FCP7, or OTIO"
+       "shotcut", "kdenlive", "final-cut-pro", "resolve"]:
+    error exportKind & " cannot represent transitions; use v3 or an editor export"
 
   case exportKind:
   of "v1", "v2", "v3":

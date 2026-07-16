@@ -147,6 +147,22 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     r2.add mediaRep
     resources.add r2
 
+  var clips: seq[Clip]
+  var transitions: seq[Transition]
+  if tl.v.len > 0 and tl.v[0].len > 0:
+    clips = tl.v[0]
+    if tl.vt.len > 0: transitions = tl.vt[0]
+  elif tl.a.len > 0 and tl.a[0].len > 0:
+    clips = tl.a[0]
+    if tl.at.len > 0: transitions = tl.at[0]
+
+  # FCP matches this uid to its built-in Cross Dissolve Motion template;
+  # Resolve matches the transition by name.
+  let dissolveId = "r" & $(sources.len * 2 + 1)
+  if transitions.len > 0:
+    resources.add <>effect(id = dissolveId, name = "Cross Dissolve",
+      uid = "FxPlug:4731E73A-8DAC-4113-9A30-AE85B1761265")
+
   let lib = <>library()
   let evt = <>event(name = group_name)
   let proj = <>project(name = projName)
@@ -202,20 +218,39 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
         asset.add(timemap)
         break
 
-  var clips: seq[Clip]
-  if tl.v.len > 0 and tl.v[0].len > 0:
-    clips = tl.v[0]
-  elif tl.a.len > 0 and tl.a[0].len > 0:
-    clips = tl.a[0]
+  proc addTransition(t: Transition) =
+    # A spine transition overlaps the edit point; the neighboring clips keep
+    # their trimmed extents and the editor pulls handle media from the source.
+    let spanStart = t.at - (case t.alignment
+      of taStart: 0'i64
+      of taCenter: t.dur div 2
+      of taEnd: t.dur)
+    let tr = newElement("transition")
+    tr.attrs = {"name": "Cross Dissolve", "offset": fraction(spanStart),
+      "duration": fraction(t.dur)}.toXmlAttributes
+    if tl.v.len > 0:
+      let fv = newElement("filter-video")
+      fv.attrs = {"ref": dissolveId, "name": "Cross Dissolve"}.toXmlAttributes
+      tr.add fv
+    spine.add tr
 
   if resolve:
     for i in countdown(tl.a.len - 1, 1):
       for clip in tl.a[i]:
         if clip.src != nil:
           makeClip(ptrToId[clip.src], clip)
-  for clip in clips:
+
+  let plan = transitionPlan(clips, transitions)
+  for i, clip in clips:
     if clip.src != nil:
+      # A centered incoming transition is already emitted as the previous
+      # clip's outgoing one.
+      if plan[i].incoming >= 0 and
+          transitions[plan[i].incoming].alignment == taStart:
+        addTransition(transitions[plan[i].incoming])
       makeClip(ptrToId[clip.src], clip)
+      if plan[i].outgoing >= 0:
+        addTransition(transitions[plan[i].outgoing])
 
   if output == "-":
     echo $fcpxml
