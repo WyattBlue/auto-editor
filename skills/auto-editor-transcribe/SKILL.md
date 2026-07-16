@@ -5,7 +5,7 @@ description: Transcribe a media file or live microphone to text or subtitles wit
 
 # Transcribe & edit by speech
 
-Use auto-editor's whisper.cpp or Apple Speech backend to transcribe audio. Cut a timeline based on subtitle content with `--edit subtitle`/`word`.
+Use auto-editor's whisper.cpp (Whisper or NVIDIA Parakeet models) or Apple Speech backend to transcribe audio. Cut a timeline based on subtitle content with `--edit subtitle`/`word`.
 
 ## Transcribe — `auto-editor whisper`
 
@@ -13,16 +13,25 @@ Use auto-editor's whisper.cpp or Apple Speech backend to transcribe audio. Cut a
 auto-editor whisper <file|:mic> <model> [options]
 ```
 
-For whisper.cpp, set `<model>` to a `ggml` model path such as
-`ggml-small.en.bin`, `ggml-medium.en.bin`, or `ggml-large-v3.bin`. For Apple's
-built-in transcriber, use the magic model name `apple`; it requires a build made
-on macOS 26 or later and macOS 26 or later at runtime. Only the first audio
-stream of a file is used. Audio is resampled to 16 kHz, and text prints to stdout
-by default.
+Set `<model>` to a `ggml` model path. Three backends, chosen by the model:
+
+- **Whisper**: `ggml-small.en.bin`, `ggml-medium.en.bin`, `ggml-large-v3.bin`, …
+  (https://huggingface.co/ggerganov/whisper.cpp). 99+ languages, `--translate`,
+  `--prompt`.
+- **Parakeet**: any model with "parakeet" in the filename, e.g.
+  `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` (https://huggingface.co/ggml-org/parakeet-GGUF).
+  Faster than Whisper at comparable English accuracy; language is
+  auto-detected. `--translate`, `--prompt`, and `--language` are rejected.
+- **Apple**: the magic model name `apple` uses Apple's built-in transcriber;
+  requires macOS 26 or later.
+
+Only the first audio stream of a file is used. Audio is resampled to 16 kHz, and
+text prints to stdout by default.
 
 ```bash
 auto-editor whisper example.mp4 ggml-medium.en.bin                      # plain text → stdout
 auto-editor whisper example.mp4 ggml-medium.en.bin --format srt -o out.srt
+auto-editor whisper example.mp4 ggml-parakeet-tdt-0.6b-v3-q8_0.bin      # parakeet backend
 auto-editor whisper example.mp4 apple --language en_US                  # macOS 26+
 ```
 
@@ -30,6 +39,8 @@ Options: `--format text|srt|json`, `-o/--output FILE`, `-l/--language en`
 (default auto), `-tr/--translate` (→ English), `-sw/--split-words` (one word per
 cue), `--queue SECS` (default 30), `--prompt TEXT`, `--threads N` (default 4),
 and `-t/--threshold THRES` (default 0.04).
+
+`--split-words` works with on all backends. Parakeet is the most accurate.
 
 With the `apple` model, set `--language` to a supported language or locale.
 Apple speech cannot auto-detect language, so `auto` falls back to `en_US` with a
