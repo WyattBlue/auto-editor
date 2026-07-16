@@ -1,7 +1,7 @@
 --- a/ggml/src/ggml-cpu/ggml-cpu.c
 +++ b/ggml/src/ggml-cpu/ggml-cpu.c
-@@ -2435,7 +2435,8 @@ static bool ggml_thread_apply_priority(int32_t prio) {
-         // Newer Windows 11 versions aggresively park (offline) CPU cores and often place
+@@ -2516,7 +2516,8 @@
+         // Newer Windows 11 versions aggressively park (offline) CPU cores and often place
          // all our threads onto the first 4 cores which results in terrible performance with
          // n_threads > 4
 -        #if _WIN32_WINNT >= 0x0602
@@ -10,16 +10,3 @@
          THREAD_POWER_THROTTLING_STATE t;
          ZeroMemory(&t, sizeof(t));
          t.Version     = THREAD_POWER_THROTTLING_CURRENT_VERSION;
---- a/ggml/src/ggml-cpu/simd-mappings.h
-+++ b/ggml/src/ggml-cpu/simd-mappings.h
-@@ -786,7 +786,9 @@
- #define GGML_F32x4_SET1(x)      wasm_f32x4_splat(x)
- #define GGML_F32x4_LOAD         wasm_v128_load
- #define GGML_F32x4_STORE        wasm_v128_store
--#define GGML_F32x4_FMA(a, b, c) wasm_f32x4_add(wasm_f32x4_mul(b, c), a)
-+// clang won't contract add(mul(...)) intrinsics into relaxed_madd, so call it
-+// directly to get a single fused op (= b*c + a) on the f16/f32 hot path.
-+#define GGML_F32x4_FMA(a, b, c) wasm_f32x4_relaxed_madd(b, c, a)
- #define GGML_F32x4_ADD          wasm_f32x4_add
- #define GGML_F32x4_MUL          wasm_f32x4_mul
- #define GGML_F32x4_REDUCE(res, x)                  \
