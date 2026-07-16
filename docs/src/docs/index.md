@@ -10,6 +10,7 @@ title: The Docs
  * [Subcommands](./subcommands)
  * [Supported Media](./supported-media)
  * [Range Syntax](./range-syntax)
+ * [Transitions](./transition)
 
 ## Timeline Documentation
  * [The v1 format](./v1)

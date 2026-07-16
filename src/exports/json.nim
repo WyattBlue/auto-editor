@@ -87,8 +87,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
   var tlJson: JsonNode
 
   if `export` == "v1" or `export` == "v2":
-    if tlV3.vt.len > 0 or tlV3.at.len > 0:
-      error `export` & " cannot represent transitions; use v3"
+    # v1/v2 cannot represent transitions; they are silently dropped.
     if not tlV3.isLinear:
       error "No chunks available for export"
 

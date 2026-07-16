@@ -253,22 +253,6 @@ blockquote {
   }
 }
 
-th {
-  padding: 10px;
-  font-weight: bold;
-  color: #323232;
-
-  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
-}
-
-td { padding: 10px }
-
-thead, tbody {
-  color: #323232;
-
-  @media (prefers-color-scheme: dark) { color: #F9F7F7 }
-}
-
 g-emoji {
   font-family: Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol;
   font-style: normal;
@@ -314,19 +298,79 @@ p {
 .medium { font-size: 1.7rem }
 .smedium { font-size: 1.5rem }
 
-.small, th, pre, blockquote { font-size: 1.28rem }
+.small, pre, blockquote { font-size: 1.28rem }
 @media (max-width: 55em) {
-  .small, th, pre, blockquote { font-size: 1.1rem }
+  .small, pre, blockquote { font-size: 1.1rem }
 }
 
 .tiny { font-size: 1rem }
 .bold { font-weight: bold }
 .underline { text-decoration: underline }
 
-table { border-collapse: collapse }
+table {
+  margin: 1.5rem 0 2rem;
+  border: 1px solid var(--charcoal-200);
+  border-radius: .65rem;
+  border-spacing: 0;
+  overflow: hidden;
+  background-color: white;
+  box-shadow: 0 .35rem 1rem rgba(19, 20, 23, .08);
+
+  @media (prefers-color-scheme: dark) {
+    border-color: var(--charcoal-600);
+    background-color: rgba(19, 20, 23, .25);
+    box-shadow: 0 .45rem 1.25rem rgba(0, 0, 0, .12);
+  }
+}
 
 th, td {
-  padding: 10px;
-  border: 1px solid #323232;
-  @media (prefers-color-scheme: dark) { border: 1px solid #F9F7F7 }
+  padding: .75rem 1rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  border-bottom: 1px solid var(--electric-blue-400);
+  background-color: var(--electric-blue-200);
+  color: var(--charcoal-900);
+  font-size: .9rem;
+  font-weight: 650;
+  letter-spacing: .045em;
+  line-height: 1.25;
+  text-transform: uppercase;
+
+  @media (prefers-color-scheme: dark) {
+    border-color: var(--charcoal-600);
+    background-color: rgba(72, 178, 255, .12);
+    color: var(--charcoal-200);
+  }
+}
+
+td {
+  border-bottom: 1px solid var(--charcoal-200);
+  color: var(--charcoal-900);
+  font-size: 1.08rem;
+  line-height: 1.35;
+
+  @media (prefers-color-scheme: dark) {
+    border-color: var(--charcoal-800);
+    color: var(--charcoal-100);
+  }
+}
+
+tbody tr:last-child td { border-bottom: 0 }
+tbody tr { transition: background-color 120ms ease }
+tbody tr:hover { background-color: rgba(72, 178, 255, .07) }
+
+th[align="right"], td[align="right"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 55em) {
+  table { margin: 1.25rem 0 1.5rem }
+  th, td { padding: .65rem .7rem }
+  th { font-size: .75rem }
+  td { font-size: .95rem }
 }
