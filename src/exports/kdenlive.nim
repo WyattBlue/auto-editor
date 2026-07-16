@@ -1,13 +1,7 @@
 import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
-from std/math import log10
+import ./mlt
 import ../[action, media, timeline]
 import ../util/[color, fun]
-
-proc addProp(parent: XmlNode, name, value: string) =
-  let prop = newElement("property")
-  prop.attrs = {"name": name}.toXmlAttributes()
-  prop.add(newText(value))
-  parent.add(prop)
 
 proc genUuid*(): string =
   var bytes: array[16, byte]
@@ -451,9 +445,13 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var filterId = 0
 
   proc addFilter(parent: XmlNode, service: string,
-      params: openArray[(string, string)] = []) =
+      params: openArray[(string, string)] = [], inOut = ("", "")) =
     let filter = newElement("filter")
-    filter.attrs = {"id": &"filter{filterId}"}.toXmlAttributes()
+    if inOut[0].len > 0:
+      filter.attrs = {"id": &"filter{filterId}", "in": inOut[0],
+        "out": inOut[1]}.toXmlAttributes()
+    else:
+      filter.attrs = {"id": &"filter{filterId}"}.toXmlAttributes()
     inc filterId
     filter.addProp("mlt_service", service)
     filter.addProp("kdenlive_id", service)
@@ -462,21 +460,30 @@ proc kdenliveWrite*(output: string, tl: v3) =
       filter.addProp(name, value)
     parent.add(filter)
 
-  proc addAudioEffects(parent: XmlNode, effects: Actions) =
+  let fps = tb.float
+
+  # Animated ramps become MLT animation strings with 0-based positions, so
+  # the filter needs an explicit in/out matching the entry it is attached to.
+  template anim(effect: Action, inTc, outTc: string): (string, string) =
+    (if effect.isAnimated: (inTc, outTc) else: ("", ""))
+
+  proc addAudioEffects(parent: XmlNode, effects: Actions, clipDur: int,
+      inTc, outTc: string) =
     for effect in effects:
       case effect.kind
       of actVolume:
         if effect.kf.len > 0:
-          let gain = effect.kf[0].float64
-          let db = (if gain <= 0.0: -100.0 else: max(-100.0, 20.0 * log10(gain)))
-          parent.addFilter("volume", [("level", $db)])
+          parent.addFilter("volume", [
+            ("level", mltAnimValue(effect, clipDur, fps, asDb = true))],
+            anim(effect, inTc, outTc))
       of actDeesser:
         parent.addFilter("avfilter.deesser", [
           ("av.i", $effect.intensity), ("av.m", $effect.maxd),
           ("av.f", $effect.freq), ("av.s", "o")])
       else: discard
 
-  proc addVideoEffects(parent: XmlNode, effects: Actions) =
+  proc addVideoEffects(parent: XmlNode, effects: Actions, clipDur: int,
+      inTc, outTc: string) =
     for effect in effects:
       case effect.kind
       of actInvert: parent.addFilter("avfilter.negate")
@@ -485,10 +492,11 @@ proc kdenliveWrite*(output: string, tl: v3) =
       of actErosion: parent.addFilter("avfilter.erosion")
       of actBlur:
         if effect.kf.len > 0:
-          let sigma = $effect.kf[0]
+          let sigma = mltAnimValue(effect, clipDur, fps)
           parent.addFilter("avfilter.gblur", [
             ("av.sigma", sigma), ("av.sigmaV", sigma),
-            ("av.steps", "1"), ("av.planes", "7")])
+            ("av.steps", "1"), ("av.planes", "7")],
+            anim(effect, inTc, outTc))
       of actBrightness:
         if effect.kf.len > 0:
           let expr = brightnessLutExpr(effect.kf[0])
@@ -576,9 +584,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
         let channelIdx = i div 2
         if channelIdx < aChannels:
-          entry.addAudioEffects(effectGroup)
+          entry.addAudioEffects(effectGroup, int(clip.dur), `in`, `out`)
         else:
-          entry.addVideoEffects(effectGroup)
+          entry.addVideoEffects(effectGroup, int(clip.dur), `in`, `out`)
 
         playlist.add(entry)
 

@@ -1,6 +1,6 @@
 import std/[strformat, strutils, xmltree]
-from std/math import log10
 
+import ./mlt
 import ../[action, ffmpeg, timeline]
 import ../util/[color, fun, rational]
 
@@ -14,15 +14,12 @@ https://mltframework.org/docs/mltxml/
 
 ]#
 
-func addProp(parent: XmlNode, name, value: string) =
-  let prop = newElement("property")
-  prop.attrs = {"name": name}.toXmlAttributes()
-  prop.add(newText(value))
-  parent.add(prop)
-
 proc addFilter(parent: XmlNode, service: string,
-    params: openArray[(string, string)] = [], shotcutFilter = "") =
+    params: openArray[(string, string)] = [], shotcutFilter = "",
+    inOut = ("", "")) =
   let filter = newElement("filter")
+  if inOut[0].len > 0:
+    filter.attrs = {"in": inOut[0], "out": inOut[1]}.toXmlAttributes()
   filter.addProp("mlt_service", service)
   if shotcutFilter.len > 0:
     filter.addProp("shotcut:filter", shotcutFilter)
@@ -30,9 +27,19 @@ proc addFilter(parent: XmlNode, service: string,
     filter.addProp(name, value)
   parent.add(filter)
 
-proc addActionFilters(parent: XmlNode, effects: Actions) =
+proc addActionFilters(parent: XmlNode, effects: Actions, clipDur: int,
+    fps: float64, inTc, outTc: string) =
+  # Animated ramps become MLT animation strings with 0-based positions, so
+  # the filter needs an explicit in/out matching the played section.
+  template anim(effect: Action): (string, string) =
+    (if effect.isAnimated: (inTc, outTc) else: ("", ""))
   for effect in effects:
     case effect.kind
+    of actVolume:
+      if effect.kf.len > 0 and not (effect.kf.len == 1 and effect.kf[0] == 1.0):
+        parent.addFilter("volume", [
+          ("level", mltAnimValue(effect, clipDur, fps, asDb = true))],
+          "audioGain", anim(effect))
     of actDeesser:
       parent.addFilter("avfilter.deesser", [
         ("av.i", $effect.intensity), ("av.m", $effect.maxd),
@@ -43,10 +50,11 @@ proc addActionFilters(parent: XmlNode, effects: Actions) =
     of actErosion: parent.addFilter("avfilter.erosion")
     of actBlur:
       if effect.kf.len > 0:
-        let sigma = $effect.kf[0]
+        let sigma = mltAnimValue(effect, clipDur, fps)
         parent.addFilter("avfilter.gblur", [
           ("av.sigma", sigma), ("av.sigmaV", sigma),
-          ("av.steps", "1"), ("av.planes", "7")], "blur_gaussian_av")
+          ("av.steps", "1"), ("av.planes", "7")], "blur_gaussian_av",
+          anim(effect))
     of actBrightness:
       if effect.kf.len > 0:
         let expr = brightnessLutExpr(effect.kf[0])
@@ -155,11 +163,12 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     let lastFrame = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
 
     let effectGroup = tl.effects[clip.effects]
+    let inTc = to_timecode(float(clip.offset / tb), Code.standard)
+    let outTc = to_timecode(float((clip.offset + clip.dur - 1) / tb), Code.standard)
 
     # Calculate combined speed from all speed/varispeed effects
     var speedVal = 1.0
     var lastSpeedWasVarispeed = false
-    var volumeVal = 1.0
     for effect in effectGroup:
       if effect.kind == actSpeed:
         speedVal *= effect.val
@@ -167,10 +176,6 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
       elif effect.kind == actVarispeed:
         speedVal *= effect.val
         lastSpeedWasVarispeed = true
-      elif effect.kind == actVolume and effect.kf.len > 0:
-        # Shotcut's volume filter is a single level; an animated ramp exports
-        # as its starting value.
-        volumeVal *= effect.kf[0]
 
     let tagName = &"chain{chains}"
     inc chains
@@ -190,16 +195,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
         producer.addProp("warp_pitch", "1")
       producer.addProp("shotcut:caption", &"{agSplitFile(src).name} ({speedVal}x)")
 
-      # Add volume filter if needed
-      if volumeVal != 1.0:
-        let filter = newElement("filter")
-        let volumeDb = 20.0 * log10(volumeVal)
-        filter.addProp("mlt_service", "volume")
-        filter.addProp("shotcut:filter", "audioGain")
-        filter.addProp("level", $volumeDb)
-        producer.add(filter)
-
-      producer.addActionFilters(effectGroup)
+      producer.addActionFilters(effectGroup, int(clip.dur), tb.float, inTc, outTc)
 
       mlt.add(producer)
     else:
@@ -212,16 +208,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
       chain.addProp("mlt_service", "avformat")
       chain.addProp("caption", agSplitFile(src).name)
 
-      # Add volume filter if needed
-      if volumeVal != 1.0:
-        let filter = newElement("filter")
-        let volumeDb = 20.0 * log10(volumeVal)
-        filter.addProp("mlt_service", "volume")
-        filter.addProp("shotcut:filter", "audioGain")
-        filter.addProp("level", $volumeDb)
-        chain.add(filter)
-
-      chain.addActionFilters(effectGroup)
+      chain.addActionFilters(effectGroup, int(clip.dur), tb.float, inTc, outTc)
 
       mlt.add(chain)
 
