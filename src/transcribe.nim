@@ -174,7 +174,6 @@ when defined(appleSpeech):
     splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, cdecl.}
   proc ae_speech_free(ctx: WhisperCtx) {.importc, cdecl.}
 else:
-  proc ae_speech_init(locale: cstring): WhisperCtx = nil
   proc ae_speech_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
     splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
   proc ae_speech_free(ctx: WhisperCtx) = discard
