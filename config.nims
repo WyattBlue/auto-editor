@@ -20,8 +20,8 @@ when defined(dynamic):
   if ffmpegLibs.exitCode == 0:
     switch("passL", ffmpegLibs.output.strip())
 
-  let whisperCflags = gorgeEx("pkg-config --cflags whisper ggml", "")
-  let whisperLibs = gorgeEx("pkg-config --libs whisper ggml", "")
+  let whisperCflags = gorgeEx("pkg-config --cflags whisper parakeet ggml", "")
+  let whisperLibs = gorgeEx("pkg-config --libs whisper parakeet ggml", "")
   if enableWhisper and whisperCflags.exitCode == 0 and whisperLibs.exitCode == 0:
     switch("define", "whisper")
     switch("passC", whisperCflags.output.strip())
