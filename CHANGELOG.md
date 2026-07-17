@@ -10,5 +10,4 @@
  -
 
 ## Fixes
- -
- 
+ - Fix dynamic linking not linking parakeet.
