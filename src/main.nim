@@ -543,6 +543,8 @@ judge making cuts.
       args.vprofile = key
     of "preset":
       args.preset = key
+    of "pix_fmt":
+      args.pixFmt = key
     of "acodec":
       args.audioCodec = key
     of "layout":

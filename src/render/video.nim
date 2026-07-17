@@ -480,6 +480,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
+  let userFmt = args.pixFmt != ""
+  if userFmt:
+    pix_fmt = av_get_pix_fmt(cstring(args.pixFmt))
+    if pix_fmt == AV_PIX_FMT_NONE:
+      error &"Unknown pixel format: {args.pixFmt}"
+
   var needValidFmt = true
   if codec.pix_fmts != nil:
     var i = 0
@@ -490,6 +496,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       i += 1
 
   if needValidFmt:
+    # A format the user asked for by name must not be silently swapped.
+    if userFmt and codec.pix_fmts != nil:
+      error &"Encoder {codec.name} does not support pixel format: {args.pixFmt}"
     if codec.pix_fmts != nil:
       let best = avcodec_find_best_pix_fmt_of_list(codec.pix_fmts, pix_fmt, 0, nil)
       pix_fmt = if best != AV_PIX_FMT_NONE: best else: AV_PIX_FMT_YUV420P

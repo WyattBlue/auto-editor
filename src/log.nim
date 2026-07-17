@@ -92,6 +92,7 @@ type mainArgs* = object
   videoCodec*: string = "auto"
   preset*: string = ""
   vprofile*: string = ""
+  pixFmt*: string = ""
   audioCodec*: string = "auto"
   audioLayout*: string = ""
   videoBitrate*: int = -1

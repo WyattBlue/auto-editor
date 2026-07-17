@@ -63,6 +63,9 @@ type
 proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.
   importc, header: "<libavutil/pixdesc.h>".}
 
+proc av_get_pix_fmt*(name: cstring): AVPixelFormat {.
+  importc, header: "<libavutil/pixdesc.h>".}
+
 func `==`*(x, y: AVPixelFormat): bool {.borrow.}
 func `$`*(pix_fmt: AVPixelFormat): string = $av_get_pix_fmt_name(pix_fmt)
 

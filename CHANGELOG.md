@@ -4,7 +4,7 @@
  -
 
 ## Features
- -
+ - Add `-pix_fmt` option to set the output pixel format (e.g. `yuv420p10le` for 10-bit)
 
 ## Performance
  -
