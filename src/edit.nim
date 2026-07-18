@@ -1,12 +1,9 @@
 import std/[math, options, os, sequtils, strformat, strutils]
-import ./[av, editlexer, editmethods, ffmpeg, log]
+import ./[av, editlexer, editmethods, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre
-
-func isSymbol(self: Expr, name, text: string): bool =
-  self.kind == ExprSym and name == text[self.`from` ..< self.to]
 
 func `or`(a, b: seq[bool]): seq[bool] =
   result = newSeq[bool](max(a.len, b.len))
@@ -84,20 +81,19 @@ proc parseBool(val: string): bool =
     return false
   error "Invalid boolean (expected true or false): " & val
 
-proc parseColFunc(argPos: var int, isKey: var bool, argOrder: seq[string], expr: Expr,
-    text: string): string =
-  if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
-    let node = expr.elements
-    let key = text[node[1].`from` ..< node[1].to]
-    isKey = true
-    argPos = argOrder.find(key)
-    if argPos == -1:
-      error &"got an unexpected keyword argument: {key}"
-    return text[node[2].`from` ..< node[2].to]
-  else:
-    if isKey:
-      error "Positional arguments must never come after keyword arguments"
-    return text[expr.`from` ..< expr.to]
+proc checkedArgs(expressions: openArray[Expr], text: string,
+    argOrder: openArray[string]): seq[BoundEditArg] =
+  try:
+    bindEditArgs(expressions, text, argOrder)
+  except ValueError as e:
+    error e.msg
+
+proc checkedMethodArgs(name: string, expressions: openArray[Expr],
+    text: string): seq[BoundEditArg] =
+  try:
+    bindEditMethodArgs(name, expressions, text)
+  except ValueError as e:
+    error e.msg
 
 
 proc parseNorm*(norm: string): Norm =
@@ -118,10 +114,6 @@ proc parseNorm*(norm: string): Norm =
   if expr.kind != ExprList:
     error "Should never happen"
 
-  var
-    isKey = false
-    argPos = 0
-
   proc normEval(expr: Expr, text: string): Norm =
     if expr.kind != ExprList or expr.elements.len == 0:
       error "Bad kind"
@@ -139,9 +131,7 @@ proc parseNorm*(norm: string): Norm =
           lra: float32 = 7.0
           tp: float32 = -2.0
           gain: float32 = 0.0
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
+        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder):
           case argPos:
           of 0: i = parseFloatInRange(val, -70.0, 5.0)
           of 1: lra = parseFloatInRange(val, 1.0, 50.0)
@@ -149,22 +139,14 @@ proc parseNorm*(norm: string): Norm =
           of 3: gain = parseFloatInRange(val, -99.0, 99.0)
           else: error "Too many args"
 
-          if not isKey:
-            argPos += 1
-
         return Norm(kind: nkEbu, i: i, lra: lra, tp: tp, gain: gain)
       of "peak":
         let argOrder = @["t"]
         var t: float32 = -8.0
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
+        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder):
           case argPos:
           of 0: t = parseFloatInRange(val, -99.0, 0.0)
           else: error "Too many args"
-
-          if not isKey:
-            argPos += 1
 
         return Norm(kind: nkPeak, t: t)
       else:
@@ -241,8 +223,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       stream: int16 = 0
       width: int32 = 400
       blur: int32 = 9
-      isKey = false
-      argPos = 0
 
     if node[0].kind == ExprNum:
       case text[node[0].`from` ..< node[0].to]:
@@ -276,19 +256,13 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       of "audio":
         stream = -1 # Set to "all" by default
         var channel = "all"
-        let argOrder = argOrderOf("audio")
-
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
+        for (argPos, val) in checkedMethodArgs(
+            "audio", node[1 ..< node.len], text):
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = parseStream(val)
           of 2: channel = val
           else: error "Too many args"
-
-          if not isKey:
-            argPos += 1
 
         if channel != "all" and audioChannelCode(channel) == "":
           error &"audio: unknown channel '{channel}'."
@@ -324,11 +298,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           y: float32 = 0.0
           w: float32 = 1.0
           h: float32 = 1.0
-        let argOrder = argOrderOf("motion")
-
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
+        for (argPos, val) in checkedMethodArgs(
+            "motion", node[1 ..< node.len], text):
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = parseStream(val)
@@ -340,9 +311,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           of 7: h = parseFloatInRange(val, 0.0, 1.0)
           else: error "Too many args"
 
-          if not isKey:
-            argPos += 1
-
         if stream < 0:
           error "motion: 'all' stream is not supported"
         let rect = packUnorm24x4(x, y, w, h)
@@ -352,31 +320,24 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       of "blackdetect":
         threshold = defaultBlackThres
         var pixelBlack: float32 = 0.10
-        let argOrder = argOrderOf("blackdetect")
-
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
+        for (argPos, val) in checkedMethodArgs(
+            "blackdetect", node[1 ..< node.len], text):
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = parseStream(val)
           of 2: pixelBlack = parseFloatInRange(val, 0.0, 1.0)
           else: error "Too many args"
 
-          if not isKey:
-            argPos += 1
-
         if stream < 0:
           error "blackdetect: 'all' stream is not supported"
         result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
       of "subtitle", "regex":
-        let argOrder = argOrderOf("subtitle")
         var pattern = ""
         var flags = {reUtf8}
 
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+        for (argPos, val) in checkedMethodArgs(
+            "subtitle", node[1 ..< node.len], text):
           case argPos:
           of 0: pattern = val
           of 1: stream = parseStream(val)
@@ -384,9 +345,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
             if parseBool(val):
               flags.incl reIgnoreCase
           else: error "Too many args"
-
-          if not isKey:
-            argPos += 1
 
         if stream < 0:
           error "subtitle: 'all' stream is not supported"
@@ -404,21 +362,17 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           return val2
         return val
       of "word":
-        let argOrder = argOrderOf("word")
         var pattern = ""
         var ignoreCase = true
         var flags: set[ReFlag]
 
-        for expr in node[1 ..< node.len]:
-          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+        for (argPos, val) in checkedMethodArgs(
+            "word", node[1 ..< node.len], text):
           case argPos:
           of 0: pattern = escapeRe(val)
           of 1: stream = parseStream(val)
           of 2: ignoreCase = parseBool(val)
           else: error "Too many args"
-
-          if not isKey:
-            argPos += 1
 
         if pattern == "":
           error "word: value required"
