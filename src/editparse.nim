@@ -7,7 +7,7 @@ type
     args*: seq[BoundEditArg]
 
 func isSymbol(expr: Expr, name, text: string): bool =
-  expr.kind == ExprSym and name == text[expr.`from` ..< expr.to]
+  expr.symbolEquals(text, name)
 
 proc bindEditArgs*(expressions: openArray[Expr], text: string,
     argOrder: openArray[string]): seq[BoundEditArg] =
@@ -25,20 +25,24 @@ proc bindEditArgs*(expressions: openArray[Expr], text: string,
     if expr.kind == ExprList and expr.elements.len > 0 and
         expr.elements[0].isSymbol("=", text):
       let node = expr.elements
-      let key = text[node[1].`from` ..< node[1].to]
       sawKeyword = true
-      position = argOrder.find(key)
+      position = -1
+      for i, name in argOrder:
+        if node[1].symbolEquals(text, name):
+          position = i
+          break
       if position == -1:
+        let key = node[1].atomText(text)
         raise newException(ValueError,
           "got an unexpected keyword argument: " & key)
-      value = text[node[2].`from` ..< node[2].to]
+      value = node[2].atomText(text)
     else:
       if sawKeyword:
         raise newException(ValueError,
           "Positional arguments must never come after keyword arguments")
       if position >= argOrder.len:
         raise newException(ValueError, "Too many args")
-      value = text[expr.`from` ..< expr.to]
+      value = expr.atomText(text)
       positional += 1
 
     result.add((position, value))
@@ -65,8 +69,8 @@ proc parseSingleEditMethod*(filename, source: string): ParsedEditMethod =
       expr.elements[0].kind != ExprSym:
     raise newException(ValueError, "expected one editing method")
 
-  let text = parser.lexer.text # mutated buffer: quoted escapes are decoded
-  result.name = text[expr.elements[0].`from` ..< expr.elements[0].to]
+  let text = parser.lexer.sourceText
+  result.name = expr.elements[0].atomText(text)
   if isEditOperator(result.name):
     raise newException(ValueError,
       "expected one editing method, got operator '" & result.name & "'")

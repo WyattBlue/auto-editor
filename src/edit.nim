@@ -1,9 +1,39 @@
 import std/[math, options, os, sequtils, strformat, strutils]
-import ./[av, editlexer, editmethods, editparse, ffmpeg, log]
+import ./[av, editlexer, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre
+
+type
+  NormSymbol = enum
+    nsUnknown, nsEbu, nsPeak
+
+  EditSymbol = enum
+    esUnknown, esZero, esOne, esOr, esAnd, esXor, esNot, esAudio, esMotion,
+    esBlackdetect, esSubtitle, esRegex, esWord, esNone, esAll
+
+func normSymbol(expr: Expr, text: string): NormSymbol =
+  if expr.symbolEquals(text, "ebu"): nsEbu
+  elif expr.symbolEquals(text, "peak"): nsPeak
+  else: nsUnknown
+
+func editSymbol(expr: Expr, text: string): EditSymbol =
+  if expr.numberEquals(text, "0"): esZero
+  elif expr.numberEquals(text, "1"): esOne
+  elif expr.symbolEquals(text, "or"): esOr
+  elif expr.symbolEquals(text, "and"): esAnd
+  elif expr.symbolEquals(text, "xor"): esXor
+  elif expr.symbolEquals(text, "not"): esNot
+  elif expr.symbolEquals(text, "audio"): esAudio
+  elif expr.symbolEquals(text, "motion"): esMotion
+  elif expr.symbolEquals(text, "blackdetect"): esBlackdetect
+  elif expr.symbolEquals(text, "subtitle"): esSubtitle
+  elif expr.symbolEquals(text, "regex"): esRegex
+  elif expr.symbolEquals(text, "word"): esWord
+  elif expr.symbolEquals(text, "none"): esNone
+  elif expr.symbolEquals(text, "all"): esAll
+  else: esUnknown
 
 func `or`(a, b: seq[bool]): seq[bool] =
   result = newSeq[bool](max(a.len, b.len))
@@ -123,8 +153,8 @@ proc parseNorm*(norm: string): Norm =
       return normEval(node[0], text)
 
     if node[0].kind == ExprSym:
-      case text[node[0].`from` ..< node[0].to]:
-      of "ebu":
+      case node[0].normSymbol(text)
+      of nsEbu:
         let argOrder = @["i", "lra", "tp", "gain"]
         var
           i: float32 = -24.0
@@ -140,7 +170,7 @@ proc parseNorm*(norm: string): Norm =
           else: error "Too many args"
 
         return Norm(kind: nkEbu, i: i, lra: lra, tp: tp, gain: gain)
-      of "peak":
+      of nsPeak:
         let argOrder = @["t"]
         var t: float32 = -8.0
         for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder):
@@ -149,12 +179,12 @@ proc parseNorm*(norm: string): Norm =
           else: error "Too many args"
 
         return Norm(kind: nkPeak, t: t)
-      else:
+      of nsUnknown:
         error &"Unknown audio norm: {text[node[0].`from` ..< node[0].to]}"
     else:
       error "Invalid audio norm expression."
 
-  return normEval(expr, parser.lexer.text) # mutated buffer: escapes unescaped
+  return normEval(expr, parser.lexer.sourceText)
 
 proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
   try:
@@ -188,17 +218,16 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
       if e.elements.len == 0:
         return
       let head = e.elements[0]
-      if head.kind == ExprSym and isEditOperator(edit[head.`from` ..< head.to]):
+      if head.editSymbol(edit) in {esOr, esAnd, esXor, esNot}:
         for i in 1 ..< e.elements.len:
           walk(e.elements[i])
       else:
         walk(head)
     elif e.kind == ExprSym:
-      for m in editMediaOf(edit[e.`from` ..< e.to]):
-        case m
-        of emVideo: video = true
-        of emAudio: audio = true
-        of emSubtitle: discard # analyzed from the subtitle stream, not v/a frames
+      case e.editSymbol(edit)
+      of esAudio: audio = true
+      of esMotion, esBlackdetect: video = true
+      else: discard # Subtitle methods do not consume video/audio frames.
 
   walk(expressions[^1])
   return (video, audio)
@@ -225,10 +254,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       blur: int32 = 9
 
     if node[0].kind == ExprNum:
-      case text[node[0].`from` ..< node[0].to]:
-      of "0":
+      case node[0].editSymbol(text)
+      of esZero:
         return @[]
-      of "1":
+      of esOne:
         let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int
 
@@ -236,24 +265,24 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
       else:
         error "We only support 0 or 1 right now."
     elif node[0].kind == ExprSym:
-      case text[node[0].`from` ..< node[0].to]:
-      of "or":
+      case node[0].editSymbol(text)
+      of esOr:
         result = editEval(node[1], text)
         for i in 2 ..< node.len:
           result = result or editEval(node[i], text)
-      of "and":
+      of esAnd:
         result = editEval(node[1], text)
         for i in 2 ..< node.len:
           result = result and editEval(node[i], text)
-      of "xor":
+      of esXor:
         result = editEval(node[1], text)
         for i in 2 ..< node.len:
           result = result xor editEval(node[i], text)
-      of "not":
+      of esNot:
         if node.len != 2:
           error "Wrong arity"
         return not editEval(node[1], text)
-      of "audio":
+      of esAudio:
         stream = -1 # Set to "all" by default
         var channel = "all"
         for (argPos, val) in checkedMethodArgs(
@@ -291,7 +320,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           result.orWithThreshold(
             audio(bar, container, input, tb, stream, channelIndex), threshold)
         return result
-      of "motion":
+      of esMotion:
         threshold = defaultMotionThres
         var
           x: float32 = 0.0
@@ -317,7 +346,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
         result.orWithThreshold(
           motion(bar, container, input, tb, stream, width, blur, rect), threshold)
         return result
-      of "blackdetect":
+      of esBlackdetect:
         threshold = defaultBlackThres
         var pixelBlack: float32 = 0.10
         for (argPos, val) in checkedMethodArgs(
@@ -332,7 +361,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           error "blackdetect: 'all' stream is not supported"
         result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
-      of "subtitle", "regex":
+      of esSubtitle, esRegex:
         var pattern = ""
         var flags = {reUtf8}
 
@@ -361,7 +390,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
             error &"regex: subtitle stream '{ret2}' does not exist."
           return val2
         return val
-      of "word":
+      of esWord:
         var pattern = ""
         var ignoreCase = true
         var flags: set[ReFlag]
@@ -396,17 +425,17 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
             error &"word: subtitle stream '{ret2}' does not exist."
           return val2
         return val
-      of "none":
+      of esNone:
         let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int
 
         return newSeqWith(tbLength, true)
-      of "all":
+      of esAll:
         return @[]
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      error &"`--edit` expects a valid expression: {text[node[0].`from` ..< node[0].to]}"
+      error &"`--edit` expects a valid expression: {node[0].atomText(text)}"
 
   proc evalEditString(editStr: string): seq[bool] =
     var lexer = initLexer("--edit", editStr)
@@ -422,7 +451,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
     let expr = expressions[^1]
     if expr.kind != ExprList:
       error "Should never happen"
-    return editEval(expr, parser.lexer.text) # mutated buffer: escapes unescaped
+    return editEval(expr, parser.lexer.sourceText)
 
   # Label 1: the default `--edit` method. Maps the boolean mask onto 0/1.
   let base = evalEditString(args.edit)
