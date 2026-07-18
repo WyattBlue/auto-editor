@@ -7,8 +7,7 @@ type
     to: uint32
     case kind: TokenKind
     of Str:
-      decoded: bool
-      strVal: string
+      hasEscapes: bool
     else:
       discard
 
@@ -91,30 +90,18 @@ proc getNextToken(self: var Lexer): Token =
     if self.`char` == '"':
       self.advance()
       let `from` = self.pos
-      var
-        decoded = false
-        value: string
+      var hasEscapes = false
       while self.`char` != '\0' and self.`char` != '"':
         if self.`char` == '\\' and self.pos + 1 < uint32(self.text.len):
-          if not decoded:
-            decoded = true
-            value = newStringOfCap(int(self.pos - `from`) + 16)
-            for i in `from` ..< self.pos:
-              value.add(self.text[i])
+          hasEscapes = true
           self.advance()
-          case self.`char`
-          of 'n': value.add('\n')
-          of 't': value.add('\t')
-          else: value.add(self.`char`) # \" \\ and others: literal
-        elif decoded:
-          value.add(self.`char`)
         self.advance()
       if self.`char` != '"':
         raise newException(ValueError, "Unterminated string literal")
       let `to` = self.pos
       self.advance()
-      return Token(kind: Str, `from`: `from`, to: `to`, decoded: decoded,
-        strVal: value)
+      return Token(kind: Str, `from`: `from`, to: `to`,
+        hasEscapes: hasEscapes)
 
     if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 <
         uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
@@ -169,6 +156,20 @@ func numberEquals*(expr: Expr, text, expected: string): bool =
   ## Compare a numeric atom without allocating a source slice.
   expr.kind == ExprNum and text.spanEquals(expr.`from`, expr.to, expected)
 
+func decodeString(text: string, `from`, to: uint32): string =
+  result = newStringOfCap(int(to - `from`))
+  var pos = `from`
+  while pos < to:
+    if text[pos] == '\\' and pos + 1 < to:
+      pos += 1
+      case text[pos]
+      of 'n': result.add('\n')
+      of 't': result.add('\t')
+      else: result.add(text[pos]) # \" \\ and others: literal
+    else:
+      result.add(text[pos])
+    pos += 1
+
 # Forward declaration
 proc expr(self: var Parser): Expr
 
@@ -200,7 +201,11 @@ proc expr(self: var Parser): Expr =
     return Expr(kind: ExprNum, `from`: token.`from`, to: token.to)
   of Str:
     self.eat()
-    return Expr(kind: ExprStr, decoded: token.decoded, strVal: token.strVal,
+    let value = if token.hasEscapes:
+      self.lexer.text.decodeString(token.`from`, token.to)
+    else:
+      ""
+    return Expr(kind: ExprStr, decoded: token.hasEscapes, strVal: value,
       `from`: token.`from`, to: token.to)
   of Sym:
     let symExpr = Expr(kind: ExprSym, `from`: token.`from`, to: token.to)
