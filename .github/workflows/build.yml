@@ -41,6 +41,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: fan
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
