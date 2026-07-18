@@ -1,4 +1,4 @@
-# 31.3.1
+# 31.3.2
 
 ## Major
  -
@@ -11,3 +11,4 @@
 
 ## Fixes
  - Fix dynamic linking not linking parakeet.
+ - Fix `levels` not allowing selecting specific audio channels.
