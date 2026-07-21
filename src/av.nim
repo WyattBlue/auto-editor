@@ -1,7 +1,7 @@
-import std/[strformat, strutils, sequtils, tables, sets]
+import std/[strformat, strutils, sequtils, tables]
 
 import ./[ffmpeg, log]
-import ./util/[dict, lang, rational]
+import ./util/[lang, rational]
 
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
@@ -235,11 +235,24 @@ proc getContainer*(cache: MediaCache, src: ptr string): InputContainer =
     )
   return cache.cns[src]
 
+const MaxOutputOptions = 2 # makeMedia sets at most frag_duration and movflags.
+
+type OutputOptions* = object
+  ## Small, inline option storage used while configuring the output muxer.
+  items: array[MaxOutputOptions, tuple[key, value: string]]
+  len: int
+
+proc add*(options: var OutputOptions, key, value: string) =
+  if options.len >= options.items.len:
+    error "Too many output muxer options"
+  options.items[options.len] = (key, value)
+  inc options.len
+
 type OutputContainer* = object
   file: string
   streams: seq[ptr AVStream] = @[]
   video*: seq[ptr AVStream] = @[]
-  options*: Table[string, string]
+  options*: OutputOptions
   formatCtx*: ptr AVFormatContext
   packet: ptr AVPacket
   started: bool = false
@@ -379,27 +392,20 @@ proc startEncoding*(self: var OutputContainer) =
       pb.min_packet_size = 0
 
   let options: ptr AVDictionary = nil
-  dictToAvdict(addr options, self.options)
+  for i in 0..<self.options.len:
+    let option = self.options.items[i]
+    discard av_dict_set(addr options, option.key.cstring, option.value.cstring, 0)
 
   var ret = avformat_write_header(outputCtx, addr options)
   if ret < 0:
     error &"Write header: {av_err2str(ret)}"
 
-  let remainOptions = avdict_to_dict(options)
-  var usedOptions: HashSet[string]
-  for k, v in self.options:
-    if k notin remainOptions:
-      usedOptions.incl k
+  for i in 0..<self.options.len:
+    let option = self.options.items[i]
+    if av_dict_get(options, option.key.cstring, nil, 0) != nil:
+      debug &"Option wasn't used: {option.key}={option.value}"
 
   av_dict_free(addr options)
-
-  var unusedOptions = initTable[string, string]()
-  for k, v in self.options:
-    if k notin usedOptions:
-      unusedOptions[k] = v
-
-  if unusedOptions.len > 0:
-    debug &"Some options weren't used: {unusedOptions}"
 
 proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders

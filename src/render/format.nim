@@ -1,4 +1,4 @@
-import std/[heapqueue, options, strformat, strutils, tables]
+import std/[heapqueue, options, strformat, strutils]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline, throttle]
@@ -90,17 +90,14 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     cache: MediaCache = nil) =
   var renderTl = tl.bakeTransitions()
   var throttle = initThrottle()
-  var options: Table[string, string]
-  var movFlags: seq[string] = @[]
+  var options: OutputOptions
   if args.fragmented and not args.noFragmented:
-    movFlags &= @["empty_moov", "default_base_moof", "frag_keyframe", "separate_moof"]
-    options["frag_duration"] = "0.2"
+    options.add("frag_duration", "0.2")
+    options.add("movflags", "empty_moov+default_base_moof+frag_keyframe+separate_moof")
     if args.faststart:
       warning "Fragmented is enabled, will not apply faststart."
   elif not args.noFaststart:
-    movFlags.add "faststart"
-  if movFlags.len > 0:
-    options["movflags"] = movFlags.join("+")
+    options.add("movflags", "faststart")
 
   var output = openWrite(outputPath)
   output.options = options
