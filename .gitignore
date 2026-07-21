@@ -1,4 +1,9 @@
 /auto-editor
+/tools/auto-editor.exe
+/tools/ffmpeg.exe
+/tools/gh/
+/demo/
+/outputs/
 build*
 ffmpeg_sources
 tests

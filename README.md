@@ -111,6 +111,60 @@ auto-editor --help
  - [Docs](https://auto-editor.com/docs)
  - [Blog](https://basswood.io/blog/)
 
+## One-command 9:16 short pipeline
+
+This repository includes a small PowerShell wrapper that removes silence, renders the result on a 720x1280 canvas, and writes a short Markdown report:
+
+```powershell
+.\shorts.cmd .\example.mp4
+```
+
+Outputs are written to `outputs/`. The wrapper uses `tools/auto-editor.exe`, keeps all paths inside the repository, and disables Auto-Editor's cache. Tune the cut with `-Threshold` and `-Margin` when needed.
+
+## SmartCut Compare
+
+Render Conservative, Balanced, and Aggressive 9:16 edits of the same source, plus per-version reports, a side-by-side preview, a JSON summary, and an automatic best-preset recommendation:
+
+```powershell
+.\smartcut-compare.cmd .\example.mp4
+```
+
+The preview is ordered left-to-right as Conservative, Balanced, and Aggressive. Green, blue, and red top markers identify the three versions; shorter edits hold on their final frame. All generated files stay under `outputs/`, and media-analysis caching is disabled.
+
+### Real talking-head demo
+
+The included local demo uses a short NASA interview with real English speech and natural pauses. Run the complete comparison with one command:
+
+```powershell
+.\smartcut-compare.cmd .\demo\smartcut-demo-original.mp4 -OutputDirectory .\outputs\smartcut-demo
+```
+
+Source and license:
+
+- **Title:** *Interview with Antti Pulkkinen 3*
+- **Author:** NASA/Goddard Space Flight Center
+- **Source:** [Wikimedia Commons file page](https://commons.wikimedia.org/wiki/File:Interview_with_Antti_Pulkkinen_3.ogv) ([original media download](https://commons.wikimedia.org/wiki/Special:Redirect/file/Interview_with_Antti_Pulkkinen_3.ogv))
+- **License:** U.S. public domain because the file was solely created by NASA. The Commons page notes that NASA logos and insignia have separate legal restrictions.
+- **Local files:** `demo/commons-antti-pulkkinen-original.ogv` is the downloaded source; `demo/smartcut-demo-original.mp4` is a 28.4-second H.264/AAC presentation derivative with normalized speech audio.
+
+Verification performed on the local files:
+
+- The Commons source contains 1280x720 Theora video and a 48 kHz stereo Vorbis audio stream.
+- Local speech recognition recovered a coherent English explanation of the event's expected technological and auroral effects.
+- FFmpeg silence detection at -30 dB found 30 natural pauses of at least 0.18 seconds; the longest was 1.228 seconds.
+
+Latest verified demo result:
+
+| Version | Score | Final | Removed | Cuts/min | Avg. segment | Under 1s | Speech retained |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Conservative | 70.0 | 27.776s | 0.624s | 2.11 | 27.761s | 0 | 24.034s |
+| **Balanced** | **75.2** | 27.370s | 1.030s | 2.11 | 27.361s | 0 | 24.019s |
+| Aggressive | 66.0 | 25.600s | 2.800s | 16.90 | 3.199s | 0 | 23.184s |
+
+**Recommendation: Balanced.** It removes more time than Conservative while keeping the same cut density, no very short segments, and nearly identical detected speech. Aggressive saves the most time but creates substantially more cuts and much shorter retained segments.
+
+Scoring is deterministic and relative to the three outputs: 30% duration removal, 20% lower cut density, 15% longer average segments, 15% fewer segments under one second, and 20% retained speech. Speech duration uses FFmpeg silence detection at -30 dB with a 0.05-second minimum silence. The full component scores, thresholds, weights, explanation, and tie-break order are stored in the JSON report.
+
 ## Run Online and as an Application
 You can [run auto-editor online](https://app.auto-editor.com/online) or [download the application](https://app.auto-editor.com/download). They use assets from this repository (Unlicense); their own unique assets are under a separate proprietary license.
 
