@@ -3,11 +3,11 @@ title: Installing Auto-Editor
 ---
 
 ## Method 1 (Recommended)
-Get the official binary, available on Windows, MacOS, and Linux.
+Get the official binary, available on Windows, macOS, and Linux.
 
  1. Go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform.
  2. Rename the binary to auto-editor (or auto-editor.exe for Windows).
- 3. `cd` into your downloads folder. If on MacOS/Linux, run `chmod +x ./auto-editor` first.
+ 3. `cd` into your downloads folder. If on macOS/Linux, run `chmod +x ./auto-editor` first.
  4. Run Auto-Editor in the terminal. Because the binaries are unsigned, you may get "Unknown developer" warnings. Ignore them.
 
 Congratulations, auto-editor should now be installed. To verify auto-editor is installed, run:
@@ -19,7 +19,7 @@ Congratulations, auto-editor should now be installed. To verify auto-editor is i
 It's recommended to place the binary in a PATH directory so that `auto-editor` is always available no matter your current working directory.
 
 ## Method 2: Platform Installers
-If you're on MacOS, use [Homebrew](https://brew.sh):
+If you're on macOS, use [Homebrew](https://brew.sh):
 ```sh
 brew install auto-editor
 ```
