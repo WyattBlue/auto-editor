@@ -4,7 +4,7 @@
  -
 
 ## Features
- -
+ - Add the `preview-worker` command, a resident NDJSON controller for playhead-driven proxy renders, cancellation, and progress events.
 
 ## Performance
  - Copy complete H.264 or VP9 GOPs without re-encoding when rendering compatible

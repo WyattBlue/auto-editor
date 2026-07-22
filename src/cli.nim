@@ -255,9 +255,11 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
 
 type CmdDef* = object
   name*: string
+  handler*: string
   help*: string
   opts*: seq[OptDef]
   files*: bool = true # Whether shell completion should offer filenames.
+  requiresArgs*: bool = true
 
 const commands*: seq[CmdDef] = @[
   CmdDef(name: "cache", help: "", opts: cacheOptions, files: false),
@@ -268,7 +270,12 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface", opts: waveformOptions),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]", opts: whisperOptions),
 ] & (
-  when defined(emscripten): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells", opts: completionOptions, files: false)]
+  when defined(emscripten): @[] else: @[
+    CmdDef(name: "completion", help: "Generate completions for shells", opts: completionOptions, files: false),
+    CmdDef(name: "preview-worker", handler: "preview_worker",
+      help: "Run the resident preview rendering worker", opts: @[], files: false,
+      requiresArgs: false),
+  ]
 )
 
 func optionNames*(opts: seq[OptDef]): seq[string] =
@@ -356,13 +363,14 @@ macro genCmdCases*(keyIdent: untyped): untyped =
       newCall(ident("commandLineParams")),
       sliceExpr
     )
+    let handlerName = if cmd.handler == "": cmd.name else: cmd.handler
     let handlerCall = newCall(
-      newDotExpr(ident(cmd.name), ident("main")),
+      newDotExpr(ident(handlerName), ident("main")),
       argsExpr
     )
 
     var stmtList = newStmtList()
-    if cmd.help != "":
+    if cmd.help != "" and cmd.requiresArgs:
       # if paramCount() < 2: echo help else: handler(args)
       stmtList.add(newNimNode(nnkIfStmt).add(
         newNimNode(nnkElifBranch).add(

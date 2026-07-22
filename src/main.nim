@@ -12,6 +12,8 @@ when not defined(windows) and not defined(emscripten):
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
+when not defined(emscripten):
+  import cmds/preview_worker
 import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
