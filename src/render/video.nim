@@ -375,7 +375,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   var targetWidth = tl.res[0]
   var targetHeight = tl.res[1]
-  var scaleGraph: Graph = nil
   var fxGraph: Graph = nil
   var fxKey: GraphKey
   var rotGraph: Graph = nil  # static source rotation, applied before the fit
@@ -532,7 +531,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       if dst != nil:
         copyMem(dst.data, sd.data, sd.size)
 
-  let pixFmtName = $pix_fmt
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
 
@@ -541,15 +539,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## graph is actually (re)configured, never on the per-frame reuse path.
     &"video_size={frame.width}x{frame.height}:pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1"
 
+  # Scaling has stable input/output geometry, so keep one libswscale
+  # context instead of sending every frame through a filter graph.
+  var scaleCtx: ptr SwsContext = nil
   if needsScaling:
-    let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-
-    scaleGraph = newGraph()
-    let bufferSrc = scaleGraph.add("buffer", bufferArgs)
-    let scaleFilter = scaleGraph.add("scale", &"{targetWidth}:{targetHeight}")
-    let bufferSink = scaleGraph.add("buffersink")
-
-    scaleGraph.linkNodes(@[bufferSrc, scaleFilter, bufferSink]).configure()
+    scaleCtx = sws_alloc_context()
+    if scaleCtx == nil:
+      error "Failed to allocate proxy scale sws context"
+    discard av_opt_set_int(scaleCtx, "threads", 0, 0)
 
   # Create a persistent sws context for the per-frame pixel format conversion.
   # Reusing it avoids the per-frame alloc/init overhead of the new sws API.
@@ -1281,6 +1278,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     frame.duration = 1
     result = frame
 
+  proc scaleProxyFrame(f: ptr AVFrame): ptr AVFrame =
+    if scaleCtx == nil or f == nil or
+        (f.width == targetWidth and f.height == targetHeight):
+      return f
+    f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
+
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     for index in 0 ..< tl.len:
       objList = @[]
@@ -1371,10 +1374,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           av_frame_free(addr top)
           acc = newAcc
 
-        if scaleGraph != nil and acc.width != targetWidth:
-          scaleGraph.push(acc)
+        let scaledAcc = scaleProxyFrame(acc)
+        if scaledAcc != acc:
           av_frame_free(addr acc)
-          acc = scaleGraph.pull()
+          acc = scaledAcc
 
         frame = finalizeFrame(acc, index)
         av_frame_free(addr lastProcessedFrame)
@@ -1419,10 +1422,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # the last frame for RGB8 palette persistence) and drop the fallback.
           av_frame_free(addr decoded)
 
-      if scaleGraph != nil and frame.width != targetWidth:
-        scaleGraph.push(frame)
+      let scaledFrame = scaleProxyFrame(frame)
+      if scaledFrame != frame:
         av_frame_free(addr frame)
-        frame = scaleGraph.pull()
+        frame = scaledFrame
 
       # Cache the pre-effects frame: effects are per-timeline-frame (animated
       # via `local`) and would compound when a source frame repeats.
@@ -1438,14 +1441,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       yield (frame, index)
 
-    if scaleGraph != nil:
-      scaleGraph.cleanup()
     if fxGraph != nil:
       fxGraph.cleanup()
     if rotGraph != nil:
       rotGraph.cleanup()
     if maskMatte != nil: av_frame_free(addr maskMatte)
     if confineMatte != nil: av_frame_free(addr confineMatte)
+    sws_free_context(addr scaleCtx)
     sws_free_context(addr reformatCtx)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
