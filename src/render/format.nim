@@ -5,6 +5,7 @@ import ../[av, ffmpeg, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
 import video
 import h264
+import vp9
 import audio
 import subtitle
 
@@ -134,16 +135,23 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     return
   var videoPacketIter: iterator(): (ptr AVPacket, int64) = iterator(): (ptr AVPacket, int64) =
     return
-  var partialLosslessH264 = false
+  var partialLosslessVideo = false
 
   if includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0:
     let h264Plan = output.partialLosslessH264Plan(renderTl, args)
-    partialLosslessH264 = h264Plan.len > 0
-    if partialLosslessH264:
+    if h264Plan.len > 0:
+      partialLosslessVideo = true
       (vOutStream, videoPacketIter) = makePartialLosslessH264(
         output, renderTl, args, h264Plan)
     else:
-      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, renderTl, args, cache)
+      let vp9Plan = output.partialLosslessVp9Plan(renderTl, args)
+      if vp9Plan.len > 0:
+        partialLosslessVideo = true
+        (vOutStream, videoPacketIter) = makePartialLosslessVp9(
+          output, renderTl, args, vp9Plan)
+      else:
+        (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(
+          output, renderTl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
@@ -361,7 +369,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
         shouldGetAudio[i] = (latestAudioIndices[i] <= float(earliestVideoIndex.get() +
             MAX_AUDIO_AHEAD))
 
-    if partialLosslessH264:
+    if partialLosslessVideo:
       videoFrame = nil
       if finished(videoPacketIter):
         videoPacket = nil

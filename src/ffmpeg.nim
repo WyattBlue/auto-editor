@@ -646,6 +646,7 @@ const
   ID_PNG* = AVCodecID(61)
   ID_BMP* = AVCodecID(78)
   ID_TIFF* = AVCodecID(96)
+  ID_VP9* = AVCodecID(167)
   ID_WEBP* = AVCodecID(171)
   ID_HEVC* = AVCodecID(173)
   ID_AV1* = AVCodecID(225)

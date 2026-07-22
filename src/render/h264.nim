@@ -3,17 +3,16 @@ from std/math import round
 
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/rational
+import smart
 
 type
-  H264SpanKind* = enum
-    hsEncode, hsCopy
-  H264Span* = object
-    kind*: H264SpanKind
-    srcStart*, srcEnd*: int64
-    outStart*: int64
-  H264PlanStats* = object
-    copiedFrames*, encodedFrames*: int64
-    copySpans*, encodeSpans*, encodeRuns*: int
+  H264SpanKind* = SmartSpanKind
+  H264Span* = SmartSpan
+  H264PlanStats* = SmartPlanStats
+
+const
+  hsEncode* = ssEncode
+  hsCopy* = ssCopy
 
 func startCodeLen(data: ptr UncheckedArray[uint8], size, pos: int): int =
   if pos + 3 <= size and data[pos] == 0 and data[pos + 1] == 0:
@@ -170,83 +169,16 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
       inc write
   result.keyframes.setLen(write)
 
-func addSpan(spans: var seq[H264Span], kind: H264SpanKind,
-    srcStart, srcEnd, outStart: int64) =
-  if srcEnd <= srcStart:
-    return
-  if spans.len > 0:
-    let prev = spans[^1]
-    let prevLen = prev.srcEnd - prev.srcStart
-    if prev.kind == kind and prev.srcEnd == srcStart and
-        prev.outStart + prevLen == outStart:
-      spans[^1].srcEnd = srcEnd
-      return
-  spans.add H264Span(kind: kind, srcStart: srcStart, srcEnd: srcEnd,
-    outStart: outStart)
-
 func h264RenderPlan*(clips: openArray[Clip], keyframes: openArray[int64],
     sourceEnd: int64): seq[H264Span] =
-  ## Copy only complete GOPs. The partial GOPs touching either side of an edit
-  ## are re-encoded so the output still begins and ends on the requested frame.
-  for clip in clips:
-    let clipSrcEnd = clip.offset + clip.dur
-    var cursor = clip.offset
-    var i = lowerBound(keyframes, clip.offset)
-    while i < keyframes.len:
-      let keyframe = keyframes[i]
-      if keyframe >= clipSrcEnd:
-        break
-      let gopEnd = if i + 1 < keyframes.len: keyframes[i + 1] else: sourceEnd
-      let finalGopNeedsHold = i + 1 == keyframes.len and clipSrcEnd > sourceEnd
-      if gopEnd > clipSrcEnd or gopEnd <= keyframe or
-          finalGopNeedsHold:
-        inc i
-        continue
-      result.addSpan(hsEncode, cursor, keyframe, clip.start + cursor - clip.offset)
-      result.addSpan(hsCopy, keyframe, gopEnd,
-        clip.start + keyframe - clip.offset)
-      cursor = gopEnd
-      inc i
-    result.addSpan(hsEncode, cursor, clipSrcEnd,
-      clip.start + cursor - clip.offset)
+  return smartRenderPlan(clips, keyframes, sourceEnd)
 
 func h264PlanStats*(spans: openArray[H264Span]): H264PlanStats =
-  var inEncodeRun = false
-  for span in spans:
-    let frames = span.srcEnd - span.srcStart
-    case span.kind
-    of hsCopy:
-      result.copiedFrames += frames
-      inc result.copySpans
-      inEncodeRun = false
-    of hsEncode:
-      result.encodedFrames += frames
-      inc result.encodeSpans
-      if not inEncodeRun:
-        inc result.encodeRuns
-      inEncodeRun = true
-
-func averageGopFrames(keyframes: openArray[int64], sourceEnd: int64): int64 =
-  var frames, count = 0'i64
-  for i, keyframe in keyframes:
-    let gopEnd = if i + 1 < keyframes.len: keyframes[i + 1] else: sourceEnd
-    if gopEnd > keyframe:
-      frames += gopEnd - keyframe
-      inc count
-  if count == 0: return max(sourceEnd, 1)
-  return max(frames div count, 1)
+  return smartPlanStats(spans)
 
 func h264PlanIsWorthwhile*(stats: H264PlanStats, timelineFrames,
     sourceFrames, averageGop: int64): bool =
-  ## Estimate work in full-render frame equivalents. Demuxing the source is
-  ## substantially cheaper than decoding and encoding it, while restarting an
-  ## encoder costs about one GOP of useful work. Be conservative: the feature
-  ## is primarily valuable when it can preserve a meaningful amount of video.
-  if stats.copiedFrames <= 0 or timelineFrames <= 0:
-    return false
-  let scanCost = max(sourceFrames, 0) div 32
-  let restartCost = int64(stats.encodeRuns) * max(averageGop, 1)
-  return stats.encodedFrames + scanCost + restartCost < timelineFrames
+  return smartPlanIsWorthwhile(stats, timelineFrames, sourceFrames, averageGop)
 
 proc partialLosslessH264Plan*(output: OutputContainer, tl: v3,
     args: mainArgs): seq[H264Span] =
@@ -259,7 +191,9 @@ proc partialLosslessH264Plan*(output: OutputContainer, tl: v3,
       args.videoBitrate >= 0:
     return @[]
   let formatName = $output.formatCtx.oformat.name
-  if "mp4" notin formatName and "mov" notin formatName:
+  let isIsoBmff = "mp4" in formatName or "mov" in formatName
+  let isMatroska = "matroska" in formatName
+  if not isIsoBmff and not isMatroska:
     return @[]
   if tl.v.len != 1 or tl.v[0].len == 0:
     return @[]
@@ -350,9 +284,10 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
   outputStream.avg_frame_rate = tl.tb
   outputStream.duration = av_rescale_q(tl.len, av_inv_q(tl.tb),
       outputStream.time_base)
-  # avc3 explicitly permits SPS/PPS updates in media samples at smart-render
-  # boundaries, unlike avc1 which assumes the sample description never changes.
-  outputStream.codecpar.codec_tag = fourccToInt("avc3")
+  if "matroska" notin $output.formatCtx.oformat.name:
+    # avc3 explicitly permits SPS/PPS updates in media samples at smart-render
+    # boundaries, unlike avc1 which assumes the sample description never changes.
+    outputStream.codecpar.codec_tag = fourccToInt("avc3")
   templateInput.close()
 
   debug &"Using H.264 partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {spans.len} spans and {stats.encodeRuns} encoder runs"
@@ -388,6 +323,7 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
         let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base)
         input.seek(seekTs, stream = stream)
         var first = true
+        var shift = 0'i64
         while av_read_frame(input.formatContext, input.packet) >= 0:
           let packet = input.packet
           if packet.stream_index != stream.index or packet.pts == AV_NOPTS_VALUE:
@@ -408,11 +344,13 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
           let outPacket = av_packet_clone(packet)
           if outPacket == nil:
             error "Could not clone H.264 packet"
-          let sourceBase = av_rescale_q(span.srcStart, frameTb,
-              stream.time_base)
-          let outputBase = av_rescale_q(span.outStart, frameTb,
-              stream.time_base)
-          let shift = outputBase - sourceBase
+          if firstPacket:
+            let outputBase = av_rescale_q(span.outStart, frameTb,
+                stream.time_base)
+            # Matroska can carry a constant sub-frame timestamp offset. Anchor
+            # the GOP to its actual key packet instead of preserving that input
+            # offset between re-encoded and copied regions.
+            shift = outputBase - outPacket.pts
           if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
           if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
           outPacket.time_base = stream.time_base

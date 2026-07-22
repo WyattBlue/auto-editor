@@ -227,7 +227,7 @@ Examples:
     help: "Disable file seeking when rendering video. Helpful for debugging desync issues"),
   OptDef(names: "--no-partial-lossless", c: cVid, kind: Flag,
     datum: "args.noPartialLossless",
-    help: "Disable copying complete H.264 GOPs and re-encode the entire video"),
+    help: "Disable copying complete GOPs and re-encode the entire video"),
 
   OptDef(names: "-c:a, -acodec, --audio-codec", c: cAud, datum: "acodec",
     metavar: "ENCODER", help: "Set audio codec for output media"),
