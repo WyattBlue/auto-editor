@@ -235,16 +235,18 @@ when not defined(emscripten):
 
     # Only reuse an existing download if it already has the streams we need.
     var reusable = false
-    try:
-      let mi = initMediaInfo(location)
-      reusable = (not wantAudio or mi.a.len > 0) and
-                 (not wantVideo or mi.v.len > 0)
-    except IOError:
-      discard
+    if fileExists(location):
+      try:
+        let mi = initMediaInfo(location)
+        reusable = (not wantAudio or mi.a.len > 0) and
+                   (not wantVideo or mi.v.len > 0)
+      except IOError:
+        discard
 
     if not reusable:
-      try: removeFile(location)
-      except OSError: error &"Couldn't remove old download: {location}"
+      if fileExists(location):
+        try: removeFile(location)
+        except OSError: error &"Couldn't remove old download: {location}"
 
       let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
       defer: p.close()
