@@ -285,9 +285,10 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
   outputStream.duration = av_rescale_q(tl.len, av_inv_q(tl.tb),
       outputStream.time_base)
   if "matroska" notin $output.formatCtx.oformat.name:
-    # avc3 explicitly permits SPS/PPS updates in media samples at smart-render
-    # boundaries, unlike avc1 which assumes the sample description never changes.
-    outputStream.codecpar.codec_tag = fourccToInt("avc3")
+    # QuickTime's file player expects the conventional avc1 sample entry. Keep
+    # the boundary SPS/PPS in-band so decoders can still switch between copied
+    # and re-encoded GOPs without changing the track's sample description.
+    outputStream.codecpar.codec_tag = fourccToInt("avc1")
   templateInput.close()
 
   debug &"Using H.264 partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {spans.len} spans and {stats.encodeRuns} encoder runs"
