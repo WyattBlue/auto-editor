@@ -491,6 +491,10 @@ type
 
 # Packets
 proc av_packet_alloc*(): ptr AVPacket {.importc, header: "<libavcodec/packet.h>".}
+proc av_packet_clone*(src: ptr AVPacket): ptr AVPacket {.importc,
+    header: "<libavcodec/packet.h>".}
+proc av_new_packet*(pkt: ptr AVPacket, size: cint): cint {.importc,
+    header: "<libavcodec/packet.h>".}
 proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
@@ -823,6 +827,8 @@ proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
 
 const AVSEEK_FLAG_BACKWARD* = 1
+const AV_PKT_FLAG_KEY* = 0x0001
+const AV_PKT_FLAG_DISCARD* = 0x0004
 
 proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
     flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}

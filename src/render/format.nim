@@ -4,12 +4,14 @@ from std/math import round
 import ../[av, ffmpeg, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
 import video
+import h264
 import audio
 import subtitle
 
 type Priority = object
   index: float64
   frame: ptr AVFrame
+  packet: ptr AVPacket
   stream: ptr AVStream
 
 func `<`(a, b: Priority): bool = a.index < b.index
@@ -130,9 +132,18 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   var vOutStream: ptr AVStream = nil
   var videoFrameIter: iterator(): (ptr AVFrame, int64) = iterator(): (ptr AVFrame, int64) =
     return
+  var videoPacketIter: iterator(): (ptr AVPacket, int64) = iterator(): (ptr AVPacket, int64) =
+    return
+  var partialLosslessH264 = false
 
   if includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0:
-    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, renderTl, args, cache)
+    let h264Plan = output.partialLosslessH264Plan(renderTl, args)
+    partialLosslessH264 = h264Plan.len > 0
+    if partialLosslessH264:
+      (vOutStream, videoPacketIter) = makePartialLosslessH264(
+        output, renderTl, args, h264Plan)
+    else:
+      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, renderTl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
@@ -303,9 +314,12 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   var title = &"({output.formatCtx.oformat.name}) "
   var encoderTitles: seq[string] = @[]
 
-  if vEncCtx != nil:
-    let name = vEncCtx.codec.canonicalName
-    encoderTitles.add (if noColor: name else: &"\e[95m{name}")
+  if vOutStream != nil:
+    let name =
+      if vEncCtx != nil: vEncCtx.codec.canonicalName
+      else: vOutStream.name()
+    if name != "":
+      encoderTitles.add (if noColor: name else: &"\e[95m{name}")
   for aEncCtx in audioEncoders:
     let name = aEncCtx.codec.canonicalName
     encoderTitles.add (if noColor: name else: &"\e[96m{name}")
@@ -331,6 +345,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     latestAudioIndices.add(-Inf)
 
   var videoFrame: ptr AVFrame
+  var videoPacket: ptr AVPacket
   var audioFrames: seq[ptr AVFrame] = newSeq[ptr AVFrame](audioFrameIters.len)
   var index: int64
 
@@ -346,13 +361,26 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
         shouldGetAudio[i] = (latestAudioIndices[i] <= float(earliestVideoIndex.get() +
             MAX_AUDIO_AHEAD))
 
-    if finished(videoFrameIter):
+    if partialLosslessH264:
       videoFrame = nil
+      if finished(videoPacketIter):
+        videoPacket = nil
+      else:
+        (videoPacket, index) = videoPacketIter()
+        if videoPacket != nil:
+          earliestVideoIndex = some(index)
+          frameQueue.push(Priority(index: float(index), packet: videoPacket,
+            stream: vOutStream))
     else:
-      (videoFrame, index) = videoFrameIter()
-      if videoFrame != nil:
-        earliestVideoIndex = some(index)
-        frameQueue.push(Priority(index: float(index), frame: videoFrame, stream: vOutStream))
+      videoPacket = nil
+      if finished(videoFrameIter):
+        videoFrame = nil
+      else:
+        (videoFrame, index) = videoFrameIter()
+        if videoFrame != nil:
+          earliestVideoIndex = some(index)
+          frameQueue.push(Priority(index: float(index), frame: videoFrame,
+            stream: vOutStream))
 
     for i in 0..<audioFrameIters.len:
       if finished(audioFrameIters[i]):
@@ -365,7 +393,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
           index = max(index, audioIndex)
 
     # Break if no more frames
-    var hasFrames = (videoFrame != nil)
+    var hasFrames = videoFrame != nil or videoPacket != nil
     for audioFrame in audioFrames:
       if audioFrame != nil:
         hasFrames = true
@@ -383,6 +411,16 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
       let item = frameQueue.pop()
       let frame = item.frame
       let outputStream = item.stream
+      if item.packet != nil:
+        let packet = item.packet
+        if packet.pts != AV_NOPTS_VALUE:
+          let time = float(packet.pts) * float(packet.time_base)
+          bar.tick(round(time * tl.tb))
+          throttle.checkpoint(time)
+        output.mux(packet[])
+        var ownedPacket = packet
+        av_packet_free(addr ownedPacket)
+        continue
       let frameType = outputStream.codecpar.codec_type
       let encCtx = if frameType == AVMEDIA_TYPE_VIDEO:
         vEncCtx
