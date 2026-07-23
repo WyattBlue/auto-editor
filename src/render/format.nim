@@ -1,7 +1,7 @@
 import std/[heapqueue, options, strformat, strutils]
 from std/math import round
 
-import ../[av, ffmpeg, log, media, timeline, throttle]
+import ../[av, ffmpeg, license, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
 import ./[video, audio, subtitle, h264, hevc, vp9]
 
@@ -85,10 +85,34 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
   error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
-proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
+proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
     cache: MediaCache = nil) =
+  var args = inputArgs
   var renderTl = tl.bakeTransitions()
   var throttle = initThrottle()
+  let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
+  let includeAudio = not args.an and rules.defaultAud != ID_NONE
+  let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
+  let renderVideo = includeVideo and renderTl.v.len > 0 and
+    renderTl.v[0].len > 0
+  if renderVideo:
+    let (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+    if not fitsFreeRenderResolution(width, height):
+      if licenseKeyProvided(args) or (args.scaleSet and args.resolutionSet):
+        requireLicense(args, "render video above 2560x1440")
+      else:
+        var scale = args.scale
+        while scale > 0.25:
+          scale = max(0.25, scale - 0.25)
+          let (scaledWidth, scaledHeight) = scaledVideoResolution(renderTl.res, scale)
+          if fitsFreeRenderResolution(scaledWidth, scaledHeight):
+            warning &"Output resolution {width}x{height} exceeds the unlicensed " &
+              &"limit; using --scale {scale} ({scaledWidth}x{scaledHeight})."
+            args.scale = scale
+            break
+        if args.scale == 1.0:
+          requireLicense(args, "render video above 2560x1440")
+
   var options: OutputOptions
   if args.fragmented and not args.noFragmented:
     options.add("frag_duration", "0.2")
@@ -101,10 +125,6 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
   var output = openWrite(outputPath)
   output.options = options
   output.streaming = args.fragmented and not args.noFragmented
-
-  let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
-  let includeAudio = not args.an and rules.defaultAud != ID_NONE
-  let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
 
   var audCodec = ""
   if includeAudio:
@@ -133,7 +153,7 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
     return
   var partialLosslessVideo = false
 
-  if includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0:
+  if renderVideo:
     let h264Plan = output.partialLosslessH264Plan(renderTl, args)
     if h264Plan.len > 0:
       partialLosslessVideo = true

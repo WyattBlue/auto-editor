@@ -30,6 +30,11 @@ proc inputWorker() {.thread.} =
     var line: string
     while stdin.readLine(line):
       inputChannel.send(line)
+      try:
+        if parseJson(line){"type"}.getStr() == "shutdown":
+          return
+      except CatchableError:
+        discard
   except IOError:
     discard
   inputChannel.send("{\"type\":\"shutdown\"}")
@@ -238,5 +243,6 @@ proc main*(args: seq[string]) =
     if running:
       sleep(5)
 
+  joinThread(inputThread)
   inputChannel.close()
   outputChannel.close()

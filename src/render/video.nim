@@ -318,6 +318,15 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32, bg: RGBColor): ptr 
   av_frame_free(addr scaled)
   return output
 
+func scaledVideoResolution*(resolution: (int32, int32),
+    scale: float64): (int32, int32) =
+  if scale == 1.0:
+    return resolution
+  (
+    max(int32(round(resolution[0].float64 * scale)) and not 1'i32, 2),
+    max(int32(round(resolution[1].float64 * scale)) and not 1'i32, 2),
+  )
+
 proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     cache: MediaCache = nil):
     (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int64)) =
@@ -373,8 +382,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     const imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
     srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or vstream.nb_frames == 1
 
-  var targetWidth = tl.res[0]
-  var targetHeight = tl.res[1]
+  let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, args.scale)
   var fxGraph: Graph = nil
   var fxKey: GraphKey
   var rotGraph: Graph = nil  # static source rotation, applied before the fit
@@ -385,12 +393,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var maskMatteKey: GraphKey
   var confineMatte: ptr AVFrame = nil
   var confineMatteKey: GraphKey
-  var needsScaling = false
-
-  if args.scale != 1.0:
-    targetWidth = max(int32(round(tl.res[0].float64 * args.scale)) and not 1'i32, 2)
-    targetHeight = max(int32(round(tl.res[1].float64 * args.scale)) and not 1'i32, 2)
-    needsScaling = true
+  let needsScaling = args.scale != 1.0
 
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec, targetFps,

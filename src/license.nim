@@ -7,7 +7,14 @@ import vendor/libp2p/ed25519
 const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
 const LICENSE_PERIOD_YEARS = 3
 const LICENSE_EXPIRY_YEARS = 4
+const
+  FREE_RENDER_LONG_SIDE* = 2560'i32
+  FREE_RENDER_SHORT_SIDE* = 1440'i32
 let buildDate = parse(CompileDate, "yyyy-MM-dd")
+
+func fitsFreeRenderResolution*(width, height: int32): bool =
+  max(width, height) <= FREE_RENDER_LONG_SIDE and
+    min(width, height) <= FREE_RENDER_SHORT_SIDE
 
 proc validateKey*(val: string): (bool, string) =
   if val == "":
@@ -90,3 +97,6 @@ proc requireLicense*(args: mainArgs, feature: string) =
     error "License key is in a bad format.\nYou can get a key at https://app.auto-editor.com"
   else:
     error reason
+
+proc licenseKeyProvided*(args: mainArgs): bool =
+  args.licenseKey != "" or getEnv("AE_PRIVATE_LK", "") != ""

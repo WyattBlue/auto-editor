@@ -524,8 +524,10 @@ judge making cuts.
       args.ytDlpExtras = key
     of "scale":
       args.scale = parseNum(key, expecting)
+      args.scaleSet = true
     of "resolution":
       args.resolution = parseResolution(key, expecting)
+      args.resolutionSet = true
     of "background":
       try: args.background = some(parseColor(key))
       except ValueError as e: error e.msg

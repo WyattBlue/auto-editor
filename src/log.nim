@@ -84,6 +84,7 @@ type mainArgs* = object
 
   # Timeline Options
   resolution*: (int32, int32) = (0, 0)
+  resolutionSet*: bool = false
   sampleRate*: cint = -1
   frameRate*: AVRational = AVRational(num: 0, den: 0)
   background*: Option[RGBColor] = none(RGBColor)
@@ -98,6 +99,7 @@ type mainArgs* = object
   videoBitrate*: int = -1
   audioBitrate*: int = -1
   scale*: float = 1.0
+  scaleSet*: bool = false
   crf*: int8 = -1
 
   audioNormalize*: Norm = Norm(kind: nkNull)
