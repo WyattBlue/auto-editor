@@ -172,8 +172,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
         elif ret < 0:
           error &"Error receiving frame from decoder: {av_err2str(ret)}"
 
-        if frame.pts == AV_NOPTS_VALUE:
-          frame.pts = frame.best_effort_timestamp
+        frame.pts = bestPts(frame)
         if frame.pts == AV_NOPTS_VALUE:
           continue
 
@@ -189,8 +188,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
 
   discard avcodec_send_packet(processor.codecCtx, nil)
   while avcodec_receive_frame(processor.codecCtx, frame) >= 0:
-    if frame.pts == AV_NOPTS_VALUE:
-      frame.pts = frame.best_effort_timestamp
+    frame.pts = bestPts(frame)
     if frame.pts == AV_NOPTS_VALUE:
       continue
 

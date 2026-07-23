@@ -358,7 +358,8 @@ iterator peaks*(processor: var AudioProcessor, container: InputContainer,
       spb = round(processor.chunkDuration * float64(
           decodedFrame.sample_rate)).int64
       let tb = audioStream.time_base
-      let pts = (if decodedFrame.pts == AV_NOPTS_VALUE: 0'i64 else: decodedFrame.pts)
+      let ts = bestPts(decodedFrame)
+      let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
       firstSamplePos = (pts * int64(decodedFrame.sample_rate) * int64(
           tb.num)) div int64(tb.den)
 
@@ -407,7 +408,8 @@ iterator channelPeaks*(processor: var AudioProcessor, container: InputContainer,
       spb = round(processor.chunkDuration * float64(
           decodedFrame.sample_rate)).int64
       let tb = audioStream.time_base
-      let pts = (if decodedFrame.pts == AV_NOPTS_VALUE: 0'i64 else: decodedFrame.pts)
+      let ts = bestPts(decodedFrame)
+      let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
       firstSamplePos = (pts * int64(decodedFrame.sample_rate) * int64(
           tb.num)) div int64(tb.den)
 
