@@ -3,11 +3,7 @@ from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
-import video
-import h264
-import vp9
-import audio
-import subtitle
+import ./[video, audio, subtitle, h264, hevc, vp9]
 
 type Priority = object
   index: float64
@@ -144,14 +140,20 @@ proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, ba
       (vOutStream, videoPacketIter) = makePartialLosslessH264(
         output, renderTl, args, h264Plan)
     else:
-      let vp9Plan = output.partialLosslessVp9Plan(renderTl, args)
-      if vp9Plan.len > 0:
+      let hevcPlan = output.partialLosslessHevcPlan(renderTl, args)
+      if hevcPlan.len > 0:
         partialLosslessVideo = true
-        (vOutStream, videoPacketIter) = makePartialLosslessVp9(
-          output, renderTl, args, vp9Plan)
+        (vOutStream, videoPacketIter) = makePartialLosslessHevc(
+          output, renderTl, args, hevcPlan)
       else:
-        (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(
-          output, renderTl, args, cache)
+        let vp9Plan = output.partialLosslessVp9Plan(renderTl, args)
+        if vp9Plan.len > 0:
+          partialLosslessVideo = true
+          (vOutStream, videoPacketIter) = makePartialLosslessVp9(
+            output, renderTl, args, vp9Plan)
+        else:
+          (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(
+            output, renderTl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
