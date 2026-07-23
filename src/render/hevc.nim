@@ -221,8 +221,7 @@ proc partialLosslessHevcPlan*(output: OutputContainer, tl: v3,
   ## Only timing- and pixel-preserving edits qualify. Complete IRAP-delimited
   ## GOPs are copied; partial GOPs at edit boundaries are re-encoded.
   if args.noPartialLossless or args.scale != 1.0 or args.pixFmt != "" or
-      args.vprofile != "" or args.preset != "" or args.crf >= 0 or
-      args.videoBitrate >= 0:
+      args.vprofile != "":
     return @[]
   let encoder = initCodec(args.videoCodec)
   if encoder == nil or encoder.id != ID_HEVC:
@@ -300,6 +299,7 @@ proc initPartialHevcEncoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.max_b_frames = max(par.video_delay, 0)
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
   encoder.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+  encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder
 

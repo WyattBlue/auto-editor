@@ -5,15 +5,6 @@ import ../[action, av, ffmpeg, log, timeline]
 import ../util/rational
 import smart
 
-type
-  H264SpanKind* = SmartSpanKind
-  H264Span* = SmartSpan
-  H264PlanStats* = SmartPlanStats
-
-const
-  hsEncode* = ssEncode
-  hsCopy* = ssCopy
-
 func startCodeLen(data: ptr UncheckedArray[uint8], size, pos: int): int =
   if pos + 3 <= size and data[pos] == 0 and data[pos + 1] == 0:
     if data[pos + 2] == 1:
@@ -169,26 +160,14 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
       inc write
   result.keyframes.setLen(write)
 
-func h264RenderPlan*(clips: openArray[Clip], keyframes: openArray[int64],
-    sourceEnd: int64): seq[H264Span] =
-  return smartRenderPlan(clips, keyframes, sourceEnd)
-
-func h264PlanStats*(spans: openArray[H264Span]): H264PlanStats =
-  return smartPlanStats(spans)
-
-func h264PlanIsWorthwhile*(stats: H264PlanStats, timelineFrames,
-    sourceFrames, averageGop: int64): bool =
-  return smartPlanIsWorthwhile(stats, timelineFrames, sourceFrames, averageGop)
-
 proc partialLosslessH264Plan*(output: OutputContainer, tl: v3,
-    args: mainArgs): seq[H264Span] =
+    args: mainArgs): seq[SmartSpan] =
   ## This path must be indistinguishable from the normal renderer except for
   ## compression. Anything that changes pixels, timing, or source topology uses
   ## the regular decode/filter/encode path.
   if args.noPartialLossless or args.videoCodec != "h264" or
       args.scale != 1.0 or args.pixFmt != "" or
-      args.vprofile != "" or args.preset != "" or args.crf >= 0 or
-      args.videoBitrate >= 0:
+      args.vprofile != "":
     return @[]
   let formatName = $output.formatCtx.oformat.name
   let isIsoBmff = "mp4" in formatName or "mov" in formatName
@@ -234,10 +213,10 @@ proc partialLosslessH264Plan*(output: OutputContainer, tl: v3,
     if clip.offset < 0 or clip.offset >= sourceEnd or
         clip.offset + clip.dur > sourceEnd + 1:
       return @[]
-  let plan = h264RenderPlan(tl.v[0], keyframes, sourceEnd)
-  let stats = plan.h264PlanStats
+  let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
+  let stats = smartPlanStats(plan)
   let averageGop = averageGopFrames(keyframes, sourceEnd)
-  if not stats.h264PlanIsWorthwhile(tl.len, sourceEnd, averageGop):
+  if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
     debug &"Skipping H.264 partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {plan.len} spans would not offset {stats.encodeRuns} encoder runs"
     return @[]
   return plan
@@ -259,11 +238,12 @@ proc initPartialH264Encoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.max_b_frames = max(par.video_delay, 0)
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
   encoder.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+  encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder
 
 proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
-    args: mainArgs, spans: seq[H264Span]):
+    args: mainArgs, spans: seq[SmartSpan]):
     (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
   let sourcePath = tl.v[0][0].src[]
   var templateInput = try: av.open(sourcePath)
@@ -272,7 +252,7 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
   let sourceParameterSets = parameterSetsToAvcc(sourceStream.codecpar.extradata,
     sourceStream.codecpar.extradata_size)
 
-  let stats = spans.h264PlanStats
+  let stats = smartPlanStats(spans)
   if stats.copiedFrames == 0:
     templateInput.close()
     error "Partial-lossless H.264 renderer selected without a complete GOP"
@@ -320,7 +300,7 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
     var firstFrameInRun = false
 
     for spanIndex, span in spans:
-      if span.kind == hsCopy:
+      if span.kind == ssCopy:
         let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base)
         input.seek(seekTs, stream = stream)
         var first = true
@@ -437,7 +417,7 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
           av_frame_free(addr lastDecoded)
 
         let endsRun = spanIndex + 1 == spans.len or
-          spans[spanIndex + 1].kind == hsCopy
+          spans[spanIndex + 1].kind == ssCopy
         if endsRun:
           for encodedPacket in encoder.encode(nil, packet):
             let outPacket = av_packet_clone(encodedPacket)

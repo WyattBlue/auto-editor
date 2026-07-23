@@ -1,6 +1,6 @@
 import std/algorithm
 
-import ../timeline
+import ../[ffmpeg, log, timeline]
 
 type
   SmartSpanKind* = enum
@@ -90,3 +90,11 @@ func smartPlanIsWorthwhile*(stats: SmartPlanStats, timelineFrames,
   let scanCost = max(sourceFrames, 0) div 32
   let restartCost = int64(stats.encodeRuns) * max(averageGop, 1)
   return stats.encodedFrames + scanCost + restartCost < timelineFrames
+
+proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, args: mainArgs) =
+  if args.videoBitrate >= 0:
+    encoder.bit_rate = args.videoBitrate
+  if args.crf >= 0:
+    discard av_opt_set_int(encoder.priv_data, "crf", args.crf.cint, 0)
+  if args.preset != "":
+    discard av_opt_set(encoder.priv_data, "preset", cstring(args.preset), 0)

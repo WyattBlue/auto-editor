@@ -63,8 +63,7 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
 proc partialLosslessVp9Plan*(output: OutputContainer, tl: v3,
     args: mainArgs): seq[SmartSpan] =
   if args.noPartialLossless or args.scale != 1.0 or args.pixFmt != "" or
-      args.vprofile != "" or args.preset != "" or args.crf >= 0 or
-      args.videoBitrate >= 0:
+      args.vprofile != "":
     return @[]
   let encoder = initCodec(args.videoCodec)
   if encoder == nil or encoder.id != ID_VP9:
@@ -127,6 +126,7 @@ proc initPartialVp9Encoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.colorspace = par.color_space
   encoder.profile = par.profile
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
+  encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder
 
