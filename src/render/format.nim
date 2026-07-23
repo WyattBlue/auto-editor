@@ -109,7 +109,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
     if not fitsFreeRenderResolution(width, height):
       if licenseKeyProvided(args) or (args.scaleSet and args.resolutionSet):
-        requireLicense(args, "render video above 2560x1440")
+        requireLicense(args, "render video above 3200x1800")
       else:
         var scale = args.scale
         while scale > 0.25:
