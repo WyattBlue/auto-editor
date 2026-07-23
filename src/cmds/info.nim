@@ -302,14 +302,19 @@ proc main*(args: seq[string]) =
   var queryExt = ""
   var queryKind: CodecListKind
   var inputFiles: seq[string] = @[]
+  var parseOptions = true
 
   for key in args:
-    if genCliMacro(key, args, infoOptions):
+    if parseOptions and expecting == "" and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", infoOptions)
-    if key.startsWith("--"):
-      error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
+    if parseOptions:
+      if genCliMacro(key, args, infoOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", infoOptions)
+      if key.startsWith("--"):
+        error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
 
     case expecting
     of "":

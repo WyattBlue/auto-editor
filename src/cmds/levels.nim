@@ -111,14 +111,19 @@ proc main*(strArgs: seq[string]) =
     edit = "audio"
     display = "float"
     tb = AVRational(num: 30, den: 1)
+    parseOptions = true
 
   for key in strArgs:
-    if genCliMacro(key, strArgs, levelsOptions):
+    if parseOptions and expecting == "" and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file> [options]", levelsOptions)
-    if key.startsWith("--"):
-      error &"Unknown option: {key}{optionDidYouMean(key, levelsOptions)}"
+    if parseOptions:
+      if genCliMacro(key, strArgs, levelsOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file> [options]", levelsOptions)
+      if key.startsWith("--"):
+        error &"Unknown option: {key}{optionDidYouMean(key, levelsOptions)}"
 
     case expecting
     of "":

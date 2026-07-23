@@ -9,13 +9,18 @@ proc main*(args: seq[string]) =
   var
     asJson = false
     inputFiles: seq[string] = @[]
+    parseOptions = true
   for key in args:
-    if genCliMacro(key, args, subdumpOptions):
+    if parseOptions and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file> [options]", subdumpOptions)
-    if key.startsWith("--"):
-      error "Unknown option: " & key & optionDidYouMean(key, subdumpOptions)
+    if parseOptions:
+      if genCliMacro(key, args, subdumpOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file> [options]", subdumpOptions)
+      if key.startsWith("--"):
+        error "Unknown option: " & key & optionDidYouMean(key, subdumpOptions)
     inputFiles.add key
 
   var jsonOut = %* {}

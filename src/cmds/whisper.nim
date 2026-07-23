@@ -26,13 +26,18 @@ proc main*(cArgs: seq[string]) =
   var threshold: float32 = 0.04
 
   var expecting: string = ""
+  var parseOptions = true
   for key in cArgs:
-    if genCliMacro(key, args, whisperOptions):
+    if parseOptions and expecting == "" and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file|:mic> <model> [options]", whisperOptions)
-    if key.startsWith("--"):
-      error &"Unknown option: {key}{optionDidYouMean(key, whisperOptions)}"
+    if parseOptions:
+      if genCliMacro(key, args, whisperOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file|:mic> <model> [options]", whisperOptions)
+      if key.startsWith("--"):
+        error &"Unknown option: {key}{optionDidYouMean(key, whisperOptions)}"
     case expecting:
     of "":
       if inputPath == "":

@@ -15,14 +15,19 @@ proc main*(strArgs: seq[string]) =
     startSample: int64 = 0
     lengthSamples: int64 = -1
     display = "float"
+    parseOptions = true
 
   for key in strArgs:
-    if genCliMacro(key, strArgs, waveformOptions):
+    if parseOptions and expecting == "" and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file> [options]", waveformOptions)
-    if key.startsWith("--"):
-      error &"Unknown option: {key}{optionDidYouMean(key, waveformOptions)}"
+    if parseOptions:
+      if genCliMacro(key, strArgs, waveformOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file> [options]", waveformOptions)
+      if key.startsWith("--"):
+        error &"Unknown option: {key}{optionDidYouMean(key, waveformOptions)}"
 
     case expecting
     of "":

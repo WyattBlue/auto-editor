@@ -6,13 +6,18 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
   var inputFiles: seq[string] = @[]
+  var parseOptions = true
   for key in args:
-    if genCliMacro(key, args, descOptions):
+    if parseOptions and key == "--":
+      parseOptions = false
       continue
-    if key in ["-h", "--help"]:
-      printHelp("<file ...>", descOptions)
-    if key.startsWith("--"):
-      error "Unknown option: " & key & optionDidYouMean(key, descOptions)
+    if parseOptions:
+      if genCliMacro(key, args, descOptions):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp("<file ...>", descOptions)
+      if key.startsWith("--"):
+        error "Unknown option: " & key & optionDidYouMean(key, descOptions)
     inputFiles.add key
 
   var formatContext: ptr AVFormatContext
