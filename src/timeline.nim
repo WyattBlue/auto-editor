@@ -53,6 +53,7 @@ type v3* = object
   s*: seq[seq[Clip]]
   langs*: seq[Lang]   # Video, Audio (flattened).
   effects*: seq[Actions]
+  numberOfSrc*: int
   clips2*: seq[Clip2] # Empty when the timeline is non-linear.
   templateFile*: ptr string
   vt*: seq[seq[Transition]]
@@ -85,6 +86,9 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
     for audio in alayer:
       if audio.src != nil:
         result.incl(audio.src)
+
+proc updateNumberOfSrc*(self: var v3) =
+  self.numberOfSrc = self.uniqueSources.len
 
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
@@ -148,6 +152,7 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
   else:
     tl.sr = 48000
     tl.layout = initLayout("stereo")
+  tl.updateNumberOfSrc()
 
 
 func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
@@ -225,6 +230,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
       var subtitleClip = clip
       subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
+  tl.updateNumberOfSrc()
 
 proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
     clips2: seq[Clip2], effects: seq[Actions]): v3 =
@@ -568,3 +574,4 @@ proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
         let mi = makeTrack(clip.stream, clip.src[])
         clip.src = interner.intern(mi.path)
         clip.stream = 0
+  tl.updateNumberOfSrc()

@@ -162,6 +162,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
 
   let tf = jsonNode{"templateFile"}.getStr("")
   result.templateFile = if tf != "": interner.intern(tf) else: result.firstSource
+  result.updateNumberOfSrc()
   result.validateTransitions()
 
 

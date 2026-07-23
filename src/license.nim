@@ -10,11 +10,27 @@ const LICENSE_EXPIRY_YEARS = 4
 const
   FREE_RENDER_LONG_SIDE* = 2560'i32
   FREE_RENDER_SHORT_SIDE* = 1440'i32
+  FREE_MULTI_SOURCE_LONG_SIDE* = 720'i32
+  FREE_MULTI_SOURCE_SHORT_SIDE* = 576'i32
 let buildDate = parse(CompileDate, "yyyy-MM-dd")
 
 func fitsFreeRenderResolution*(width, height: int32): bool =
   max(width, height) <= FREE_RENDER_LONG_SIDE and
     min(width, height) <= FREE_RENDER_SHORT_SIDE
+
+func fitsFreeMultiSourceResolution*(width, height: int32): bool =
+  max(width, height) <= FREE_MULTI_SOURCE_LONG_SIDE and
+    min(width, height) <= FREE_MULTI_SOURCE_SHORT_SIDE
+
+func freeMultiSourceScale*(width, height: int32): float64 =
+  ## Return the largest non-upscaling factor that fits inside an SD frame.
+  ## Compare long and short sides so portrait renders get the rotated limit.
+  if width <= 0 or height <= 0:
+    return 1.0
+  min(1.0, min(
+    FREE_MULTI_SOURCE_LONG_SIDE.float64 / max(width, height).float64,
+    FREE_MULTI_SOURCE_SHORT_SIDE.float64 / min(width, height).float64,
+  ))
 
 proc validateKey*(val: string): (bool, string) =
   if val == "":

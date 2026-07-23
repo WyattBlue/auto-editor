@@ -14,3 +14,4 @@
 
 ## Misc.
  - Rendering 4K and beyond now requires a license key.
+ - Unlicensed multi-source media can now render up to SD instead of being rejected; multi-source timeline exports still require a license key.

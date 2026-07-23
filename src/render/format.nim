@@ -96,7 +96,17 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
   let renderVideo = includeVideo and renderTl.v.len > 0 and
     renderTl.v[0].len > 0
   if renderVideo:
-    let (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+    var (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+    if renderTl.numberOfSrc > 1 and
+        not fitsFreeMultiSourceResolution(width, height):
+      if licenseKeyProvided(args):
+        requireLicense(args, "render video with multiple sources above 720x576")
+      else:
+        args.scale *= freeMultiSourceScale(width, height)
+        (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+        warning &"Rendering multiple sources without a license is limited to " &
+          &"720x576; using --scale {args.scale} ({width}x{height})."
+
     if not fitsFreeRenderResolution(width, height):
       if licenseKeyProvided(args) or (args.scaleSet and args.resolutionSet):
         requireLicense(args, "render video above 2560x1440")

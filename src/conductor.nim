@@ -225,6 +225,7 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
       continue
     tl.langs.insert(toLang("und"), tl.v.len)  # keep video langs before audio
     tl.v.add track
+  tl.updateNumberOfSrc()
 
 proc editMedia*(args: var mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
@@ -368,11 +369,13 @@ proc editMedia*(args: var mainArgs) =
     preview(tlV3)
     return
 
-  # Rendering or exporting a timeline that draws from more than one source file
-  # is a paid feature. This is the authoritative gate: it also covers timelines
-  # imported from a file/stdin, which never pass through the CLI-level checks.
-  if tlV3.uniqueSources().len > 1:
-    requireLicense(args, "render or export a timeline with multiple sources")
+  # Timeline/project exports that draw from more than one source remain a paid
+  # feature. Rendered media is handled in makeMedia, where an unlicensed render
+  # can continue at SD resolution. This also covers timelines imported from a
+  # file/stdin, which never pass through the CLI-level checks.
+  if tlV3.numberOfSrc > 1 and
+      exportKind notin ["default", "clip-sequence"]:
+    requireLicense(args, "export a timeline with multiple sources")
 
   case exportKind:
   of "v1", "v2", "v3":
