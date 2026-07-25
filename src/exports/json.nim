@@ -83,10 +83,10 @@ func `%`*(self: v3): JsonNode =
       "a": transitionsToJson(self.at)
     }
 
-proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
+proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
   var tlJson: JsonNode
 
-  if `export` == "v1" or `export` == "v2":
+  if `export` in {exV1, exV2}:
     # v1/v2 cannot represent transitions; they are silently dropped.
     if not tlV3.isLinear:
       error "No chunks available for export"
@@ -99,7 +99,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
 
     let clips2 = tlV3.clips2
     let tb = tlV3.tb
-    if `export` == "v2":
+    if `export` == exV2:
       tlJson = %v2(source: source, tb: tb, clips: clips2, effects: tlV3.effects)
     else:
       var chunks: seq[(int64, int64, float64)] = @[]

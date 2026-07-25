@@ -31,7 +31,7 @@ const actionsRef = Link(href: "https://auto-editor.com/ref/actions", a: "actions
 type OptKind* = enum
   Regular # expecting = $datum
   Flag    # $datum = true
-  Special # args.`export` = "$datum"
+  Special # args.`export` = parseExportString("$datum")
 
 type OptDef* = object
   names*: string
@@ -443,7 +443,7 @@ macro genFlagInterface*(argsType: untyped): untyped =
 macro genCliMacro*(keyIdent, argsIdent: untyped, myOpts: static seq[OptDef]): untyped =
   ## Generates a case statement for CLI option handling.
   ## - Flag: sets datum to true (or bitpacks into args.flags if datum starts with "args.")
-  ## - Special: sets args.export to datum string
+  ## - Special: parses datum as an export specification
   ## - Regular: sets expecting to datum string
   result = newNimNode(nnkCaseStmt)
   result.add(keyIdent)
@@ -466,9 +466,10 @@ macro genCliMacro*(keyIdent, argsIdent: untyped, myOpts: static seq[OptDef]): un
           ident(opt.datum)
       stmts.add(newAssignment(target, ident("true")))
     of Special:
-      # Generate: args.`export` = "datum"
+      # Generate: args.`export` = parseExportString("datum")
       let target = newDotExpr(argsIdent, newNimNode(nnkAccQuoted).add(ident("export")))
-      stmts.add(newAssignment(target, newStrLitNode(opt.datum)))
+      stmts.add(newAssignment(target, newCall(
+        ident("parseExportString"), newStrLitNode(opt.datum))))
     of Regular:
       # Generate: expecting = "datum"
       stmts.add(newAssignment(ident("expecting"), newStrLitNode(opt.datum)))

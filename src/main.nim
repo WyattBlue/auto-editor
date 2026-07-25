@@ -481,7 +481,7 @@ judge making cuts.
       else:
         setLabeledEdit(args, expectingLabel, key)
     of "export":
-      args.`export` = key
+      args.`export` = parseExportString(key)
     of "output":
       args.output = key
     of "when":
@@ -614,7 +614,8 @@ judge making cuts.
         if args.output == "":
           args.output = "mic_ALTERED.wav"
         let outputExt = agSplitFile(args.output).ext.toLowerAscii
-        let keepRecording = args.`export` notin ["", "default", "clip-sequence"] or
+        let keepRecording = args.`export`.kind notin
+          {exAuto, exDefault, exClipSequence} or
           outputExt in [".xml", ".fcpxml", ".mlt", ".kdenlive", ".otio",
                         ".json", ".v1", ".v2", ".v3"]
         var capturePath: string

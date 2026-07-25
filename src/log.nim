@@ -8,6 +8,32 @@ import ./util/[color, rational, term]
 type BarType* = enum
   modern, classic, ascii, machine, none
 
+type
+  ExportKind* = enum
+    exAuto, exDefault, exClipSequence, exV1, exV2, exV3, exPremiere,
+    exResolveFcp7, exFinalCutPro, exResolve, exShotcut, exKdenlive, exPremiereOtio
+
+  ExportSpec* = object
+    kind*: ExportKind
+    name*: string
+    version*: string
+
+func `$`*(kind: ExportKind): string =
+  case kind
+  of exAuto: ""
+  of exDefault: "default"
+  of exClipSequence: "clip-sequence"
+  of exV1: "v1"
+  of exV2: "v2"
+  of exV3: "v3"
+  of exPremiere: "premiere"
+  of exResolveFcp7: "resolve-fcp7"
+  of exFinalCutPro: "final-cut-pro"
+  of exResolve: "resolve"
+  of exShotcut: "shotcut"
+  of exKdenlive: "kdenlive"
+  of exPremiereOtio: "premiere-otio"
+
 type PackedInt* = distinct int64
 
 func pack*(flag: bool, number: int64): PackedInt =
@@ -69,7 +95,8 @@ type mainArgs* = object
   whenActive*: Actions = aNil
   labeledEdits*: seq[tuple[label: int, expr: string]]
   labeledWhens*: seq[tuple[label: int, action: Actions]]
-  `export`*: string = ""
+  `export`*: ExportSpec = ExportSpec(
+    kind: exAuto, name: "Auto-Editor Media Group", version: "11")
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
   adds*: seq[AddSpec]   # `add:` overlays (see AddSpec)
