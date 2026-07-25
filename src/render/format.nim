@@ -86,7 +86,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
 proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
-    cache: MediaCache = nil) =
+    cache: MediaCache) =
   var args = inputArgs
   var renderTl = tl.bakeTransitions()
   var throttle = initThrottle()

@@ -417,6 +417,8 @@ proc editMedia*(args: var mainArgs) =
 
   let rule = initRules(output)
   args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
+  let cache = newMediaCache()
+  defer: cache.close()
 
   if args.`export` == "clip-sequence":
     if not tlV3.isLinear:
@@ -440,8 +442,6 @@ proc editMedia*(args: var mainArgs) =
       break
     if src == nil:
       error "Trying to render an empty timeline"
-    var cache = newMediaCache()
-    defer: cache.close()
 
     let mi = initMediaInfo(cache.getContainer(src).formatContext, src[])
 
@@ -450,7 +450,7 @@ proc editMedia*(args: var mainArgs) =
       applyArgs(myTimeline, args)
       makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar, cache)
   else:
-    makeMedia(args, tlV3, output, rule, bar)
+    makeMedia(args, tlV3, output, rule, bar, cache)
 
   # Retiming embedded subtitles is handled by makeMedia. Also retime every
   # subtitle-only sibling of each original media input into its own sidecar.
