@@ -384,8 +384,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if subcontainer.isNone():
             error &"regex: subtitle stream '{ret}' does not exist."
 
+          let external = subcontainer.unsafeGet()
+          defer: external.close()
           let index = int16(stream - container.subtitle.len)
-          let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          let (ret2, val2) = subtitle(external, tb, regexPattern, index)
           if ret2 != -1:
             error &"regex: subtitle stream '{ret2}' does not exist."
           return val2
@@ -419,8 +421,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
           if subcontainer.isNone():
             error &"word: subtitle stream '{ret}' does not exist."
 
+          let external = subcontainer.unsafeGet()
+          defer: external.close()
           let index = int16(stream - container.subtitle.len)
-          let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          let (ret2, val2) = subtitle(external, tb, regexPattern, index)
           if ret2 != -1:
             error &"word: subtitle stream '{ret2}' does not exist."
           return val2

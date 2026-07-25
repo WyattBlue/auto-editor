@@ -1452,6 +1452,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if confineMatte != nil: av_frame_free(addr confineMatte)
     sws_free_context(addr scaleCtx)
     sws_free_context(addr reformatCtx)
+    av_frame_free(addr frame)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
     for _, f in decodedCache:

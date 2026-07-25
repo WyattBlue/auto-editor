@@ -89,6 +89,7 @@ proc preview*(tl: var v3) =
       try: av.open(src[])
       except IOError as e: error e.msg
     )
+    defer: container.close()
     let mediaLength: AVRational = container.mediaLength()
     inputLength += round((mediaLength * tl.tb).f64).int64
 

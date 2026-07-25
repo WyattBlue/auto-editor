@@ -48,6 +48,7 @@ proc main*(args: seq[string]) =
       let tbSeconds = formatCtx.streams[s].time_base.toDouble
       var cues: seq[JsonNode] = @[]
       var codecCtx = initDecoder(formatCtx.streams[s].codecpar)
+      defer: avcodec_free_context(addr codecCtx)
       var subtitle: AVSubtitle
       # The previous stream's loop left the demuxer at EOF, so rewind before
       # dumping the next one. Only needed from the second stream on — some
