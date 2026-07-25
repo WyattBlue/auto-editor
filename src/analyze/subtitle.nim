@@ -10,11 +10,11 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
   if stream < 0 or stream >= container.subtitle.len:
     return (stream, @[])
 
-  let
-    formatCtx = container.formatContext
-    s = container.subtitle[stream].index
-    codecCtx = initDecoder(formatCtx.streams[s].codecpar)
-    packet = av_packet_alloc()
+  let formatCtx = container.formatContext
+  let s = container.subtitle[stream].index
+  var codecCtx = initDecoder(formatCtx.streams[s].codecpar)
+  defer: avcodec_free_context(addr codecCtx)
+  let packet = av_packet_alloc()
 
   if packet == nil:
     quit(1)
