@@ -294,6 +294,10 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   echo "s: " & subs.join(",")
   echo "other: " & others.join(",")
 
+const infoArgumentOptions = {coEncoders, coDecoders, coCodecs}
+
+assertArgumentOptions(infoOptions, infoArgumentOptions)
+
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
@@ -329,7 +333,7 @@ proc main*(args: seq[string]) =
       queryExt = key
       queryKind = clkCodecs
     else:
-      error &"Internal error: unexpected CLI option {expecting}"
+      discard
     expecting = coNone
 
   if expecting != coNone:

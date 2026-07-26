@@ -10,6 +10,12 @@ var ctrlcStop = false
 proc onCtrlC() {.noconv.} =
   ctrlcStop = true
 
+const whisperArgumentOptions = {
+  coLanguage, coFormat, coOutput, coQueue, coPrompt, coThreads, coThreshold,
+}
+
+assertArgumentOptions(whisperOptions, whisperArgumentOptions)
+
 proc main*(cArgs: seq[string]) =
   var inputPath: string = ""
   var model: string = ""
@@ -71,7 +77,7 @@ proc main*(cArgs: seq[string]) =
     of coThreshold:
       threshold = parseThres(key).toFloat32
     else:
-      error &"Internal error: unexpected CLI option {expecting}"
+      discard
     expecting = coNone
 
   if inputPath == "":

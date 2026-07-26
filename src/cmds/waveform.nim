@@ -5,6 +5,13 @@ import ../[av, cache, cli, ffmpeg, log]
 import ../analyze/audio
 import ./help
 
+const waveformArgumentOptions = {
+  coStream, coChannel, coSamplesPerBucket, coStartSample, coLengthSamples,
+  coDisplay,
+}
+
+assertArgumentOptions(waveformOptions, waveformArgumentOptions)
+
 proc main*(strArgs: seq[string]) =
   var
     expecting = coNone
@@ -50,7 +57,7 @@ proc main*(strArgs: seq[string]) =
     of coDisplay:
       display = key
     else:
-      error &"Internal error: unexpected CLI option {expecting}"
+      discard
     expecting = coNone
 
   if expecting != coNone:

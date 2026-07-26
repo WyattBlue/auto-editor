@@ -417,6 +417,17 @@ proc setLabeledEdit(args: var mainArgs, label: int, expr: string) =
       return
   args.labeledEdits.add (label: label, expr: expr)
 
+const mainArgumentOptions = {
+  coEdit, coWhenActive, coWhenInactive, coMargin, coSmooth, coTransition,
+  coOutput, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
+  coVideoSpeed, coExport, coFrameRate, coSampleRate, coResolution, coBackground,
+  coYtDlpLocation, coOutputFormat, coYtDlpExtras, coProgress, coVcodec,
+  coVideoBitrate, coCrf, coVprofile, coPreset, coPixFmt, coScale, coAcodec,
+  coLayout, coAudioBitrate, coAudioNormalize, coKey, coWhen,
+}
+
+assertArgumentOptions(mainOptions, mainArgumentOptions, {coWhen})
+
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -573,7 +584,7 @@ judge making cuts.
     of coKey:
       args.licenseKey = key
     else:
-      error &"Internal error: unexpected CLI option {expecting}"
+      discard
     expecting = coNone
     expectingLabel = 1
 

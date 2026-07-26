@@ -3,6 +3,8 @@ import std/[json, strutils]
 import ../[av, cli, ffmpeg, log]
 import ./help
 
+assertArgumentOptions(subdumpOptions, {})
+
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 

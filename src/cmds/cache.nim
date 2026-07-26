@@ -4,6 +4,8 @@ import ../[about, cli, log]
 import ../util/fun
 import ./help
 
+assertArgumentOptions(cacheOptions, {})
+
 func formatBytes(intSize: BiggestInt): (string, string) =
   if intSize < 1024:
     return ($intSize, "B")

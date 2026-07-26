@@ -104,6 +104,10 @@ proc parseLevelsMethod(editStr: string): LevelsMethod =
     else:
       error &"Unknown editing method: {result.name}"
 
+const levelsArgumentOptions = {coEdit, coTimebase, coDisplay}
+
+assertArgumentOptions(levelsOptions, levelsArgumentOptions)
+
 proc main*(strArgs: seq[string]) =
   var
     expecting = coNone
@@ -138,7 +142,7 @@ proc main*(strArgs: seq[string]) =
     of coDisplay:
       display = key
     else:
-      error &"Internal error: unexpected CLI option {expecting}"
+      discard
     expecting = coNone
 
   if expecting != coNone:

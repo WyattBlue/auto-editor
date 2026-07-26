@@ -2,6 +2,8 @@ import std/strutils
 import ../[av, cli, ffmpeg, log]
 import ./help
 
+assertArgumentOptions(descOptions, {})
+
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 

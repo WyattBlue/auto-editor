@@ -51,71 +51,6 @@ type CliOption* = enum
     coMixAudioStreams, coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion,
     coWhen
 
-func `$`*(opt: CliOption): string {.raises: [].} =
-  case opt
-  of coNone, coIsDebug, coSplitWords, coTranslate, coIsJson, coNoCache, coAsJson,
-      coQuiet, coPreview, coVn, coAn, coSn, coDn, coFaststart, coNoFaststart,
-      coFragmented, coNoFragmented, coNoSeek, coNoPartialLossless,
-      coMixAudioStreams, coOpen, coNoOpen, coShowVersion:
-    ""
-  of coLanguage: "language"
-  of coFormat: "format"
-  of coOutput: "output"
-  of coQueue: "queue"
-  of coPrompt: "prompt"
-  of coThreads: "threads"
-  of coThreshold: "threshold"
-  of coEncoders: "encoders"
-  of coDecoders: "decoders"
-  of coCodecs: "codecs"
-  of coEdit: "edit"
-  of coTimebase: "timebase"
-  of coDisplay: "display"
-  of coStream: "stream"
-  of coChannel: "channel"
-  of coSamplesPerBucket: "samples-per-bucket"
-  of coStartSample: "start-sample"
-  of coLengthSamples: "length-samples"
-  of coShell: "shell"
-  of coWhenActive: "when-active"
-  of coWhenInactive: "when-inactive"
-  of coMargin: "margin"
-  of coSmooth: "smooth"
-  of coTransition: "transition"
-  of coCutOut: "cut-out"
-  of coAddIn: "add-in"
-  of coSetSpeed: "set-speed"
-  of coSetAction: "set-action"
-  of coSilentSpeed: "silent-speed"
-  of coVideoSpeed: "video-speed"
-  of coPremiere: "premiere"
-  of coResolve: "resolve"
-  of coFinalCutPro: "final-cut-pro"
-  of coShotcut: "shotcut"
-  of coKdenlive: "kdenlive"
-  of coExport: "export"
-  of coFrameRate: "frame-rate"
-  of coSampleRate: "sample-rate"
-  of coResolution: "resolution"
-  of coBackground: "background"
-  of coYtDlpLocation: "yt-dlp-location"
-  of coOutputFormat: "output-format"
-  of coYtDlpExtras: "yt-dlp-extras"
-  of coProgress: "progress"
-  of coVcodec: "vcodec"
-  of coVideoBitrate: "video-bitrate"
-  of coCrf: "crf"
-  of coVprofile: "vprofile"
-  of coPreset: "preset"
-  of coPixFmt: "pix_fmt"
-  of coScale: "scale"
-  of coAcodec: "acodec"
-  of coLayout: "layout"
-  of coAudioBitrate: "audio-bitrate"
-  of coAudioNormalize: "audio-normalize"
-  of coKey: "key"
-  of coWhen: "when"
-
 type OptDef* = object
   names*: string
   kind*: OptKind = Regular
@@ -124,6 +59,44 @@ type OptDef* = object
   metavar*: string # Shouldn't be set for flags.
   help*: string
   hidden*: bool
+
+func argumentOptions(options: seq[OptDef]): set[CliOption] {.compileTime.} =
+  for opt in options:
+    if opt.kind == Regular:
+      result.incl opt.datum
+
+template assertArgumentOptions*(options, expected: untyped) =
+  static:
+    doAssert argumentOptions(options) == expected
+
+template assertArgumentOptions*(options, expected, extra: untyped) =
+  static:
+    doAssert argumentOptions(options) + extra == expected
+
+func cliOptionLabel(opt: CliOption): string {.compileTime.} =
+  if opt == coPixFmt:
+    return "pix_fmt"
+  let name = repr(opt)[2 .. ^1]
+  for i, c in name:
+    if c.isUpperAscii:
+      if i > 0:
+        result.add '-'
+      result.add c.toLowerAscii
+    else:
+      result.add c
+
+macro genCliOptionToString(options: static seq[OptDef]): untyped =
+  var flags: set[CliOption]
+  for option in options:
+    if option.kind == Flag:
+      flags.incl option.datum
+
+  var caseStmt = newTree(nnkCaseStmt, ident("opt"))
+  for opt in CliOption:
+    let label = if opt == coNone or opt in flags: "" else: cliOptionLabel(opt)
+    caseStmt.add newTree(nnkOfBranch, ident(repr(opt)), newStmtList(newLit(label)))
+
+  result = caseStmt
 
 const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--debug", kind: Flag, datum: coIsDebug,
@@ -336,6 +309,13 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
     help: "Show info about this program or option"),
 ]
 
+const cliOptions =
+  whisperOptions & infoOptions & levelsOptions & subdumpOptions &
+    waveformOptions & completionOptions & mainOptions
+
+func `$`*(opt: CliOption): string {.raises: [].} =
+  genCliOptionToString(cliOptions)
+
 type CmdDef* = object
   name*: string
   handler*: string
@@ -482,31 +462,12 @@ const argsFlagOptions = {
 }
 
 func flagTarget(opt: CliOption): string {.compileTime.} =
-  case opt
-  of coIsDebug: "isDebug"
-  of coSplitWords: "splitWords"
-  of coTranslate: "translate"
-  of coIsJson: "isJson"
-  of coNoCache: "noCache"
-  of coAsJson: "asJson"
-  of coQuiet: "quiet"
-  of coPreview: "preview"
-  of coVn: "vn"
-  of coAn: "an"
-  of coSn: "sn"
-  of coDn: "dn"
-  of coFaststart: "faststart"
-  of coNoFaststart: "noFaststart"
-  of coFragmented: "fragmented"
-  of coNoFragmented: "noFragmented"
-  of coNoSeek: "noSeek"
-  of coNoPartialLossless: "noPartialLossless"
-  of coMixAudioStreams: "mixAudioStreams"
-  of coOpen: "open"
-  of coNoOpen: "noOpen"
-  of coShowVersion: "showVersion"
-  else:
-    raiseAssert "CLI option is not a flag: " & $opt
+  for option in cliOptions:
+    if option.kind == Flag and option.datum == opt:
+      result = repr(opt)[2 .. ^1]
+      result[0] = result[0].toLowerAscii
+      return
+  raiseAssert "CLI option is not a flag: " & repr(opt)
 
 func argsFlags(): seq[CliOption] {.compileTime.} =
   for opt in mainOptions:

@@ -3,6 +3,10 @@ import ../[cli, log]
 import ./help
 
 
+const completionArgumentOptions = {coShell}
+
+assertArgumentOptions(completionOptions, completionArgumentOptions)
+
 proc main*(args: seq[string]) =
   var expecting = coNone
   var shell = ""
@@ -17,7 +21,7 @@ proc main*(args: seq[string]) =
     case expecting
     of coShell: shell = key
     of coNone: discard
-    else: error &"Internal error: unexpected CLI option {expecting}"
+    else: discard
     expecting = coNone
 
   case shell
