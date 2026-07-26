@@ -18,7 +18,7 @@ type
     name*: string
     version*: string
 
-func `$`*(kind: ExportKind): string =
+func `$`*(kind: ExportKind): string {.raises: [].} =
   case kind
   of exAuto: ""
   of exDefault: "default"
@@ -36,15 +36,15 @@ func `$`*(kind: ExportKind): string =
 
 type PackedInt* = distinct int64
 
-func pack*(flag: bool, number: int64): PackedInt =
+func pack*(flag: bool, number: int64): PackedInt {.raises: [].} =
   let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64
   let flagBit = if flag: 0x8000000000000000'i64 else: 0'i64
   PackedInt(flagBit or maskedNumber)
 
-func getFlag*(packed: PackedInt): bool =
+func getFlag*(packed: PackedInt): bool {.raises: [].} =
   int64(packed) < 0
 
-func getNumber*(packed: PackedInt): int64 =
+func getNumber*(packed: PackedInt): int64 {.raises: [].} =
   let raw = int64(packed) and 0x7FFFFFFFFFFFFFFF'i64
   if (raw and 0x4000000000000000'i64) != 0:
     raw or 0x8000000000000000'i64
@@ -209,7 +209,7 @@ proc intern*(interner: var StringInterner, s: string): ptr string {.raises: [].}
   result[] = s
   interner[s] = result
 
-proc cleanup*(interner: var StringInterner) =
+proc cleanup*(interner: var StringInterner) {.raises: [].} =
   for ptrStr in interner.values:
     `=destroy`(ptrStr[])
     dealloc(ptrStr)

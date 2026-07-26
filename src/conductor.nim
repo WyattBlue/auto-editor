@@ -13,7 +13,7 @@ import render/subtitle
 import stats
 
 
-func prefixEquals(s, expected: string, stop: int): bool =
+func prefixEquals(s, expected: string, stop: int): bool {.raises: [].} =
   if stop != expected.len:
     return false
   for i in 0 ..< stop:
@@ -21,7 +21,7 @@ func prefixEquals(s, expected: string, stop: int): bool =
       return false
   true
 
-proc parseExportString*(exportStr: string): ExportSpec =
+proc parseExportString*(exportStr: string): ExportSpec {.raises: [].} =
   result.name = "Auto-Editor Media Group"
   result.version = "11"
 
@@ -99,7 +99,8 @@ proc parseExportString*(exportStr: string): ExportSpec =
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int, int) =
+func normalizeRange(span: (PackedInt, PackedInt), tb: float64,
+    arrayLen: int): (int, int) {.raises: [].} =
   var start = toTb(span[0], tb)
   var stop = toTb(span[1], tb)
   if start < 0:
@@ -109,7 +110,7 @@ func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (
   return (start, stop)
 
 proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
-  value: int, maxLen: int) =
+    value: int, maxLen: int) {.raises: [].} =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
   if start >= stop:
@@ -121,7 +122,7 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
     actionIndex[i] = value
 
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
-    isUrl = false): (string, ExportKind) =
+    isUrl = false): (string, ExportKind) {.raises: [].} =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
@@ -171,7 +172,8 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
 
   return (&"{root}{ext}", myExport)
 
-func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules, isUrl = false): string =
+func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
+    isUrl = false): string {.raises: [].} =
   if inCodec != "auto":
     return inCodec
 

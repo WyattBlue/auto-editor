@@ -3,13 +3,14 @@ import std/[json, sequtils]
 import ../[action, ffmpeg, log, timeline]
 import ../util/[color, lang]
 
-func effectGroupToJson(actions: Actions): JsonNode =
+func effectGroupToJson(actions: Actions): JsonNode {.raises: [].} =
   if actions.isCut: return %["cut"]
   var parts: seq[string]
   for a in actions: parts.add $a
   return %parts
 
-func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
+func tracksToJson(tracks: seq[seq[Clip]],
+    effects: seq[Actions]): JsonNode {.raises: [].} =
   result = newJArray()
   for track in tracks:
     var trackArray = newJArray()
@@ -28,7 +29,7 @@ func tracksToJson(tracks: seq[seq[Clip]], effects: seq[Actions]): JsonNode =
       trackArray.add(clipObj)
     result.add(trackArray)
 
-func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode =
+func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
   result = newJArray()
   for track in tracks:
     var arr = newJArray()
@@ -44,7 +45,7 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode =
       }
     result.add arr
 
-func `%`(self: v1): JsonNode =
+func `%`(self: v1): JsonNode {.raises: [].} =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
   return %* {
     "version": "1",
@@ -53,7 +54,7 @@ func `%`(self: v1): JsonNode =
     "chunks": jsonChunks,
   }
 
-func `%`(self: v2): JsonNode =
+func `%`(self: v2): JsonNode {.raises: [].} =
   let jsonClips = self.clips.mapIt(%[%it.start, %it.`end`, %it.`effect`])
   let jsonEffects = self.effects.mapIt(effectGroupToJson(it))
   return %* {
@@ -64,7 +65,7 @@ func `%`(self: v2): JsonNode =
     "clips": jsonClips,
   }
 
-func `%`*(self: v3): JsonNode =
+func `%`*(self: v3): JsonNode {.raises: [].} =
   result = %* {
     "version": "3",
     "templateFile": (if self.templateFile != nil: self.templateFile[] else: ""),
