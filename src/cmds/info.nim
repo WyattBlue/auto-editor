@@ -297,7 +297,7 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
-  var expecting = ""
+  var expecting = coNone
   var isJson = false
   var queryExt = ""
   var queryKind: CodecListKind
@@ -305,7 +305,7 @@ proc main*(args: seq[string]) =
   var parseOptions = true
 
   for key in args:
-    if parseOptions and expecting == "" and key == "--":
+    if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
       continue
     if parseOptions:
@@ -317,20 +317,22 @@ proc main*(args: seq[string]) =
         error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
 
     case expecting
-    of "":
+    of coNone:
       inputFiles.add key
-    of "encoders":
+    of coEncoders:
       queryExt = key
       queryKind = clkEncoders
-    of "decoders":
+    of coDecoders:
       queryExt = key
       queryKind = clkDecoders
-    of "codecs":
+    of coCodecs:
       queryExt = key
       queryKind = clkCodecs
-    expecting = ""
+    else:
+      error &"Internal error: unexpected CLI option {expecting}"
+    expecting = coNone
 
-  if expecting != "":
+  if expecting != coNone:
     error &"-{expecting} requires a format argument"
 
   if queryExt != "":

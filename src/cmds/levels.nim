@@ -106,7 +106,7 @@ proc parseLevelsMethod(editStr: string): LevelsMethod =
 
 proc main*(strArgs: seq[string]) =
   var
-    expecting = ""
+    expecting = coNone
     inputFile = ""
     edit = "audio"
     display = "float"
@@ -114,7 +114,7 @@ proc main*(strArgs: seq[string]) =
     parseOptions = true
 
   for key in strArgs:
-    if parseOptions and expecting == "" and key == "--":
+    if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
       continue
     if parseOptions:
@@ -126,20 +126,22 @@ proc main*(strArgs: seq[string]) =
         error &"Unknown option: {key}{optionDidYouMean(key, levelsOptions)}"
 
     case expecting
-    of "":
+    of coNone:
       if inputFile != "":
         error &"Input file is already set: {key}"
       inputFile = key
-    of "timebase":
+    of coTimebase:
       try: tb = toAVRational(key)
       except ValueError as e: error e.msg
-    of "edit":
+    of coEdit:
       edit = key
-    of "display":
+    of coDisplay:
       display = key
-    expecting = ""
+    else:
+      error &"Internal error: unexpected CLI option {expecting}"
+    expecting = coNone
 
-  if expecting != "":
+  if expecting != coNone:
     error &"--{expecting} needs argument."
 
   if display notin ["float", "d16"]:

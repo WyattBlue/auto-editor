@@ -4,7 +4,7 @@ import ./help
 
 
 proc main*(args: seq[string]) =
-  var expecting: string = ""
+  var expecting = coNone
   var shell = ""
   for key in args:
     if genCliMacro(key, args, completionOptions):
@@ -15,8 +15,10 @@ proc main*(args: seq[string]) =
       error &"Unknown option: {key}{optionDidYouMean(key, completionOptions)}"
 
     case expecting
-    of "shell": shell = key
-    expecting = ""
+    of coShell: shell = key
+    of coNone: discard
+    else: error &"Internal error: unexpected CLI option {expecting}"
+    expecting = coNone
 
   case shell
   of "zsh":

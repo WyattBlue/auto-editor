@@ -25,10 +25,10 @@ proc main*(cArgs: seq[string]) =
   var threads: cint = 4
   var threshold: float32 = 0.04
 
-  var expecting: string = ""
+  var expecting = coNone
   var parseOptions = true
   for key in cArgs:
-    if parseOptions and expecting == "" and key == "--":
+    if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
       continue
     if parseOptions:
@@ -39,28 +39,28 @@ proc main*(cArgs: seq[string]) =
       if key.startsWith("--"):
         error &"Unknown option: {key}{optionDidYouMean(key, whisperOptions)}"
     case expecting:
-    of "":
+    of coNone:
       if inputPath == "":
         inputPath = key
       elif model == "":
         model = key
       else:
         error "Got too many arguments\nUsage: <file|:mic> <model> [options]"
-    of "language":
+    of coLanguage:
       language = key
-    of "format":
+    of coFormat:
       format = key
       formatExplicit = true
-    of "output":
+    of coOutput:
       output = key
-    of "queue":
+    of coQueue:
       queue = (
         try: parseInt(key)
         except ValueError: error &"Invalid --queue: {key}"
       )
-    of "prompt":
+    of coPrompt:
       prompt = key
-    of "threads":
+    of coThreads:
       let n = (
         try: parseInt(key)
         except ValueError: error &"Invalid --threads: {key}"
@@ -68,9 +68,11 @@ proc main*(cArgs: seq[string]) =
       if n < 1 or n > 1024:
         error &"--threads must be in range [1, 1024], got: {key}"
       threads = n.cint
-    of "threshold":
+    of coThreshold:
       threshold = parseThres(key).toFloat32
-    expecting = ""
+    else:
+      error &"Internal error: unexpected CLI option {expecting}"
+    expecting = coNone
 
   if inputPath == "":
     error "A media file is needed"

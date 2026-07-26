@@ -377,18 +377,18 @@ proc parseActionAndRange(val: string, args: var mainArgs): (Actions, PackedInt, 
   let acts = (if rest == "": aNil else: parseActions(rest))
   return (acts, startTime, endTime)
 
-proc parseLabeledFlag(key: string): tuple[matched: bool, kind: string, label: int] =
+proc parseLabeledFlag(key: string): tuple[matched: bool, kind: CliOption, label: int] =
   ## Detect the generic `:<n>` label suffix on `--edit`/`-e` and `--when`/`-w`.
   ## Returns kind "edit" (label 1..255) or "when" (label 0..255). The suffix must
   ## be a bare integer in range; `--edit:0` is rejected (label 0 is silent-only).
   let ci = key.find(':')
   if ci == -1:
-    return (false, "", 0)
+    return (false, coNone, 0)
   let kind =
     case key[0 ..< ci]
-    of "-e", "--edit": "edit"
-    of "-w", "--when": "when"
-    else: return (false, "", 0)
+    of "-e", "--edit": coEdit
+    of "-w", "--when": coWhen
+    else: return (false, coNone, 0)
   let suffix = key[ci + 1 .. ^1]
   var n: int
   let parsedLen = (
@@ -397,7 +397,7 @@ proc parseLabeledFlag(key: string): tuple[matched: bool, kind: string, label: in
   )
   if suffix.len == 0 or parsedLen != suffix.len:
     error &"Invalid label in {key}: expected an integer after ':'"
-  if kind == "edit" and n == 0:
+  if kind == coEdit and n == 0:
     error "--edit:0 is invalid (label 0 is reserved for silent; use --when:0 to act on silent sections)"
   if n < 0 or n > 255:
     error &"Label out of range [0, 255] in {key}"
@@ -433,7 +433,7 @@ judge making cuts.
 
   var args = mainArgs()
   var showVersion: bool = false
-  var expecting: string = ""
+  var expecting = coNone
   var expectingLabel: int = 1  # label for a pending "edit"/"when" value (plain --edit => 1)
   var parseOptions = true
   var positionalStart = int.high  # index of first input after `--`
@@ -447,14 +447,14 @@ judge making cuts.
 
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
-    if parseOptions and expecting == "" and key == "--":
+    if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
       positionalStart = args.inputs.len
       continue
-    if expecting == "":
+    if expecting == coNone:
       # Generic `--edit:N` / `-e:N` / `--when:N` / `-w:N`. Plain `--edit` and the
       # named `--when-*` aliases have no `:` suffix, so they fall through to
-      # genCliMacro below (which sets `expecting` to "edit"/"when-normal"/... ).
+      # genCliMacro below (which sets the corresponding `expecting` enum).
       if parseOptions:
         let lf = parseLabeledFlag(key)
         if lf.matched:
@@ -473,18 +473,18 @@ judge making cuts.
         parseLabeledFlag(key).matched:
       error &"--{expecting} needs argument, got option: {key}"
     case expecting
-    of "":
+    of coNone:
       args.inputs.add key
-    of "edit":
+    of coEdit:
       if expectingLabel == 1:
         args.edit = key
       else:
         setLabeledEdit(args, expectingLabel, key)
-    of "export":
+    of coExport:
       args.`export` = parseExportString(key)
-    of "output":
+    of coOutput:
       args.output = key
-    of "when":
+    of coWhen:
       # Generic `--when:N` / `-w:N`. Labels 0 and 1 share storage with the named
       let rest = extractAdds(key, expectingLabel, -1, args)
       if rest.strip() != "":
@@ -492,90 +492,92 @@ judge making cuts.
         of 0: args.whenInactive = parseActions(rest)
         of 1: args.whenActive = parseActions(rest)
         else: setLabeledWhen(args, expectingLabel, parseActions(rest))
-    of "when-inactive":
+    of coWhenInactive:
       let rest = extractAdds(key, 0, -1, args)
       if rest.strip() != "":
         args.whenInactive = parseActions(rest)
-    of "when-active":
+    of coWhenActive:
       let rest = extractAdds(key, 1, -1, args)
       if rest.strip() != "":
         args.whenActive = parseActions(rest)
-    of "silent-speed":
-      args.whenInactive = actionFromUserSpeed(parseSpeed(key, expecting))
-    of "video-speed":
-      args.whenActive = actionFromUserSpeed(parseSpeed(key, expecting))
-    of "add-in":
+    of coSilentSpeed:
+      args.whenInactive = actionFromUserSpeed(parseSpeed(key, $expecting))
+    of coVideoSpeed:
+      args.whenActive = actionFromUserSpeed(parseSpeed(key, $expecting))
+    of coAddIn:
       block:
-        let span = parseTimeRange(key, expecting)
+        let span = parseTimeRange(key, $expecting)
         args.setAction.add (aNil, span[0], span[1])
-    of "cut-out":
+    of coCutOut:
       block:
-        let span = parseTimeRange(key, expecting)
+        let span = parseTimeRange(key, $expecting)
         args.setAction.add (aCut, span[0], span[1])
-    of "set-speed":
+    of coSetSpeed:
       args.setAction.add parseSpeedRange(key)
-    of "set-action":
+    of coSetAction:
       args.setAction.add parseActionAndRange(key, args)
-    of "yt-dlp-location":
+    of coYtDlpLocation:
       args.ytDlpLocation = key
-    of "output-format":
+    of coOutputFormat:
       args.outputFormat = key
-    of "yt-dlp-extras":
+    of coYtDlpExtras:
       args.ytDlpExtras = key
-    of "scale":
-      args.scale = parseNum(key, expecting)
+    of coScale:
+      args.scale = parseNum(key, $expecting)
       args.scaleSet = true
-    of "resolution":
-      args.resolution = parseResolution(key, expecting)
+    of coResolution:
+      args.resolution = parseResolution(key, $expecting)
       args.resolutionSet = true
-    of "background":
+    of coBackground:
       try: args.background = some(parseColor(key))
       except ValueError as e: error e.msg
-    of "sample-rate":
+    of coSampleRate:
       args.sampleRate = parseSampleRate(key)
-    of "frame-rate":
+    of coFrameRate:
       args.frameRate = parseFrameRate(key)
-    of "vcodec":
+    of coVcodec:
       args.videoCodec = key
-    of "video-bitrate":
+    of coVideoBitrate:
       args.videoBitrate = parseBitrate(key)
-    of "crf":
+    of coCrf:
       var val: int
       if key.len == 0 or parseSaturatedNatural(key, val) != key.len:
         error "invalid constant rate factor: " & key
       if val > 63: error "constant rate factor is too high: " & key
       args.crf = val.int8
-    of "vprofile":
+    of coVprofile:
       args.vprofile = key
-    of "preset":
+    of coPreset:
       args.preset = key
-    of "pix_fmt":
+    of coPixFmt:
       args.pixFmt = key
-    of "acodec":
+    of coAcodec:
       args.audioCodec = key
-    of "layout":
+    of coLayout:
       args.audioLayout = key
-    of "audio-normalize":
+    of coAudioNormalize:
       args.audioNormalize = parseNorm(key)
-    of "audio-bitrate":
+    of coAudioBitrate:
       args.audioBitrate = parseBitrate(key)
-    of "progress":
+    of coProgress:
       try:
         args.progress = parseEnum[BarType](key)
       except ValueError:
         error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
-    of "margin":
-      args.margin = parseTwoLengths(key, expecting)
-    of "smooth":
-      args.smooth = parseTwoLengths(key, expecting)
-    of "transition":
+    of coMargin:
+      args.margin = parseTwoLengths(key, $expecting)
+    of coSmooth:
+      args.smooth = parseTwoLengths(key, $expecting)
+    of coTransition:
       (args.transition, args.transitionMinCut) = parseTransition(key)
-    of "key":
+    of coKey:
       args.licenseKey = key
-    expecting = ""
+    else:
+      error &"Internal error: unexpected CLI option {expecting}"
+    expecting = coNone
     expectingLabel = 1
 
-  if expecting != "":
+  if expecting != coNone:
     error &"--{expecting} needs argument."
 
   if showVersion:
