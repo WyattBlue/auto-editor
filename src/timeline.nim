@@ -59,7 +59,7 @@ type v3* = object
   vt*: seq[seq[Transition]]
   at*: seq[seq[Transition]]
 
-func len*(self: v3): int64 =
+func len*(self: v3): int64 {.raises: [].} =
   result = 0
   for clips in self.v:
     if len(clips) > 0:
@@ -68,7 +68,7 @@ func len*(self: v3): int64 =
     if len(clips) > 0:
       result = max(result, clips[^1].start + clips[^1].dur)
 
-func firstSource*(self: v3): ptr string =
+func firstSource*(self: v3): ptr string {.raises: [].} =
   for vlayer in self.v:
     if vlayer.len > 0 and vlayer[0].src != nil:
       return vlayer[0].src
@@ -77,7 +77,7 @@ func firstSource*(self: v3): ptr string =
       return alayer[0].src
   return nil
 
-func uniqueSources*(self: v3): HashSet[ptr string] =
+func uniqueSources*(self: v3): HashSet[ptr string] {.raises: [].} =
   for vlayer in self.v:
     for video in vlayer:
       if video.src != nil:
@@ -87,16 +87,16 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
       if audio.src != nil:
         result.incl(audio.src)
 
-proc updateNumberOfSrc*(self: var v3) =
+proc updateNumberOfSrc*(self: var v3) {.raises: [].} =
   self.numberOfSrc = self.uniqueSources.len
 
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
 
-func isLinear*(self: v3): bool =
+func isLinear*(self: v3): bool {.raises: [].} =
   return self.clips2.len > 0 or self.timelineIsEmpty
 
-func hasTransitions*(self: v3): bool =
+func hasTransitions*(self: v3): bool {.raises: [].} =
   for track in self.vt:
     if track.len > 0: return true
   for track in self.at:
@@ -399,7 +399,7 @@ func spanStart*(t: Transition): int64 =
     of taCenter: t.dur div 2
     of taEnd: t.dur)
 
-proc validateTransitions*(tl: v3) =
+proc validateTransitions*(tl: v3) {.raises: [].} =
   proc validateTrack(clips: seq[Clip], transitions: seq[Transition]) =
     var priorEnd = low(int64)
     var priorAt = low(int64)
@@ -530,7 +530,7 @@ proc bakeTransitions*(source: v3): v3 =
 func stem(path: string): string =
   agSplitFile(path).name
 
-func makeSaneTimebase*(tb: AVRational): AVRational =
+func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
   # A 0/0 rate (no declared fps) is NaN as a float; av_d2q(NaN) is degenerate.
   if not tb.isValid:
     return AVRational(num: 30, den: 1)

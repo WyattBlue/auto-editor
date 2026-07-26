@@ -14,15 +14,15 @@ const
   FREE_MULTI_SOURCE_SHORT_SIDE* = 576'i32
 let buildDate = parse(CompileDate, "yyyy-MM-dd")
 
-func fitsFreeRenderResolution*(width, height: int32): bool =
+func fitsFreeRenderResolution*(width, height: int32): bool {.raises: [].} =
   max(width, height) <= FREE_RENDER_LONG_SIDE and
     min(width, height) <= FREE_RENDER_SHORT_SIDE
 
-func fitsFreeMultiSourceResolution*(width, height: int32): bool =
+func fitsFreeMultiSourceResolution*(width, height: int32): bool {.raises: [].} =
   max(width, height) <= FREE_MULTI_SOURCE_LONG_SIDE and
     min(width, height) <= FREE_MULTI_SOURCE_SHORT_SIDE
 
-func freeMultiSourceScale*(width, height: int32): float64 =
+func freeMultiSourceScale*(width, height: int32): float64 {.raises: [].} =
   ## Return the largest non-upscaling factor that fits inside an SD frame.
   ## Compare long and short sides so portrait renders get the rotated limit.
   if width <= 0 or height <= 0:
@@ -32,7 +32,7 @@ func freeMultiSourceScale*(width, height: int32): float64 =
     FREE_MULTI_SOURCE_SHORT_SIDE.float64 / min(width, height).float64,
   ))
 
-proc validateKey*(val: string): (bool, string) =
+proc validateKey*(val: string): (bool, string) {.raises: [].} =
   if val == "":
     return (false, "")
 
@@ -114,5 +114,5 @@ proc requireLicense*(args: mainArgs, feature: string) =
   else:
     error reason
 
-proc licenseKeyProvided*(args: mainArgs): bool =
+proc licenseKeyProvided*(args: mainArgs): bool {.raises: [].} =
   args.licenseKey != "" or getEnv("AE_PRIVATE_LK", "") != ""

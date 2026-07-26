@@ -157,28 +157,34 @@ proc conwrite*(msg: string) {.raises: [].} =
     except IOError:
       discard
 
-proc debug*(msg: string) =
+proc debug*(msg: string) {.raises: [].} =
   if isDebug:
     conwrite ""
-    if noColor:
-      stderr.writeLine(&"Debug: {msg}")
-    else:
-      stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
+    try:
+      if noColor:
+        stderr.writeLine(&"Debug: {msg}")
+      else:
+        stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
+    except IOError:
+      discard
 
-proc warning*(msg: string) =
+proc warning*(msg: string) {.raises: [].} =
   if not quiet:
     conwrite ""
-    if noColor:
-      stderr.write(&"Warning! {msg}\n")
-    else:
-      stderr.styledWriteLine(fgYellow, "Warning! ", msg, resetStyle)
+    try:
+      if noColor:
+        stderr.write(&"Warning! {msg}\n")
+      else:
+        stderr.styledWriteLine(fgYellow, "Warning! ", msg, resetStyle)
+    except IOError:
+      discard
 
 when defined(windows):
   proc cExit(code: cint) {.importc: "_exit", header: "<stdlib.h>", noreturn.}
 else:
   proc cExit(code: cint) {.importc: "_exit", header: "<unistd.h>", noreturn.}
 
-proc error*(msg: string) {.noreturn.} =
+proc error*(msg: string) {.noreturn, raises: [].} =
   conwrite ""
   try:
     if noColor:

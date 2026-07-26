@@ -184,7 +184,8 @@ func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     return $avcodec_get_name(codecId)
   return $avcodec_get_name(rule.defaultVid)
 
-proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
+proc applyAdds(tl: var v3, args: mainArgs,
+    interner: var StringInterner) {.raises: [].} =
   ## Inject `add:` overlays as new video layers. Each spec overlays its source on
   ## every base-layer (v[0]) clip whose section matches the spec's selector
   ## (0 = silent, 1 = normal), spanning the same timeline range. With
@@ -227,13 +228,15 @@ proc applyAdds(tl: var v3, args: mainArgs, interner: var StringInterner) =
     if spec.hasPos:
       acts.add Action(kind: actPos, pxKf: spec.xKf, pyKf: spec.yKf,
         pscaleKf: spec.scaleKf)
-    if spec.effects.len > 0:
-      try:
+    var group = aNil
+    try:
+      if spec.effects.len > 0:
         for a in parseActions(spec.effects):
           acts.add a
-      except ActionParseError as e:
-        error e.msg
-    let group = (if acts.len > 0: newActions(acts) else: aNil)
+      if acts.len > 0:
+        group = newActions(acts)
+    except ActionParseError as e:
+      error e.msg
     var idx = tl.effects.find(group)
     if idx == -1:
       tl.effects.add group

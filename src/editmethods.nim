@@ -85,7 +85,7 @@ const editOperatorDefs*: seq[EditOperatorDef] = @[
     help: "Invert a boolean array."),
 ]
 
-func argOrderOf*(name: string): seq[string] =
+func argOrderOf*(name: string): seq[string] {.raises: [].} =
   ## Positional argument names for the method whose canonical name or alias is
   ## `name`. Empty if no such method.
   for d in editMethodDefs:
@@ -94,13 +94,13 @@ func argOrderOf*(name: string): seq[string] =
         result.add prm.name
       return
 
-func editMediaOf*(name: string): set[EditMedia] =
+func editMediaOf*(name: string): set[EditMedia] {.raises: [].} =
   ## The stream(s) an edit method analyzes; empty for unknown names/operators.
   for d in editMethodDefs:
     if name in d.names:
       return {d.media}
 
-func isEditOperator*(name: string): bool =
+func isEditOperator*(name: string): bool {.raises: [].} =
   for o in editOperatorDefs:
     if o.name == name:
       return true

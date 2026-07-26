@@ -49,7 +49,7 @@ type
     i*: seq[VideoStream]
 
 
-func getRes*(self: MediaInfo): (int32, int32) =
+func getRes*(self: MediaInfo): (int32, int32) {.raises: [].} =
   if self.v.len > 0:
     (self.v[0].width, self.v[0].height)
   else:

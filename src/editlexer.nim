@@ -1,3 +1,5 @@
+{.push raises: [].}
+
 type
   TokenKind = enum
     Lparen, Rparen, Sym, Str, Num, Colon, Comma, Equal, Eof
@@ -57,7 +59,7 @@ proc advance(self: var Lexer) =
 func isWhiteSpace(c: char): bool =
   c in "\0 \t\n\r\x0b\x0c"
 
-proc getNextToken(self: var Lexer): Token =
+proc getNextToken(self: var Lexer): Token {.raises: [ValueError].} =
   while self.`char` != '\0':
     while self.`char` != '\0' and isWhiteSpace(self.`char`):
       self.advance()
@@ -118,19 +120,19 @@ proc getNextToken(self: var Lexer): Token =
 
   return Token(kind: Eof)
 
-proc initParser*(lexer: var Lexer): Parser =
+proc initParser*(lexer: var Lexer): Parser {.raises: [ValueError].} =
   result = Parser(lexer: lexer)
   result.currentToken = result.lexer.getNextToken()
   result.nextToken = result.lexer.getNextToken()
 
-proc eat(self: var Parser) =
+proc eat(self: var Parser) {.raises: [ValueError].} =
   self.currentToken = self.nextToken
   self.nextToken = self.lexer.getNextToken()
 
 func peek(self: Parser): Token =
   self.nextToken
 
-func atomText*(expr: Expr, text: string): string =
+func atomText*(expr: Expr, text: string): string {.raises: [ValueError].} =
   case expr.kind
   of ExprSym, ExprNum:
     text[expr.`from` ..< expr.to]
@@ -171,10 +173,10 @@ func decodeString(text: string, `from`, to: uint32): string =
     pos += 1
 
 # Forward declaration
-proc expr(self: var Parser): Expr
+proc expr(self: var Parser): Expr {.raises: [ValueError].}
 
 
-proc list(self: var Parser): Expr =
+proc list(self: var Parser): Expr {.raises: [ValueError].} =
   let startPos = self.currentToken.`from`
   self.eat()
 
@@ -191,7 +193,7 @@ proc list(self: var Parser): Expr =
 
   return Expr(kind: ExprList, elements: elements, `from`: startPos, to: endPos)
 
-proc expr(self: var Parser): Expr =
+proc expr(self: var Parser): Expr {.raises: [ValueError].} =
   let token = self.currentToken
   case token.kind:
   of Lparen:
@@ -222,12 +224,10 @@ proc expr(self: var Parser): Expr =
         if self.currentToken.kind == Sym:
           let nextToken = self.peek()
           if nextToken.kind == Colon:
-            # This is another function call, stop processing arguments for current function
+            # This is another function call; stop processing args for the current func.
             break
 
         var arg = self.expr()
-
-        # Check if this argument is followed by = (assignment syntax)
         if self.currentToken.kind == Equal:
           self.eat()
           if self.currentToken.kind notin {Num, Sym, Str, Lparen}:
@@ -257,7 +257,7 @@ proc expr(self: var Parser): Expr =
     # This should not happen with valid input
     raise newException(ValueError, "Unexpected token")
 
-proc parse*(self: var Parser): seq[Expr] =
+proc parse*(self: var Parser): seq[Expr] {.raises: [ValueError].} =
   var tokens = newSeqOfCap[Expr](4)
 
   while self.currentToken.kind != Eof:
@@ -273,3 +273,5 @@ proc parse*(self: var Parser): seq[Expr] =
     return @[Expr(kind: ExprList, elements: tokens, `from`: 0,
         to: uint32(self.lexer.text.len))]
   return tokens
+
+{.pop.}

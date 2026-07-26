@@ -269,7 +269,8 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     tb = AVRational(num: 30, den: 1)
   result = toNonLinear(ptrInput, tb, mi, chunks)
 
-proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
+proc readJson*(jsonStr: string,
+    interner: var StringInterner): v3 {.raises: [].} =
   let jsonNode = try: parseJson(jsonStr)
     except CatchableError as e: error "Invalid JSON: " & e.msg
   let version = jsonNode{"version"}.getStr("unknown")
