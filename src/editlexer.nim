@@ -113,7 +113,7 @@ proc getNextToken(self: var Lexer): Token {.raises: [ValueError].} =
       return Token(kind: Num, `from`: `from`, to: self.pos)
 
     let `from` = self.pos
-    while self.`char` notin "'.()[]{}=\",:;\0 \t\n\r\x0b\x0c":
+    while self.`char` notin ".()[]{}=\",:;\0 \t\n\r\x0b\x0c":
       self.advance()
 
     return Token(kind: Sym, `from`: `from`, to: self.pos)
@@ -229,12 +229,13 @@ proc expr(self: var Parser): Expr {.raises: [ValueError].} =
 
         var arg = self.expr()
         if self.currentToken.kind == Equal:
+          let equalToken = self.currentToken
           self.eat()
           if self.currentToken.kind notin {Num, Sym, Str, Lparen}:
             let key = arg.atomText(self.lexer.text)
             raise newException(ValueError, "'" & key & "=' is missing a value")
-          let equalExpr = Expr(kind: ExprSym, `from`: self.currentToken.`from` -
-              1, to: self.currentToken.`from`)
+          let equalExpr = Expr(kind: ExprSym, `from`: equalToken.`from`,
+              to: equalToken.to)
           let value = self.expr()
           arg = Expr(kind: ExprList, elements: @[equalExpr, arg, value],
               `from`: arg.`from`, to: value.to)
