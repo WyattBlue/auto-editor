@@ -11,6 +11,8 @@ when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+when defined(emscripten):
+  import ./av
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
 when not defined(emscripten):
   import cmds/preview_worker
@@ -594,6 +596,9 @@ judge making cuts.
   if showVersion:
     echo version
     quit(0)
+
+  when defined(emscripten):
+    useWebCodecs = args.webCodecs
 
   if args.inputs.len == 0 and isDebug:
     echo "Auto-Editor: ", version

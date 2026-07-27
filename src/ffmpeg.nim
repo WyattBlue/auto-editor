@@ -343,6 +343,10 @@ proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,
 proc avcodec_parameters_to_context*(codec_ctx: ptr AVCodecContext,
     par: ptr AVCodecParameters): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
+proc avcodec_parameters_alloc*(): ptr AVCodecParameters {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_parameters_free*(par: ptr ptr AVCodecParameters) {.importc,
+    header: "<libavcodec/avcodec.h>".}
 proc avcodec_alloc_context3*(codec: pointer): ptr AVCodecContext {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_free_context*(avctx: ptr ptr AVCodecContext) {.importc,
@@ -527,6 +531,8 @@ proc av_frame_clone*(src: ptr AVFrame): ptr AVFrame {.importc,
 # Codec
 proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
+proc avcodec_find_decoder_by_name*(name: cstring): ptr AVCodec {.importc,
+    header: "<libavcodec/avcodec.h>".}
 proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
     options: ptr ptr AVDictionary): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
@@ -646,6 +652,7 @@ const
   ID_PNG* = AVCodecID(61)
   ID_BMP* = AVCodecID(78)
   ID_TIFF* = AVCodecID(96)
+  ID_VP8* = AVCodecID(139)
   ID_VP9* = AVCodecID(167)
   ID_WEBP* = AVCodecID(171)
   ID_HEVC* = AVCodecID(173)

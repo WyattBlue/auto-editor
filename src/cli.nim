@@ -49,7 +49,7 @@ type CliOption* = enum
     coVcodec, coVideoBitrate, coCrf, coVprofile, coPreset, coPixFmt, coScale,
     coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate,
     coMixAudioStreams, coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion,
-    coWhen
+    coWebCodecs, coWhen
 
 type OptDef* = object
   names*: string
@@ -299,6 +299,12 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
 
   OptDef(names: "--no-cache", c: cMis, kind: Flag, datum: coNoCache,
     help: "Disable reading and writing cache files"),
+] & (
+  when defined(emscripten): @[
+    OptDef(names: "--webcodecs", c: cMis, kind: Flag, datum: coWebCodecs,
+      help: "Use browser WebCodecs decoders"),
+  ] else: @[]
+) & @[
   OptDef(names: "--open", c: cMis, kind: Flag, datum: coOpen,
     help: "Open the output file after editing is done"),
   OptDef(names: "--no-open", c: cMis, kind: Flag, datum: coNoOpen,
@@ -458,7 +464,7 @@ macro genCmdCases*(keyIdent: untyped): untyped =
 const argsFlagOptions = {
   coPreview, coVn, coAn, coSn, coDn, coFaststart, coNoFaststart, coFragmented,
   coNoFragmented, coNoSeek, coNoPartialLossless, coMixAudioStreams, coOpen,
-  coNoOpen,
+  coNoOpen, coWebCodecs,
 }
 
 func flagTarget(opt: CliOption): string {.compileTime.} =

@@ -397,13 +397,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec, targetFps,
       lang = tl.langs[0], width = targetWidth, height = targetHeight)
-  let codec = encoderCtx.codec
+  var codec = encoderCtx.codec
 
   if codec.id == ID_HEVC:
     const codecTag = fourccToInt("hvc1") # for QuickTime
     outputStream.codecpar.codec_tag = codecTag
     encoderCtx.codec_tag = codecTag
-    discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
 
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
@@ -509,12 +508,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if args.vprofile != "":
     encoderCtx.setProfileOrErr(args.vprofile)
 
+  encoderCtx.pix_fmt = pix_fmt
+  resolveEncoderContext(encoderCtx)
+  codec = encoderCtx.codec
+
+  if codec.id == ID_HEVC:
+    discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
   if args.crf >= 0:
     discard av_opt_set_int(encoderCtx.priv_data, "crf", args.crf.cint, 0)
   if args.preset != "":
     discard av_opt_set(encoderCtx.priv_data, "preset", cstring(args.preset), 0)
 
-  encoderCtx.pix_fmt = pix_fmt
   encoderCtx.open()
   pix_fmt = encoderCtx.pix_fmt
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:

@@ -28,6 +28,7 @@ let
   wasmBuildPath = absolutePath("build_wasm")
   wa64BuildPath = absolutePath("build_wasm64")
   ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
+  webCodecsDir = absolutePath("src")
 
 type CrossKind = enum native, winX64, winArm, armv7, wasm32, wasm64
 
@@ -260,7 +261,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   result &= [lamer, opus, dav1d, x264, zlib]
   if not disableVpx:
     result.add vpx
-  if not disableSvtAv1:
+  if not disableSvtAv1 and not isWasm:
     result.add svtav1
   if not disableHevc:
     result.add x265
@@ -748,6 +749,91 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
       package.download()
       package.extract()
       if package.name == "ffmpeg":
+        if isWasm:
+          let codecDir = "ffmpeg" / "libavcodec"
+          cpFile(webCodecsDir / "webcodecsdec.c", codecDir / "webcodecsdec.c")
+          cpFile(webCodecsDir / "webcodecsenc.c", codecDir / "webcodecsenc.c")
+
+          let makefilePath = codecDir / "Makefile"
+          var makefile = readFile(makefilePath)
+          let makeNeedle = "OBJS-$(CONFIG_H264_DECODER)"
+          var webCodecsObjects = ""
+          for (config, spacing) in [
+            ("H264", " "),
+            ("AAC", "  "),
+            ("AV1", "  "),
+            ("VP8", "  "),
+            ("VP9", "  "),
+            ("HEVC", " "),
+          ]:
+            if "CONFIG_" & config & "_WEBCODECS_DECODER" notin makefile:
+              webCodecsObjects &= "OBJS-$(CONFIG_" & config &
+                "_WEBCODECS_DECODER)" & spacing & "+= webcodecsdec.o\n"
+          if webCodecsObjects != "":
+            let pos = makefile.find(makeNeedle)
+            if pos < 0:
+              raise newException(ValueError, "Could not patch FFmpeg libavcodec/Makefile")
+            let lineStart = makefile.rfind('\n', 0, pos) + 1
+            makefile.insert(webCodecsObjects, lineStart)
+            writeFile(makefilePath, makefile)
+
+          var webCodecsEncoderObjects = ""
+          for (config, spacing) in [
+            ("H264", " "),
+            ("AAC", "  "),
+            ("AV1", "  "),
+            ("VP8", "  "),
+            ("VP9", "  "),
+            ("HEVC", " "),
+          ]:
+            if "CONFIG_" & config & "_WEB_ENCODER" notin makefile:
+              webCodecsEncoderObjects &= "OBJS-$(CONFIG_" & config &
+                "_WEB_ENCODER)" & spacing & "+= webcodecsenc.o\n"
+          if webCodecsEncoderObjects != "":
+            let pos = makefile.find(makeNeedle)
+            if pos < 0:
+              raise newException(ValueError,
+                "Could not patch FFmpeg encoder Makefile")
+            let lineStart = makefile.rfind('\n', 0, pos) + 1
+            makefile.insert(webCodecsEncoderObjects, lineStart)
+            writeFile(makefilePath, makefile)
+
+          let codecsPath = codecDir / "allcodecs.c"
+          var codecs = readFile(codecsPath)
+          var codecsChanged = false
+          for codec in ["h264", "aac", "av1", "vp8", "vp9", "hevc"]:
+            let webCodecsDecoder = "ff_" & codec & "_webcodecs_decoder"
+            if webCodecsDecoder notin codecs:
+              let decoder = "extern const FFCodec ff_" & codec & "_decoder;"
+              if decoder notin codecs:
+                raise newException(ValueError,
+                  "Could not patch FFmpeg decoder declaration: " & codec)
+              codecs = codecs.replace(decoder,
+                decoder & "\nextern const FFCodec " & webCodecsDecoder & ";")
+              codecsChanged = true
+          if codecsChanged:
+            writeFile(codecsPath, codecs)
+
+          codecs = readFile(codecsPath)
+          codecsChanged = false
+          for (codec, anchor) in [
+            ("h264", "extern const FFCodec ff_h264_decoder;"),
+            ("aac", "extern const FFCodec ff_aac_encoder;"),
+            ("av1", "extern const FFCodec ff_av1_decoder;"),
+            ("vp8", "extern const FFCodec ff_vp8_decoder;"),
+            ("vp9", "extern const FFCodec ff_vp9_decoder;"),
+            ("hevc", "extern const FFCodec ff_hevc_decoder;"),
+          ]:
+            let webEncoder = "ff_" & codec & "_web_encoder"
+            if webEncoder notin codecs:
+              if anchor notin codecs:
+                raise newException(ValueError,
+                  "Could not patch FFmpeg encoder declaration: " & codec)
+              codecs = codecs.replace(anchor,
+                anchor & "\nextern const FFCodec " & webEncoder & ";")
+              codecsChanged = true
+          if codecsChanged:
+            writeFile(codecsPath, codecs)
         continue
 
       withDir package.name:
@@ -836,17 +922,17 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
 
   var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
 
+  let isCrossWasm = kind == wasm32 or kind == wasm64
   for package in packages:
-    if package.name == "libvpx":
+    if package.name == "libvpx" and not isCrossWasm:
       enableEncoders &= ["libvpx_vp8", "libvpx_vp9"]
-    if package.name == "x265":
+    if package.name == "x265" and not isCrossWasm:
       enableEncoders.add "libx265"
-    if package.name == "libsvtav1":
+    if package.name == "libsvtav1" and not isCrossWasm:
       enableEncoders.add "libsvtav1"
-    if package.name == "amf-headers":
+    if package.name == "amf-headers" and not isCrossWasm:
       enableEncoders &= ["h264_amf", "hevc_amf", "av1_amf"]
 
-  let isCrossWasm = kind == wasm32 or kind == wasm64
   let isMacNative = defined(macosx) and kind == native
   let isWindows = kind in [winX64, winArm] or (defined(windows) and kind == native)
   let isLinux = kind == armv7 or (defined(linux) and kind == native)
@@ -907,6 +993,9 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       if kind != armv7 and kind != winArm:
         commonFlags &= "  --enable-nvenc \\\n"
         commonFlags &= "  --enable-ffnvcodec \\\n"
+  else:
+    commonFlags &= "  --enable-decoder=h264_webcodecs,aac_webcodecs,av1_webcodecs,vp8_webcodecs,vp9_webcodecs,hevc_webcodecs \\\n"
+    commonFlags &= "  --enable-encoder=h264_web,aac_web,av1_web,vp8_web,vp9_web,hevc_web \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags

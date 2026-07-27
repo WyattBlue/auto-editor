@@ -217,26 +217,18 @@ proc hwDeviceForEncoder(codec: ptr AVCodec): AVHWDeviceType =
 
 proc hwEncoderUsable(codec: ptr AVCodec): bool =
   let deviceType = hwDeviceForEncoder(codec)
-  if deviceType == AV_HWDEVICE_TYPE_NONE:
+  # WebCodecs wrappers do not expose an AVHWDeviceContext, but opening them is
+  # the operation that calls VideoEncoder/AudioEncoder.isConfigSupported in the
+  # browser. Probe those explicitly so `info -encoders` reports runtime support
+  # rather than every WebCodecs encoder compiled into the wasm binary.
+  let browserEncoder = ($codec.name).endsWith("_web")
+  if deviceType == AV_HWDEVICE_TYPE_NONE and not browserEncoder:
     return true
-  if not hwDeviceAvailable(deviceType):
+  if deviceType != AV_HWDEVICE_TYPE_NONE and not hwDeviceAvailable(deviceType):
     return false
-  if codec.`type` != AVMEDIA_TYPE_VIDEO:
+  if codec.`type` notin [AVMEDIA_TYPE_VIDEO, AVMEDIA_TYPE_AUDIO]:
     return true
-  var ctx = avcodec_alloc_context3(codec)
-  if ctx == nil:
-    return false
-  ctx.width = 1280
-  ctx.height = 720
-  ctx.bit_rate = 2_000_000
-  ctx.time_base = AVRational(num: 1, den: 25)
-  ctx.framerate = AVRational(num: 25, den: 1)
-  ctx.pix_fmt = AV_PIX_FMT_YUV420P
-  if codec.pix_fmts != nil and codec.pix_fmts[0] != AV_PIX_FMT_NONE:
-    ctx.pix_fmt = codec.pix_fmts[0]
-  let ok = avcodec_open2(ctx, codec, nil) >= 0
-  avcodec_free_context(addr ctx)
-  return ok
+  return encoderOpens(codec)
 
 proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]

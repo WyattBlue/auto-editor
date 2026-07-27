@@ -126,6 +126,7 @@ proc initPartialVp9Encoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.colorspace = par.color_space
   encoder.profile = par.profile
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
+  resolveEncoderContext(encoder)
   encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder

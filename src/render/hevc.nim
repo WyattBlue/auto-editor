@@ -299,6 +299,7 @@ proc initPartialHevcEncoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.max_b_frames = max(par.video_delay, 0)
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
   encoder.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+  resolveEncoderContext(encoder)
   encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder

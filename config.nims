@@ -57,11 +57,16 @@ else:
     when not defined(danger) and not defined(release):
       switch("passL", "-sPTHREAD_POOL_SIZE_STRICT=2")
     switch("passL", "-sPROXY_TO_PTHREAD=1")
+    switch("passL", "-sJSPI=1")
+    switch("passL",
+      "-sJSPI_IMPORTS=ae_wc_init,ae_wc_decode,ae_wc_command,ae_we_init,ae_we_encode,ae_we_command")
     switch("passL", "-sEXIT_RUNTIME=1")
     switch("passL", "-sMODULARIZE=1")
     switch("passL", "-sEXPORT_NAME=AutoEditor")
     switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS,ENV]")
     switch("passL", "-sENVIRONMENT=web,worker")
+    switch("passL", "--js-library=src/webcodecs.js")
+    switch("passL", "--js-library=src/webcodecsenc.js")
     # emscripten 6.0.2 dropped mainScriptUrlOrBlob from the default incoming
     # API, but the site's worker loader (runner.js) sets it to spawn pthreads.
     # `+=` is silently ineffective for this setting, so restate the full
@@ -98,7 +103,7 @@ if not defined(dynamic):
   switch("passL", "-lmp3lame -lopus -lx264 -ldav1d -lz")
   if enableVpx:
     switch("passL", "-lvpx")
-  if enableSvtav1:
+  if enableSvtav1 and not defined(emscripten):
     switch("passL", "-lSvtAv1Enc")
   if enableHevc:
     switch("passL", "-lx265")

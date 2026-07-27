@@ -3,8 +3,123 @@ import std/[strformat, strutils, sequtils, tables]
 import ./[ffmpeg, log]
 import ./util/[lang, rational]
 
+var useWebCodecs* = false
+
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
+
+proc encoderOpens*(codec: ptr AVCodec): bool =
+  ## Some encoders only reject a configuration at open time: hardware wrappers
+  ## when no device is present, WebCodecs wrappers when the browser reports the
+  ## config unsupported. Finding out costs a throwaway context.
+  var ctx = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    return false
+  if codec.`type` == AVMEDIA_TYPE_VIDEO:
+    ctx.width = 1280
+    ctx.height = 720
+    ctx.bit_rate = 2_000_000
+    ctx.time_base = AVRational(num: 1, den: 25)
+    ctx.framerate = AVRational(num: 25, den: 1)
+    ctx.pix_fmt = AV_PIX_FMT_YUV420P
+    if codec.pix_fmts != nil and codec.pix_fmts[0] != AV_PIX_FMT_NONE:
+      ctx.pix_fmt = codec.pix_fmts[0]
+  else:
+    ctx.sample_rate = 48_000
+    ctx.bit_rate = 128_000
+    ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
+    av_channel_layout_default(addr ctx.ch_layout, 2)
+    if codec.sample_fmts != nil and codec.sample_fmts[0] != AV_SAMPLE_FMT_NONE:
+      ctx.sample_fmt = codec.sample_fmts[0]
+  result = avcodec_open2(ctx, codec, nil) >= 0
+  avcodec_free_context(addr ctx)
+
+when defined(emscripten):
+  proc findSoftwareEncoder(codec: ptr AVCodec): ptr AVCodec =
+    if codec == nil:
+      return
+    var opaque: pointer = nil
+    while true:
+      let other = av_codec_iterate(addr opaque)
+      if other == nil:
+        return
+      if other.id == codec.id and av_codec_is_encoder(other) != 0 and
+          not ($other.name).endsWith("_web"):
+        return other
+
+  proc copyEncoderContext(src: ptr AVCodecContext,
+      codec: ptr AVCodec): ptr AVCodecContext =
+    ## Copy the public encoder configuration while allocating codec-private state
+    ## for `codec`. AVCodecParameters carries format/profile/color/layout fields;
+    ## the remaining timing and encoder controls live only on AVCodecContext.
+    let par = avcodec_parameters_alloc()
+    if par == nil:
+      return nil
+    defer:
+      var ownedPar = par
+      avcodec_parameters_free(addr ownedPar)
+    if avcodec_parameters_from_context(par, src) < 0:
+      return nil
+
+    result = avcodec_alloc_context3(codec)
+    if result == nil:
+      return
+    if avcodec_parameters_to_context(result, par) < 0:
+      avcodec_free_context(addr result)
+      return nil
+
+    result.time_base = src.time_base
+    result.framerate = src.framerate
+    result.bit_rate_tolerance = src.bit_rate_tolerance
+    result.global_quality = src.global_quality
+    result.compression_level = src.compression_level
+    result.flags = src.flags
+    result.flags2 = src.flags2
+    result.gop_size = src.gop_size
+    result.max_b_frames = src.max_b_frames
+    result.thread_type = src.thread_type
+    result.thread_count = src.thread_count
+    result.strict_std_compliance = src.strict_std_compliance
+
+  proc configuredEncoderOpens(ctx: ptr AVCodecContext): bool =
+    let probe = copyEncoderContext(ctx, ctx.codec)
+    if probe == nil:
+      return false
+    result = avcodec_open2(probe, probe.codec, nil) >= 0
+    var ownedProbe = probe
+    avcodec_free_context(addr ownedProbe)
+
+proc ensureEncoderTimeBase(ctx: ptr AVCodecContext) =
+  if ctx.time_base.isValid:
+    return
+  if ctx.codec_type == AVMEDIA_TYPE_VIDEO:
+    if not ctx.framerate.isValid:
+      ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+    else:
+      ctx.time_base = av_inv_q(ctx.framerate)
+  elif ctx.codec_type == AVMEDIA_TYPE_AUDIO:
+    ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
+  else:
+    ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+
+proc resolveEncoderContext*(ctx: var ptr AVCodecContext) =
+  ## WebCodecs support depends on the complete configuration, so probe only
+  ## after callers have populated the real context. If unsupported, rebuild the
+  ## context with a software encoder before codec-private options are applied.
+  when defined(emscripten):
+    if ctx == nil or ctx.codec == nil:
+      return
+    ensureEncoderTimeBase(ctx)
+    if not ($ctx.codec.name).endsWith("_web") or configuredEncoderOpens(ctx):
+      return
+    let software = findSoftwareEncoder(ctx.codec)
+    if software == nil:
+      return
+    let replacement = copyEncoderContext(ctx, software)
+    if replacement == nil:
+      return
+    avcodec_free_context(addr ctx)
+    ctx = replacement
 
 proc initCodec*(name: string): ptr AVCodec =
   if name == "opus":
@@ -27,7 +142,7 @@ proc initEnCtx(codec: ptr AVCodec): ptr AVCodecContext =
   return encoderCtx
 
 proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
-  let codec: ptr AVCodec = avcodec_find_encoder(id)
+  let codec = avcodec_find_encoder(id)
   if codec == nil:
     error "Encoder not found: " & $id
   return (codec, initEnCtx(codec))
@@ -38,8 +153,32 @@ proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
     error "Unknown encoder: " & name
   return (codec, initEnCtx(codec))
 
+proc findSoftwareDecoder(codecId: AVCodecID): ptr AVCodec =
+  when defined(emscripten):
+    if codecId == ID_VP8:
+      return avcodec_find_decoder_by_name("libvpx")
+    if codecId == ID_VP9:
+      return avcodec_find_decoder_by_name("libvpx-vp9")
+  return avcodec_find_decoder(codecId)
+
 proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
-  let codec: ptr AVCodec = avcodec_find_decoder(codecpar.codec_id)
+  var codec: ptr AVCodec
+  when defined(emscripten):
+    if useWebCodecs:
+      if codecpar.codec_id == ID_H264:
+        codec = avcodec_find_decoder_by_name("h264_webcodecs")
+      elif codecpar.codec_id == ID_AAC:
+        codec = avcodec_find_decoder_by_name("aac_webcodecs")
+      elif codecpar.codec_id == ID_AV1:
+        codec = avcodec_find_decoder_by_name("av1_webcodecs")
+      elif codecpar.codec_id == ID_VP8:
+        codec = avcodec_find_decoder_by_name("vp8_webcodecs")
+      elif codecpar.codec_id == ID_VP9:
+        codec = avcodec_find_decoder_by_name("vp9_webcodecs")
+      elif codecpar.codec_id == ID_HEVC:
+        codec = avcodec_find_decoder_by_name("hevc_webcodecs")
+  if codec == nil:
+    codec = findSoftwareDecoder(codecpar.codec_id)
   if codec == nil:
     error "Decoder not found"
 
@@ -56,6 +195,20 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
     error &"Failed to copy codec parameters: {av_err2str(ret)}"
 
   if avcodec_open2(result, codec, nil) < 0:
+    when defined(emscripten):
+      if useWebCodecs and
+          codecpar.codec_id in [ID_H264, ID_AAC, ID_AV1, ID_VP8, ID_VP9, ID_HEVC]:
+        avcodec_free_context(addr result)
+        codec = findSoftwareDecoder(codecpar.codec_id)
+        if codec != nil:
+          result = avcodec_alloc_context3(codec)
+          if result != nil:
+            result.thread_count = 0
+            if result.codec_type == AVMEDIA_TYPE_VIDEO:
+              result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+            if avcodec_parameters_to_context(result, codecpar) >= 0 and
+                avcodec_open2(result, codec, nil) >= 0:
+              return
     error "Could not open codec"
 
 type InputContainer* = object
@@ -409,20 +562,14 @@ proc startEncoding*(self: var OutputContainer) =
 
 proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders
-  if not ctx.time_base.isValid:
-    if ctx.codec_type == AVMEDIA_TYPE_VIDEO:
-      if not ctx.framerate.isValid:
-        ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
-      else:
-        ctx.time_base = av_inv_q(ctx.framerate)
-    elif ctx.codec_type == AVMEDIA_TYPE_AUDIO:
-      ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
-    else:
-      ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+  ensureEncoderTimeBase(ctx)
   ctx.strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL
   let codecName = if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name else: "unknown"
   let ret = avcodec_open2(ctx, ctx.codec, nil)
   if ret < 0:
+    when defined(emscripten):
+      if codecName.endsWith("_web"):
+        error &"This browser cannot encode {avcodec_get_name(ctx.codec.id)}"
     error &"Could not open encoder '{codecName}': {av_err2str(ret)}"
 
 proc setProfileOrErr*(ctx: ptr AVCodecContext, to: string) =
