@@ -622,7 +622,7 @@ func sameRun(effs: seq[Actions], a, b: Clip): bool =
     a.start + a.dur == b.start and a.offset + a.dur == b.offset and
     clipSpeed(effs, a) == clipSpeed(effs, b)
 
-proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
+proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
@@ -1119,14 +1119,3 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       for fr in drainRechunk(true):
         yield fr
 
-proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
-    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
-
-  let allLayerIndices = toSeq(0..<tl.a.len)
-  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, norm, cache)
-
-proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
-    frameSize: int, norm: Norm,
-    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
-
-  return makeAudioFrames(fmt, tl, frameSize, @[index.int], norm, cache)

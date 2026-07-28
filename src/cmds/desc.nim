@@ -8,18 +8,7 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
   var inputFiles: seq[string] = @[]
-  var parseOptions = true
-  for key in args:
-    if parseOptions and key == "--":
-      parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, args, descOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp("<file ...>", descOptions)
-      if key.startsWith("--"):
-        error "Unknown option: " & key & optionDidYouMean(key, descOptions)
+  parseArgs(args, descOptions, "<file ...>", "--"):
     inputFiles.add key
 
   var formatContext: ptr AVFormatContext

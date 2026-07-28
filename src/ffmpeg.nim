@@ -373,7 +373,6 @@ proc avcodec_get_supported_config*(avctx: ptr AVCodecContext, codec: ptr AVCodec
 
 const FF_COMPLIANCE_STRICT*: cint = 1
 const FF_COMPLIANCE_NORMAL*: cint = 0
-const FF_COMPLIANCE_INOFFICIAL*: cint = -1
 const FF_COMPLIANCE_EXPERIMENTAL*: cint = -2
 
 # https://www.ffmpeg.org/doxygen/7.0/group__lavu__dict.html#gae67f143237b2cb2936c9b147aa6dfde3

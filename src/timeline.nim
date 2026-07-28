@@ -96,12 +96,6 @@ func timelineIsEmpty(self: v3): bool =
 func isLinear*(self: v3): bool {.raises: [].} =
   return self.clips2.len > 0 or self.timelineIsEmpty
 
-func hasTransitions*(self: v3): bool {.raises: [].} =
-  for track in self.vt:
-    if track.len > 0: return true
-  for track in self.at:
-    if track.len > 0: return true
-
 proc chunkify(arr: seq[int], effects: seq[Actions]): seq[(int64, int64, int, Actions)] =
   if arr.len == 0:
     return @[]

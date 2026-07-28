@@ -1,5 +1,5 @@
-import std/strutils
-import ../cli
+import std/[strformat, strutils]
+import ../[cli, log]
 import ../util/[fun, term]
 
 proc printHelp*(usage: string, opts: seq[OptDef]) {.noreturn.} =
@@ -34,3 +34,25 @@ proc printHelp*(usage: string, opts: seq[OptDef]) {.noreturn.} =
     wrapText("Show info about this program then exit", helpWidth, optWidth)
   echo ""
   quit(0)
+
+template parseArgs*(args: seq[string], opts: seq[OptDef], usage: string,
+    prefix: string, body: untyped) =
+  ## Drive a subcommand's option loop. `body` runs for every non-option
+  ## argument with `key` bound to it, and dispatches on `expecting` for
+  ## options that take a value. A bare `--` ends option parsing. `prefix` is
+  ## what marks an unrecognized argument as a mistyped option rather than a
+  ## positional; subcommands whose positionals never start with `-` pass "-".
+  var expecting {.inject.} = coNone
+  var parseOptions = true
+  for key {.inject.} in args:
+    if parseOptions and expecting == coNone and key == "--":
+      parseOptions = false
+      continue
+    if parseOptions:
+      if genCliMacro(key, args, opts):
+        continue
+      if key in ["-h", "--help"]:
+        printHelp(usage, opts)
+      if key.startsWith(prefix):
+        error "Unknown option: " & key & optionDidYouMean(key, opts)
+    body

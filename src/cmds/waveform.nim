@@ -14,7 +14,6 @@ assertArgumentOptions(waveformOptions, waveformArgumentOptions)
 
 proc main*(strArgs: seq[string]) =
   var
-    expecting = coNone
     inputFile = ""
     userStream: int16 = 0
     channel = ""
@@ -22,20 +21,8 @@ proc main*(strArgs: seq[string]) =
     startSample: int64 = 0
     lengthSamples: int64 = -1
     display = "float"
-    parseOptions = true
 
-  for key in strArgs:
-    if parseOptions and expecting == coNone and key == "--":
-      parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, strArgs, waveformOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp("<file> [options]", waveformOptions)
-      if key.startsWith("--"):
-        error &"Unknown option: {key}{optionDidYouMean(key, waveformOptions)}"
-
+  parseArgs(strArgs, waveformOptions, "<file> [options]", "--"):
     case expecting
     of coNone:
       if inputFile != "":

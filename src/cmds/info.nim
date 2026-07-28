@@ -293,27 +293,13 @@ assertArgumentOptions(infoOptions, infoArgumentOptions)
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
-  var expecting = coNone
   var isJson = false
   var queryExt = ""
   var queryKind: CodecListKind
   var inputFiles: seq[string] = @[]
-  var parseOptions = true
 
-  for key in args:
-    if parseOptions and expecting == coNone and key == "--":
-      parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, args, infoOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp(
-          "<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>",
-          infoOptions)
-      if key.startsWith("--"):
-        error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
-
+  parseArgs(args, infoOptions,
+      "<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", "--"):
     case expecting
     of coNone:
       inputFiles.add key

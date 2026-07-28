@@ -31,19 +31,7 @@ proc main*(cArgs: seq[string]) =
   var threads: cint = 4
   var threshold: float32 = 0.04
 
-  var expecting = coNone
-  var parseOptions = true
-  for key in cArgs:
-    if parseOptions and expecting == coNone and key == "--":
-      parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, args, whisperOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp("<file|:mic> <model> [options]", whisperOptions)
-      if key.startsWith("--"):
-        error &"Unknown option: {key}{optionDidYouMean(key, whisperOptions)}"
+  parseArgs(cArgs, whisperOptions, "<file|:mic> <model> [options]", "--"):
     case expecting:
     of coNone:
       if inputPath == "":

@@ -6,9 +6,6 @@ type
     name*: string
     args*: seq[BoundEditArg]
 
-func isSymbol(expr: Expr, name, text: string): bool =
-  expr.symbolEquals(text, name)
-
 proc bindEditArgs*(expressions: openArray[Expr], text: string,
     argOrder: openArray[string]): seq[BoundEditArg] =
   ## Bind positional and keyword arguments to their position in `argOrder`.
@@ -23,7 +20,7 @@ proc bindEditArgs*(expressions: openArray[Expr], text: string,
       value: string
 
     if expr.kind == ExprList and expr.elements.len > 0 and
-        expr.elements[0].isSymbol("=", text):
+        expr.elements[0].symbolEquals(text, "="):
       let node = expr.elements
       sawKeyword = true
       position = -1

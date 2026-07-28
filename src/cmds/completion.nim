@@ -1,4 +1,4 @@
-import std/[strformat, strutils]
+import std/strutils
 import ../[cli, log]
 import ./help
 
@@ -8,16 +8,8 @@ const completionArgumentOptions = {coShell}
 assertArgumentOptions(completionOptions, completionArgumentOptions)
 
 proc main*(args: seq[string]) =
-  var expecting = coNone
   var shell = ""
-  for key in args:
-    if genCliMacro(key, args, completionOptions):
-      continue
-    if key in ["-h", "--help"]:
-      printHelp("[options]", completionOptions)
-    if key.startsWith("-"):
-      error &"Unknown option: {key}{optionDidYouMean(key, completionOptions)}"
-
+  parseArgs(args, completionOptions, "[options]", "-"):
     case expecting
     of coShell: shell = key
     of coNone: discard

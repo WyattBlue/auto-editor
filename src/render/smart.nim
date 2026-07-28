@@ -1,6 +1,8 @@
 import std/algorithm
+from std/math import round
 
 import ../[ffmpeg, log, timeline]
+import ../util/rational
 
 type
   SmartSpanKind* = enum
@@ -95,3 +97,98 @@ proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, args: mainArgs) =
     discard av_opt_set_int(encoder.priv_data, "crf", args.crf.cint, 0)
   if args.preset != "":
     discard av_opt_set(encoder.priv_data, "preset", cstring(args.preset), 0)
+
+func frameAt*(ts: int64, tb, fps: AVRational): int64 =
+  int64(round(float(ts) * float(tb) * float(fps)))
+
+func encoderSupports*(encoder: ptr AVCodec, format: AVPixelFormat): bool =
+  if encoder == nil:
+    return false
+  if encoder.pix_fmts == nil:
+    return true
+  var i = 0
+  while encoder.pix_fmts[i] != AV_PIX_FMT_NONE:
+    if encoder.pix_fmts[i] == format:
+      return true
+    inc i
+  false
+
+# --- Annex B <-> four-byte-length NAL conversion, shared by H.264 and HEVC ---
+
+func startCodeLen*(data: ptr UncheckedArray[uint8], size, pos: int): int =
+  if pos + 3 <= size and data[pos] == 0 and data[pos + 1] == 0:
+    if data[pos + 2] == 1:
+      return 3
+    if pos + 4 <= size and data[pos + 2] == 0 and data[pos + 3] == 1:
+      return 4
+  0
+
+proc appendNal*(result: var seq[uint8], data: ptr UncheckedArray[uint8],
+    first, last: int) =
+  let size = last - first
+  if size <= 0:
+    return
+  result.add uint8(size shr 24)
+  result.add uint8(size shr 16)
+  result.add uint8(size shr 8)
+  result.add uint8(size)
+  for i in first..<last:
+    result.add data[i]
+
+proc annexBToLengthPrefixed*(data: ptr uint8, size: int): seq[uint8] =
+  let bytes = cast[ptr UncheckedArray[uint8]](data)
+  var pos = 0
+  while pos < size and startCodeLen(bytes, size, pos) == 0:
+    inc pos
+  if pos == size:
+    result.setLen(size)
+    if size > 0:
+      copyMem(addr result[0], data, size)
+    return
+
+  while pos < size:
+    let codeLen = startCodeLen(bytes, size, pos)
+    if codeLen == 0:
+      inc pos
+      continue
+    let nalStart = pos + codeLen
+    var next = nalStart
+    while next < size and startCodeLen(bytes, size, next) == 0:
+      inc next
+    result.appendNal(bytes, nalStart, next)
+    pos = next
+
+proc normalizeLengthPrefixed*(packet: ptr AVPacket,
+    parameterSets: openArray[uint8], label: string) =
+  ## Rewrite an Annex B packet in place as four-byte-length NALs, optionally
+  ## prefixed with `parameterSets`, preserving the packet's timing fields.
+  let bytes = cast[ptr UncheckedArray[uint8]](packet.data)
+  var start = 0
+  while start < packet.size.int and
+      startCodeLen(bytes, packet.size.int, start) == 0:
+    inc start
+  if start == packet.size.int and parameterSets.len == 0:
+    return
+
+  let payload = annexBToLengthPrefixed(packet.data, packet.size.int)
+  let pts = packet.pts
+  let dts = packet.dts
+  let duration = packet.duration
+  let flags = packet.flags
+  let streamIndex = packet.stream_index
+  let timeBase = packet.time_base
+  av_packet_unref(packet)
+  let total = parameterSets.len + payload.len
+  if av_new_packet(packet, total.cint) < 0:
+    error "Could not allocate normalized " & label & " packet"
+  if parameterSets.len > 0:
+    copyMem(packet.data, unsafeAddr parameterSets[0], parameterSets.len)
+  if payload.len > 0:
+    copyMem(cast[pointer](cast[int](packet.data) + parameterSets.len),
+      unsafeAddr payload[0], payload.len)
+  packet.pts = pts
+  packet.dts = dts
+  packet.duration = duration
+  packet.flags = flags
+  packet.stream_index = streamIndex
+  packet.time_base = timeBase

@@ -110,25 +110,12 @@ assertArgumentOptions(levelsOptions, levelsArgumentOptions)
 
 proc main*(strArgs: seq[string]) =
   var
-    expecting = coNone
     inputFile = ""
     edit = "audio"
     display = "float"
     tb = AVRational(num: 30, den: 1)
-    parseOptions = true
 
-  for key in strArgs:
-    if parseOptions and expecting == coNone and key == "--":
-      parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, strArgs, levelsOptions):
-        continue
-      if key in ["-h", "--help"]:
-        printHelp("<file> [options]", levelsOptions)
-      if key.startsWith("--"):
-        error &"Unknown option: {key}{optionDidYouMean(key, levelsOptions)}"
-
+  parseArgs(strArgs, levelsOptions, "<file> [options]", "--"):
     case expecting
     of coNone:
       if inputFile != "":

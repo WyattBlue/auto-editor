@@ -19,13 +19,7 @@ func formatBytes(intSize: BiggestInt): (string, string) =
 
 proc main*(args: seq[string]) =
   var positionals: seq[string] = @[]
-  for key in args:
-    if genCliMacro(key, args, cacheOptions):
-      continue
-    if key in ["-h", "--help"]:
-      printHelp("[clean | clear]", cacheOptions)
-    if key.startsWith("-"):
-      error "Unknown option: " & key & optionDidYouMean(key, cacheOptions)
+  parseArgs(args, cacheOptions, "[clean | clear]", "-"):
     positionals.add key
 
   let cacheDir = getTempDir() / &"ae-{version}"

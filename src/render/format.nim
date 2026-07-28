@@ -1,9 +1,9 @@
-import std/[heapqueue, options, strformat, strutils]
+import std/[heapqueue, options, sequtils, strformat, strutils]
 from std/math import round
 
 import ../[action, av, ffmpeg, license, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
-import ./[video, audio, subtitle, h264, hevc, partialplan, vp9av1]
+import ./[video, audio, subtitle, partialplan]
 
 type Priority = object
   index: float64
@@ -96,18 +96,8 @@ proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArg
   if plan.len == 0:
     return
 
-  case encoder.id
-  of ID_H264:
-    (result.stream, result.packets) =
-      makePartialLosslessH264(output, tl, args, plan)
-  of ID_HEVC:
-    (result.stream, result.packets) =
-      makePartialLosslessHevc(output, tl, args, plan)
-  of ID_VP9, ID_AV1:
-    (result.stream, result.packets) =
-      makePartialLossless(output, tl, args, plan, encoder.id)
-  else:
-    return
+  (result.stream, result.packets) =
+    makePartialLossless(output, tl, args, plan, encoder.id)
 
 proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules,
     bar: Bar, cache: MediaCache) =
@@ -237,8 +227,8 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], renderTl,
-          frameSize, args.audioNormalize, cache)
+      let audioFrameIter = makeAudioFrames(encoder.sample_fmts[0], renderTl,
+          frameSize, toSeq(0 ..< tl.a.len), args.audioNormalize, cache)
       audioFrameIters.add(audioFrameIter)
   elif includeAudio:
     # Create separate streams for each timeline layer
@@ -270,8 +260,8 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32,
-            renderTl, frameSize, args.audioNormalize, cache)
+        let audioFrameIter = makeAudioFrames(encoder.sample_fmts[0], renderTl,
+            frameSize, @[i], args.audioNormalize, cache)
         audioFrameIters.add(audioFrameIter)
 
   defer:
