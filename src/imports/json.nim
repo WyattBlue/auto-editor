@@ -53,6 +53,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
     effects.add(group)
     result.effects = uint32(effects.len - 1)
   else:
+    group.free()
     result.effects = uint32(effectIndex)
 
 proc parseTransition(node: JsonNode): Transition {.raises: [].} =
@@ -210,6 +211,8 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
       if effectIndex == -1:
         effects.add(group)
         effectIndex = effects.len - 1
+      else:
+        group.free()
       indexMap.add uint32(effectIndex)
 
   let clipsNode = jsonNode{"clips"}

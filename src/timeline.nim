@@ -282,6 +282,8 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
       if effectIndex == -1:
         effects.add action
         effectIndex = effects.len - 1
+      else:
+        action.free()
       if effectIndex > int64(high(uint32)):
         error "'Number of actions' limit for timeline reached."
       let e = uint32(effectIndex)
@@ -452,6 +454,7 @@ proc withRamp(tl: var v3, cache: var Table[RampKey, uint32], effectIdx: uint32,
   let found = tl.effects.find(group)
   result =
     if found >= 0:
+      group.free()
       found.uint32
     else:
       tl.effects.add group

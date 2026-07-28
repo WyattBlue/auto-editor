@@ -404,9 +404,14 @@ proc parseLabeledFlag(key: string): tuple[matched: bool, kind: CliOption, label:
 proc setLabeledWhen(args: var mainArgs, label: int, action: Actions) =
   for w in args.labeledWhens.mitems:
     if w.label == label:
+      w.action.free()
       w.action = action
       return
   args.labeledWhens.add (label: label, action: action)
+
+proc replaceAction(dest: var Actions, replacement: Actions) =
+  dest.free()
+  dest = replacement
 
 proc setLabeledEdit(args: var mainArgs, label: int, expr: string) =
   for e in args.labeledEdits.mitems:
@@ -499,21 +504,23 @@ judge making cuts.
       let rest = extractAdds(key, expectingLabel, -1, args)
       if rest.strip() != "":
         case expectingLabel
-        of 0: args.whenInactive = parseActions(rest)
-        of 1: args.whenActive = parseActions(rest)
+        of 0: replaceAction(args.whenInactive, parseActions(rest))
+        of 1: replaceAction(args.whenActive, parseActions(rest))
         else: setLabeledWhen(args, expectingLabel, parseActions(rest))
     of coWhenInactive:
       let rest = extractAdds(key, 0, -1, args)
       if rest.strip() != "":
-        args.whenInactive = parseActions(rest)
+        replaceAction(args.whenInactive, parseActions(rest))
     of coWhenActive:
       let rest = extractAdds(key, 1, -1, args)
       if rest.strip() != "":
-        args.whenActive = parseActions(rest)
+        replaceAction(args.whenActive, parseActions(rest))
     of coSilentSpeed:
-      args.whenInactive = actionFromUserSpeed(parseSpeed(key, $expecting))
+      replaceAction(args.whenInactive,
+        actionFromUserSpeed(parseSpeed(key, $expecting)))
     of coVideoSpeed:
-      args.whenActive = actionFromUserSpeed(parseSpeed(key, $expecting))
+      replaceAction(args.whenActive,
+        actionFromUserSpeed(parseSpeed(key, $expecting)))
     of coAddIn:
       block:
         let span = parseTimeRange(key, $expecting)

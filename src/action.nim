@@ -229,6 +229,13 @@ const aCut* = Actions(1)
 func isCut*(a: Actions): bool = int(a) == 1
 func isEmpty*(a: Actions): bool = int(a) == 0
 
+proc free*(a: Actions) =
+  ## Release the buffer allocated by `newActions`.
+  ##
+  ## `aNil` and `aCut` are sentinel values and do not own a buffer.
+  if int(a) > 1:
+    dealloc(cast[pointer](int(a)))
+
 const
   luvBrighthueId* = toSnorm16(0.0'f32)
   luvContrastId* = 1.0'f32

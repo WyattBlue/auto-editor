@@ -12,6 +12,25 @@ import render/format
 import render/subtitle
 import stats
 
+proc freeActions(args: mainArgs, tl: v3) =
+  ## CLI actions are copied into the timeline, so release each shared buffer
+  ## exactly once.
+  var freed: HashSet[int]
+  template freeOnce(a: Actions) =
+    let address = int(a)
+    if address > 1 and address notin freed:
+      freed.incl address
+      a.free()
+
+  for a in tl.effects:
+    freeOnce(a)
+  freeOnce(args.whenInactive)
+  freeOnce(args.whenActive)
+  for item in args.labeledWhens:
+    freeOnce(item.action)
+  for item in args.setAction:
+    freeOnce(item[0])
+
 
 func prefixEquals(s, expected: string, stop: int): bool {.raises: [].} =
   if stop != expected.len:
@@ -231,8 +250,11 @@ proc applyAdds(tl: var v3, args: mainArgs,
     var group = aNil
     try:
       if spec.effects.len > 0:
-        for a in parseActions(spec.effects):
-          acts.add a
+        block:
+          let parsed = parseActions(spec.effects)
+          defer: parsed.free()
+          for a in parsed:
+            acts.add a
       if acts.len > 0:
         group = newActions(acts)
     except ActionParseError as e:
@@ -241,6 +263,8 @@ proc applyAdds(tl: var v3, args: mainArgs,
     if idx == -1:
       tl.effects.add group
       idx = tl.effects.len - 1
+    else:
+      group.free()
     let eIdx = uint32(idx)
     var track: seq[Clip]
     for clip in tl.v[0]:
@@ -263,6 +287,7 @@ proc editMedia*(args: var mainArgs) =
   var usePath: string = ""
   var mi: MediaInfo
   defer: interner.cleanup()
+  defer: freeActions(args, tlV3)
 
   if args.progress == BarType.machine and args.output != "-":
     conwrite "Starting"

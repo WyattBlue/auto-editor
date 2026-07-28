@@ -1,7 +1,7 @@
 import std/[heapqueue, options, strformat, strutils]
 from std/math import round
 
-import ../[av, ffmpeg, license, log, media, timeline, throttle]
+import ../[action, av, ffmpeg, license, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
 import ./[video, audio, subtitle, h264, hevc, partialplan, vp9av1]
 
@@ -112,7 +112,11 @@ proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArg
 proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules,
     bar: Bar, cache: MediaCache) =
   var args = inputArgs
+  let sourceEffectCount = tl.effects.len
   var renderTl = tl.bakeTransitions()
+  defer:
+    for i in sourceEffectCount ..< renderTl.effects.len:
+      renderTl.effects[i].free()
   var throttle = initThrottle()
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE

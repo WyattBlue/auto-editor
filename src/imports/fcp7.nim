@@ -77,6 +77,7 @@ proc getEffect(speed: float, effects: var seq[Actions]): uint32 =
   if idx == -1:
     effects.add(actionGroup)
     return uint32(effects.len - 1)
+  actionGroup.free()
   return uint32(idx)
 
 proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
