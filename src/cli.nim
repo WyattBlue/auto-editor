@@ -340,6 +340,7 @@ type CmdDef* = object
   opts*: seq[OptDef]
   files*: bool = true # Whether shell completion should offer filenames.
   requiresArgs*: bool = true
+  shellCompletion*: bool = true
 
 const commands*: seq[CmdDef] = @[
   CmdDef(name: "cache", help: "", opts: cacheOptions, files: false),
@@ -351,7 +352,7 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out",
       opts: subdumpOptions),
   CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface",
-      opts: waveformOptions),
+      opts: waveformOptions, shellCompletion: false),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]",
       opts: whisperOptions),
 ] & (
@@ -360,7 +361,7 @@ const commands*: seq[CmdDef] = @[
         opts: completionOptions, files: false),
     CmdDef(name: "preview-worker", handler: "preview_worker",
       help: "Run the resident preview rendering worker", opts: @[], files: false,
-      requiresArgs: false),
+      requiresArgs: false, shellCompletion: false),
   ]
 )
 
@@ -392,6 +393,8 @@ proc writeZshOptions(name: string, opts: seq[OptDef]) =
 proc zshcomplete*() =
   var locals = @["subcommands", "options"]
   for cmd in commands:
+    if not cmd.shellCompletion:
+      continue
     locals.add cmd.name & "_options"
 
   echo "#compdef auto-editor"
@@ -400,6 +403,8 @@ proc zshcomplete*() =
   echo "  local -a " & locals.join(" ")
   echo "  subcommands=("
   for cmd in commands:
+    if not cmd.shellCompletion:
+      continue
     if cmd.help != "":
       echo "    '" & cmd.name & ":" & cmd.help.replace("'", "'\\''") & "'"
     else:
@@ -407,6 +412,8 @@ proc zshcomplete*() =
   echo "  )"
   writeZshOptions("options", mainOptions)
   for cmd in commands:
+    if not cmd.shellCompletion:
+      continue
     writeZshOptions(cmd.name & "_options", cmd.opts)
   echo """
   if (( CURRENT == 2 )); then
@@ -416,6 +423,8 @@ proc zshcomplete*() =
   else
     case "$words[2]" in"""
   for cmd in commands:
+    if not cmd.shellCompletion:
+      continue
     echo "      " & cmd.name & ")"
     echo "        _describe 'option' " & cmd.name & "_options"
     if cmd.files:
