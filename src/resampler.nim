@@ -84,7 +84,8 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       else: ""
     let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={frame.ch_layout}{extraArgs}"
 
-    var ret = avfilter_graph_create_filter(addr resampler.abuffer, abuffer, nil, abufferArgs.cstring, nil, resampler.graph)
+    var ret = avfilter_graph_create_filter(addr resampler.abuffer, abuffer, nil,
+        abufferArgs.cstring, nil, resampler.graph)
     if ret < 0:
       error "Could not create abuffer"
 
@@ -92,11 +93,13 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={resampler.layout}"
 
     var aformatCtx: ptr AVFilterContext = nil
-    ret = avfilter_graph_create_filter(addr aformatCtx, aformat, nil, aformatArgs.cstring, nil, resampler.graph)
+    ret = avfilter_graph_create_filter(addr aformatCtx, aformat, nil,
+        aformatArgs.cstring, nil, resampler.graph)
     if ret < 0:
       error "Could not create aformat"
 
-    ret = avfilter_graph_create_filter(addr resampler.abuffersink, asink, nil, nil, nil, resampler.graph)
+    ret = avfilter_graph_create_filter(addr resampler.abuffersink, asink, nil, nil, nil,
+        resampler.graph)
     if ret < 0:
       error "Could not create abuffersink"
     if resampler.frameSize > 0:

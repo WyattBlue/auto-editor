@@ -373,7 +373,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
   var miToUrl = initTable[MediaInfo, string]()
   var miToId = initTable[MediaInfo, string]()
-  var ptrToMi = initTable[ptr string, MediaInfo]() # Cache ptr -> MediaInfo lookup
+  var ptrToMi = initTable[ptr string, MediaInfo]()       # Cache ptr -> MediaInfo lookup
   var fileDefs = initHashSet[string]() # Contains urls
 
   var idCounter = 0
@@ -390,9 +390,9 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     let filedef = <>file(id = miToId[mi])
     if pathurl notin fileDefs:
       let durationStr =
-        if resolve: ""                              # Resolve wants it blank
-        elif isStillImage(mi, tl.tb): $tl.len       # hold the still long enough
-        else: ""                                    # Premiere reads media length
+        if resolve: ""                        # Resolve wants it blank
+        elif isStillImage(mi, tl.tb): $tl.len # hold the still long enough
+        else: ""                              # Premiere reads media length
       mediaDef(filedef, pathurl, mi, tl, timebase, ntsc, durationStr)
       fileDefs.incl(pathurl)
     clipitem.add filedef
@@ -408,8 +408,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     videoTrackStart[k] = nextVideoId
     nextVideoId += tl.v[k].len
   let firstAudioId = (if hasVideo: nextVideoId else: 1)
-  let audioPlan = (if resolve: @[]
-                   else: planPremiereAudio(tl, ptrToMi, firstAudioId))
+  let audioPlan = if resolve: @[] else: planPremiereAudio(tl, ptrToMi, firstAudioId)
 
   let xmeml = <>xmeml(version = "5")
   let sequence = (if resolve: <>sequence() else: <>sequence(explodedTracks = "true"))

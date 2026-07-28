@@ -6,9 +6,9 @@ import ./util/[fun, rational, dnorm16]
 import nimcrypto/sha
 
 type CacheCodec = enum
-  ccFloat32 = 0'u8  # raw float32
-  ccUnorm16 = 1'u8  # [0.0, 1.0]
-  ccSnorm16 = 2'u8  # [-1.0, 1.0]
+  ccFloat32 = 0'u8 # raw float32
+  ccUnorm16 = 1'u8 # [0.0, 1.0]
+  ccSnorm16 = 2'u8 # [-1.0, 1.0]
 
 func codecOf(T: typedesc): CacheCodec =
   when T is Unorm16: ccUnorm16

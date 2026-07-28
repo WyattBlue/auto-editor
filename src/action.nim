@@ -238,8 +238,7 @@ func brightnessLutExpr*(brightness: float32): string =
   ## FFmpeg LUT expression used by the renderer and editor exports.
   "val+" & $(brightness * 255.0'f32)
 
-func luvLutExprs*(brightness, contrast, saturation: float32):
-    tuple[y, u, v: string] =
+func luvLutExprs*(brightness, contrast, saturation: float32): tuple[y, u, v: string] =
   ## Keep exported color adjustment math identical to the renderer.
   let shift = brightness * 255.0'f32
   result.y = "(val-128)*" & $contrast & "+128+" & $shift
@@ -441,7 +440,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "duck amount must be in [0.0, 1.0]")
     if not (vals[1] >= 0.0 and vals[1] <= 1.0):
       raise newException(ActionParseError, "duck threshold must be in [0.0, 1.0]")
-    if not (vals[2] >= 0.0 and vals[2] <= 65535.0 and vals[3] >= 0.0 and vals[3] <= 65535.0):
+    if not (vals[2] >= 0.0 and vals[2] <= 65535.0 and
+        vals[3] >= 0.0 and vals[3] <= 65535.0):
       raise newException(ActionParseError, "duck attack/release must be in [0, 65535] ms")
     return Action(kind: actDuck, duckAmount: toUnorm16(vals[0]),
       duckThresh: toUnorm16(vals[1]), duckAttack: uint16(vals[2]),
@@ -471,7 +471,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError,
         "rotate takes a fixed angle (rotate:deg); use spin:deg/rate for a continuous spin")
     try:
-      return Action(kind: actRotate, rStart: Unorm16(rotCode(parseFloat(parts[1]).float32)))
+      return Action(kind: actRotate,
+        rStart: Unorm16(rotCode(parseFloat(parts[1]).float32)))
     except ValueError:
       raise newException(ActionParseError, "Invalid float value:" & parts[1])
 

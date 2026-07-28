@@ -70,8 +70,9 @@ proc resolveFile(fileNode: XmlNode, sources: var Table[string, ptr string],
   return nil
 
 proc getEffect(speed: float, effects: var seq[Actions]): uint32 =
-  let actionGroup = if speed == 1.0: aNil
-                    else: newActions([Action(kind: actSpeed, val: speed)])
+  let actionGroup =
+    if speed == 1.0: aNil
+    else: newActions([Action(kind: actSpeed, val: speed)])
   let idx = effects.find(actionGroup)
   if idx == -1:
     effects.add(actionGroup)
@@ -111,7 +112,8 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
 
     let dur = endVal - startVal
     let e = getEffect(speed, effects)
-    result.add Clip(src: srcPtr, start: startVal, dur: dur, offset: inVal, effects: e, stream: 0)
+    result.add Clip(src: srcPtr, start: startVal, dur: dur, offset: inVal,
+      effects: e, stream: 0)
 
 proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   let xmlContent = readFile(path)

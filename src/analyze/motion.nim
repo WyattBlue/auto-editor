@@ -85,14 +85,14 @@ proc createFilterGraph(timeBase: AVRational, pixFmtName: string,
     &"video_size={width}x{height}:pix_fmt={pixFmtName}:time_base={timeBase.num}/{timeBase.den}:pixel_aspect=1/1"
   )
 
-  var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("buffer"),
-                                        "in", bufferArgs, nil, filterGraph)
+  var ret = avfilter_graph_create_filter(addr bufferSrc,
+    avfilter_get_by_name("buffer"), "in", bufferArgs, nil, filterGraph)
   if ret < 0:
     error &"Cannot create buffer source with args: {bufferArgs}, error code: {ret}"
 
   # Create buffer sink
-  ret = avfilter_graph_create_filter(addr bufferSink, avfilter_get_by_name("buffersink"),
-                                    "out", nil, nil, filterGraph)
+  ret = avfilter_graph_create_filter(addr bufferSink,
+    avfilter_get_by_name("buffersink"), "out", nil, nil, filterGraph)
   if ret < 0:
     error "Cannot create buffer sink"
 
@@ -282,19 +282,15 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
 
-  var processor = VideoProcessor(
-    formatCtx: container.formatContext,
-    codecCtx: initDecoder(videoStream.codecpar),
-    tb: tb,
-    videoIndex: videoStream.index,
-  )
+  var processor = VideoProcessor(formatCtx: container.formatContext,
+    codecCtx: initDecoder(videoStream.codecpar), tb: tb,
+    videoIndex: videoStream.index)
 
-  let inaccurateDur = (
+  let inaccurateDur =
     if videoStream.duration != AV_NOPTS_VALUE and videoStream.time_base.isValid:
       float(videoStream.duration) * float(videoStream.time_base * tb)
     else:
       container.duration * float(tb)
-  )
   bar.start(inaccurateDur, "Analyzing motion")
 
   var i: float = 0

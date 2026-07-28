@@ -46,12 +46,12 @@ type
     progress: Atomic[float]
     total: Atomic[float]
     shouldStop: Atomic[bool]
-    paused: Atomic[bool]        # set by end() to halt writes
-    sleeping: Atomic[bool]      # set by worker to acknowledge it isn't writing
+    paused: Atomic[bool]   # set by end() to halt writes
+    sleeping: Atomic[bool] # set by worker to acknowledge it isn't writing
     title: string
     lenTitle: int
     begin: float
-    config: ptr BarConfig # Share constant config via pointer
+    config: ptr BarConfig  # Share constant config via pointer
 
   Bar* = ref object
     config: BarConfig
@@ -174,14 +174,8 @@ proc initBar*(barType: BarType): Bar =
       except:
         discard
 
-  let config = BarConfig(
-    icon: icon,
-    chars: chars,
-    brackets: brackets,
-    machine: machine,
-    partWidth: partWidth,
-    ampm: ampm
-  )
+  let config = BarConfig(icon: icon, chars: chars, brackets: brackets,
+    machine: machine, partWidth: partWidth, ampm: ampm)
   result = Bar(hide: hide, config: config, stack: @[])
   if not hide:
     when not defined(windows):
@@ -189,7 +183,8 @@ proc initBar*(barType: BarType): Bar =
       signal(SIGWINCH, sigwinchHandler)
     result.threadData = ThreadData(config: addr result.config)
     result.threadData.shouldStop.store(false)
-    result.threadData.paused.store(true) # start() unpauses; prevents writes before first bar
+    # start() unpauses; prevents writes before the first bar.
+    result.threadData.paused.store(true)
     createThread(result.progressThread, progressWorker, result.threadData)
 
 

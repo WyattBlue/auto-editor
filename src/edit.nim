@@ -97,10 +97,7 @@ proc parseNat(val: string): int32 =
 proc parseStream(val: string): int16 =
   if val == "all":
     return -1
-  let n = (
-    try: parseInt(val)
-    except ValueError: error &"Invalid stream: {val}"
-  )
+  let n = (try: parseInt(val) except ValueError: error &"Invalid stream: {val}")
   if n > 1000 or n < 0: error &"Invalid stream: {val}"
   result = int16(n)
 
@@ -232,7 +229,8 @@ proc editNeeds*(edit: string): tuple[video, audio: bool] =
   walk(expressions[^1])
   return (video, audio)
 
-proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb: AVRational, bar: Bar): seq[uint8] =
+proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
+    tb: AVRational, bar: Bar): seq[uint8] =
 
   proc editEval(expr: Expr, text: string): seq[bool] =
     if expr.kind in {ExprSym, ExprNum}:
@@ -359,7 +357,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string, tb
 
         if stream < 0:
           error "blackdetect: 'all' stream is not supported"
-        result.orWithThreshold(blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
+        result.orWithThreshold(
+          blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
         return result
       of esSubtitle, esRegex:
         var pattern = ""

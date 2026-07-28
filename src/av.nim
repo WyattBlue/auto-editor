@@ -258,15 +258,16 @@ proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
   var formatCtx = container.formatContext
   discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
-  var audioStreamIndex = (if container.audio.len == 0: -1 else: container.audio[0].index)
-  var videoStreamIndex = (if container.video.len == 0: -1 else: container.video[0].index)
+  var audioStreamIndex = if container.audio.len == 0: -1 else: container.audio[0].index
+  var videoStreamIndex = if container.video.len == 0: -1 else: container.video[0].index
 
   if audioStreamIndex != -1:
     let packet = ffmpeg.av_packet_alloc()
     var biggestEnd = 0'i64
 
     while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
-      if packet.stream_index == audioStreamIndex and packet.pts != ffmpeg.AV_NOPTS_VALUE:
+      if packet.stream_index == audioStreamIndex and packet.pts !=
+          ffmpeg.AV_NOPTS_VALUE:
         let endPts = packet.pts + max(packet.duration, 0)
         if endPts > biggestEnd:
           biggestEnd = endPts
@@ -325,8 +326,8 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
 
         yield frame
 
-iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
-    frame: ptr AVFrame): ptr AVFrame =
+iterator flushDecode*(container: InputContainer, index: cint,
+    codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
   ## Drain-first decode loop. Always pulls all available frames out of the
   ## decoder before sending more packets, so we never hit AVERROR(EAGAIN) on
   ## send (which would silently drop the packet under the previous pattern).
@@ -354,15 +355,10 @@ iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCo
         discard avcodec_send_packet(codecCtx, packet)
       av_packet_unref(packet)
 
-proc seek*(container: InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
-  var flags: cint = 0
-
-  if backward:
-    flags |= AVSEEK_FLAG_BACKWARD
-
+proc seek*(container: InputContainer, offset: int64, stream: ptr AVStream = nil) =
+  var flags: cint = AVSEEK_FLAG_BACKWARD
   var streamIndex: cint = (if stream == nil: -1 else: stream.index)
-  var ret = av_seek_frame(container.formatContext, streamIndex, offset, flags)
-  if ret < 0:
+  if av_seek_frame(container.formatContext, streamIndex, offset, flags) < 0:
     error "Error seeking frame"
   # Callers need to call `avcodec_flush_buffers()` after.
 
@@ -385,10 +381,7 @@ proc close*(cache: MediaCache) =
 
 proc getContainer*(cache: MediaCache, src: ptr string): InputContainer =
   if src notin cache.cns:
-    cache.cns[src] = (
-      try: open(src[])
-      except IOError as e: error e.msg
-    )
+    cache.cns[src] = (try: open(src[]) except IOError as e: error e.msg)
   return cache.cns[src]
 
 const MaxOutputOptions = 2 # makeMedia sets at most frag_duration and movflags.
@@ -476,8 +469,11 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, lang: Lang,
-    width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (ptr AVStream, ptr AVCodecContext) =
+proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational,
+    lang: Lang,
+
+width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (
+        ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
     error "Encoder not found: " & codecName
@@ -567,7 +563,9 @@ proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders
   ensureEncoderTimeBase(ctx)
   ctx.strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL
-  let codecName = if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name else: "unknown"
+  let codecName =
+    if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name
+    else: "unknown"
   let ret = avcodec_open2(ctx, ctx.codec, nil)
   if ret < 0:
     when defined(emscripten):
@@ -625,7 +623,8 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   if ret < 0:
     error &"Could not write packet (disk full?): {av_err2str(ret)}"
 
-iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
+iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame,
+    packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
 
   var ret = avcodec_send_frame(encoderCtx, frame)

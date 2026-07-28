@@ -141,14 +141,18 @@ void ae_parakeet_free(void *ctx) {
 }
 """.}
 
-  proc ae_whisper_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
+  proc ae_whisper_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx {.
+    importc, nodecl, cdecl.}
   proc ae_whisper_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
     language: cstring, translate: cint, nThreads: cint, initialPrompt: cstring,
-    maxLen: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, nodecl, cdecl.}
+    maxLen: cint, onSegment: WhisperSegmentCb, user: pointer):
+    cint {.importc, nodecl, cdecl.}
   proc ae_whisper_free(ctx: WhisperCtx) {.importc, nodecl, cdecl.}
-  proc ae_parakeet_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
+  proc ae_parakeet_init(modelPath: cstring, useGpu,
+      verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
   proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
-    nThreads, splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, nodecl, cdecl.}
+    nThreads, splitWords: cint, onSegment: WhisperSegmentCb,
+    user: pointer): cint {.importc, nodecl, cdecl.}
   proc ae_parakeet_free(ctx: WhisperCtx) {.importc, nodecl, cdecl.}
 else:
   proc ae_whisper_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx = nil
@@ -158,7 +162,8 @@ else:
   proc ae_whisper_free(ctx: WhisperCtx) = discard
   proc ae_parakeet_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx = nil
   proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
-    nThreads, splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
+    nThreads, splitWords: cint, onSegment: WhisperSegmentCb,
+    user: pointer): cint = -1
   proc ae_parakeet_free(ctx: WhisperCtx) = discard
 
 # Whisper and parakeet GGUFs share the same ggml magic, and a failed
@@ -171,7 +176,8 @@ func isParakeetModel*(model: string): bool =
 when defined(appleSpeech):
   proc ae_speech_init(locale: cstring): WhisperCtx {.importc, cdecl.}
   proc ae_speech_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
-    splitWords: cint, onSegment: WhisperSegmentCb, user: pointer): cint {.importc, cdecl.}
+    splitWords: cint, onSegment: WhisperSegmentCb,
+    user: pointer): cint {.importc, cdecl.}
   proc ae_speech_free(ctx: WhisperCtx) {.importc, cdecl.}
 else:
   proc ae_speech_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
@@ -179,11 +185,11 @@ else:
   proc ae_speech_free(ctx: WhisperCtx) = discard
 
 const
-  Rate = 16000               # whisper's sample rate; the graph resamples to it
-  WinSize = 480              # 30ms analysis window, matching auto-editor's chunking
-  SilenceGap = Rate div 2    # 0.5s of trailing silence ends an utterance
-  PrerollMax = Rate div 5    # keep 0.2s of pre-speech audio so onsets aren't clipped
-  MinSpeech = Rate div 5     # ignore <0.2s blips (clicks, coughs)
+  Rate = 16000            # whisper's sample rate; the graph resamples to it
+  WinSize = 480           # 30ms analysis window, matching auto-editor's chunking
+  SilenceGap = Rate div 2 # 0.5s of trailing silence ends an utterance
+  PrerollMax = Rate div 5 # keep 0.2s of pre-speech audio so onsets aren't clipped
+  MinSpeech = Rate div 5  # ignore <0.2s blips (clicks, coughs)
 
 type OutCtx = object
   f: File
@@ -218,7 +224,7 @@ proc segCb(user: pointer, text: cstring, t0ms, t1ms: int64) {.cdecl.} =
 
 type
   Job = object
-    samples: seq[float32]    # mono f32 @16k; len 0 is the end-of-stream sentinel
+    samples: seq[float32] # mono f32 @16k; len 0 is the end-of-stream sentinel
     startMs: int64
   WorkerArgs = object
     wctx: WhisperCtx
@@ -233,7 +239,7 @@ type
     maxLen: cint
     debug: bool
 
-const MaxPending = 16  # queued utterances before capture has to wait (back-pressure)
+const MaxPending = 16 # queued utterances before capture has to wait (back-pressure)
 
 # Whisper runs here, off the capture thread, so a (multi-second) transcription
 # never stalls av_read_frame and live mic audio isn't dropped. This thread alone
@@ -301,8 +307,11 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     elif useParakeet: ae_parakeet_free(wctx)
     else: ae_whisper_free(wctx)
 
-  let outFile = if output == "-": stdout
-    else: (try: open(output, fmWrite) except IOError: error &"Could not open output: {output}")
+  let outFile =
+    if output == "-": stdout
+    else:
+      try: open(output, fmWrite)
+      except IOError: error &"Could not open output: {output}"
   defer: (if output != "-": outFile.close())
 
   # Resample whatever the device gives us to mono f32 @16k for whisper.
@@ -318,13 +327,21 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   defer: avfilter_graph_free(addr graph)
 
   var srcCtx, resCtx, afmtCtx, sinkCtx: ptr AVFilterContext
-  var ret = avfilter_graph_create_filter(addr srcCtx, avfilter_get_by_name("abuffer"), nil, bufferArgs.cstring, nil, graph)
-  if ret >= 0: ret = avfilter_graph_create_filter(addr resCtx, avfilter_get_by_name("aresample"), nil, "16000", nil, graph)
-  if ret >= 0: ret = avfilter_graph_create_filter(addr afmtCtx, avfilter_get_by_name("aformat"), nil,
-    "sample_fmts=flt:channel_layouts=mono:sample_rates=16000", nil, graph)
-  if ret >= 0: ret = avfilter_graph_create_filter(addr sinkCtx, avfilter_get_by_name("abuffersink"), nil, nil, nil, graph)
+  var ret = avfilter_graph_create_filter(addr srcCtx,
+    avfilter_get_by_name("abuffer"), nil, bufferArgs.cstring, nil, graph)
+  if ret >= 0:
+    ret = avfilter_graph_create_filter(addr resCtx,
+      avfilter_get_by_name("aresample"), nil, "16000", nil, graph)
+  if ret >= 0:
+    ret = avfilter_graph_create_filter(addr afmtCtx,
+      avfilter_get_by_name("aformat"), nil,
+      "sample_fmts=flt:channel_layouts=mono:sample_rates=16000", nil, graph)
+  if ret >= 0:
+    ret = avfilter_graph_create_filter(addr sinkCtx,
+      avfilter_get_by_name("abuffersink"), nil, nil, nil, graph)
   if ret < 0: error "Failed to create audio filters"
-  if avfilter_link(srcCtx, 0, resCtx, 0) < 0 or avfilter_link(resCtx, 0, afmtCtx, 0) < 0 or
+  if avfilter_link(srcCtx, 0, resCtx, 0) < 0 or
+      avfilter_link(resCtx, 0, afmtCtx, 0) < 0 or
       avfilter_link(afmtCtx, 0, sinkCtx, 0) < 0:
     error "Failed to connect filters"
   graph.nb_threads = threads
@@ -342,7 +359,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   var inSpeech = false
   var silenceRun = 0
   var speechSamples = 0
-  var elapsed: int64 = 0        # total samples seen (real-time clock)
+  var elapsed: int64 = 0 # total samples seen (real-time clock)
   var segStartSample: int64 = 0
 
   proc flushSeg() =
@@ -366,7 +383,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     if peak >= threshold:
       if not inSpeech:
         inSpeech = true
-        segStartSample = winStart - preroll.len  # back-date to include preroll
+        segStartSample = winStart - preroll.len # back-date to include preroll
         if preroll.len > 0:
           seg.add(preroll)
           preroll.setLen(0)
@@ -374,12 +391,12 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
       speechSamples += L
       silenceRun = 0
     elif inSpeech:
-      for i in 0 ..< L: seg.add(w[i])  # keep the natural trailing tail
+      for i in 0 ..< L: seg.add(w[i]) # keep the natural trailing tail
       silenceRun += L
       if silenceRun >= SilenceGap:
         flushSeg()
     else:
-      for i in 0 ..< L: preroll.add(w[i])  # rolling pre-speech buffer
+      for i in 0 ..< L: preroll.add(w[i]) # rolling pre-speech buffer
       if preroll.len > PrerollMax:
         preroll = preroll[preroll.len - PrerollMax .. ^1]
 
@@ -451,6 +468,6 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   let pending = jobs.peek()
   if pending > 0:
     stderr.writeLine(&"\nFinishing {pending} queued segment(s)...")
-  jobs.send(Job(samples: @[]))  # sentinel
+  jobs.send(Job(samples: @[])) # sentinel
   joinThread(worker)
   jobs.close()

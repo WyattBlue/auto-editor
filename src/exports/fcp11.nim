@@ -64,7 +64,8 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
 
     let timecodeFps = int(round(fps.num / fps.den))
     if frames >= timecodeFps:
-      raise newException(ValueError, &"Frame count {frames} exceeds timecode fps {timecodeFps}")
+      raise newException(ValueError,
+        &"Frame count {frames} exceeds timecode fps {timecodeFps}")
 
     result = (hours * 3600 + minutes * 60 + seconds) * timecodeFps + frames
     if isDrop and fps.num mod fps.den != 0:
@@ -142,7 +143,10 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
         audioChannels = audioChannels, duration = fraction(assetDur))
 
     let mediaRep = newElement("media-rep")
-    mediaRep.attrs = {"kind": "original-media", "src": mi.path.absPath.pathToUri()}.toXmlAttributes
+    mediaRep.attrs = {
+      "kind": "original-media",
+      "src": mi.path.absPath.pathToUri(),
+    }.toXmlAttributes
 
     r2.add mediaRep
     resources.add r2
@@ -169,9 +173,9 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   # FCP/Resolve sequences only accept "stereo" or "surround"; map any
   # other layout (e.g. "mono", "5.1") to one of these.
   let audioLayout = (if tl.layout.nb_channels > 2: "surround" else: "stereo")
+  let audioRate = if tl.sr == 44100: "44.1k" else: "48k"
   let sequence = <>sequence(format = "r1", tcStart = "0s", tcFormat = "NDF",
-      audioLayout = audioLayout, audioRate = (if tl.sr ==
-      44100: "44.1k" else: "48k"))
+      audioLayout = audioLayout, audioRate = audioRate)
   let spine = <>spine()
 
   sequence.add spine
@@ -204,7 +208,8 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
 
         let timemap = newElement("timeMap")
         let timept1 = newElement("timept")
-        timept1.attrs = {"time": "0s", "value": "0s", "interp": "smooth2"}.toXmlAttributes
+        timept1.attrs = {"time": "0s", "value": "0s",
+            "interp": "smooth2"}.toXmlAttributes
         timemap.add(timept1)
 
         let timept2 = newElement("timept")

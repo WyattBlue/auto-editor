@@ -47,8 +47,7 @@ proc selectEncoderRate(ctx: ptr AVCodecContext, requested: cint): cint =
     return nearestRate(requested, aacRates)
   return requested
 
-proc selectEncoderLayout(ctx: ptr AVCodecContext,
-    inputLayout: ptr AVChannelLayout) =
+proc selectEncoderLayout(ctx: ptr AVCodecContext, inputLayout: ptr AVChannelLayout) =
   var configPtr: pointer = nil
   var num: cint = 0
   discard avcodec_get_supported_config(ctx, nil, AV_CODEC_CONFIG_CHANNEL_LAYOUT,
@@ -96,7 +95,8 @@ proc validateAudioCodec*(codecName, outputPath: string) =
 
 proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
     frameSize: cint): AudioBuffer =
-  result.fifo = av_audio_fifo_alloc(sampleFmt, channels, frameSize * 2) # Buffer extra space
+  # Allocate extra FIFO space.
+  result.fifo = av_audio_fifo_alloc(sampleFmt, channels, frameSize * 2)
   result.frameSize = frameSize
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
@@ -105,8 +105,7 @@ proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
   return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
       frame.nb_samples)
 
-proc readSamplesFromBuffer(buffer: var AudioBuffer,
-    outputFrame: ptr AVFrame): bool =
+proc readSamplesFromBuffer(buffer: var AudioBuffer, outputFrame: ptr AVFrame): bool =
   if av_audio_fifo_size(buffer.fifo) < buffer.frameSize:
     return false
 
@@ -316,8 +315,8 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
     let finalFrames = audioResampler.resample(nil)
     for resampledFrame in finalFrames:
       if addSamplesToBuffer(audioBuffer, resampledFrame) >= 0:
-        discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx, outputStream,
-          audioBuffer, currentPts, nil)
+        discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx,
+          outputStream, audioBuffer, currentPts, nil)
       av_frame_free(addr resampledFrame)
   except Exception as e:
     error &"Error during resampler flush: {e.msg}"
@@ -335,7 +334,8 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
     if av_frame_get_buffer(tailFrame, 0) < 0:
       error "Could not allocate frame buffer"
     if av_audio_fifo_read(audioBuffer.fifo,
-        cast[ptr pointer](addr tailFrame.data[0]), remainingSamples) != remainingSamples:
+        cast[ptr pointer](addr tailFrame.data[0]),
+        remainingSamples) != remainingSamples:
       error "Could not read final samples"
     tailFrame.pts = currentPts
     currentPts += remainingSamples

@@ -9,12 +9,12 @@ type VideoFrame = object
   index: int
   src: ptr string
   effects: Actions
-  local: int  # frame offset within the clip, for animated effects
-  dur: int    # clip length in frames
-  x: float32  # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
+  local: int     # frame offset within the clip, for animated effects
+  dur: int       # clip length in frames
+  x: float32     # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
   y: float32
-  scale: float32  # overlay size multiplier; 1.0 for the base layer
-  fit: bool   # no explicit `pos`: fit-and-center to the canvas like the base
+  scale: float32 # overlay size multiplier; 1.0 for the base layer
+  fit: bool      # no explicit `pos`: fit-and-center to the canvas like the base
 
 func envAnimLen(unit: DurUnit, mag: float32, clipDur: int, fps: float): int =
   ## Resolve an ease duration to a frame count for the current clip.
@@ -59,8 +59,8 @@ func maskGray(a: Action): string =
   let f = a.mFeather.float
   let cx = a.mX.float + a.mW.float / 2
   let cy = a.mY.float + a.mH.float / 2
-  var cover: string  # 0..1 coverage, 1 = fully inside
-  if a.mRadius < 0:  # ellipse
+  var cover: string # 0..1 coverage, 1 = fully inside
+  if a.mRadius < 0: # ellipse
     let rx = a.mW.float / 2
     let ry = a.mH.float / 2
     let rr2 = &"pow((X-{cx})/{rx},2)+pow((Y-{cy})/{ry},2)"
@@ -110,7 +110,8 @@ type SrcState = ref object
   hasSeekFrame: bool          # whether seekFrame holds a pending marker
   isStill: bool               # single-frame image source (logo/watermark)
 
-proc buildKeyframeIndex(stream: ptr AVStream, fps: float, defaultInterval: int): KeyframeIndex =
+proc buildKeyframeIndex(stream: ptr AVStream, fps: float,
+    defaultInterval: int): KeyframeIndex =
   ## Build a keyframe index from the stream's index entries.
   result.frames = @[]
   result.hasIndex = false
@@ -127,7 +128,8 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: float, defaultInterval: int):
   for i in 0 ..< count:
     let entry = avformat_index_get_entry(stream, i)
     if entry != nil and entry.isKeyframe and entry.timestamp != AV_NOPTS_VALUE:
-      let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * fps))
+      let frameNum = int(round(
+        float(entry.timestamp) * float(tb.num) / float(tb.den) * fps))
 
       # Be a bit conservative by adding video_deplay (the worst-case DTS/PTS gap), even
       # if some formats use PTS.
@@ -175,13 +177,14 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     error &"Failed to allocate buffer for new frame: {ret}"
 
   var ownedCtx: ptr SwsContext = nil
-  let swsCtx = if ctx != nil:
-    ctx
-  else:
-    ownedCtx = sws_alloc_context()
-    if ownedCtx == nil:
-      error "Failed to allocate sws context"
-    ownedCtx
+  let swsCtx =
+    if ctx != nil:
+      ctx
+    else:
+      ownedCtx = sws_alloc_context()
+      if ownedCtx == nil:
+        error "Failed to allocate sws context"
+      ownedCtx
 
   ret = sws_scale_frame(swsCtx, newFrame, frame)
 
@@ -246,7 +249,8 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32, bg: RGBColor): ptr AVFrame =
+proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
+    bg: RGBColor): ptr AVFrame =
   ## Scale src to fit within targetW x targetH preserving aspect ratio,
   ## centering with bg color padding. Returns a new YUV420P frame.
   ## Uses sws_scale_frame + manual pixel copy to avoid filter graph NEON
@@ -302,17 +306,20 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32, bg: RGBColor): ptr 
 
   for y in 0 ..< scaled.height.int:
     let sp = cast[pointer](cast[int](scaled.data[0]) + y * scaled.linesize[0].int)
-    let dp = cast[pointer](cast[int](output.data[0]) + (oy.int + y) * output.linesize[0].int + ox.int)
+    let dp = cast[pointer](cast[int](output.data[0]) + (oy.int + y) * output.linesize[
+        0].int + ox.int)
     copyMem(dp, sp, scaled.width.int)
 
   for y in 0 ..< (scaled.height div 2).int:
     let sp = cast[pointer](cast[int](scaled.data[1]) + y * scaled.linesize[1].int)
-    let dp = cast[pointer](cast[int](output.data[1]) + ((oy div 2).int + y) * output.linesize[1].int + (ox div 2).int)
+    let dp = cast[pointer](cast[int](output.data[1]) + ((oy div 2).int + y) *
+        output.linesize[1].int + (ox div 2).int)
     copyMem(dp, sp, (scaled.width div 2).int)
 
   for y in 0 ..< (scaled.height div 2).int:
     let sp = cast[pointer](cast[int](scaled.data[2]) + y * scaled.linesize[2].int)
-    let dp = cast[pointer](cast[int](output.data[2]) + ((oy div 2).int + y) * output.linesize[2].int + (ox div 2).int)
+    let dp = cast[pointer](cast[int](output.data[2]) + ((oy div 2).int + y) *
+        output.linesize[2].int + (ox div 2).int)
     copyMem(dp, sp, (scaled.width div 2).int)
 
   av_frame_free(addr scaled)
@@ -379,12 +386,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # reports exactly one frame (single-frame webp, png_pipe, etc.).
     let vstream = myCache.cns[src].video[0]
     const imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
-    srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or vstream.nb_frames == 1
+    srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or
+      vstream.nb_frames == 1
 
   let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, args.scale)
   var fxGraph: Graph = nil
   var fxKey: GraphKey
-  var rotGraph: Graph = nil  # static source rotation, applied before the fit
+  var rotGraph: Graph = nil # static source rotation, applied before the fit
   var rotKey: GraphKey
   # Cached mask/confine mattes (gray8), rebuilt only when the region/size changes
   # so the per-pixel geq runs once, not every frame.
@@ -524,8 +532,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 
-  let templateVid = if tl.templateFile != nil:
-    myCache.getContainer(tl.templateFile).video else: @[]
+  let templateVid =
+    if tl.templateFile != nil: myCache.getContainer(tl.templateFile).video
+    else: @[]
   if templateVid.len > 0:
     let srcPar = templateVid[0].codecpar
     let sd = av_packet_side_data_get(srcPar.coded_side_data,
@@ -593,8 +602,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       &"{col}:{effect.similar}:{effect.blend}")
     let ov = g.add("overlay", "format=yuv420")
     discard g.linkNodes(@[fgSrc, toAlpha, keyer])
-    g.link(bgSrc, ov, 0, 0)  # background on the bottom pad
-    g.link(keyer, ov, 0, 1)  # keyed frame on top
+    g.link(bgSrc, ov, 0, 0) # background on the bottom pad
+    g.link(keyer, ov, 0, 1) # keyed frame on top
     g.link(ov, g.add("buffersink"))
     g.configure()
     g.pushIdx(0, bgFrame)
@@ -640,7 +649,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## Set `frame`'s alpha from the gray matte (cheap; no per-pixel geq).
     var frame = frame0
     frame.pts = 0
-    var m = av_frame_clone(matte)  # cached matte; push a fresh ref
+    var m = av_frame_clone(matte) # cached matte; push a fresh ref
     m.pts = 0
     let g = newGraph()
     let fSrc = g.add("buffer", bufArgsOf(frame))
@@ -693,7 +702,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let origFmt = AVPixelFormat(saved.format)
     saved.pts = 0
     effected.pts = 0
-    var m = av_frame_clone(matte)  # cached matte; push a fresh ref
+    var m = av_frame_clone(matte) # cached matte; push a fresh ref
     m.pts = 0
     let g = newGraph()
     let bSrc = g.add("buffer", bufArgsOf(saved))
@@ -741,7 +750,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # Eased progress in [0, 1] for an animated action, using its own packed
     # easing curve + duration (defaults to linear over the whole clip).
     template prog(e: Action): float32 =
-      applyEase(e.easeCurve, clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
+      applyEase(e.easeCurve,
+        clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
 
     # Run `frame` through the effect graph identified by `key`, reusing the
     # previous graph when the key matches; `build` must add nodes to `fxGraph`
@@ -772,7 +782,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     for effect in effects:
       confineThis = confineActive and effect.kind in confinable
       case effect.kind:
-      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPos, actRotate, actLoop: discard
+      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPos, actRotate,
+          actLoop: discard
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
@@ -785,7 +796,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # picture shows over the base); the base layer fills them with bg.
           let side = cint(int(ceil(hypot(w.float, h.float))) + 1) and not 1.cint
           let aExpr = &"a=({startDeg}+({rate})*t)*PI/180:ow={side}:oh={side}"
-          var nodes: seq[ptr AVFilterContext] = @[fxGraph.add("buffer", bufArgsOf(frame))]
+          var nodes: seq[ptr AVFilterContext] =
+            @[fxGraph.add("buffer", bufArgsOf(frame))]
           if isOverlay:
             # Convert to rgba first so the rotate fill (and exposed corners) can
             # be transparent.
@@ -818,10 +830,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32,
             i2 = (if zoomCrop: 1'i32 else: 0'i32))):
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let mid = if zoomCrop:
-              fxGraph.add("crop", &"{origW}:{origH}")
-            else:
-              fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+          let mid =
+            if zoomCrop: fxGraph.add("crop", &"{origW}:{origH}")
+            else: fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
       of actHflip, actVflip, actInvert, actErosion:
@@ -870,8 +881,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let expr = luvLutExprs(b, c, s)
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
-          let lut = fxGraph.add("lutyuv",
-            &"y={expr.y}:u={expr.u}:v={expr.v}")
+          let lut = fxGraph.add("lutyuv", &"y={expr.y}:u={expr.u}:v={expr.v}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
@@ -895,7 +905,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
             let lut = fxGraph.add("lutrgb",
               &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
-            let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
+            let toOrig = fxGraph.add("format",
+                &"pix_fmts={$AVPixelFormat(frame.format)}")
             let bufferSink = fxGraph.add("buffersink")
             fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
       of actLens:
@@ -1003,7 +1014,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## Decode one clip's frame at its native resolution (after any static
     ## rotation), maintaining per-source seek state. Still images decode once
     ## and return clones. Caller owns the returned frame.
-    if obj.src == nil:  # synthesized background base (audio-only `add`)
+    if obj.src == nil: # synthesized background base (audio-only `add`)
       return (av_frame_clone(nullFrame), true)
     let st = srcs[obj.src]
     if st.isStill:
@@ -1088,7 +1099,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       let decoder: ptr AVCodecContext = st.decoder
       var foundFrame = false
-      for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
+      for decodedFrame in myCache.cns[obj.src].flushDecode(
+          myStream.index.cint, decoder, frame):
         frame = decodedFrame
         frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
         if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
@@ -1164,7 +1176,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # Output colorspace/range for overlays, from the encoder (stable). Declaring
   # these on the base buffer keeps the composite yuv420p (not gbrp) and makes the
   # overlay's rgb->yuv conversion match the base instead of washing out.
-  let ovColorspace = (if encoderCtx.colorspace.int in 1 .. 15: encoderCtx.colorspace.int else: 1)
+  let ovColorspace =
+    if encoderCtx.colorspace.int in 1 .. 15: encoderCtx.colorspace.int
+    else: 1
   let ovRange = (if encoderCtx.color_range.int == 2: 2 else: 1)
 
   proc subpixelShift(src: ptr AVFrame; dx, dy: float32): ptr AVFrame =
@@ -1194,16 +1208,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let sxf = x.float32 - dx
         let x0 = floor(sxf).int
         let wx = sxf - x0.float32
-        for c in 0 ..< 4:  # bilinear blend of the 4 neighbours, per RGBA channel
+        for c in 0 ..< 4: # bilinear blend of the 4 neighbours, per RGBA channel
           template px(xx, yy: int): float32 =
             if xx < 0 or xx >= w or yy < 0 or yy >= h: 0.0'f32
-            else: cast[ptr UncheckedArray[uint8]](sBase + yy * sStride)[xx * 4 + c].float32
+            else:
+              cast[ptr UncheckedArray[uint8]](
+                sBase + yy * sStride)[xx * 4 + c].float32
           let t = px(x0, y0) * (1 - wx) + px(x0 + 1, y0) * wx
           let b = px(x0, y0 + 1) * (1 - wx) + px(x0 + 1, y0 + 1) * wx
           dRow[x * 4 + c] = uint8(clamp(t * (1 - wy) + b * wy + 0.5'f32, 0, 255))
     return dst
 
-  proc overlayFrame(base, top: ptr AVFrame; x, y: float32; scale: float32): ptr AVFrame =
+  proc overlayFrame(base, top: ptr AVFrame; x, y: float32;
+      scale: float32): ptr AVFrame =
     ## Composite `top` over `base` at (x, y), preserving the overlay's alpha.
     ## (x, y) may be fractional: `overlay` places the integer part (it only does
     ## whole pixels) and a bilinear shift places the sub-pixel remainder, so a slow
@@ -1271,8 +1288,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if frame != nil and (frame.width <= 0 or frame.height <= 0):
       debug &"Warning: Invalid frame at {index}tb, using fallback"
       av_frame_free(addr frame)
-      frame = (if lastProcessedFrame != nil: av_frame_clone(lastProcessedFrame)
-               else: av_frame_clone(nullFrame))
+      frame =
+        if lastProcessedFrame != nil: av_frame_clone(lastProcessedFrame)
+        else: av_frame_clone(nullFrame)
       if frame == nil:
         error &"Failed to create fallback frame at {index}tb"
     let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
@@ -1320,7 +1338,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 # the other animatable effects; static pos has 1-keyframe seqs.
                 # Kept as floats so overlayFrame can place at a sub-pixel offset.
                 let pp = applyEase(effect.easeCurve, clipT(int(index - obj.start),
-                  envAnimLen(effect.easeDurUnit, effect.easeDur, int(obj.dur), tl.tb.float)))
+                  envAnimLen(effect.easeDurUnit, effect.easeDur, int(obj.dur),
+                    tl.tb.float)))
                 ox = sampleKf(effect.pxKf, pp)
                 oy = sampleKf(effect.pyKf, pp)
                 oscale = sampleKf(effect.pscaleKf, pp)
@@ -1388,7 +1407,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         frame = finalizeFrame(acc, index)
         av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
-        lastFrameIndex = -1  # compositing bypasses the single-layer reuse cache
+        lastFrameIndex = -1 # compositing bypasses the single-layer reuse cache
         yield (frame, index)
         continue
 
@@ -1441,7 +1460,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         lastFrameIndex = objList[0].index
 
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
-        frame = applyEffects(frame, objList[0].effects, objList[0].local, objList[0].dur)
+        frame = applyEffects(frame, objList[0].effects, objList[0].local,
+          objList[0].dur)
 
       frame = finalizeFrame(frame, index)
 

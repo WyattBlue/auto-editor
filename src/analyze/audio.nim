@@ -164,8 +164,8 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
     let resampledFrames = iter.resampler.resample(frame)
 
     for resampledFrame in resampledFrames:
-      let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr resampledFrame.data[0]),
-                                  resampledFrame.nb_samples)
+      let ret = av_audio_fifo_write(iter.fifo,
+        cast[pointer](addr resampledFrame.data[0]), resampledFrame.nb_samples)
       if ret < resampledFrame.nb_samples:
         error "Could not write data to FIFO"
 
@@ -429,8 +429,7 @@ iterator channelPeaks*(processor: var AudioProcessor, container: InputContainer,
       yield (firstSamplePos + bucketIdx * spb,
         processor.`iterator`.readChannelPeaks(channels))
 
-iterator loudness*(processor: var AudioProcessor,
-    container: InputContainer): Unorm16 =
+iterator loudness*(processor: var AudioProcessor, container: InputContainer): Unorm16 =
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate frame"
@@ -474,19 +473,14 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
 
-  var processor = AudioProcessor(
-    codecCtx: initDecoder(audioStream.codecpar),
-    audioIndex: audioStream.index,
-    channel: channel,
-    chunkDuration: av_inv_q(tb),
-  )
+  var processor = AudioProcessor(codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioStream.index, channel: channel, chunkDuration: av_inv_q(tb))
 
-  let inaccurateDur = (
+  let inaccurateDur =
     if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base.isValid:
-    float(audioStream.duration) * float(audioStream.time_base * tb)
-  else:
-    container.duration * float(tb)
-  )
+      float(audioStream.duration) * float(audioStream.time_base * tb)
+    else:
+      container.duration * float(tb)
   bar.start(inaccurateDur, "Analyzing audio volume")
 
   result = newSeqOfCap[Unorm16](int(inaccurateDur) + 1)

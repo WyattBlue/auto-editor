@@ -13,10 +13,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
     return
 
   # Open source container for each remux operation
-  var srcContainer = (
-    try: av.open(sourcePath)
-    except IOError as e: error e.msg
-  )
+  var srcContainer = (try: av.open(sourcePath) except IOError as e: error e.msg)
   defer: srcContainer.close()
 
   let outTb = outputStream.time_base
@@ -46,10 +43,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
         # the demuxer at the beginning; scanning forward below is slower but
         # preserves cues that overlap the clip boundary.
         srcContainer.close()
-        srcContainer = (
-          try: av.open(sourcePath)
-          except IOError as e: error e.msg
-        )
+        srcContainer = (try: av.open(sourcePath) except IOError as e: error e.msg)
         if clip.stream >= srcContainer.subtitle.len:
           continue
         streamIndex = srcContainer.subtitle[clip.stream].index
@@ -83,7 +77,8 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
 
       # Intersect cue with the window, then map source -> timeline frames -> output.
       let visStart = max(cueStart, clipStartSrc)
-      let startFrame = clip.start + av_rescale_q(visStart - clipStartSrc, srcTb, frameTb)
+      let startFrame = clip.start +
+        av_rescale_q(visStart - clipStartSrc, srcTb, frameTb)
       let newPts = av_rescale_q(startFrame, frameTb, outTb)
 
       var outPacket: AVPacket
@@ -92,7 +87,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
       outPacket.stream_index = outputStream.index
       outPacket.time_base = outTb
       outPacket.pts = newPts
-      outPacket.dts = newPts  # subtitle streams have no reordering; keep dts == pts
+      outPacket.dts = newPts # subtitle streams have no reordering; keep dts == pts
       if hasDur:
         let visEnd = min(cueEnd, clipEndSrc)
         let endFrame = clip.start + av_rescale_q(visEnd - clipStartSrc, srcTb, frameTb)
@@ -104,10 +99,7 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
 proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
     timelineTb: AVRational) =
   ## Write every subtitle stream in a sidecar file, retimed to `layer`.
-  let source = (
-    try: av.open(sourcePath)
-    except IOError as e: error e.msg
-  )
+  let source = (try: av.open(sourcePath) except IOError as e: error e.msg)
   defer: source.close()
 
   var output = openWrite(outputPath)

@@ -150,7 +150,7 @@ proc main*(strArgs: seq[string]) =
   if startSample > 0:
     let tb = audioStream.time_base
     let pts = (startSample * int64(tb.den)) div (int64(sampleRate) * int64(tb.num))
-    container.seek(pts, backward = true, stream = audioStream)
+    container.seek(pts, stream = audioStream)
     avcodec_flush_buffers(processor.codecCtx)
 
   let endSample: int64 =
@@ -176,7 +176,7 @@ proc main*(strArgs: seq[string]) =
       flat.add shi
   else:
     for (bucketStart, peaks) in processor.channelPeaks(
-        container, audioStream, channelIndices):
+      container, audioStream, channelIndices):
       if bucketStart + int64(samplesPerBucket) <= startSample:
         continue
       if bucketStart >= endSample:

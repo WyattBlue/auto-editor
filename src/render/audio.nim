@@ -27,7 +27,8 @@ type LoudnormCapture = ref object
 # captures can't clobber each other's storage.
 var activeCapture: LoudnormCapture = nil
 
-proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.} =
+proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString,
+    vl: VaList) {.cdecl.} =
   let cap = activeCapture
   if cap == nil:
     av_log_default_callback(avcl, level, fmt, vl)
@@ -110,10 +111,7 @@ func channels(self: Getter): cint =
 
 proc newGetter(path: string, stream: int32, rate: cint): Getter =
   result = new(Getter)
-  result.container = (
-    try: av.open(path)
-    except IOError as e: error e.msg
-  )
+  result.container = (try: av.open(path) except IOError as e: error e.msg)
   result.stream = result.container.audio[stream]
   result.container.setActiveStream(result.stream.index)
   result.rate = rate
@@ -152,7 +150,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   if av_seek_frame(container.formatContext, stream.index, startPts,
       AVSEEK_FLAG_BACKWARD) < 0:
     # If seeking fails, fall back to reading from beginning
-    discard av_seek_frame(container.formatContext, stream.index, 0, AVSEEK_FLAG_BACKWARD)
+    discard av_seek_frame(container.formatContext, stream.index, 0,
+      AVSEEK_FLAG_BACKWARD)
 
   # Flush decoder after seeking
   avcodec_flush_buffers(decoderCtx)
@@ -181,11 +180,12 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     let samples = frame.nb_samples
 
     # Convert frame PTS to sample position
-    let frameSamplePos = if frame.pts != AV_NOPTS_VALUE:
-      int64(frame.pts.float * timeBase.num.float / timeBase.den.float *
-          sampleRate.float)
-    else:
-      samplesProcessed.int64
+    let frameSamplePos =
+      if frame.pts != AV_NOPTS_VALUE:
+        int64(frame.pts.float * timeBase.num.float / timeBase.den.float *
+            sampleRate.float)
+      else:
+        samplesProcessed.int64
 
     # If this frame is before our target start, skip it
     if frameSamplePos + samples.int64 <= start.int64:
@@ -248,7 +248,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
         let frameIndex = samplesSkippedInFrame + i
         let resultIndex = (totalSamples + i) * channels
         for ch in 0 ..< channels:
-          result[resultIndex + ch] = int16(ashr(audioData[frameIndex * channels + ch], 16))
+          result[resultIndex + ch] =
+            int16(ashr(audioData[frameIndex * channels + ch], 16))
 
     elif frame.format == AV_SAMPLE_FMT_S32P.cint:
       # Planar 32-bit
@@ -265,22 +266,26 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     totalSamples += samplesToProcess
     samplesProcessed += samples
 
-  while av_read_frame(container.formatContext, packet) >= 0 and totalSamples < targetSamples:
+  while av_read_frame(container.formatContext, packet) >= 0 and
+      totalSamples < targetSamples:
     defer: av_packet_unref(packet)
 
     if packet.stream_index == stream.index:
       if avcodec_send_packet(decoderCtx, packet) >= 0:
-        while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
+        while avcodec_receive_frame(decoderCtx, frame) >= 0 and
+            totalSamples < targetSamples:
           processFrame()
 
 
   # Flush the decoder: CAP_DELAY decoders may hold the tail frames.
   if totalSamples < targetSamples:
     discard avcodec_send_packet(decoderCtx, nil)
-    while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
+    while avcodec_receive_frame(decoderCtx, frame) >= 0 and
+        totalSamples < targetSamples:
       processFrame()
 
-proc createFilterGraph(effects: openArray[Action], sr: cint, layout: ref AVChannelLayout):
+proc createFilterGraph(effects: openArray[Action], sr: cint,
+    layout: ref AVChannelLayout):
   (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
 
   let filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
@@ -503,9 +508,10 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
 
   return processedData
 
-# Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint,
-    layout: ref AVChannelLayout, fps: float): seq[int16] =
+# Returns seq[int16] where channel data is interleaved:
+# [ch0, ch1, ..., ch0, ch1, ...] etc.
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
+    targetSr: cint, layout: ref AVChannelLayout, fps: float): seq[int16] =
   if data.len == 0:
     return @[]
 
@@ -669,7 +675,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     let floorG = max(0.0'f32, 1.0'f32 - d.duckAmount.toFloat32)
     let thr = d.duckThresh.toFloat32
     let aCoef = exp(-1.0 / (sr.float * max(0.001, d.duckAttack.float / 1000.0))).float32
-    let rCoef = exp(-1.0 / (sr.float * max(0.001, d.duckRelease.float / 1000.0))).float32
+    let rCoef = exp(-1.0 / (sr.float * max(0.001, d.duckRelease.float /
+        1000.0))).float32
     var cur = 1.0'f32
     for i in 0 ..< n:
       var peak = 0'i32
@@ -742,8 +749,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     return iterator(): seq[int16] =
       var cursors = newSeq[int](tl.a.len)
 
-      var acc: seq[int32] = @[]   # interleaved accumulator over [bufStart, ...)
-      var bufStart = 0            # output sample-frame index mapped to acc[0]
+      var acc: seq[int32] = @[] # interleaved accumulator over [bufStart, ...)
+      var bufStart = 0 # output sample-frame index mapped to acc[0]
 
       template startOf(li: int): int =
         int(tl.a[li][cursors[li]].start * sr.int64 * tb.den div tb.num)
@@ -769,14 +776,18 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           off += cf
           yield chunk
         if emitFrames > 0:
-          acc = (if emitFrames * targetChannels < acc.len: acc[emitFrames * targetChannels .. ^1] else: @[])
+          acc =
+            if emitFrames * targetChannels < acc.len:
+              acc[emitFrames * targetChannels .. ^1]
+            else: @[]
           bufStart += emitFrames
 
       while true:
         # Pick the not-yet-processed clip with the smallest start across layers.
         var bestLi = -1
         for li in activeLayers:
-          if cursors[li] < tl.a[li].len and (bestLi == -1 or startOf(li) < startOf(bestLi)):
+          if cursors[li] < tl.a[li].len and
+              (bestLi == -1 or startOf(li) < startOf(bestLi)):
             bestLi = li
         if bestLi == -1:
           break
@@ -832,12 +843,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
               let outputSampleIndex = startSample + i
               if outputSampleIndex < totalSamples:
                 let fadeIn = (
-                  if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) / fadeSamples.float32
+                  if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) /
+                      fadeSamples.float32
                   else: 1.0'f32
                 )
                 let tailDist = max(0, n - 1 - i)
                 let fadeOut = (
-                  if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) / fadeSamples.float32
+                  if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) /
+                      fadeSamples.float32
                   else: 1.0'f32
                 )
                 let gain = min(1.0'f32, min(fadeIn, fadeOut))
@@ -846,7 +859,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                 for ch in 0 ..< min(targetChannels, sourceChannels):
                   let sourceIndex = i * sourceChannels + ch
                   if sourceIndex < processedData.len:
-                    acc[baseIndex + ch] += int32(round(processedData[sourceIndex].float32 * gain * dg))
+                    acc[baseIndex + ch] += int32(round(processedData[
+                        sourceIndex].float32 * gain * dg))
 
         # Everything below the next clip's start can receive no further writes.
         var hasRemaining = false
@@ -1072,7 +1086,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
       let aformat = loudnormGraph.add("aformat", &"sample_rates={sr}")
       let bufferSink = loudnormGraph.add("abuffersink")
-      loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat, bufferSink]).configure()
+      loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat,
+          bufferSink]).configure()
 
       fltpPts = 0
       block:
@@ -1099,7 +1114,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       # Pad with silence if loudnorm produced fewer samples than the timeline.
       let pending = rechunkBuf.len div targetChannels
       if ebuEmitted + pending < totalSamples:
-        rechunkBuf.add newSeq[int16]((totalSamples - ebuEmitted - pending) * targetChannels)
+        rechunkBuf.add newSeq[int16](
+          (totalSamples - ebuEmitted - pending) * targetChannels)
       for fr in drainRechunk(true):
         yield fr
 
@@ -1110,7 +1126,7 @@ proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: No
   return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, norm, cache)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
-    frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
+    frameSize: int, norm: Norm,
+    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
 
   return makeAudioFrames(fmt, tl, frameSize, @[index.int], norm, cache)
-

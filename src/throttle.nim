@@ -38,7 +38,7 @@ type Throttle* = object
   enabled: bool
   when not defined(emscripten):
     path: string
-    cachedMs: int   # last permit we read; skip the file read while still under it
+    cachedMs: int # last permit we read; skip the file read while still under it
 
 proc initThrottle*(): Throttle =
   when defined(emscripten):

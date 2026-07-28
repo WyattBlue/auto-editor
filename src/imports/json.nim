@@ -7,7 +7,8 @@ proc parseActionOrErr(val: string): Action {.raises: [].} =
   try: parseAction(val)
   except ActionParseError as e: error e.msg
 
-proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip {.raises: [].} =
+proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
+    Actions]): Clip {.raises: [].} =
   let srcNode = node{"src"}
   if srcNode != nil and srcNode.kind == JNull:
     result.src = nil # synthesized base clip: a render canvas with no media
@@ -68,7 +69,8 @@ proc parseTransition(node: JsonNode): Transition {.raises: [].} =
   of "end": result.alignment = taEnd
   else: error "Invalid transition alignment"
 
-proc parseTransitions(node: JsonNode, trackCount: int): seq[seq[Transition]] {.raises: [].} =
+proc parseTransitions(node: JsonNode,
+    trackCount: int): seq[seq[Transition]] {.raises: [].} =
   if node == nil: return
   if node.kind != JArray or node.len != trackCount:
     error "Transition track count must match media track count"
@@ -223,10 +225,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
           error "Invalid effect index"
         clips.add Clip2(start: start, `end`: `end`, effect: indexMap[effIdx])
 
-  let mi = (
-    try: initMediaInfo(input)
-    except IOError as e: error e.msg
-  )
+  let mi = (try: initMediaInfo(input) except IOError as e: error e.msg)
   result = toNonLinear2(ptrInput, tb, mi, clips, effects)
 
 
@@ -253,10 +252,7 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     let speed = chunkNode[2].getFloat()
     chunks.add (start, `end`, speed)
 
-  let mi = (
-    try: initMediaInfo(input)
-    except IOError as e: error e.msg
-  )
+  let mi = (try: initMediaInfo(input) except IOError as e: error e.msg)
   var tb: AVRational
   let tbString = jsonNode{"timebase"}.getStr("")
   if tbString != "":
@@ -269,8 +265,7 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     tb = AVRational(num: 30, den: 1)
   result = toNonLinear(ptrInput, tb, mi, chunks)
 
-proc readJson*(jsonStr: string,
-    interner: var StringInterner): v3 {.raises: [].} =
+proc readJson*(jsonStr: string, interner: var StringInterner): v3 {.raises: [].} =
   let jsonNode = try: parseJson(jsonStr)
     except CatchableError as e: error "Invalid JSON: " & e.msg
   let version = jsonNode{"version"}.getStr("unknown")

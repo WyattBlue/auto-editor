@@ -168,10 +168,10 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   # dissolve) and mix (audio crossfade) transitions. Start/end-aligned
   # dissolves become fade filters on the clip itself.
   type ClipPlan = object
-    entryIn, entryOut: int64   # source frames the plain entry still covers
-    postroll: int64            # extra source frames the chain must expose
+    entryIn, entryOut: int64 # source frames the plain entry still covers
+    postroll: int64          # extra source frames the chain must expose
     fadeInDur, fadeOutDur: int64
-    outCenter: int             # centered transition leaving this clip, or -1
+    outCenter: int           # centered transition leaving this clip, or -1
 
   var plans = newSeq[ClipPlan](layer.len)
   for i, clip in layer:

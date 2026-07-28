@@ -84,7 +84,7 @@ else:
     else:
       switch("passC", "-m64")
       switch("passL", "-m64")
-      switch("passL", "-sMAXIMUM_MEMORY=17179869184")  # 16 GiB
+      switch("passL", "-sMAXIMUM_MEMORY=17179869184") # 16 GiB
 
 # See for details: https://simonbyrne.github.io/notes/fastmath/
 switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-signed-zeros")
@@ -124,10 +124,7 @@ when hostOS == "macosx":
     switch("passL", "-framework AVFoundation -framework Foundation -framework CoreGraphics")
   when not defined(emscripten):
     # Apple SpeechAnalyzer backend for `whisper <file> apple` (macOS 26+ only).
-    let osMajor = (
-      try: parseInt(majorVer)
-      except ValueError: 0
-    )
+    let osMajor = (try: parseInt(majorVer) except ValueError: 0)
     if osVerCode == 0 and osMajor >= 26:
       # Deployment target 14 (matching the C side) so release binaries still
       # launch on pre-26 macOS; the shim weak-links Speech's new symbols.

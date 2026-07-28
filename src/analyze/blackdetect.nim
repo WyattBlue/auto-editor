@@ -47,19 +47,15 @@ proc blackdetect*(bar: Bar, container: InputContainer, path: string, tb: AVRatio
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
 
-  var processor = VideoProcessor(
-    formatCtx: container.formatContext,
-    codecCtx: initDecoder(videoStream.codecpar),
-    tb: tb,
-    videoIndex: videoStream.index,
-  )
+  var processor = VideoProcessor(formatCtx: container.formatContext,
+    codecCtx: initDecoder(videoStream.codecpar), tb: tb,
+    videoIndex: videoStream.index)
 
-  let inaccurateDur = (
+  let inaccurateDur =
     if videoStream.duration != AV_NOPTS_VALUE and videoStream.time_base.isValid:
       float(videoStream.duration) * float(videoStream.time_base * tb)
     else:
       container.duration * float(tb)
-  )
   bar.start(inaccurateDur, "Analyzing blackness")
 
   var i: float = 0

@@ -24,9 +24,11 @@ func `$`(link: Link): string =
   when defined(nimscript): &"<a href=\"{link.href}\">{link.a}</a>"
   else: &"\e]8;;{link.href}\e\\{link.a}\e]8;;\e\\"
 
-const fragmented = Link(href: "https://ffmpeg.org/ffmpeg-formats.html#Fragmentation", a: "fragmented")
+const fragmented = Link(href: "https://ffmpeg.org/ffmpeg-formats.html#Fragmentation",
+    a: "fragmented")
 const ytDlp = Link(href: "https://github.com/yt-dlp/yt-dlp", a: "yt-dlp")
-const actionsRef = Link(href: "https://auto-editor.com/ref/actions", a: "actions reference")
+const actionsRef = Link(href: "https://auto-editor.com/ref/actions",
+    a: "actions reference")
 
 type OptKind* = enum
   Regular # expecting = $datum
@@ -179,10 +181,11 @@ const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: coEdit, metavar: "METHOD",
       help: """
 Set an expression which determines how to make auto edits. (default is "audio")"""),
-  OptDef(names: "-w:1, --when-normal, --when-active", c: cEdit, datum: coWhenActive, metavar: "ACTION",
+  OptDef(names: "-w:1, --when-normal, --when-active", c: cEdit, datum: coWhenActive,
+    metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
-  OptDef(names: "-w:0, --when-silent, --when-inactive", c: cEdit, datum: coWhenInactive, metavar: "ACTION",
-      help: &"""
+  OptDef(names: "-w:0, --when-silent, --when-inactive", c: cEdit, datum: coWhenInactive,
+      metavar: "ACTION", help: &"""
 When a segment is inactive (defined by --edit) do an action. The default action being 'cut'. See the {actionsRef} for all available actions."""),
   OptDef(names: "-m, --margin", c: cEdit, datum: coMargin, metavar: "LENGTH[,LENGTH?]",
       help: """
@@ -205,21 +208,29 @@ Skip cuts whose removed source interval is shorter than MIN-CUT (default 1sec)."
     metavar: "[START,STOP ...]", help: "Set segment(s) that are leaved \"as is\", overriding other actions"),
   OptDef(names: "--set-speed, --set-speed-for-range", c: cEdit, datum: coSetSpeed,
     metavar: "[SPEED,START,STOP ...]", help: "Set segment(s) to a SPEED, overriding other actions"),
-  OptDef(names: "--set-action", c: cEdit, datum: coSetAction, metavar: "ACTION,start,end",
+  OptDef(names: "--set-action", c: cEdit, datum: coSetAction,
+    metavar: "ACTION,start,end",
     help: """Set a time segment to an ACTION, overriding other actions
 Examples:
   --set-action nil,0,5sec
   --set-action speed:1.5,varispeed:1.5,30sec,end"""),
-  OptDef(names: "--silent-speed", c: cEdit, datum: coSilentSpeed, metavar: "NUM", hidden: true,
+  OptDef(names: "--silent-speed", c: cEdit, datum: coSilentSpeed, metavar: "NUM",
+    hidden: true,
     help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),
-  OptDef(names: "--video-speed", c: cEdit, datum: coVideoSpeed, metavar: "NUM", hidden: true,
+  OptDef(names: "--video-speed", c: cEdit, datum: coVideoSpeed, metavar: "NUM",
+    hidden: true,
     help: "[Deprecated] Set speed of active segments to NUM. (default is 1)"),
 
-  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: coPremiere, hidden: true),
-  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: coResolve, hidden: true),
-  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: coFinalCutPro, hidden: true),
-  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: coShotcut, hidden: true),
-  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: coKdenlive, hidden: true),
+  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: coPremiere,
+      hidden: true),
+  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: coResolve,
+      hidden: true),
+  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: coFinalCutPro,
+      hidden: true),
+  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: coShotcut,
+      hidden: true),
+  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: coKdenlive,
+      hidden: true),
 
   OptDef(names: "-ex, --export", c: cTl, datum: coExport,
     metavar: "EXPORT:ATTRS?", help: "Choose the export mode"),
@@ -332,15 +343,21 @@ type CmdDef* = object
 
 const commands*: seq[CmdDef] = @[
   CmdDef(name: "cache", help: "", opts: cacheOptions, files: false),
-  CmdDef(name: "desc", help: "Display a media file's description metadata", opts: descOptions),
-  CmdDef(name: "info", help: "Retrieve information and properties about media files\nUsage: <file> [options] | -encoders <ext> | -decoders <ext>", opts: infoOptions),
+  CmdDef(name: "desc", help: "Display a media file's description metadata",
+      opts: descOptions),
+  CmdDef(name: "info", help: "Retrieve information and properties about media files\nUsage: <file> [options] | -encoders <ext> | -decoders <ext>",
+      opts: infoOptions),
   CmdDef(name: "levels", help: "Display loudness over time", opts: levelsOptions),
-  CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out", opts: subdumpOptions),
-  CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface", opts: waveformOptions),
-  CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]", opts: whisperOptions),
+  CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out",
+      opts: subdumpOptions),
+  CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface",
+      opts: waveformOptions),
+  CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]",
+      opts: whisperOptions),
 ] & (
   when defined(emscripten): @[] else: @[
-    CmdDef(name: "completion", help: "Generate completions for shells", opts: completionOptions, files: false),
+    CmdDef(name: "completion", help: "Generate completions for shells",
+        opts: completionOptions, files: false),
     CmdDef(name: "preview-worker", handler: "preview_worker",
       help: "Run the resident preview rendering worker", opts: @[], files: false,
       requiresArgs: false),
@@ -360,7 +377,10 @@ proc writeZshOptions(name: string, opts: seq[OptDef]) =
   for opt in opts:
     if opt.hidden:
       continue
-    let desc = if opt.help != "": opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:") else: ""
+    let desc =
+      if opt.help != "":
+        opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:")
+      else: ""
     for name in opt.names.split(", "):
       let n = name.strip().replace(":", "\\:")
       if desc != "":
@@ -443,7 +463,8 @@ macro genCmdCases*(keyIdent: untyped): untyped =
       # if paramCount() < 2: echo help else: handler(args)
       stmtList.add(newNimNode(nnkIfStmt).add(
         newNimNode(nnkElifBranch).add(
-          newNimNode(nnkInfix).add(ident("<"), newCall(ident("paramCount")), newIntLitNode(2)),
+          newNimNode(nnkInfix).add(ident("<"), newCall(ident("paramCount")),
+              newIntLitNode(2)),
           newStmtList(newCall(ident("echo"), newStrLitNode(cmd.help)))
         ),
         newNimNode(nnkElse).add(newStmtList(handlerCall))

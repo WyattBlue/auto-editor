@@ -44,14 +44,11 @@ func smartRenderPlan*(clips: openArray[Clip], keyframes: openArray[int64],
       if gopEnd > clipSrcEnd or gopEnd <= keyframe or finalGopNeedsHold:
         inc i
         continue
-      result.addSpan(ssEncode, cursor, keyframe,
-        clip.start + cursor - clip.offset)
-      result.addSpan(ssCopy, keyframe, gopEnd,
-        clip.start + keyframe - clip.offset)
+      result.addSpan(ssEncode, cursor, keyframe, clip.start + cursor - clip.offset)
+      result.addSpan(ssCopy, keyframe, gopEnd, clip.start + keyframe - clip.offset)
       cursor = gopEnd
       inc i
-    result.addSpan(ssEncode, cursor, clipSrcEnd,
-      clip.start + cursor - clip.offset)
+    result.addSpan(ssEncode, cursor, clipSrcEnd, clip.start + cursor - clip.offset)
 
 func smartPlanStats*(spans: openArray[SmartSpan]): SmartPlanStats =
   var inEncodeRun = false

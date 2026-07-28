@@ -5,18 +5,18 @@ when not defined(emscripten):
 import ./[action, cli]
 import ./util/[color, rational, term]
 
-type BarType* = enum
-  modern, classic, ascii, machine, none
-
 type
+  BarType* = enum
+    modern, classic, ascii, machine, none
   ExportKind* = enum
-    exAuto, exDefault, exClipSequence, exV1, exV2, exV3, exPremiere,
-    exResolveFcp7, exFinalCutPro, exResolve, exShotcut, exKdenlive, exPremiereOtio
-
+    exAuto, exDefault, exClipSequence, exV1, exV2, exV3, exPremiere, exResolveFcp7,
+    exFinalCutPro, exResolve, exShotcut, exKdenlive, exPremiereOtio
   ExportSpec* = object
     kind*: ExportKind
     name*: string
     version*: string
+
+  PackedInt* = distinct int64
 
 func `$`*(kind: ExportKind): string {.raises: [].} =
   case kind
@@ -33,8 +33,6 @@ func `$`*(kind: ExportKind): string {.raises: [].} =
   of exShotcut: "shotcut"
   of exKdenlive: "kdenlive"
   of exPremiereOtio: "premiere-otio"
-
-type PackedInt* = distinct int64
 
 func pack*(flag: bool, number: int64): PackedInt {.raises: [].} =
   let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64
@@ -54,7 +52,6 @@ func getNumber*(packed: PackedInt): int64 {.raises: [].} =
 type
   NormKind* = enum
     nkNull, nkEbu, nkPeak
-
   Norm* = object
     case kind*: NormKind
     of nkNull:
@@ -77,12 +74,12 @@ type AddSpec* = object
   selector*: int
   setActionRef*: int = -1
   path*: string
-  hasPos*: bool        # whether x:y:scale were given (else origin, native size)
-  xKf*, yKf*, scaleKf*: seq[float32]  # placement ramps (len 1 = static), fed to pos
-  followBase*: bool = true  # mirror the base clip's offset (stay time-synced) vs.
-                            # restart from frame 0 each kept section (logo/gif use)
-  effects*: string     # actions chained after `add:` — applied to this overlay
-                       # layer (not the base), as a comma-separated atf-8 string
+  hasPos*: bool # whether x:y:scale were given (else origin, native size)
+  xKf*, yKf*, scaleKf*: seq[float32] # placement ramps (len 1 = static), fed to pos
+  followBase*: bool = true # mirror the base clip's offset (stay time-synced) vs.
+                             # restart from frame 0 each kept section (logo/gif use)
+  effects*: string # actions chained after `add:` — applied to this overlay
+                     # layer (not the base), as a comma-separated atf-8 string
 
 type mainArgs* = object
   inputs*: seq[string]
@@ -99,7 +96,7 @@ type mainArgs* = object
     kind: exAuto, name: "Auto-Editor Media Group", version: "11")
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
-  adds*: seq[AddSpec]   # `add:` overlays (see AddSpec)
+  adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
   transition*: PackedInt = pack(false, 0) # 0 disables; otherwise dissolve duration
   transitionMinCut*: PackedInt = pack(true, 1000) # 1 second
 
@@ -133,7 +130,7 @@ type mainArgs* = object
   progress*: BarType = modern
 
   # Licensing
-  licenseKey*: string  # -k/--license-key; gates paid features (see license.nim)
+  licenseKey*: string # -k/--license-key; gates paid features (see license.nim)
   flags: uint32
 
 genFlagInterface(mainArgs)
@@ -206,7 +203,7 @@ proc error*(msg: string) {.noreturn, raises: [].} =
 
 type StringInterner* = Table[string, ptr string]
 
-proc intern*(interner: var StringInterner, s: string): ptr string {.raises: [].}=
+proc intern*(interner: var StringInterner, s: string): ptr string {.raises: [].} =
   result = interner.getOrDefault(s)
   if result != nil:
     return result

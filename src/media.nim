@@ -94,9 +94,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
 
       let ctxSAR = codecCtx.sample_aspect_ratio
-      let sar =
-        if not ctxSAR.isValid: AVRational(num: 1, den: 1)
-        else: ctxSAR
+      let sar = if not ctxSAR.isValid: AVRational(num: 1, den: 1) else: ctxSAR
 
       let newStream = VideoStream(
         duration: duration,
@@ -142,13 +140,11 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
       result.d.add(
-        DataStream(codecId: codecCtx.codec_id, tag: codecCtx.codec_tag, timecode: timecodeStr)
+        DataStream(codecId: codecCtx.codec_id, tag: codecCtx.codec_tag,
+            timecode: timecodeStr)
       )
 
 proc initMediaInfo*(path: string): MediaInfo =
-  let formatCtx = (
-    try: av.openFormatCtx(path)
-    except IOError as e: error e.msg
-  )
+  let formatCtx = (try: av.openFormatCtx(path) except IOError as e: error e.msg)
   result = initMediaInfo(formatCtx, path)
   avformat_close_input(addr formatCtx)

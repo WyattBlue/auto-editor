@@ -3,22 +3,23 @@ import ./[av, ffmpeg, log]
 
 when defined(macosx):
 
-  type AudioObjectPropertyAddress {.importc, header: "<CoreAudio/CoreAudio.h>", bycopy.} = object
+  type AudioObjectPropertyAddress {.importc, header: "<CoreAudio/CoreAudio.h>",
+      bycopy.} = object
     mSelector: uint32
     mScope: uint32
     mElement: uint32
 
   const
     kAudioObjectSystemObject = 1'u32
-    kAudioHardwarePropertyDevices = 0x64657623'u32             # 'dev#'
-    kAudioHardwarePropertyDefaultInputDevice = 0x64496E20'u32  # 'dIn '
-    kAudioObjectPropertyName = 0x6C6E616D'u32                  # 'lnam'
-    kAudioObjectPropertyScopeGlobal = 0x676C6F62'u32           # 'glob'
-    kAudioObjectPropertyScopeInput = 0x696E7074'u32            # 'inpt'
-    kAudioDevicePropertyStreams = 0x73746D23'u32               # 'stm#'
-    kAudioDevicePropertyTransportType = 0x7472616E'u32         # 'tran'
-    kAudioDeviceTransportTypeUSB = 0x75736220'u32              # 'usb '
-    kAudioDeviceTransportTypeVirtual = 0x76697274'u32          # 'virt'
+    kAudioHardwarePropertyDevices = 0x64657623'u32            # 'dev#'
+    kAudioHardwarePropertyDefaultInputDevice = 0x64496E20'u32 # 'dIn '
+    kAudioObjectPropertyName = 0x6C6E616D'u32                 # 'lnam'
+    kAudioObjectPropertyScopeGlobal = 0x676C6F62'u32          # 'glob'
+    kAudioObjectPropertyScopeInput = 0x696E7074'u32           # 'inpt'
+    kAudioDevicePropertyStreams = 0x73746D23'u32              # 'stm#'
+    kAudioDevicePropertyTransportType = 0x7472616E'u32        # 'tran'
+    kAudioDeviceTransportTypeUSB = 0x75736220'u32             # 'usb '
+    kAudioDeviceTransportTypeVirtual = 0x76697274'u32         # 'virt'
     kCFStringEncodingUTF8 = 0x08000100'u32
 
   proc AudioObjectGetPropertyData(inObjectID: uint32,
@@ -27,7 +28,8 @@ when defined(macosx):
     outData: pointer): int32 {.importc, header: "<CoreAudio/CoreAudio.h>".}
   proc AudioObjectGetPropertyDataSize(inObjectID: uint32,
     inAddress: ptr AudioObjectPropertyAddress, inQualifierDataSize: uint32,
-    inQualifierData: pointer, outDataSize: ptr uint32): int32 {.importc, header: "<CoreAudio/CoreAudio.h>".}
+    inQualifierData: pointer, outDataSize: ptr uint32): int32 {.importc,
+        header: "<CoreAudio/CoreAudio.h>".}
   proc CFStringGetCString(theString: pointer, buffer: cstring, bufferSize: int,
     encoding: uint32): uint8 {.importc, header: "<CoreFoundation/CoreFoundation.h>".}
   proc CFRelease(cf: pointer) {.importc, header: "<CoreFoundation/CoreFoundation.h>".}
@@ -36,13 +38,15 @@ when defined(macosx):
     AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: 0)
 
   proc deviceName(devId: uint32): string =
-    var name: pointer = nil  # CFStringRef
+    var name: pointer = nil # CFStringRef
     var size = uint32(sizeof(name))
     var a = propAddr(kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal)
-    if AudioObjectGetPropertyData(devId, addr a, 0, nil, addr size, addr name) != 0 or name == nil:
+    if AudioObjectGetPropertyData(devId, addr a, 0, nil, addr size, addr name) != 0 or
+        name == nil:
       return ""
     var buf: array[256, char]
-    if CFStringGetCString(name, cast[cstring](addr buf[0]), buf.len, kCFStringEncodingUTF8) != 0:
+    if CFStringGetCString(name, cast[cstring](addr buf[0]), buf.len,
+        kCFStringEncodingUTF8) != 0:
       result = $cast[cstring](addr buf[0])
     CFRelease(name)
 
@@ -58,16 +62,20 @@ when defined(macosx):
 
   proc defaultInputId(): uint32 =
     var size = uint32(sizeof(result))
-    var a = propAddr(kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal)
-    discard AudioObjectGetPropertyData(kAudioObjectSystemObject, addr a, 0, nil, addr size, addr result)
+    var a = propAddr(kAudioHardwarePropertyDefaultInputDevice,
+      kAudioObjectPropertyScopeGlobal)
+    discard AudioObjectGetPropertyData(kAudioObjectSystemObject, addr a, 0, nil,
+        addr size, addr result)
 
   proc inputDevices(): seq[uint32] =
     var size: uint32 = 0
     var a = propAddr(kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal)
-    if AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, addr a, 0, nil, addr size) != 0 or size == 0:
+    if AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, addr a, 0, nil,
+        addr size) != 0 or size == 0:
       return
     var ids = newSeq[uint32](int(size) div sizeof(uint32))
-    if AudioObjectGetPropertyData(kAudioObjectSystemObject, addr a, 0, nil, addr size, addr ids[0]) != 0:
+    if AudioObjectGetPropertyData(kAudioObjectSystemObject, addr a, 0, nil, addr size,
+        addr ids[0]) != 0:
       return
     for id in ids:
       if hasInput(id):
@@ -80,7 +88,7 @@ when defined(macosx):
     var candidates: seq[uint32]
     for id in inputDevices():
       if deviceTransport(id) != kAudioDeviceTransportTypeVirtual:
-        candidates.add id  # never auto-select virtual devices
+        candidates.add id # never auto-select virtual devices
     if candidates.len == 0:
       return ("", "")
 
@@ -97,7 +105,8 @@ when defined(macosx):
 elif defined(windows):
   import std/strutils
 
-  proc chooseMicDevice*(inputFormat: pointer): tuple[name, description, warning: string] =
+  proc chooseMicDevice*(inputFormat: pointer): tuple[name, description,
+      warning: string] =
     ## DirectShow has no special name for the default capture device, so ask
     ## libavdevice for its audio sources. Prefer a USB microphone when one is
     ## identifiable, then fall back to the first audio capture device.

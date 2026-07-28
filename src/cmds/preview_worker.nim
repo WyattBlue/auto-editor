@@ -142,10 +142,9 @@ proc startRender(message: JsonNode, active: var ActiveRender) =
   let outputPath = message["outputPath"].getStr()
   let timelinePath = outputPath & ".preview-worker-" & $id & ".v3"
   let throttled = message.hasKey("permitMs")
-  let controlPath = if throttled:
-    outputPath & ".preview-worker-" & $id & ".ctrl"
-  else:
-    ""
+  let controlPath =
+    if throttled: outputPath & ".preview-worker-" & $id & ".ctrl"
+    else: ""
 
   writeFile(timelinePath, message["timeline"].getStr())
   if throttled:

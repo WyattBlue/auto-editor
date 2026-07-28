@@ -161,8 +161,8 @@ proc kdenliveWrite*(output: string, tl: v3) =
         "id": warpedProducerId(w, i),
         "in": "00:00:00.000",
         # A timewarp producer is as long as the warped source, not the
-        # timeline; clamping to timeline length freezes any clip whose warped
-        # source position lies past it.
+          # timeline; clamping to timeline length freezes any clip whose warped
+          # source position lies past it.
         "out": toTimecode(pathDuration[path] / speedVal, standard)
       }.toXmlAttributes()
 
@@ -319,11 +319,17 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(tractorProp)
 
     var track = newElement("track")
-    track.attrs = {"hide": "video", "producer": &"playlist{playlists - 2}"}.toXmlAttributes()
+    track.attrs = {
+      "hide": "video",
+      "producer": &"playlist{playlists - 2}",
+    }.toXmlAttributes()
     tractor.add(track)
 
     track = newElement("track")
-    track.attrs = {"hide": "video", "producer": &"playlist{playlists - 1}"}.toXmlAttributes()
+    track.attrs = {
+      "hide": "video",
+      "producer": &"playlist{playlists - 1}",
+    }.toXmlAttributes()
     tractor.add(track)
 
     mlt.add(tractor)
@@ -394,11 +400,17 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(tractorProp)
 
     var track = newElement("track")
-    track.attrs = {"hide": "audio", "producer": &"playlist{playlists - 2}"}.toXmlAttributes()
+    track.attrs = {
+      "hide": "audio",
+      "producer": &"playlist{playlists - 2}",
+    }.toXmlAttributes()
     tractor.add(track)
 
     track = newElement("track")
-    track.attrs = {"hide": "audio", "producer": &"playlist{playlists - 1}"}.toXmlAttributes()
+    track.attrs = {
+      "hide": "audio",
+      "producer": &"playlist{playlists - 1}",
+    }.toXmlAttributes()
     tractor.add(track)
 
     mlt.add(tractor)
@@ -626,8 +638,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
       if ci in warpedIdxOf:
         clipProd = warpedProducerId(warpedIdxOf[ci], c)
       else:
-        let chainIdx = if isAudio: audioChainOf[(c, path)]
-                       else: videoChainOf[(c - aChannels, path)]
+        let chainIdx =
+          if isAudio: audioChainOf[(c, path)]
+          else: videoChainOf[(c - aChannels, path)]
         clipProd = &"chain{chainIdx}"
 
       let entry = newElement("entry")

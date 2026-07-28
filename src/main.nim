@@ -163,10 +163,7 @@ proc parseFrameRate(val: string): AVRational =
   of "film": return AVRational(num: 24, den: 1)
   else: discard
 
-  result = (
-    try: toAVRational(val)
-    except ValueError as e: error e.msg
-  )
+  result = (try: toAVRational(val) except ValueError as e: error e.msg)
   if result == AVRational(num: 2997, den: 100):
     warning "29.97 is not the NTSC rate; use `-r ntsc` for 30000/1001"
   elif result == AVRational(num: 2997, den: 125) or
@@ -180,7 +177,7 @@ when not defined(emscripten):
     ## Decide whether the video and/or audio streams are worth downloading,
     ## based on what the output format holds and what --edit needs to analyze.
     var (editV, editA) = editNeeds(args.edit)
-    for le in args.labeledEdits:  # union the needs of every --edit:N method
+    for le in args.labeledEdits: # union the needs of every --edit:N method
       let (v, a) = editNeeds(le.expr)
       editV = editV or v
       editA = editA or a
@@ -252,7 +249,8 @@ when not defined(emscripten):
         try: removeFile(location)
         except OSError: error &"Couldn't remove old download: {location}"
 
-      let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
+      let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath,
+          poParentStreams})
       defer: p.close()
       discard p.waitForExit()
 
@@ -296,7 +294,7 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
   ## drive-letter colon in `C:\dir\img.png` is part of the path), with or without
   ## placement. A trailing `follow-base=<bool>` option may follow either form.
   var keep: seq[string]
-  var curAdd = -1   # index in args.adds that trailing actions attach to; -1 = base
+  var curAdd = -1 # index in args.adds that trailing actions attach to; -1 = base
   for field in val.split(","):
     let f = field.strip()
     if f.startsWith("add:"):
@@ -323,7 +321,7 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
           spec.scaleKf = parseKeyframes(segs[^1].strip())
           hasPlacement = true
         except ActionParseError:
-          hasPlacement = false   # trailing fields aren't numeric => part of path
+          hasPlacement = false # trailing fields aren't numeric => part of path
       if hasPlacement:
         spec.hasPos = true
         spec.path = segs[0 ..< segs.len - 3].join(":")
@@ -366,7 +364,8 @@ proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   let action = actionFromUserSpeed(speed)
   return (action, parseTime(vals[1]), parseTime(vals[2]))
 
-proc parseActionAndRange(val: string, args: var mainArgs): (Actions, PackedInt, PackedInt) =
+proc parseActionAndRange(
+    val: string, args: var mainArgs): (Actions, PackedInt, PackedInt) =
   let parts = val.strip().split(",")
   if parts.len < 3:
     error "--set-action has too few arguments"
@@ -393,10 +392,7 @@ proc parseLabeledFlag(key: string): tuple[matched: bool, kind: CliOption, label:
     else: return (false, coNone, 0)
   let suffix = key[ci + 1 .. ^1]
   var n: int
-  let parsedLen = (
-    try: parseInt(suffix, n)
-    except ValueError: 0
-  )
+  let parsedLen = (try: parseInt(suffix, n) except ValueError: 0)
   if suffix.len == 0 or parsedLen != suffix.len:
     error &"Invalid label in {key}: expected an integer after ':'"
   if kind == coEdit and n == 0:
@@ -447,9 +443,10 @@ judge making cuts.
   var args = mainArgs()
   var showVersion: bool = false
   var expecting = coNone
-  var expectingLabel: int = 1  # label for a pending "edit"/"when" value (plain --edit => 1)
+  # Label for a pending "edit"/"when" value (plain --edit => 1).
+  var expectingLabel: int = 1
   var parseOptions = true
-  var positionalStart = int.high  # index of first input after `--`
+  var positionalStart = int.high # index of first input after `--`
 
   func isKnownOption(key: string): bool =
     for opt in mainOptions:

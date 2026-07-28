@@ -283,7 +283,8 @@ const
   AVMEDIA_TYPE_DATA* = AVMediaType(2)
   AVMEDIA_TYPE_SUBTITLE* = AVMediaType(3)
   AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
-  AVDISCARD_DEFAULT* = AVDiscard(0)  # Discard useless packets like 0-size packets in AVI
+  # Discard useless packets like 0-size packets in AVI.
+  AVDISCARD_DEFAULT* = AVDiscard(0)
   AVDISCARD_ALL* = AVDiscard(48)     # Discard all packets for the stream
   AVFMT_GLOBALHEADER* = 0x0040
   AV_CODEC_FLAG_GLOBAL_HEADER* = 4194304 # 1 << 22
@@ -308,7 +309,8 @@ proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
 type
   ConstCString* {.importc: "const char*", nodecl.} = cstring
-  AVLogCallback* = proc(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.}
+  AVLogCallback* =
+    proc(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.}
 
 proc av_log_set_callback*(callback: AVLogCallback) {.importc, header: "<libavutil/log.h>".}
 proc av_log_default_callback*(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}

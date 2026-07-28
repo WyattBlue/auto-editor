@@ -52,8 +52,8 @@ proc effectNode(matchName, effectName, name: string, intrinsic: bool,
         "IsIntrinsic": intrinsic,
         "MatchName": matchName,
         "Parameters": params
-      }
-    },
+    }
+  },
     "name": name,
     "effect_name": effectName,
     "enabled": true
@@ -109,7 +109,7 @@ proc rotationParam(actions: Actions, srcStart, srcDur: float, clipDur: int,
         var resets = 0
         for k in 1 .. n:
           let posK = round(srcStart + (k.float * maxDeg / abs(totalDeg)) * span)
-          if posK + 1.0 >= lastPos: break  # no room before the end; fold into last
+          if posK + 1.0 >= lastPos: break # no room before the end; fold into last
           kfs.add %*{"Position": rationalTime(rate, posK),
                      "Value": startDeg + sign * maxDeg}
           kfs.add %*{"Position": rationalTime(rate, posK + 1.0), "Value": startDeg}
@@ -287,10 +287,10 @@ proc mediaRef(mi: MediaInfo, rate, availDur: float): JsonNode =
         "OTIO_SCHEMA": "TimeRange.1",
         "duration": rationalTime(rate, availDur),
         "start_time": rationalTime(rate, 0.0)
-      },
-      "available_image_bounds": nil,
-      "target_url": mi.path.absPath.pathToUri()
-    }
+    },
+    "available_image_bounds": nil,
+    "target_url": mi.path.absPath.pathToUri()
+  }
   }
 
 proc clipSpeed(actions: Actions): float =
@@ -319,8 +319,7 @@ proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
   # Available media length (frames). A still has ~no real duration, so size its
   # range to cover the clip; otherwise Premiere mis-scales its keyframe times.
   let realAvail = float(int(mi.duration * tb))
-  let availDur = (if mi.v.len > 0 and realAvail <= 1.0: srcStart + srcDur
-                  else: realAvail)
+  let availDur = if mi.v.len > 0 and realAvail <= 1.0: srcStart + srcDur else: realAvail
 
   let effectsArr = newJArray()
   if isVideo:
@@ -601,14 +600,14 @@ proc otioWrite*(name, output: string, tl: v3) =
         "PixelAspectRatio": {"denominator": 1.0, "numerator": 1.0},
         "VideoFrameRate": rate,
         "VideoResolution": {"height": height.int, "width": width.int}
-      }},
-      "name": name,
-      "source_range": nil,
-      "effects": newJArray(),
-      "markers": newJArray(),
-      "enabled": true,
-      "children": children
-    }
+    }},
+    "name": name,
+    "source_range": nil,
+    "effects": newJArray(),
+    "markers": newJArray(),
+    "enabled": true,
+    "children": children
+  }
   }
 
   if output == "-":

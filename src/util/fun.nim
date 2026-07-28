@@ -184,8 +184,8 @@ func aspectRatio*(width, height: int, sarNum = 1, sarDen = 1): tuple[w, h: int] 
     for (a, b) in [(cw, ch), (ch, cw)]:
       # Stored dimensions that would yield this display ratio for the given SAR.
       let
-        ta = float(a * sd)  # storage-width units
-        tb = float(b * sn)  # storage-height units
+        ta = float(a * sd) # storage-width units
+        tb = float(b * sn) # storage-height units
         drift = max(abs(w - h * ta / tb), abs(h - w * tb / ta))
       if drift < bestDrift:
         bestDrift = drift

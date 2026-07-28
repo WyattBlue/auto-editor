@@ -85,10 +85,7 @@ proc preview*(tl: var v3) =
 
   var inputLength: int64 = 0
   for src in tl.uniqueSources:
-    let container = (
-      try: av.open(src[])
-      except IOError as e: error e.msg
-    )
+    let container = (try: av.open(src[]) except IOError as e: error e.msg)
     defer: container.close()
     let mediaLength: AVRational = container.mediaLength()
     inputLength += round((mediaLength * tl.tb).f64).int64

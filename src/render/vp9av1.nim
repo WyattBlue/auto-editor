@@ -1,6 +1,3 @@
-## VP9 and AV1 share this partial-lossless rendering core. AV1-specific entry
-## points live in av1.nim; VP9 frame-header parsing remains here.
-
 import std/[algorithm, strformat, strutils]
 from std/math import round
 
@@ -95,7 +92,8 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   let formatName = $output.formatCtx.oformat.name
   let isWebm = formatName == "webm"
   let isMatroska = "matroska" in formatName
-  if not isWebm and (codecId != ID_AV1 or (not isMatroska and not formatName.isIsoBmff)):
+  if not isWebm and (codecId != ID_AV1 or (not isMatroska and
+      not formatName.isIsoBmff)):
     return
   if tl.v.len != 1 or tl.v[0].len == 0:
     return
@@ -329,7 +327,3 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_packet_unref(encodedPacket)
           avcodec_free_context(addr encoder)
   )
-
-proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3, args: mainArgs,
-    spans: seq[SmartSpan]): (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
-  output.makePartialLossless(tl, args, spans, ID_VP9)

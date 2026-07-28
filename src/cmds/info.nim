@@ -213,7 +213,7 @@ proc hwDeviceForEncoder(codec: ptr AVCodec): AVHWDeviceType =
     if cfg.device_type != AV_HWDEVICE_TYPE_NONE:
       return cfg.device_type
     inc i
-  return AV_HWDEVICE_TYPE_NONE  # software encoder
+  return AV_HWDEVICE_TYPE_NONE # software encoder
 
 proc hwEncoderUsable(codec: ptr AVCodec): bool =
   let deviceType = hwDeviceForEncoder(codec)
@@ -308,7 +308,9 @@ proc main*(args: seq[string]) =
       if genCliMacro(key, args, infoOptions):
         continue
       if key in ["-h", "--help"]:
-        printHelp("<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>", infoOptions)
+        printHelp(
+          "<file> [options] | -encoders <ext> | -decoders <ext> | -codecs <ext>",
+          infoOptions)
       if key.startsWith("--"):
         error &"Unknown option: {key}{optionDidYouMean(key, infoOptions)}"
 

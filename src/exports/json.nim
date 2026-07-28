@@ -39,9 +39,9 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
         "at": t.at,
         "dur": t.dur,
         "alignment": (case t.alignment
-          of taStart: "start"
-          of taCenter: "center"
-          of taEnd: "end")
+        of taStart: "start"
+        of taCenter: "center"
+        of taEnd: "end")
       }
     result.add arr
 

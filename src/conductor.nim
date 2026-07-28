@@ -217,7 +217,7 @@ proc applyAdds(tl: var v3, args: mainArgs,
     for clip in tl.a[0]:
       base.add Clip(src: nil, start: clip.start, dur: clip.dur,
         offset: clip.offset, effects: clip.effects, stream: 0)
-    tl.langs.insert(toLang("und"), 0)  # video lang precedes audio langs
+    tl.langs.insert(toLang("und"), 0) # video lang precedes audio langs
     tl.v.add base
 
   for spec in args.adds:
@@ -250,7 +250,7 @@ proc applyAdds(tl: var v3, args: mainArgs,
           stream: 0)
     if track.len == 0:
       continue
-    tl.langs.insert(toLang("und"), tl.v.len)  # keep video langs before audio
+    tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
     tl.v.add track
   tl.updateNumberOfSrc()
 
@@ -371,10 +371,12 @@ proc editMedia*(args: var mainArgs) =
 
         if not tlInitialized:
           mi = inputMi
-          tlV3 = initLinearTimeline(interner.intern(args.inputs[i]), tb, bg, mi, actionMap, actionIndex)
+          tlV3 = initLinearTimeline(interner.intern(args.inputs[i]), tb, bg, mi,
+              actionMap, actionIndex)
           tlInitialized = true
         else:
-          appendLinearTimeline(tlV3, interner.intern(args.inputs[i]), inputMi, actionIndex)
+          appendLinearTimeline(tlV3, interner.intern(args.inputs[i]), inputMi,
+            actionIndex)
 
       applyAdds(tlV3, args, interner)
       tlV3.applyArgs(args)
@@ -478,7 +480,8 @@ proc editMedia*(args: var mainArgs) =
     for clipNum, clip2 in clips2.pairs:
       var myTimeline = toNonLinear2(src, tlV3.tb, mi, @[clip2], tlV3.effects)
       applyArgs(myTimeline, args)
-      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar, cache)
+      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule,
+        bar, cache)
   else:
     makeMedia(args, tlV3, output, rule, bar, cache)
 

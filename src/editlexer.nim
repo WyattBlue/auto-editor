@@ -102,8 +102,7 @@ proc getNextToken(self: var Lexer): Token {.raises: [ValueError].} =
         raise newException(ValueError, "Unterminated string literal")
       let `to` = self.pos
       self.advance()
-      return Token(kind: Str, `from`: `from`, to: `to`,
-        hasEscapes: hasEscapes)
+      return Token(kind: Str, `from`: `from`, to: `to`, hasEscapes: hasEscapes)
 
     if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 <
         uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
@@ -203,10 +202,9 @@ proc expr(self: var Parser): Expr {.raises: [ValueError].} =
     return Expr(kind: ExprNum, `from`: token.`from`, to: token.to)
   of Str:
     self.eat()
-    let value = if token.hasEscapes:
-      self.lexer.text.decodeString(token.`from`, token.to)
-    else:
-      ""
+    let value =
+      if token.hasEscapes: self.lexer.text.decodeString(token.`from`, token.to)
+      else: ""
     return Expr(kind: ExprStr, decoded: token.hasEscapes, strVal: value,
       `from`: token.`from`, to: token.to)
   of Sym:

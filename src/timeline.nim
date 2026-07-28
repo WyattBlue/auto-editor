@@ -272,7 +272,8 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
       if dur == 0:
         continue
 
-      let action = if chunk[2] == 1.0:
+      let action =
+        if chunk[2] == 1.0:
           aNil
         else:
           try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
@@ -331,8 +332,7 @@ func transitionPlan*(clips: seq[Clip], transitions: seq[Transition]):
         transitions[outCursor].alignment != taStart:
       result[i].outgoing = outCursor.int32
 
-proc addDissolveTransitions*(tl: var v3, requested: int64,
-    minCut: int64 = 0) =
+proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
   ## Add portable start/center/end aligned dissolves to primary A/V tracks.
   ## Centered transitions are shortened symmetrically so they cannot overlap a
   ## neighboring transition or consume an entire visible clip.
@@ -450,9 +450,12 @@ proc withRamp(tl: var v3, cache: var Table[RampKey, uint32], effectIdx: uint32,
   actions.add ramp
   let group = newActions(actions)
   let found = tl.effects.find(group)
-  result = if found >= 0: found.uint32 else:
-    tl.effects.add group
-    uint32(tl.effects.len - 1)
+  result =
+    if found >= 0:
+      found.uint32
+    else:
+      tl.effects.add group
+      uint32(tl.effects.len - 1)
   cache[key] = result
 
 proc bakeTransitions*(source: v3): v3 =
