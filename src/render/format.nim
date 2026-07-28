@@ -3,7 +3,7 @@ from std/math import round
 
 import ../[av, ffmpeg, license, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
-import ./[video, audio, subtitle, h264, hevc, vp9av1]
+import ./[video, audio, subtitle, h264, hevc, partialplan, vp9av1]
 
 type Priority = object
   index: float64
@@ -86,6 +86,29 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
   error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
+proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArgs):
+    tuple[stream: ptr AVStream, packets: iterator(): (ptr AVPacket, int64)] =
+  let encoder = initCodec(args.videoCodec)
+  if encoder == nil:
+    return
+
+  let plan = output.partialLosslessPlan(tl, args, encoder.id)
+  if plan.len == 0:
+    return
+
+  case encoder.id
+  of ID_H264:
+    (result.stream, result.packets) =
+      makePartialLosslessH264(output, tl, args, plan)
+  of ID_HEVC:
+    (result.stream, result.packets) =
+      makePartialLosslessHevc(output, tl, args, plan)
+  of ID_VP9, ID_AV1:
+    (result.stream, result.packets) =
+      makePartialLossless(output, tl, args, plan, encoder.id)
+  else:
+    return
+
 proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules,
     bar: Bar, cache: MediaCache) =
   var args = inputArgs
@@ -161,32 +184,12 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
   var partialLosslessVideo = false
 
   if renderVideo:
-    let h264Plan = output.partialLosslessH264Plan(renderTl, args)
-    if h264Plan.len > 0:
-      partialLosslessVideo = true
-      (vOutStream, videoPacketIter) = makePartialLosslessH264(
-        output, renderTl, args, h264Plan)
-    else:
-      let hevcPlan = output.partialLosslessHevcPlan(renderTl, args)
-      if hevcPlan.len > 0:
-        partialLosslessVideo = true
-        (vOutStream, videoPacketIter) = makePartialLosslessHevc(
-          output, renderTl, args, hevcPlan)
-      else:
-        let vp9Plan = output.partialLosslessPlan(renderTl, args, ID_VP9)
-        if vp9Plan.len > 0:
-          partialLosslessVideo = true
-          (vOutStream, videoPacketIter) = makePartialLossless(
-            output, renderTl, args, vp9Plan, ID_VP9)
-        else:
-          let av1Plan = output.partialLosslessPlan(renderTl, args, ID_AV1)
-          if av1Plan.len > 0:
-            partialLosslessVideo = true
-            (vOutStream, videoPacketIter) = makePartialLossless(
-              output, renderTl, args, av1Plan, ID_AV1)
-          else:
-            (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(
-              output, renderTl, args, cache)
+    (vOutStream, videoPacketIter) =
+      output.makePartialLosslessVideo(renderTl, args)
+    partialLosslessVideo = vOutStream != nil
+    if not partialLosslessVideo:
+      (vEncCtx, vOutStream, videoFrameIter) =
+        makeNewVideoFrames(output, renderTl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]

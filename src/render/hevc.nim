@@ -1,7 +1,7 @@
-import std/[algorithm, strformat, strutils]
+import std/[strformat, strutils]
 from std/math import round
 
-import ../[action, av, ffmpeg, log, timeline]
+import ../[av, ffmpeg, log, timeline]
 import ../util/rational
 import ./smart
 
@@ -150,7 +150,7 @@ func frameAt(ts: int64, tb, fps: AVRational): int64 =
 func hevcNalIsCopyBoundary*(typ: int): bool =
   typ in 16..20
 
-func hasRandomAccessPoint(data: ptr uint8, size: int): bool =
+func hevcIsCopyBoundary*(data: ptr uint8, size: int): bool =
   ## Only closed HEVC random-access pictures are safe splice boundaries. CRA
   ## (type 21) may be followed in decode order by RASL pictures that display
   ## before it, so treating CRA as a complete-GOP boundary can drop frames.
@@ -184,26 +184,6 @@ func hasRandomAccessPoint(data: ptr uint8, size: int): bool =
       pos += nalLen
   return false
 
-proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
-    tuple[keyframes: seq[int64], sourceEnd: int64] =
-  while av_read_frame(input.formatContext, input.packet) >= 0:
-    let packet = input.packet
-    if packet.stream_index == stream.index and packet.pts != AV_NOPTS_VALUE:
-      let frame = frameAt(packet.pts, stream.time_base, fps)
-      result.sourceEnd = max(result.sourceEnd, frame + 1)
-      if (packet.flags and AV_PKT_FLAG_KEY) != 0 and
-          hasRandomAccessPoint(packet.data, packet.size.int):
-        result.keyframes.add frame
-    av_packet_unref(packet)
-
-  result.keyframes.sort()
-  var write = 0
-  for keyframe in result.keyframes:
-    if write == 0 or result.keyframes[write - 1] != keyframe:
-      result.keyframes[write] = keyframe
-      inc write
-  result.keyframes.setLen(write)
-
 func encoderSupports(encoder: ptr AVCodec, format: AVPixelFormat): bool =
   if encoder == nil:
     return false
@@ -216,70 +196,18 @@ func encoderSupports(encoder: ptr AVCodec, format: AVPixelFormat): bool =
     inc i
   false
 
-proc partialLosslessHevcPlan*(output: OutputContainer, tl: v3,
-    args: mainArgs): seq[SmartSpan] =
-  ## Only timing- and pixel-preserving edits qualify. Complete IRAP-delimited
-  ## GOPs are copied; partial GOPs at edit boundaries are re-encoded.
-  if args.noPartialLossless or args.scale != 1.0 or args.pixFmt != "" or
-      args.vprofile != "":
-    return @[]
-  let encoder = initCodec(args.videoCodec)
-  if encoder == nil or encoder.id != ID_HEVC:
-    return @[]
-  let formatName = $output.formatCtx.oformat.name
-  let isMatroska = "matroska" in formatName
-  if not formatName.isIsoBmff and not isMatroska:
-    return @[]
-  if tl.v.len != 1 or tl.v[0].len == 0:
-    return @[]
-
-  let source = tl.v[0][0].src
-  if source == nil:
-    return @[]
-  var expectedStart = 0'i64
-  for clip in tl.v[0]:
-    if clip.src != source or clip.stream != 0 or clip.start != expectedStart or
-        not tl.effects[clip.effects].isEmpty:
-      return @[]
-    expectedStart = clip.start + clip.dur
-  if expectedStart != tl.len:
-    return @[]
-
-  var input = try: av.open(source[])
-              except IOError: return @[]
-  defer: input.close()
-  if input.video.len == 0:
-    return @[]
-  let stream = input.video[0]
-  if stream.codecpar.codec_id != ID_HEVC or
-      stream.codecpar.width != tl.res[0] or stream.codecpar.height != tl.res[1] or
-      not encoder.encoderSupports(AVPixelFormat(stream.codecpar.format)) or
-      not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
-    return @[]
-
+func hevcSupportsPartialLossless*(stream: ptr AVStream, encoder: ptr AVCodec): bool =
+  if not encoder.encoderSupports(AVPixelFormat(stream.codecpar.format)):
+    return false
   # Partial-lossless samples are normalized to four-byte lengths. hvcC stores
   # lengthSizeMinusOne in byte 21; reject sources that declare another size.
   let extra = stream.codecpar.extradata
   if extra == nil or stream.codecpar.extradata_size < 23 or extra[] != 1 or
       (cast[ptr UncheckedArray[uint8]](extra)[21] and 3) != 3:
-    return @[]
+    return false
   let sourceParameterSets = parameterSetsToHvcc(extra,
     stream.codecpar.extradata_size)
-  if not sourceParameterSets.hasRequiredParameterSets:
-    return @[]
-
-  let (keyframes, sourceEnd) = scanGops(input, stream, tl.tb)
-  for clip in tl.v[0]:
-    if clip.offset < 0 or clip.offset >= sourceEnd or
-        clip.offset + clip.dur > sourceEnd + 1:
-      return @[]
-  let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
-  let stats = smartPlanStats(plan)
-  let averageGop = averageGopFrames(keyframes, sourceEnd)
-  if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
-    debug &"Skipping HEVC partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {plan.len} spans would not offset {stats.encodeRuns} encoder runs"
-    return @[]
-  return plan
+  sourceParameterSets.hasRequiredParameterSets
 
 proc initPartialHevcEncoder(args: mainArgs, par: ptr AVCodecParameters,
     frameTb, fps: AVRational): ptr AVCodecContext =
@@ -375,15 +303,14 @@ proc makePartialLosslessHevc*(output: var OutputContainer, tl: v3,
           # Stop at the next closed random-access picture, not merely at the
           # first packet whose presentation timestamp belongs to the next GOP.
           if sourceFrame >= span.srcEnd and
-              hasRandomAccessPoint(sourcePacket.data, sourcePacket.size.int):
+              hevcIsCopyBoundary(sourcePacket.data, sourcePacket.size.int):
             av_packet_unref(sourcePacket)
             break
           if sourceFrame < span.srcStart or sourceFrame >= span.srcEnd:
             av_packet_unref(sourcePacket)
             continue
           if first and ((sourcePacket.flags and AV_PKT_FLAG_KEY) == 0 or
-              not hasRandomAccessPoint(sourcePacket.data,
-                  sourcePacket.size.int)):
+              not hevcIsCopyBoundary(sourcePacket.data, sourcePacket.size.int)):
             av_packet_unref(sourcePacket)
             continue
           let firstPacket = first
@@ -405,8 +332,7 @@ proc makePartialLosslessHevc*(output: var OutputContainer, tl: v3,
           let orderTs =
             if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
             else: outPacket.pts
-          let orderFrame = max(0'i64,
-            frameAt(orderTs, stream.time_base, tl.tb))
+          let orderFrame = max(0'i64, frameAt(orderTs, stream.time_base, tl.tb))
           av_packet_unref(sourcePacket)
           yield (outPacket, orderFrame)
       else:
