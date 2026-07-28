@@ -5,6 +5,9 @@ import ./util/[lang, rational]
 
 var useWebCodecs* = false
 
+func isIsoBmff*(formatName: string): bool =
+  "mp4" in formatName or "mov" in formatName
+
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
 

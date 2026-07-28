@@ -170,9 +170,8 @@ proc partialLosslessH264Plan*(output: OutputContainer, tl: v3,
       args.vprofile != "":
     return @[]
   let formatName = $output.formatCtx.oformat.name
-  let isIsoBmff = "mp4" in formatName or "mov" in formatName
   let isMatroska = "matroska" in formatName
-  if not isIsoBmff and not isMatroska:
+  if not formatName.isIsoBmff and not isMatroska:
     return @[]
   if tl.v.len != 1 or tl.v[0].len == 0:
     return @[]
@@ -339,8 +338,9 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
           outPacket.stream_index = outputStream.index
           if firstPacket:
             outPacket.normalizeAvcc(sourceParameterSets)
-          let orderTs = if outPacket.dts !=
-              AV_NOPTS_VALUE: outPacket.dts else: outPacket.pts
+          let orderTs =
+            if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+            else: outPacket.pts
           let orderFrame = max(0'i64, frameAt(orderTs, stream.time_base, tl.tb))
           av_packet_unref(packet)
           yield (outPacket, orderFrame)
@@ -371,8 +371,9 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
           decoded.pts = span.outStart + encoded
           decoded.time_base = frameTb
           decoded.duration = 1
-          decoded.pict_type = if firstFrameInRun:
-              AV_PICTURE_TYPE_I else: AV_PICTURE_TYPE_NONE
+          decoded.pict_type =
+            if firstFrameInRun: AV_PICTURE_TYPE_I
+            else: AV_PICTURE_TYPE_NONE
           firstFrameInRun = false
           for encodedPacket in encoder.encode(decoded, packet):
             let outPacket = av_packet_clone(encodedPacket)
@@ -383,8 +384,9 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
             outPacket.stream_index = outputStream.index
             outPacket.normalizeAvcc(if firstPacket: encodedParameterSets else: @[])
             firstPacket = false
-            let orderTs = if outPacket.dts !=
-                AV_NOPTS_VALUE: outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           inc encoded
@@ -407,8 +409,9 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
             outPacket.stream_index = outputStream.index
             outPacket.normalizeAvcc(if firstPacket: encodedParameterSets else: @[])
             firstPacket = false
-            let orderTs = if outPacket.dts !=
-                AV_NOPTS_VALUE: outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           av_frame_free(addr held)
@@ -429,8 +432,9 @@ proc makePartialLosslessH264*(output: var OutputContainer, tl: v3,
             outPacket.stream_index = outputStream.index
             outPacket.normalizeAvcc(if firstPacket: encodedParameterSets else: @[])
             firstPacket = false
-            let orderTs = if outPacket.dts !=
-                AV_NOPTS_VALUE: outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           avcodec_free_context(addr encoder)

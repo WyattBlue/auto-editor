@@ -1,9 +1,12 @@
-import std/[algorithm, strformat]
+## VP9 and AV1 share this partial-lossless rendering core. AV1-specific entry
+## points live in av1.nim; VP9 frame-header parsing remains here.
+
+import std/[algorithm, strformat, strutils]
 from std/math import round
 
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/rational
-import smart
+import ./smart
 
 func frameAt(ts: int64, tb, fps: AVRational): int64 =
   int64(round(float(ts) * float(tb) * float(fps)))
@@ -40,15 +43,35 @@ func vp9IsKeyframe(data: ptr uint8, size: int): bool =
     return false
   return readBit(bytes, size, pos) == 0
 
-proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
-    tuple[keyframes: seq[int64], sourceEnd: int64] =
+func packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool =
+  ## FFmpeg's AV1 parser marks only independently decodable packets as key.
+  ## VP9's container flag is less strict, so also inspect its frame header.
+  codecId == ID_AV1 or (codecId == ID_VP9 and vp9IsKeyframe(data, size))
+
+func encoderSupports(encoder: ptr AVCodec, format: AVPixelFormat): bool =
+  if encoder == nil:
+    return false
+  if encoder.pix_fmts == nil:
+    return true
+  var i = 0
+  while encoder.pix_fmts[i] != AV_PIX_FMT_NONE:
+    if encoder.pix_fmts[i] == format:
+      return true
+    inc i
+  false
+
+func codecLabel(codecId: AVCodecID): string =
+  ($avcodec_get_name(codecId)).toUpperAscii
+
+proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
+    codecId: AVCodecID): tuple[keyframes: seq[int64], sourceEnd: int64] =
   while av_read_frame(input.formatContext, input.packet) >= 0:
     let packet = input.packet
     if packet.stream_index == stream.index and packet.pts != AV_NOPTS_VALUE:
       let frame = frameAt(packet.pts, stream.time_base, fps)
       result.sourceEnd = max(result.sourceEnd, frame + 1)
       if (packet.flags and AV_PKT_FLAG_KEY) != 0 and
-          vp9IsKeyframe(packet.data, packet.size.int):
+          packetIsCopyBoundary(codecId, packet.data, packet.size.int):
         result.keyframes.add frame
     av_packet_unref(packet)
 
@@ -60,58 +83,65 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational):
       inc write
   result.keyframes.setLen(write)
 
-proc partialLosslessVp9Plan*(output: OutputContainer, tl: v3,
-    args: mainArgs): seq[SmartSpan] =
+proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
+    codecId: AVCodecID): seq[SmartSpan] =
+  let codecLabel = codecId.codecLabel
   if args.noPartialLossless or args.scale != 1.0 or args.pixFmt != "" or
       args.vprofile != "":
     return @[]
   let encoder = initCodec(args.videoCodec)
-  if encoder == nil or encoder.id != ID_VP9:
+  if encoder == nil or encoder.id != codecId:
     return @[]
-  if $output.formatCtx.oformat.name != "webm":
-    return @[]
+  let formatName = $output.formatCtx.oformat.name
+  let isWebm = formatName == "webm"
+  let isMatroska = "matroska" in formatName
+  if not isWebm and (codecId != ID_AV1 or (not isMatroska and not formatName.isIsoBmff)):
+    return
   if tl.v.len != 1 or tl.v[0].len == 0:
-    return @[]
+    return
 
   let source = tl.v[0][0].src
   if source == nil:
-    return @[]
+    return
+
   var expectedStart = 0'i64
   for clip in tl.v[0]:
     if clip.src != source or clip.stream != 0 or clip.start != expectedStart or
         not tl.effects[clip.effects].isEmpty:
-      return @[]
+      return
     expectedStart = clip.start + clip.dur
   if expectedStart != tl.len:
-    return @[]
+    return
 
-  var input = try: av.open(source[])
-              except IOError: return @[]
+  var input = try: av.open(source[]) except IOError: return @[]
   defer: input.close()
   if input.video.len == 0:
-    return @[]
+    return
+
   let stream = input.video[0]
-  if stream.codecpar.codec_id != ID_VP9 or
+  let pixelFormat = AVPixelFormat(stream.codecpar.format)
+  if stream.codecpar.codec_id != codecId or
       stream.codecpar.width != tl.res[0] or
       stream.codecpar.height != tl.res[1] or
-      stream.codecpar.format != AV_PIX_FMT_YUV420P.cint or
+      (codecId == ID_VP9 and pixelFormat != AV_PIX_FMT_YUV420P) or
+      (codecId == ID_AV1 and not encoder.encoderSupports(pixelFormat)) or
       not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
-    return @[]
+    return
 
-  let (keyframes, sourceEnd) = scanGops(input, stream, tl.tb)
+  let (keyframes, sourceEnd) = scanGops(input, stream, tl.tb, codecId)
   for clip in tl.v[0]:
     if clip.offset < 0 or clip.offset >= sourceEnd or
         clip.offset + clip.dur > sourceEnd + 1:
-      return @[]
+      return
   let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
   let stats = smartPlanStats(plan)
   let averageGop = averageGopFrames(keyframes, sourceEnd)
   if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
-    debug &"Skipping VP9 partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {plan.len} spans would not offset {stats.encodeRuns} encoder runs"
-    return @[]
+    debug &"Skipping {codecLabel} partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {plan.len} spans would not offset {stats.encodeRuns} encoder runs"
+    return
   return plan
 
-proc initPartialVp9Encoder(args: mainArgs, par: ptr AVCodecParameters,
+proc initPartialEncoder(args: mainArgs, par: ptr AVCodecParameters,
     frameTb, fps: AVRational): ptr AVCodecContext =
   var (_, encoder) = initEncoder(args.videoCodec)
   encoder.width = par.width
@@ -126,33 +156,37 @@ proc initPartialVp9Encoder(args: mainArgs, par: ptr AVCodecParameters,
   encoder.colorspace = par.color_space
   encoder.profile = par.profile
   encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
+  # SVT-AV1 rejects CRF mode when a target bitrate is also configured. The
+  # bitrate above is only an automatic fallback, so do not let it conflict
+  # with an explicit quality target.
+  if encoder.codec_id == ID_AV1 and args.crf >= 0 and args.videoBitrate < 0:
+    encoder.bit_rate = 0
   resolveEncoderContext(encoder)
   encoder.applyPartialEncoderArgs(args)
   encoder.open()
   return encoder
 
-proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
-    args: mainArgs, spans: seq[SmartSpan]):
+proc makePartialLossless*(output: var OutputContainer, tl: v3, args: mainArgs,
+    spans: seq[SmartSpan], codecId: AVCodecID):
     (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
+  let codecLabel = codecId.codecLabel
   let sourcePath = tl.v[0][0].src[]
-  var templateInput = try: av.open(sourcePath)
-                      except IOError as e: error e.msg
+  var templateInput = try: av.open(sourcePath) except IOError as e: error e.msg
   let sourceStream = templateInput.video[0]
   let stats = smartPlanStats(spans)
   if stats.copiedFrames == 0:
     templateInput.close()
-    error "Partial-lossless VP9 renderer selected without a complete GOP"
+    error &"Partial-lossless {codecLabel} renderer selected without a complete GOP"
 
   let outputStream = output.addStreamFromTemplate(sourceStream)
   if sourceStream.metadata != nil:
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
   outputStream.time_base = sourceStream.time_base
   outputStream.avg_frame_rate = tl.tb
-  outputStream.duration = av_rescale_q(tl.len, av_inv_q(tl.tb),
-      outputStream.time_base)
+  outputStream.duration = av_rescale_q(tl.len, av_inv_q(tl.tb), outputStream.time_base)
   templateInput.close()
 
-  debug &"Using VP9 partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {spans.len} spans and {stats.encodeRuns} encoder runs"
+  debug &"Using {codecLabel} partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {spans.len} spans and {stats.encodeRuns} encoder runs"
 
   return (outputStream, iterator(): (ptr AVPacket, int64) =
     let frameTb = av_inv_q(tl.tb)
@@ -169,7 +203,7 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
       frame = av_frame_alloc()
       packet = av_packet_alloc()
       if frame == nil or packet == nil:
-        error "Could not allocate partial-lossless VP9 frame/packet"
+        error &"Could not allocate partial-lossless {codecLabel} frame/packet"
     defer:
       if packet != nil: av_packet_free(addr packet)
       if frame != nil: av_frame_free(addr frame)
@@ -197,31 +231,30 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
             av_packet_unref(sourcePacket)
             continue
           if first and ((sourcePacket.flags and AV_PKT_FLAG_KEY) == 0 or
-              not vp9IsKeyframe(sourcePacket.data, sourcePacket.size.int)):
+              not packetIsCopyBoundary(codecId, sourcePacket.data,
+                sourcePacket.size.int)):
             av_packet_unref(sourcePacket)
             continue
           first = false
           let outPacket = av_packet_clone(sourcePacket)
           if outPacket == nil:
-            error "Could not clone VP9 packet"
-          let sourceBase = av_rescale_q(span.srcStart, frameTb,
-              stream.time_base)
-          let outputBase = av_rescale_q(span.outStart, frameTb,
-              stream.time_base)
+            error &"Could not clone {codecLabel} packet"
+          let sourceBase = av_rescale_q(span.srcStart, frameTb, stream.time_base)
+          let outputBase = av_rescale_q(span.outStart, frameTb, stream.time_base)
           let shift = outputBase - sourceBase
           if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
           if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
           outPacket.time_base = stream.time_base
           outPacket.stream_index = outputStream.index
-          let orderTs = if outPacket.dts != AV_NOPTS_VALUE:
-              outPacket.dts else: outPacket.pts
-          let orderFrame = max(0'i64,
-            frameAt(orderTs, stream.time_base, tl.tb))
+          let orderTs =
+            if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+            else: outPacket.pts
+          let orderFrame = max(0'i64, frameAt(orderTs, stream.time_base, tl.tb))
           av_packet_unref(sourcePacket)
           yield (outPacket, orderFrame)
       else:
         if encoder == nil:
-          encoder = initPartialVp9Encoder(args, stream.codecpar, frameTb, tl.tb)
+          encoder = initPartialEncoder(args, stream.codecpar, frameTb, tl.tb)
           firstFrameInRun = true
 
         let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base)
@@ -230,8 +263,7 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
         var encoded = 0'i64
         var lastDecoded: ptr AVFrame = nil
         for decoded in input.flushDecode(stream.index, decoder, frame):
-          let sourceFrame = int64(round(
-            decoded.time(stream.time_base) * float(tl.tb)))
+          let sourceFrame = int64(round(decoded.time(stream.time_base) * float(tl.tb)))
           if sourceFrame < span.srcStart:
             continue
           if sourceFrame >= span.srcEnd:
@@ -242,17 +274,19 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
           decoded.pts = span.outStart + encoded
           decoded.time_base = frameTb
           decoded.duration = 1
-          decoded.pict_type = if firstFrameInRun:
-              AV_PICTURE_TYPE_I else: AV_PICTURE_TYPE_NONE
+          decoded.pict_type =
+            if firstFrameInRun: AV_PICTURE_TYPE_I
+            else: AV_PICTURE_TYPE_NONE
           firstFrameInRun = false
           for encodedPacket in encoder.encode(decoded, packet):
             let outPacket = av_packet_clone(encodedPacket)
             if outPacket == nil:
-              error "Could not clone encoded VP9 packet"
+              error &"Could not clone encoded {codecLabel} packet"
             outPacket.time_base = encoder.time_base
             outPacket.stream_index = outputStream.index
-            let orderTs = if outPacket.dts != AV_NOPTS_VALUE:
-                outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           inc encoded
@@ -266,11 +300,12 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
           for encodedPacket in encoder.encode(held, packet):
             let outPacket = av_packet_clone(encodedPacket)
             if outPacket == nil:
-              error "Could not clone held VP9 packet"
+              error &"Could not clone held {codecLabel} packet"
             outPacket.time_base = encoder.time_base
             outPacket.stream_index = outputStream.index
-            let orderTs = if outPacket.dts != AV_NOPTS_VALUE:
-                outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           av_frame_free(addr held)
@@ -279,18 +314,22 @@ proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3,
         if lastDecoded != nil:
           av_frame_free(addr lastDecoded)
 
-        let endsRun = spanIndex + 1 == spans.len or
-          spans[spanIndex + 1].kind == ssCopy
+        let endsRun = spanIndex + 1 == spans.len or spans[spanIndex + 1].kind == ssCopy
         if endsRun:
           for encodedPacket in encoder.encode(nil, packet):
             let outPacket = av_packet_clone(encodedPacket)
             if outPacket == nil:
-              error "Could not clone flushed VP9 packet"
+              error &"Could not clone flushed {codecLabel} packet"
             outPacket.time_base = encoder.time_base
             outPacket.stream_index = outputStream.index
-            let orderTs = if outPacket.dts != AV_NOPTS_VALUE:
-                outPacket.dts else: outPacket.pts
+            let orderTs =
+              if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
+              else: outPacket.pts
             yield (outPacket, max(0'i64, orderTs))
             av_packet_unref(encodedPacket)
           avcodec_free_context(addr encoder)
   )
+
+proc makePartialLosslessVp9*(output: var OutputContainer, tl: v3, args: mainArgs,
+    spans: seq[SmartSpan]): (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
+  output.makePartialLossless(tl, args, spans, ID_VP9)
