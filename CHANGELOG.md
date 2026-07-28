@@ -4,7 +4,7 @@
  -
 
 ## Features
- -
+ - Add support for partial lossless AV1 too.
 
 ## Performance
  -

@@ -179,8 +179,12 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
-  var videoFrameIter: iterator(): (ptr AVFrame, int64)
-  var videoPacketIter: iterator(): (ptr AVPacket, int64)
+  var videoFrameIter: iterator(): (ptr AVFrame, int64) =
+    iterator(): (ptr AVFrame, int64) =
+      return
+  var videoPacketIter: iterator(): (ptr AVPacket, int64) =
+    iterator(): (ptr AVPacket, int64) =
+      return
   var partialLosslessVideo = false
 
   if renderVideo:
