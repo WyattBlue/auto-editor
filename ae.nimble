@@ -263,7 +263,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add vpx
   if not disableSvtAv1 and not isWasm:
     result.add svtav1
-  if not disableHevc:
+  if not disableHevc and not isWasm:
     result.add x265
   return result
 
@@ -685,7 +685,7 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
       exec "make install"
     of "libvpx":
       if not fileExists("Makefile"):
-        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory -msimd128 -mfma{memArg}" """
+        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory -msimd128 -mfma{memArg}" """
       makeInstall()
     of "zlib":
       # zlib ships a hand-written configure (not autotools): it reads CFLAGS

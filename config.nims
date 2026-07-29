@@ -2,7 +2,7 @@ import std/[strformat, strutils]
 
 var enableVpx = getEnv("DISABLE_VPX").len == 0
 var enableSvtav1 = getEnv("DISABLE_SVTAV1").len == 0
-var enableHevc = getEnv("DISABLE_HEVC").len == 0
+var enableHevc = getEnv("DISABLE_HEVC").len == 0 and not defined(emscripten)
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
