@@ -92,8 +92,7 @@ type KeyframeIndex = object
   avgInterval: int # average interval between keyframes (for seek decisions)
   hasIndex: bool   # whether the demuxer provided index entries
 
-func videoFrameToTimestamp*(frame: int, frameRate,
-    streamTimebase: AVRational): int64 =
+func videoFrameToTimestamp*(frame: int, frameRate, streamTimebase: AVRational): int64 =
   ## Convert a source-frame index to the stream timestamp used for seeking.
   ## Keep this rational: truncating the duration of one frame accumulates a
   ## large timestamp error in long videos (e.g. 33 ms instead of 1001/30 ms).

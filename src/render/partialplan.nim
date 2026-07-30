@@ -93,8 +93,7 @@ func packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool 
 func codecLabel(codecId: AVCodecID): string =
   if codecId == ID_H264: "H.264" else: ($avcodec_get_name(codecId)).toUpperAscii
 
-func normalizedCopyDts*(codecId: AVCodecID, first: bool,
-    pts, dts: int64): int64 =
+func normalizedCopyDts*(codecId: AVCodecID, first: bool, pts, dts: int64): int64 =
   ## Matroska can leave DTS unset on the first H.264 packet returned after a
   ## seek. A closed random-access packet has no decode dependency before it, so
   ## its shifted PTS is also the decode-time anchor for the copied span.

@@ -261,7 +261,7 @@ proc parseTime*(val: string): PackedInt =
 
 func toTb*(val: PackedInt, tb: float64): int =
   if val.getFlag:
-    return int(val.getNumber.float64 / 1000.0 * tb)
+    return round(val.getNumber.float64 / 1000.0 * tb).int
   return int(val.getNumber)
 
 proc smoothing*(val: var seq[bool], mincut, minclip: int) =

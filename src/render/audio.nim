@@ -622,6 +622,15 @@ func sameRun(effs: seq[Actions], a, b: Clip): bool =
     a.start + a.dur == b.start and a.offset + a.dur == b.offset and
     clipSpeed(effs, a) == clipSpeed(effs, b)
 
+func audioSampleSpan*(start, dur: int64, sampleRate: cint,
+    tb: AVRational): tuple[start, dur: int] =
+  ## Convert a half-open timeline interval to a half-open sample interval.
+  ## Deriving the duration from absolute endpoints keeps adjacent clips
+  ## contiguous when a frame contains a fractional number of audio samples.
+  let sampleStart = start * sampleRate.int64 * tb.den div tb.num
+  let sampleEnd = (start + dur) * sampleRate.int64 * tb.den div tb.num
+  (sampleStart.int, (sampleEnd - sampleStart).int)
+
 proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
@@ -816,8 +825,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
           let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
           let srcData = getter.get(sampStart, sampEnd)
-          let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
-          let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
+          let (startSample, durSamples) =
+            audioSampleSpan(clip.start, clip.dur, sr, tb)
 
           let processedData = processAudioClip(tl.effects, clip, srcData,
               getter.stream.codecpar.sample_rate, sr, getter.layout, tb.float)
@@ -1118,4 +1127,3 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           (totalSamples - ebuEmitted - pending) * targetChannels)
       for fr in drainRechunk(true):
         yield fr
-
