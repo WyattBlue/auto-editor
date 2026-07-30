@@ -619,9 +619,15 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   if av_packet_ref(self.packet, addr packet) < 0:
     error "Failed to reference packet"
 
+  let packetStream = self.packet.stream_index
+  let packetPts = self.packet.pts
+  let packetDts = self.packet.dts
+  let packetDuration = self.packet.duration
   let ret = av_interleaved_write_frame(self.formatCtx, self.packet)
   if ret < 0:
-    error &"Could not write packet (disk full?): {av_err2str(ret)}"
+    error &"Could not write packet: {av_err2str(ret)} " &
+      &"(stream {packetStream}, pts {packetPts}, dts {packetDts}, " &
+      &"duration {packetDuration}, timebase {dst.num}/{dst.den})"
 
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame,
     packet: ptr AVPacket): ptr AVPacket =

@@ -93,6 +93,13 @@ func packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool 
 func codecLabel(codecId: AVCodecID): string =
   if codecId == ID_H264: "H.264" else: ($avcodec_get_name(codecId)).toUpperAscii
 
+func normalizedCopyDts*(codecId: AVCodecID, first: bool,
+    pts, dts: int64): int64 =
+  ## Matroska can leave DTS unset on the first H.264 packet returned after a
+  ## seek. A closed random-access packet has no decode dependency before it, so
+  ## its shifted PTS is also the decode-time anchor for the copied span.
+  if codecId == ID_H264 and first and dts == AV_NOPTS_VALUE: pts else: dts
+
 proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
     codecId: AVCodecID): tuple[keyframes: seq[int64], sourceEnd: int64] =
   while av_read_frame(input.formatContext, input.packet) >= 0:
@@ -338,6 +345,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, args: mainArgs,
                   stream.time_base)
             if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
             if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
+            outPacket.dts = normalizedCopyDts(codecId, isFirst,
+              outPacket.pts, outPacket.dts)
             outPacket.time_base = stream.time_base
           outPacket.stream_index = outputStream.index
           if isFirst and isNal:

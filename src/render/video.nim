@@ -92,13 +92,20 @@ type KeyframeIndex = object
   avgInterval: int # average interval between keyframes (for seek decisions)
   hasIndex: bool   # whether the demuxer provided index entries
 
+func videoFrameToTimestamp*(frame: int, frameRate,
+    streamTimebase: AVRational): int64 =
+  ## Convert a source-frame index to the stream timestamp used for seeking.
+  ## Keep this rational: truncating the duration of one frame accumulates a
+  ## large timestamp error in long videos (e.g. 33 ms instead of 1001/30 ms).
+  av_rescale_q(frame.int64, av_inv_q(frameRate), streamTimebase)
+
 type SrcState = ref object
   kfFrames: seq[int]          # indexed keyframe frame numbers
   observedKeyframes: seq[int] # keyframes seen while decoding (for backward seeks)
   decoder: ptr AVCodecContext
   still: ptr AVFrame          # memoized decoded still; nil until first decode
   held: ptr AVFrame           # last decoded frame, held for forward reuse
-  tou: int                    # timebase units per source frame (for seeks)
+  frameRate: AVRational       # source frames/second, also used for seek timestamps
   kfInterval: int             # average interval between indexed keyframes
   frameIndex: int             # decoder's current source position; -1 = none yet
   seekThreshold: int          # don't seek-ahead before this frame
@@ -459,16 +466,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       let stream = cn.video[0]
       let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))
 
-      # tou (timebase units per source frame) turns a frame index into a seek
-      # timestamp. avg_frame_rate can be 0/0 for streams with no declared frame
-      # rate; fall back to the timeline rate so the int conversion never sees
-      # inf/nan from a divide-by-zero.
-      let srcFps = float(stream.avg_frame_rate)
-      let fps = if srcFps > 0.0: srcFps else: float(targetFps)
-      # ticks/frame = (1/fps) / (num/den); num is 1 for mp4-style timebases
-      # but e.g. 1001 for AVI's 1001/30000.
-      st.tou = int(float(stream.time_base.den) /
-                   (float(stream.time_base.num) * fps))
+      # avg_frame_rate can be 0/0 for streams with no declared frame rate; use
+      # the timeline rate for both frame indexing and seek timestamp conversion.
+      st.frameRate =
+        if stream.avg_frame_rate.isValid: stream.avg_frame_rate else: targetFps
+      let fps = st.frameRate.float
 
       if args.noSeek:
         st.kfFrames = @[]
@@ -1076,15 +1078,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let indexInfo = if st.hasKfIndex: &"{st.kfFrames.len} indexed" else: "no index"
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
-      myCache.cns[obj.src].seek(seekTarget * st.tou, stream = myStream)
+      myCache.cns[obj.src].seek(
+        videoFrameToTimestamp(seekTarget, st.frameRate, myStream.time_base),
+        stream = myStream)
       avcodec_flush_buffers(st.decoder)
       st.lastSeekTarget = seekTarget
       frameIndex = min(seekTarget, target - 1)
 
-    # avg_frame_rate can be 0/0 (no declared frame rate); fall back to the
-    # timeline rate so frameIndex never comes from NaN (matches st.tou above).
-    let srcTb =
-      if myStream.avg_frame_rate.isValid: myStream.avg_frame_rate else: targetFps
     var didDecode = false
     while frameIndex < target:
       if target - frameIndex > st.kfInterval and frameIndex > seekThreshold:
@@ -1093,7 +1093,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           seekFrame = frameIndex
           hasSeekFrame = true
           debug &"Seek: {frameIndex} -> {target}"
-          myCache.cns[obj.src].seek(target * st.tou, stream = myStream)
+          myCache.cns[obj.src].seek(
+            videoFrameToTimestamp(target, st.frameRate, myStream.time_base),
+            stream = myStream)
           avcodec_flush_buffers(st.decoder)
           st.lastSeekTarget = target
 
@@ -1102,7 +1104,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       for decodedFrame in myCache.cns[obj.src].flushDecode(
           myStream.index.cint, decoder, frame):
         frame = decodedFrame
-        frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
+        frameIndex = int(round(
+          decodedFrame.time(myStream.time_base) * st.frameRate.float))
         if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
             frameIndex > st.observedKeyframes[^1]:
           st.observedKeyframes.add frameIndex
