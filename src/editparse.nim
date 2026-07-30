@@ -1,3 +1,5 @@
+import std/strutils
+
 import ./[editlexer, editmethods]
 
 type
@@ -7,7 +9,7 @@ type
     args*: seq[BoundEditArg]
 
 proc bindEditArgs*(expressions: openArray[Expr], text: string,
-    argOrder: openArray[string]): seq[BoundEditArg] =
+    argOrder: openArray[string], name = "expression"): seq[BoundEditArg] =
   ## Bind positional and keyword arguments to their position in `argOrder`.
   ## Values remain strings so each consumer can apply its own semantic policy.
   var
@@ -38,7 +40,10 @@ proc bindEditArgs*(expressions: openArray[Expr], text: string,
         raise newException(ValueError,
           "Positional arguments must never come after keyword arguments")
       if position >= argOrder.len:
-        raise newException(ValueError, "Too many args")
+        let params = argOrder.join(", ")
+        raise newException(ValueError, name & " accepts at most " &
+          $argOrder.len & " arguments (" & params & "); got " &
+          $expressions.len)
       value = expr.atomText(text)
       positional += 1
 
@@ -46,7 +51,7 @@ proc bindEditArgs*(expressions: openArray[Expr], text: string,
 
 proc bindEditMethodArgs*(name: string, expressions: openArray[Expr],
     text: string): seq[BoundEditArg] =
-  bindEditArgs(expressions, text, argOrderOf(name))
+  bindEditArgs(expressions, text, argOrderOf(name), name)
 
 proc parseSingleEditMethod*(filename, source: string): ParsedEditMethod =
   ## Parse exactly one edit method. Operators and constants belong to the full

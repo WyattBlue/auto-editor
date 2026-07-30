@@ -49,6 +49,16 @@ func initLexer*(filename, text: string): Lexer =
 func sourceText*(self: Lexer): lent string =
   self.text
 
+func sourceText*(expr: Expr, text: string): string =
+  ## Return the original source covered by any expression, including lists.
+  ## Unlike atomText, this is intended for diagnostics and never decodes strings.
+  let start = int(expr.`from`)
+  let stop = int(expr.to)
+  if start <= stop and stop <= text.len:
+    text[start ..< stop]
+  else:
+    "<invalid expression>"
+
 proc advance(self: var Lexer) =
   self.pos += 1
   if self.pos == high(uint32) or self.pos > uint32(self.text.len - 1):

@@ -438,7 +438,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      error &"`--edit` expects a valid expression: {node[0].atomText(text)}"
+      error &"`--edit` expects a valid expression: {node[0].sourceText(text)}"
 
   proc evalEditString(editStr: string): seq[bool] =
     var lexer = initLexer("--edit", editStr)
