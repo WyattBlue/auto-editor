@@ -74,13 +74,13 @@ const editMethodDefs*: seq[EditMethodDef] = @[
 
 const editOperatorDefs*: seq[EditOperatorDef] = @[
   EditOperatorDef(name: "or", variadic: true,
-    help: "\"Logical Or\" two or more boolean arrays. If they are different " &
+    help: "\"Logical Or\" one or more boolean arrays. If they are different " &
           "lengths, use the biggest one."),
   EditOperatorDef(name: "and", variadic: true,
-    help: "\"Logical And\" two or more boolean arrays. If they are different " &
+    help: "\"Logical And\" one or more boolean arrays. If they are different " &
           "lengths, use the smallest one."),
   EditOperatorDef(name: "xor", variadic: true,
-    help: "\"Logical Xor\" two or more boolean arrays."),
+    help: "\"Logical Xor\" one or more boolean arrays."),
   EditOperatorDef(name: "not", variadic: false,
     help: "Invert a boolean array."),
 ]

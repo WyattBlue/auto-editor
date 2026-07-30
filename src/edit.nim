@@ -263,7 +263,15 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
       else:
         error "We only support 0 or 1 right now."
     elif node[0].kind == ExprSym:
-      case node[0].editSymbol(text)
+      let editSymbol = node[0].editSymbol(text)
+      let operandCount = node.len - 1
+      if editSymbol == esNot and operandCount != 1:
+        error &"--edit: 'not' expects exactly 1 operand; got {operandCount}"
+      if editSymbol in {esOr, esAnd, esXor} and operandCount < 1:
+        let operator = node[0].sourceText(text)
+        error &"--edit: '{operator}' expects at least 1 operand; got {operandCount}"
+
+      case editSymbol
       of esOr:
         result = editEval(node[1], text)
         for i in 2 ..< node.len:
@@ -277,8 +285,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
         for i in 2 ..< node.len:
           result = result xor editEval(node[i], text)
       of esNot:
-        if node.len != 2:
-          error "Wrong arity"
         return not editEval(node[1], text)
       of esAudio:
         stream = -1 # Set to "all" by default
