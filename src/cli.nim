@@ -75,10 +75,15 @@ template assertArgumentOptions*(options, expected, extra: untyped) =
   static:
     doAssert argumentOptions(options) + extra == expected
 
+func cliOptionName(opt: CliOption): string {.compileTime.} =
+  let name = system.`$`(opt)
+  doAssert name.startsWith("co"), "Invalid CLI option name: " & name
+  name[2 .. ^1]
+
 func cliOptionLabel(opt: CliOption): string {.compileTime.} =
   if opt == coPixFmt:
     return "pix_fmt"
-  let name = repr(opt)[2 .. ^1]
+  let name = cliOptionName(opt)
   for i, c in name:
     if c.isUpperAscii:
       if i > 0:
@@ -96,7 +101,8 @@ macro genCliOptionToString(options: static seq[OptDef]): untyped =
   var caseStmt = newTree(nnkCaseStmt, ident("opt"))
   for opt in CliOption:
     let label = if opt == coNone or opt in flags: "" else: cliOptionLabel(opt)
-    caseStmt.add newTree(nnkOfBranch, ident(repr(opt)), newStmtList(newLit(label)))
+    caseStmt.add newTree(nnkOfBranch, ident(system.`$`(opt)),
+      newStmtList(newLit(label)))
 
   result = caseStmt
 
@@ -500,10 +506,10 @@ const argsFlagOptions = {
 func flagTarget(opt: CliOption): string {.compileTime.} =
   for option in cliOptions:
     if option.kind == Flag and option.datum == opt:
-      result = repr(opt)[2 .. ^1]
+      result = cliOptionName(opt)
       result[0] = result[0].toLowerAscii
       return
-  raiseAssert "CLI option is not a flag: " & repr(opt)
+  raiseAssert "CLI option is not a flag: " & system.`$`(opt)
 
 func argsFlags(): seq[CliOption] {.compileTime.} =
   for opt in mainOptions:

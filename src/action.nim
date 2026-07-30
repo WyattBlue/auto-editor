@@ -233,8 +233,9 @@ proc free*(a: Actions) =
   ## Release the buffer allocated by `newActions`.
   ##
   ## `aNil` and `aCut` are sentinel values and do not own a buffer.
-  if int(a) > 1:
-    dealloc(cast[pointer](int(a)))
+  when not defined(nimscript):
+    if int(a) > 1:
+      dealloc(cast[pointer](int(a)))
 
 const
   luvBrighthueId* = toSnorm16(0.0'f32)
