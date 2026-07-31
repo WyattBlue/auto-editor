@@ -568,6 +568,12 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   if fileExists(buildPath / "lib" / "pkgconfig" / "x265.pc"):
     return
 
+  if defined(macosx) and hostCPU == "amd64" and kind == native:
+    # Skip the project configs: they add auto-editor's own link flags, which
+    # cannot resolve from inside ffmpeg_sources.
+    exec "nim r -d:release --hints:off --skipParentCfg:on --skipProjCfg:on " &
+      "../../scripts/strip_avx512_asm.nim source/common/x86"
+
   let isWasm = kind == wasm32 or kind == wasm64
   let cmakePrefix = if isWasm: "emcmake cmake" else: "cmake"
   let memArg = if kind == wasm64: " -m64" else: ""
@@ -847,6 +853,14 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
         continue
 
       withDir package.name:
+        # x264 has no configure switch for AVX-512, so take it out of the
+        # assembly itself. patches/x264.patch zeroes X264_CPU_AVX512 to keep
+        # the dispatchers from referencing what is no longer assembled.
+        if package.name == "x264" and defined(macosx) and hostCPU == "amd64" and
+            kind == native:
+          exec "nim r -d:release --hints:off --skipParentCfg:on --skipProjCfg:on " &
+            "../../scripts/strip_avx512_asm.nim common/x86"
+
         if package.buildSystem == "cmake":
           if isWasm:
             cmakeBuildWasm(package, buildPath, kind)

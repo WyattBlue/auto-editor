@@ -112,15 +112,16 @@
              }
 
              /* Sum up accumulators */
---- a/common/cpu.c
-+++ b/common/cpu.c
-@@ -317,7 +317,10 @@
-     cpu |= X264_CPU_STACK_MOD4;
+--- a/common/osdep.h
++++ b/common/osdep.h
+@@ -50,5 +50,10 @@
  #endif
--
-+#if defined(__APPLE__) && ARCH_X86_64
-+    cpu &= ~X264_CPU_AVX512;
-+#endif
+
+ #include "x264.h"
 +
-     return cpu;
- }
++#if defined(__APPLE__) && defined(__x86_64__)
++#undef X264_CPU_AVX512
++#define X264_CPU_AVX512 0
++#endif
+
+ #if !HAVE_LOG2F
