@@ -18,3 +18,23 @@
          string(FIND "${CMAKE_CXX_FLAGS}" "-march" marchPos)
          if(marchPos LESS "0")
              add_definitions(-march=i686)
+--- a/source/common/cpu.cpp
++++ b/source/common/cpu.cpp
+@@ -159,0 +160,3 @@
++#if defined(__APPLE__) && X86_64
++    (void)benableavx512;
++#endif
+@@ -219,0 +223 @@
++#if !defined(__APPLE__) || !X86_64
+@@ -230,0 +235 @@
++#endif
+--- a/source/common/x86/asm-primitives.cpp
++++ b/source/common/x86/asm-primitives.cpp
+@@ -2364,0 +2365 @@
++#if !defined(__APPLE__) || !X86_64
+@@ -3201,0 +3203 @@
++#endif
+@@ -4756,0 +4759 @@
++#if !defined(__APPLE__) || !X86_64
+@@ -5450,0 +5454 @@
++#endif
