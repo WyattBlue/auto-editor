@@ -376,6 +376,8 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     cmakeArgs.add(&"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={sourceDir}/=")
 
   if package.name == "libsvtav1":
+    if defined(macosx) and hostCPU == "amd64" and kind == native:
+      cmakeArgs.add("-DENABLE_AVX512=OFF")
     # SVT-AV1's CMakeLists writes archives into the source tree at
     # Bin/${CMAKE_BUILD_TYPE}/. Override the CACHE PATH so the .a stays in
     # the build dir and re-installs don't produce a hybrid BSD/GNU archive.
