@@ -979,6 +979,10 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     if package.ffFlag != "":
       commonFlags &= &"  {package.ffFlag} \\\n"
 
+  if isMacNative and hostCPU == "amd64":
+    commonFlags &= "  --disable-avx512 \\\n"
+    commonFlags &= "  --disable-avx512icl \\\n"
+
   if not isCrossWasm:
     if defined(arm) or defined(arm64) or kind == winArm or kind == armv7:
       commonFlags &= "  --enable-neon \\\n"
