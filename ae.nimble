@@ -181,7 +181,11 @@ let vpx = Package(
   name: "libvpx",
   sourceUrl: "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz",
   sha256: "7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c",
-  buildArguments: "--disable-dependency-tracking --disable-examples --disable-unit-tests --enable-runtime-cpu-detect --enable-vp9-highbitdepth".split(" "),
+  buildArguments: (
+    "--disable-dependency-tracking --disable-examples --disable-unit-tests " &
+    (when defined(macosx) and hostCPU == "amd64": "--disable-avx512 " else: "") &
+    "--enable-runtime-cpu-detect --enable-vp9-highbitdepth"
+  ).split(" "),
   ffFlag: "--enable-libvpx",
 )
 let dav1d = Package(
