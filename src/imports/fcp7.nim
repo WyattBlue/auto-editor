@@ -1,4 +1,4 @@
-import std/[strutils, streams, tables, uri, xmlparser, xmltree]
+import std/[algorithm, strutils, streams, tables, uri, xmlparser, xmltree]
 
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/[color, rational]
@@ -29,31 +29,107 @@ func readTbNtsc(tb: int, ntsc: bool): AVRational =
     return tb.int64 * AVRational(num: 1000, den: 1001)
   return AVRational(num: tb.cint, den: 1)
 
-func readFilters(filterNode: XmlNode): float =
-  result = 1.0
+func num(s: string): (bool, float) =
+  try: (true, parseFloat(s.strip()))
+  except ValueError: (false, 0.0)
+
+func readParam(parmNode: XmlNode): (string, seq[(float, float)]) =
+  for c in parmNode:
+    if c.kind != xnElement: continue
+    case c.tag
+    of "parameterid":
+      result[0] = c.innerText.strip()
+    of "value":
+      let (ok, v) = num(c.innerText)
+      if ok: result[1].add (0.0, v)
+    of "keyframe":
+      var timeOk, valOk = false
+      var time, value = 0.0
+      for kc in c:
+        if kc.kind != xnElement: continue
+        case kc.tag
+        of "when": (timeOk, time) = num(kc.innerText)
+        of "value": (valOk, value) = num(kc.innerText)
+        else: discard
+      if timeOk and valOk: result[1].add (time, value)
+    else: discard
+
+func addFixed(acts: var seq[Action], act: Action) =
+  for a in acts:
+    if a.kind == act.kind: return
+  acts.add act
+
+func lerpAt(pts: seq[(float, float)], time: float): float =
+  if time <= pts[0][0]: return pts[0][1]
+  for i in 1 ..< pts.len:
+    let (t0, v0) = pts[i - 1]
+    let (t1, v1) = pts[i]
+    if time <= t1:
+      if t1 <= t0: return v1
+      return v0 + (v1 - v0) * (time - t0) / (t1 - t0)
+  pts[^1][1]
+
+func onGrid(pts: seq[(float, float)], srcIn, span: float): bool =
+  for i, p in pts:
+    if abs(p[0] - (srcIn + float(i) / float(pts.len - 1) * span)) > 0.5:
+      return false
+  true
+
+func kfSeq(pts: seq[(float, float)], srcIn, srcOut, scale, lo, hi: float):
+    seq[float32] =
+  if pts.len == 0: return
+  if pts.len == 1:
+    if pts[0][1] * scale == 1.0: return
+    return @[clamp(pts[0][1] * scale, lo, hi).float32]
+
+  let ordered = pts.sorted
+  let span = max(srcOut - srcIn - 1.0, 1.0)
+  if ordered.len <= 255 and ordered.onGrid(srcIn, span):
+    for p in ordered:
+      result.add clamp(p[1] * scale, lo, hi).float32
+    return
+
+  let n = min(int(span) + 1, 255)
+  for i in 0 ..< n:
+    let time = srcIn + float(i) / float(n - 1) * span
+    result.add clamp(ordered.lerpAt(time) * scale, lo, hi).float32
+
+proc readFilters(filterNode: XmlNode, acts: var seq[Action],
+    srcIn, srcOut: float) =
+  for c in filterNode:
+    if c.kind == xnElement and c.tag == "enabled" and
+        c.innerText.strip() == "FALSE":
+      return
+
   for effectTag in filterNode:
-    if effectTag.kind != xnElement: continue
-    if effectTag.tag in ["enabled", "start", "end"]: continue
-    # Process <effect>: i=0 is <name>, i=1 is <effectid>, i>1 are <parameter>s
-    var paramIdx = 0
+    if effectTag.kind != xnElement or effectTag.tag != "effect": continue
+
+    var effectId = ""
+    var params: Table[string, seq[(float, float)]]
     for effectChild in effectTag:
       if effectChild.kind != xnElement: continue
-      if paramIdx > 1:
-        var parmIdx = 0
-        var isSpeed = false
-        for parm in effectChild:
-          if parm.kind != xnElement: continue
-          if parmIdx == 0:
-            if parm.tag == "parameterid" and parm.innerText.strip() == "speed":
-              isSpeed = true
-            else:
-              break
-          elif isSpeed and parm.tag == "value":
-            let text = parm.innerText.strip()
-            if text != "":
-              return parseFloat(text) / 100.0
-          inc parmIdx
-      inc paramIdx
+      if effectChild.tag == "effectid":
+        effectId = effectChild.innerText.strip()
+      elif effectChild.tag == "parameter":
+        let (id, vals) = readParam(effectChild)
+        if id != "" and vals.len > 0:
+          params[id] = vals
+
+    case effectId
+    of "timeremap":
+      if "speed" in params:
+        let speed = params["speed"][0][1] / 100.0
+        if speed > 0.0 and speed < 99999.0 and speed != 1.0:
+          acts.addFixed Action(kind: actSpeed, val: speed.float32)
+    of "opacity":
+      let kf = kfSeq(params.getOrDefault("opacity"), srcIn, srcOut, 0.01, 0.0, 1.0)
+      if kf.len > 0:
+        acts.addFixed Action(kind: actOpacity, kf: kf)
+    of "audiolevels":
+      let kf = kfSeq(params.getOrDefault("level"), srcIn, srcOut, 1.0, 0.0, 3.98109)
+      if kf.len > 0:
+        acts.addFixed Action(kind: actVolume, kf: kf)
+    else: discard
 
 proc resolveFile(fileNode: XmlNode, sources: var Table[string, ptr string],
                  interner: var StringInterner): ptr string =
@@ -69,10 +145,8 @@ proc resolveFile(fileNode: XmlNode, sources: var Table[string, ptr string],
       return p
   return nil
 
-proc getEffect(speed: float, effects: var seq[Actions]): uint32 =
-  let actionGroup =
-    if speed == 1.0: aNil
-    else: newActions([Action(kind: actSpeed, val: speed)])
+proc getEffect(acts: seq[Action], effects: var seq[Actions]): uint32 =
+  let actionGroup = newActions(acts)
   let idx = effects.find(actionGroup)
   if idx == -1:
     effects.add(actionGroup)
@@ -89,8 +163,10 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     var startVal = 0i64
     var endVal = 0i64
     var inVal = 0i64
+    var outVal = -1i64
     var fileNode: XmlNode = nil
-    var speed = 1.0
+    var acts: seq[Action]
+    var filterNodes: seq[XmlNode]
 
     for ci in trackChild:
       if ci.kind != xnElement: continue
@@ -98,13 +174,9 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
       of "start": startVal = parseInt(ci.innerText.strip())
       of "end": endVal = parseInt(ci.innerText.strip())
       of "in": inVal = parseInt(ci.innerText.strip())
+      of "out": outVal = parseInt(ci.innerText.strip())
       of "file": fileNode = ci
-      # A clipitem can carry several <filter>s (Opacity, Motion, Time Remap);
-      # only the Time Remap one yields a non-default speed, so keep that one
-      # regardless of sibling order rather than letting the last filter win.
-      of "filter":
-        let s = readFilters(ci)
-        if s != 1.0: speed = s
+      of "filter": filterNodes.add ci
       else: discard
 
     if fileNode == nil: continue
@@ -112,7 +184,10 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     if srcPtr == nil: continue
 
     let dur = endVal - startVal
-    let e = getEffect(speed, effects)
+    if outVal <= inVal: outVal = inVal + dur
+    for fn in filterNodes:
+      readFilters(fn, acts, inVal.float, outVal.float)
+    let e = getEffect(acts, effects)
     result.add Clip(src: srcPtr, start: startVal, dur: dur, offset: inVal,
       effects: e, stream: 0)
 

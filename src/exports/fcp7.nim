@@ -62,6 +62,91 @@ func speedup(speed: float): XmlNode =
 
   return fil
 
+func rampPoints(act: Action, dur: int64, fps: float): seq[(float32, float32)] =
+  if act.kf.len <= 1:
+    return @[(0.0'f32, (if act.kf.len == 1: act.kf[0] else: 1.0'f32))]
+  if not act.hasEase:
+    for i, v in act.kf:
+      result.add (float32(i) / float32(act.kf.len - 1), v)
+    return
+  let animLen = case act.easeDurUnit
+    of duClip: int(dur)
+    of duSec: max(1, int(round(act.easeDur.float * fps)))
+    of duFrames: max(1, int(round(act.easeDur.float)))
+  let denom = max(1, int(dur) - 1)
+  let samples = min(denom, 60)
+  for s in 0 .. samples:
+    let local = int(round(s.float / samples.float * denom.float))
+    result.add (float32(local) / float32(denom),
+      sampleKf(act.kf, applyEase(act.easeCurve, clipT(local, animLen))))
+
+func rampParam(id, name: string, lo, hi, scale: float, act: Action,
+    inFrame, outFrame, dur: int64, fps: float): XmlNode =
+  let span = max(outFrame - inFrame - 1, 0)
+  var keys: seq[(int64, float)]
+  for (p, v) in rampPoints(act, dur, fps):
+    let time = inFrame + int64(round(p.float * float(span)))
+    let value = clamp(v.float * scale, lo, hi)
+    if keys.len > 0 and keys[^1][0] == time: keys[^1] = (time, value)
+    else: keys.add (time, value)
+
+  if keys.len == 1:
+    return param(id, name, $keys[0][1], $lo, $hi)
+
+  result = <>parameter(authoringApp = "PremierePro")
+  result.add elem("parameterid", id)
+  result.add elem("name", name)
+  result.add elem("valuemin", $lo)
+  result.add elem("valuemax", $hi)
+  for (time, value) in keys:
+    let kf = newElement("keyframe")
+    kf.add elem("when", $time)
+    kf.add elem("value", $value)
+    result.add kf
+
+func opacityFilter(act: Action, inFrame, outFrame, dur: int64, fps: float): XmlNode =
+  let effect = newElement("effect")
+  effect.add elem("name", "Opacity")
+  effect.add elem("effectid", "opacity")
+  effect.add elem("effectcategory", "motion")
+  effect.add elem("effecttype", "motion")
+  effect.add elem("mediatype", "video")
+  effect.add rampParam("opacity", "opacity", 0.0, 100.0, 100.0, act,
+    inFrame, outFrame, dur, fps)
+  result = newElement("filter")
+  result.add effect
+
+func audioLevelsFilter(act: Action, inFrame, outFrame, dur: int64,
+    fps: float): XmlNode =
+  let effect = newElement("effect")
+  effect.add elem("name", "Audio Levels")
+  effect.add elem("effectid", "audiolevels")
+  effect.add elem("effectcategory", "audiolevels")
+  effect.add elem("effecttype", "audiolevels")
+  effect.add elem("mediatype", "audio")
+  effect.add rampParam("level", "Level", 0.0, 3.98109, 1.0, act,
+    inFrame, outFrame, dur, fps)
+  result = newElement("filter")
+  result.add effect
+
+func clipFilters(effects: Actions, isVideo: bool, inFrame, outFrame, dur: int64,
+    fps: float): seq[XmlNode] =
+  var seen: set[ActionKind]
+  for a in effects:
+    if a.kind in seen: continue
+    seen.incl a.kind
+    case a.kind
+    of actSpeed, actVarispeed:
+      seen.incl {actSpeed, actVarispeed}
+      result.add speedup(a.val * 100)
+    of actOpacity:
+      if isVideo:
+        result.add opacityFilter(a, inFrame, outFrame, dur, fps)
+    of actVolume:
+      if not isVideo:
+        result.add audioLevelsFilter(a, inFrame, outFrame, dur, fps)
+    else: discard
+
 
 proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
     ntsc: string, durationStr: string) =
@@ -186,11 +271,9 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
         link2.add elem("linkclipref", &"clipitem-{clipItemNum}")
         clipitem.add link2
 
-      let effectGroup = tl.effects[aclip.effects]
-      for effect in effectGroup:
-        if effect.kind in [actSpeed, actVarispeed]:
-          clipitem.add speedup(effect.val * 100)
-          break
+      for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
+          aclip.dur, tl.tb.float64):
+        clipitem.add f
 
       track.add clipitem
       if transitionLinks[j].outgoing >= 0:
@@ -314,11 +397,9 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       labels.add elem("label2", "Iris")
       clipitem.add labels
 
-      let effectGroup = tl.effects[aclip.effects]
-      for effect in effectGroup:
-        if effect.kind in [actSpeed, actVarispeed]:
-          clipitem.add speedup(effect.val * 100)
-          break
+      for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
+          aclip.dur, tl.tb.float64):
+        clipitem.add f
 
       track.add clipitem
       if transitionLinks[j].outgoing >= 0:
@@ -498,11 +579,10 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
         clipitem.add elem("compositemode", "normal")
 
-        let effectGroup = tl.effects[clip.effects]
-        for effect in effectGroup:
-          if effect.kind in [actSpeed, actVarispeed]:
-            clipitem.add speedup(effect.val * 100)
-            break
+        for f in clipFilters(tl.effects[clip.effects], true,
+            (if still: 0'i64 else: inFrame), (if still: clip.dur else: outFrame),
+            clip.dur, tl.tb.float64):
+          clipitem.add f
 
         if resolve:
           let link1 = newElement("link")
