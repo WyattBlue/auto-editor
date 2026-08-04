@@ -12,6 +12,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 
 ]#
 
+{.push raises: [].}
 
 func getColorspace(mi: MediaInfo): string =
   # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
@@ -73,7 +74,7 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
       let totalMinutes = hours * 60 + minutes
       result -= d * (totalMinutes - totalMinutes div 10)
   except ValueError as e:
-    error(&"Cannot parse SMPTE timecode '{val}': {e.msg}")
+    error &"Cannot parse SMPTE timecode '{val}': {e.msg}"
 
 func timecode(self: MediaInfo): string = # In SMPTE
   for d in self.d:
@@ -101,21 +102,16 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
 
   var srcDur = 0
   var projName: string
-
-  var ptrToMi = initTable[ptr string, MediaInfo]()
-  var ptrToId = initTable[ptr string, string]()
+  var ptrToIdx = initTable[ptr string, int]()
 
   var sources: seq[MediaInfo]
   for track in tl.v & tl.a:
     for clip in track:
-      if clip.src != nil and clip.src notin ptrToMi:
-        let mi = initMediaInfo(clip.src[])
-        ptrToMi[clip.src] = mi
-        ptrToId[clip.src] = "r" & $(sources.len * 2 + 2)
-        sources.add mi
+      if clip.src != nil and clip.src notin ptrToIdx:
+        ptrToIdx[clip.src] = sources.len
+        sources.add initMediaInfo(clip.src[])
 
   for i, mi in sources:
-
     # An asset's duration is that of the source media itself, not the
     # (shorter) edited timeline. Clips reference positions in the source.
     let assetDur = int(mi.duration * tl.tb)
@@ -184,14 +180,14 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   lib.add evt
   fcpxml.add lib
 
-  proc makeClip(`ref`: string, clip: Clip) =
-    let src = ptrToMi[clip.src]
-    let startPoint = parseSMPTE(src.timecode, tl.tb)
+  proc makeClip(clip: Clip) =
+    let i = ptrToIdx.getOrDefault(clip.src)
+    let startPoint = parseSMPTE(sources[i].timecode, tl.tb)
 
     let asset = newElement("asset-clip")
     asset.attrs = {
       "name": projName,
-      "ref": `ref`,
+      "ref": "r" & $(i * 2 + 2),
       "offset": fraction(clip.start),
       "duration": fraction(clip.dur),
       "start": fraction(clip.offset + startPoint),
@@ -239,7 +235,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     for i in countdown(tl.a.len - 1, 1):
       for clip in tl.a[i]:
         if clip.src != nil:
-          makeClip(ptrToId[clip.src], clip)
+          makeClip(clip)
 
   let plan = transitionPlan(clips, transitions)
   for i, clip in clips:
@@ -249,7 +245,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
       if plan[i].incoming >= 0 and
           transitions[plan[i].incoming].alignment == taStart:
         addTransition(transitions[plan[i].incoming])
-      makeClip(ptrToId[clip.src], clip)
+      makeClip(clip)
       if plan[i].outgoing >= 0:
         addTransition(transitions[plan[i].outgoing])
 
@@ -257,4 +253,9 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     echo $fcpxml
   else:
     let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $fcpxml
-    writeFile(output, xmlStr)
+    try:
+      writeFile(output, xmlStr)
+    except IOError, OSError:
+      error &"Cannot write to: {output}"
+
+{.pop.}
