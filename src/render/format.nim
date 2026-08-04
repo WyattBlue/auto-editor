@@ -62,7 +62,8 @@ func opusRate(rate: cint): cint =
   return 48000
 
 proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
-  if ctx.codec.sample_fmts == nil:
+  let sampleFmts = ctx.codec.supportedSampleFmts
+  if sampleFmts == nil:
     error &"{ctx.codec.name}: No known audio formats avail."
 
   var configPtr: pointer = nil
@@ -227,7 +228,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeAudioFrames(encoder.sample_fmts[0], renderTl,
+      let audioFrameIter = makeAudioFrames(encoder.supportedSampleFmts[0], renderTl,
           frameSize, toSeq(0 ..< tl.a.len), args.audioNormalize, cache)
       audioFrameIters.add(audioFrameIter)
   elif includeAudio:
@@ -260,7 +261,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeAudioFrames(encoder.sample_fmts[0], renderTl,
+        let audioFrameIter = makeAudioFrames(encoder.supportedSampleFmts[0], renderTl,
             frameSize, @[i], args.audioNormalize, cache)
         audioFrameIters.add(audioFrameIter)
 

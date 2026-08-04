@@ -11,6 +11,22 @@ func isIsoBmff*(formatName: string): bool =
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
 
+proc supportedConfig[T](codec: ptr AVCodec,
+    config: AVCodecConfig): ptr UncheckedArray[T] =
+  var configPtr: pointer = nil
+  if avcodec_get_supported_config(nil, codec, config, 0.cuint, addr configPtr, nil) < 0:
+    return nil
+  return cast[ptr UncheckedArray[T]](configPtr)
+
+proc supportedPixFmts*(codec: ptr AVCodec): ptr UncheckedArray[AVPixelFormat] =
+  supportedConfig[AVPixelFormat](codec, AV_CODEC_CONFIG_PIX_FORMAT)
+
+proc supportedSampleFmts*(codec: ptr AVCodec): ptr UncheckedArray[AVSampleFormat] =
+  supportedConfig[AVSampleFormat](codec, AV_CODEC_CONFIG_SAMPLE_FORMAT)
+
+proc firstSupported[T](list: ptr UncheckedArray[T], fallback: T): T =
+  if list == nil or list[0].cint == -1: fallback else: list[0]
+
 proc encoderOpens*(codec: ptr AVCodec): bool =
   ## Some encoders only reject a configuration at open time: hardware wrappers
   ## when no device is present, WebCodecs wrappers when the browser reports the
@@ -24,16 +40,13 @@ proc encoderOpens*(codec: ptr AVCodec): bool =
     ctx.bit_rate = 2_000_000
     ctx.time_base = AVRational(num: 1, den: 25)
     ctx.framerate = AVRational(num: 25, den: 1)
-    ctx.pix_fmt = AV_PIX_FMT_YUV420P
-    if codec.pix_fmts != nil and codec.pix_fmts[0] != AV_PIX_FMT_NONE:
-      ctx.pix_fmt = codec.pix_fmts[0]
+    ctx.pix_fmt = firstSupported(codec.supportedPixFmts, AV_PIX_FMT_YUV420P)
   else:
     ctx.sample_rate = 48_000
     ctx.bit_rate = 128_000
     ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
     av_channel_layout_default(addr ctx.ch_layout, 2)
-    if codec.sample_fmts != nil and codec.sample_fmts[0] != AV_SAMPLE_FMT_NONE:
-      ctx.sample_fmt = codec.sample_fmts[0]
+    ctx.sample_fmt = firstSupported(codec.supportedSampleFmts, ctx.sample_fmt)
   result = avcodec_open2(ctx, codec, nil) >= 0
   avcodec_free_context(addr ctx)
 
@@ -139,8 +152,8 @@ proc initEnCtx(codec: ptr AVCodec): ptr AVCodecContext =
   if encoderCtx == nil:
     error "Could not allocate encoder context"
 
-  if codec.sample_fmts != nil:
-    encoderCtx.sample_fmt = codec.sample_fmts[0]
+  encoderCtx.sample_fmt = firstSupported(codec.supportedSampleFmts,
+      encoderCtx.sample_fmt)
 
   return encoderCtx
 
@@ -505,7 +518,7 @@ width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (
     stream.time_base = ctx.time_base
   # Some sane audio defaults
   elif codec.`type` == AVMEDIA_TYPE_AUDIO:
-    ctx.sample_fmt = codec.sample_fmts[0]
+    ctx.sample_fmt = firstSupported(codec.supportedSampleFmts, ctx.sample_fmt)
     ctx.bit_rate = 0
     ctx.bit_rate_tolerance = 32000
     ctx.sample_rate = rate.num div rate.den

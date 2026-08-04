@@ -243,8 +243,8 @@ let zlib = Package(
 )
 let ffmpeg = Package(
   name: "ffmpeg",
-  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
-  sha256: "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz",
+  sha256: "7f607a00dd0d28a729d5a4811205812eef01cf6ef6155025febb6f36a9062d52",
 )
 
 proc selectPackages(kind: CrossKind = native): seq[Package] =
@@ -1003,7 +1003,9 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     commonFlags &= "  --disable-avx512 \\\n"
     commonFlags &= "  --disable-avx512icl \\\n"
 
-  if not isCrossWasm:
+  if isCrossWasm:
+    commonFlags &= "  --enable-encoder=h264_web,aac_web,av1_web,vp8_web,vp9_web,hevc_web \\\n"
+  else:
     if defined(arm) or defined(arm64) or kind == winArm or kind == armv7:
       commonFlags &= "  --enable-neon \\\n"
 
@@ -1021,9 +1023,6 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       if kind != armv7 and kind != winArm:
         commonFlags &= "  --enable-nvenc \\\n"
         commonFlags &= "  --enable-ffnvcodec \\\n"
-  else:
-    commonFlags &= "  --enable-decoder=h264_webcodecs,aac_webcodecs,av1_webcodecs,vp8_webcodecs,vp9_webcodecs,hevc_webcodecs \\\n"
-    commonFlags &= "  --enable-encoder=h264_web,aac_web,av1_web,vp8_web,vp9_web,hevc_web \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags

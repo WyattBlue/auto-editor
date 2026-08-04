@@ -1,7 +1,7 @@
 import std/algorithm
 from std/math import round
 
-import ../[ffmpeg, log, timeline]
+import ../[av, ffmpeg, log, timeline]
 import ../util/rational
 
 type
@@ -101,14 +101,15 @@ proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, args: mainArgs) =
 func frameAt*(ts: int64, tb, fps: AVRational): int64 =
   int64(round(float(ts) * float(tb) * float(fps)))
 
-func encoderSupports*(encoder: ptr AVCodec, format: AVPixelFormat): bool =
+proc encoderSupports*(encoder: ptr AVCodec, format: AVPixelFormat): bool =
   if encoder == nil:
     return false
-  if encoder.pix_fmts == nil:
+  let pixFmts = encoder.supportedPixFmts
+  if pixFmts == nil:
     return true
   var i = 0
-  while encoder.pix_fmts[i] != AV_PIX_FMT_NONE:
-    if encoder.pix_fmts[i] == format:
+  while pixFmts[i] != AV_PIX_FMT_NONE:
+    if pixFmts[i] == format:
       return true
     inc i
   false

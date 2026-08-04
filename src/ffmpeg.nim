@@ -180,8 +180,6 @@ type
     name*: cstring
     `type`*: AVMediaType
     id*: AVCodecID
-    pix_fmts*: ptr UncheckedArray[AVPixelFormat]
-    sample_fmts*: ptr UncheckedArray[AVSampleFormat]
 
   AVCodecParameters* {.importc, incompleteStruct, header: "<libavcodec/avcodec.h>".} = object
     codec_type*: AVMediaType
@@ -654,10 +652,10 @@ const
   ID_BMP* = AVCodecID(78)
   ID_TIFF* = AVCodecID(96)
   ID_VP8* = AVCodecID(139)
-  ID_VP9* = AVCodecID(167)
-  ID_WEBP* = AVCodecID(171)
-  ID_HEVC* = AVCodecID(173)
-  ID_AV1* = AVCodecID(225)
+  ID_VP9* = AVCodecID(166)
+  ID_WEBP* = AVCodecID(170)
+  ID_HEVC* = AVCodecID(172)
+  ID_AV1* = AVCodecID(222)
   ID_PCM_S16LE* = AVCodecID(65536)
   ID_AAC* = AVCodecID(86018)
   ID_MOV_TEXT* = AVCodecID(0x17000 + 5)
