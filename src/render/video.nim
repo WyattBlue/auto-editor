@@ -532,6 +532,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if args.preset != "":
     discard av_opt_set(encoderCtx.priv_data, "preset", cstring(args.preset), 0)
 
+  if args.fragmented and not args.noFragmented:
+    encoderCtx.gop_size = max(1, int(round(tl.tb.float))).cint
+
   encoderCtx.open()
   pix_fmt = encoderCtx.pix_fmt
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
