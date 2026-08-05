@@ -190,6 +190,8 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
       ownedCtx = sws_alloc_context()
       if ownedCtx == nil:
         error "Failed to allocate sws context"
+      # sws_alloc_context defaults to a single thread.
+      discard av_opt_set_int(ownedCtx, "threads", 0, 0)
       ownedCtx
 
   ret = sws_scale_frame(swsCtx, newFrame, frame)
@@ -299,6 +301,7 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     av_frame_free(addr scaled)
     av_frame_free(addr output)
     error "Could not allocate sws context in scaleWithPad"
+  discard av_opt_set_int(swsCtx, "threads", 0, 0)
   let scaleRet = sws_scale_frame(swsCtx, scaled, src)
   sws_free_context(addr swsCtx)
   if scaleRet < 0:
