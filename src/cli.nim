@@ -48,7 +48,7 @@ type CliOption* = enum
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn,
     coSn, coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented,
-    coVcodec, coVideoBitrate, coCrf, coVprofile, coPreset, coPixFmt, coScale,
+    coVcodec, coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale,
     coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate,
     coMixAudioStreams, coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion,
     coWebCodecs, coWhen
@@ -288,6 +288,8 @@ Examples:
     metavar: "BITRATE", help: "Set the number of bits per second for video"),
   OptDef(names: "-crf", c: cVid, datum: coCrf, metavar: "NUM",
     help: "Set the Constant Rate Factor for quality-based encoding. Lower = better quality. [0-63]"),
+  OptDef(names: "-g, --gop", c: cVid, datum: coGop, metavar: "NUM",
+    help: "Set the maximum number of frames between keyframes. Shorter = lower latency and larger files"),
   OptDef(names: "-profile:v, -vprofile", c: cVid, datum: coVprofile,
     metavar: "PROFILE", help: "Set the video profile. For h264: high, main, or baseline"),
   OptDef(names: "-preset, --preset", c: cVid, datum: coPreset, metavar: "PRESET",

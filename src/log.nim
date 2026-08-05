@@ -125,6 +125,7 @@ type mainArgs* = object
   scale*: float = 1.0
   scaleSet*: bool = false
   crf*: int8 = -1
+  gop*: int = -1
 
   audioNormalize*: Norm = Norm(kind: nkNull)
   progress*: BarType = modern

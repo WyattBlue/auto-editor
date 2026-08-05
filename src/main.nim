@@ -425,7 +425,7 @@ const mainArgumentOptions = {
   coOutput, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
   coVideoSpeed, coExport, coFrameRate, coSampleRate, coResolution, coBackground,
   coYtDlpLocation, coOutputFormat, coYtDlpExtras, coProgress, coVcodec,
-  coVideoBitrate, coCrf, coVprofile, coPreset, coPixFmt, coScale, coAcodec,
+  coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coAcodec,
   coLayout, coAudioBitrate, coAudioNormalize, coKey, coWhen,
 }
 
@@ -562,6 +562,11 @@ judge making cuts.
         error "invalid constant rate factor: " & key
       if val > 63: error "constant rate factor is too high: " & key
       args.crf = val.int8
+    of coGop:
+      var val: int
+      if key.len == 0 or parseSaturatedNatural(key, val) != key.len or val < 1:
+        error "invalid gop size: " & key
+      args.gop = val
     of coVprofile:
       args.vprofile = key
     of coPreset:

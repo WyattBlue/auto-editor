@@ -532,7 +532,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if args.preset != "":
     discard av_opt_set(encoderCtx.priv_data, "preset", cstring(args.preset), 0)
 
-  if args.fragmented and not args.noFragmented:
+  if args.gop >= 1:
+    encoderCtx.gop_size = args.gop.cint
+  elif args.fragmented and not args.noFragmented:
+    # frag_keyframe only cuts a fragment at a keyframe, so the default keyint
+    # would hold back the first fragment for seconds of media.
     encoderCtx.gop_size = max(1, int(round(tl.tb.float))).cint
 
   encoderCtx.open()

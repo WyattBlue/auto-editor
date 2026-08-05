@@ -97,6 +97,8 @@ proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, args: mainArgs) =
     discard av_opt_set_int(encoder.priv_data, "crf", args.crf.cint, 0)
   if args.preset != "":
     discard av_opt_set(encoder.priv_data, "preset", cstring(args.preset), 0)
+  if args.gop >= 1:
+    encoder.gop_size = args.gop.cint
 
 func frameAt*(ts: int64, tb, fps: AVRational): int64 =
   int64(round(float(ts) * float(tb) * float(fps)))
