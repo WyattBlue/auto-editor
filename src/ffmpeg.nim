@@ -2,21 +2,22 @@ import ./util/rational
 
 type VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
 
-proc vsnprintf*(s: cstring, n: csize_t, format: cstring, ap: VaList): cint {.
-  importc, header: "<stdio.h>".}
+proc vsnprintf*(s: cstring, n: csize_t, format: cstring, ap: VaList): cint {.importc,
+    header: "<stdio.h>".}
 
 proc av_mul_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_div_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_add_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_sub_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>".}
-proc av_d2q*(d: cdouble, max: cint): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_d2q*(d: cdouble, max: cint): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
 proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
-proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
+proc av_parse_ratio(q: ptr AVRational, str: cstring, max, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
 proc av_cmp_q(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
 proc av_reduce*(dst_num, dst_den: ptr cint, num, den, max: int64): cint {.importc,
-  header: "<libavutil/rational.h>".}
+    header: "<libavutil/rational.h>".}
 
 func `+`*(a, b: AVRational): AVRational = av_add_q(a, b)
 func `-`*(a, b: AVRational): AVRational = av_sub_q(a, b)
@@ -27,28 +28,24 @@ func `~=`*(a, b: AVRational): bool = av_cmp_q(a, b) == 0
 func `~=`*[T: int64 | int32 | int](a: AVRational, b: T): bool =
   a ~= AVRational(num: b.cint, den: 1)
 func `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
-  discard av_reduce(addr result.num, addr result.den,
-    a.int64 * b.num.int64, b.den.int64, high(cint).int64)
+  discard av_reduce(addr result.num, addr result.den, a.int64 * b.num.int64, b.den.int64,
+      high(cint).int64)
 func `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
-  discard av_reduce(addr result.num, addr result.den,
-    a.int64 * b.den.int64, b.num.int64, high(cint).int64)
+  discard av_reduce(addr result.num, addr result.den, a.int64 * b.den.int64, b.num.int64,
+      high(cint).int64)
 converter toDouble*(r: AVRational): cdouble = av_q2d(r)
 
 func toAVRational*(s: string): AVRational {.raises: [ValueError].} =
   if s.len == 0:
     raise newException(ValueError, "Empty string cannot be converted to AVRational")
 
-  var rational: AVRational
-  let ret = av_parse_ratio(addr rational, cstring(s), cint(high(cint)), 0, nil)
-
+  let ret = av_parse_ratio(addr result, s.cstring, cint(high(cint)), 0, nil)
   if ret < 0:
     raise newException(ValueError, "Failed to rational: " & s)
-  if rational.den == 0:
+  if result.den == 0:
     raise newException(ValueError, "Rational cannot have a zero denominator: " & s)
-  if rational.num == 0:
+  if result.num == 0:
     raise newException(ValueError, "Rational cannot be zero: " & s)
-
-  return rational
 
 type
   AVMediaType* = cint
@@ -59,12 +56,13 @@ type
   AVColorTransferCharacteristic* = cint
   AVColorSpace* = cint
   AVPixelFormat* = distinct cint
+  AVPixFmtDescriptor* {.importc, header: "<libavutil/pixdesc.h>".} = object
+    flags*: uint64
 
-proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.
-  importc, header: "<libavutil/pixdesc.h>".}
-
-proc av_get_pix_fmt*(name: cstring): AVPixelFormat {.
-  importc, header: "<libavutil/pixdesc.h>".}
+proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.importc,
+    header: "<libavutil/pixdesc.h>".}
+proc av_get_pix_fmt*(name: cstring): AVPixelFormat {.importc,
+    header: "<libavutil/pixdesc.h>".}
 
 func `==`*(x, y: AVPixelFormat): bool {.borrow.}
 func `$`*(pix_fmt: AVPixelFormat): string = $av_get_pix_fmt_name(pix_fmt)
@@ -75,13 +73,8 @@ const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
 const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
 const AV_PIX_FMT_RGBA* = AVPixelFormat(26)
 
-type
-  AVPixFmtDescriptor* {.importc, incompleteStruct,
-    header: "<libavutil/pixdesc.h>".} = object
-    flags*: uint64
-
-proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.
-  importc, header: "<libavutil/pixdesc.h>".}
+proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.importc,
+    header: "<libavutil/pixdesc.h>".}
 
 const AV_PIX_FMT_FLAG_ALPHA = 1'u64 shl 7
 
@@ -91,24 +84,25 @@ func hasAlpha*(pix_fmt: AVPixelFormat): bool =
   d != nil and (d.flags and AV_PIX_FMT_FLAG_ALPHA) != 0'u64
 
 type
-  AVDictionary* {.importc, incompleteStruct, header: "<libavutil/dict.h>".} = object
+  AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
   AVDictionaryEntry* {.importc, completeStruct, header: "<libavutil/dict.h>".} = object
     key*: cstring
     value*: cstring
 
-  AVChannelLayout* {.importc, completeStruct, header: "<libavutil/channel_layout.h>".} = object
+  AVChannelLayout* {.importc, completeStruct,
+      header: "<libavutil/channel_layout.h>".} = object
     order*: cint
     nb_channels*: cint
     u_mask: uint64
     opaque: pointer
 
-  AVCodecTag* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+  AVCodecTag* {.importc, header: "<libavformat/avformat.h>".} = object
 
-  AVIOContext* {.importc, incompleteStruct, header: "<libavformat/avio.h>".} = object
+  AVIOContext* {.importc, header: "<libavformat/avio.h>".} = object
     seekable*: cint
     min_packet_size*: cint
 
-  AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+  AVOutputFormat* {.importc, header: "<libavformat/avformat.h>".} = object
     name*: cstring
     long_name: cstring
     mime_type: cstring
@@ -119,7 +113,7 @@ type
     flags*: cint
     codec_tag*: ptr ptr AVCodecTag
 
-  AVFormatContext* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+  AVFormatContext* {.importc, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
     iformat*: pointer
     oformat*: ptr AVOutputFormat
@@ -141,7 +135,7 @@ type
     metadata*: ptr AVDictionary
     max_interleave_delta*: int64
 
-  AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>"} = object
+  AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>".} = object
     buf*: pointer
     pts*: int64
     dts*: int64
@@ -162,7 +156,7 @@ type
     size*: csize_t
     `type`*: cint
 
-  AVStream* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+  AVStream* {.importc, header: "<libavformat/avformat.h>".} = object
     index*: cint
     codecpar*: ptr AVCodecParameters
     time_base*: AVRational
@@ -176,12 +170,12 @@ type
     disposition*: cint
     discardLevel* {.importc: "discard".}: AVDiscard
 
-  AVCodec* {.importc, incompleteStruct, header: "<libavcodec/codec.h>".} = object
+  AVCodec* {.importc, header: "<libavcodec/codec.h>".} = object
     name*: cstring
     `type`*: AVMediaType
     id*: AVCodecID
 
-  AVCodecParameters* {.importc, incompleteStruct, header: "<libavcodec/avcodec.h>".} = object
+  AVCodecParameters* {.importc, header: "<libavcodec/avcodec.h>".} = object
     codec_type*: AVMediaType
     codec_id*: AVCodecID
     codec_tag*: cuint
@@ -216,7 +210,8 @@ type
     AV_CODEC_CONFIG_COLOR_RANGE,
     AV_CODEC_CONFIG_COLOR_SPACE
 
-  AVSampleFormat* {.importc: "enum AVSampleFormat", header: "<libavutil/samplefmt.h>".} = enum
+  AVSampleFormat* {.importc: "enum AVSampleFormat",
+      header: "<libavutil/samplefmt.h>".} = enum
     AV_SAMPLE_FMT_NONE = -1,
     AV_SAMPLE_FMT_U8,
     AV_SAMPLE_FMT_S16,
@@ -229,7 +224,7 @@ type
     AV_SAMPLE_FMT_FLTP,
     AV_SAMPLE_FMT_DBLP
 
-  AVCodecContext* {.importc, incompleteStruct, header: "<libavcodec/avcodec.h>".} = object
+  AVCodecContext* {.importc, header: "<libavcodec/avcodec.h>".} = object
     av_class*: pointer
     log_level_offset*: cint
     codec_type*: AVMediaType
@@ -281,9 +276,8 @@ const
   AVMEDIA_TYPE_DATA* = AVMediaType(2)
   AVMEDIA_TYPE_SUBTITLE* = AVMediaType(3)
   AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
-  # Discard useless packets like 0-size packets in AVI.
   AVDISCARD_DEFAULT* = AVDiscard(0)
-  AVDISCARD_ALL* = AVDiscard(48)     # Discard all packets for the stream
+  AVDISCARD_ALL* = AVDiscard(48)         # Discard all packets for the stream
   AVFMT_GLOBALHEADER* = 0x0040
   AV_CODEC_FLAG_GLOBAL_HEADER* = 4194304 # 1 << 22
   AV_TIME_BASE* = 1000000
@@ -291,17 +285,15 @@ const
   FF_THREAD_FRAME* = 1
   FF_THREAD_SLICE* = 2
   AV_CODEC_FLAG2_FAST* = 1
-
-const
-  AV_LOG_QUIET* = -8   # Print no output
-  AV_LOG_PANIC* = 0    # Something went really wrong
-  AV_LOG_FATAL* = 8    # Something went wrong and recovery is not possible
-  AV_LOG_ERROR* = 16   # Something went wrong and cannot losslessly be recovered
-  AV_LOG_WARNING* = 24 # Something somehow does not look correct
-  AV_LOG_INFO* = 32    # Standard information
-  AV_LOG_VERBOSE* = 40 # Detailed information
-  AV_LOG_DEBUG* = 48   # Stuff which is only useful for libav* developers
-  AV_LOG_TRACE* = 56   # Extremely verbose debugging
+  AV_LOG_QUIET* = -8                     # Print no output
+  AV_LOG_PANIC* = 0                      # Something went really wrong
+  AV_LOG_FATAL* = 8                      # Something went wrong and recovery is not possible
+  AV_LOG_ERROR* = 16                     # Something went wrong and cannot losslessly be recovered
+  AV_LOG_WARNING* = 24                   # Something somehow does not look correct
+  AV_LOG_INFO* = 32                      # Standard information
+  AV_LOG_VERBOSE* = 40                   # Detailed information
+  AV_LOG_DEBUG* = 48                     # Stuff which is only useful for libav* developers
+  AV_LOG_TRACE* = 56                     # Extremely verbose debugging
 
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
@@ -309,17 +301,6 @@ type
   ConstCString* {.importc: "const char*", nodecl.} = cstring
   AVLogCallback* =
     proc(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.}
-
-proc av_log_set_callback*(callback: AVLogCallback) {.importc, header: "<libavutil/log.h>".}
-proc av_log_default_callback*(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}
-
-proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
-    fmt: pointer, options: pointer): cint {.importc,
-    header: "<libavformat/avformat.h>".}
-proc av_find_input_format*(short_name: cstring): pointer {.importc,
-    header: "<libavformat/avformat.h>".}
-
-type
   AVDeviceInfo* {.importc, header: "<libavdevice/avdevice.h>", bycopy.} = object
     device_name*: cstring
     device_description*: cstring
@@ -329,6 +310,15 @@ type
     devices*: ptr UncheckedArray[ptr AVDeviceInfo]
     nb_devices*: cint
     default_device*: cint
+
+proc av_log_set_callback*(callback: AVLogCallback) {.importc,
+    header: "<libavutil/log.h>".}
+proc av_log_default_callback*(avcl: pointer, level: cint, fmt: ConstCString,
+    vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}
+proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring, fmt,
+    options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
+proc av_find_input_format*(short_name: cstring): pointer {.importc,
+    header: "<libavformat/avformat.h>".}
 
 proc avdevice_register_all*() {.importc, header: "<libavdevice/avdevice.h>".}
 proc avdevice_list_input_sources*(device: pointer, device_name: cstring,
@@ -341,8 +331,7 @@ proc avformat_find_stream_info*(ic: ptr AVFormatContext,
 proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
 proc avcodec_parameters_to_context*(codec_ctx: ptr AVCodecContext,
-    par: ptr AVCodecParameters): cint {.importc,
-    header: "<libavcodec/avcodec.h>".}
+    par: ptr AVCodecParameters): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_alloc*(): ptr AVCodecParameters {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_free*(par: ptr ptr AVCodecParameters) {.importc,
@@ -354,11 +343,9 @@ proc avcodec_free_context*(avctx: ptr ptr AVCodecContext) {.importc,
 proc avcodec_get_name*(id: AVCodecID): cstring {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
-  std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
-
+    std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_codec_get_tag2*(tags: ptr ptr AVCodecTag, id: AVCodecID,
     tag: ptr cuint): cint {.importc, header: "<libavformat/avformat.h>".}
-
 proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc av_codec_is_encoder*(codec: ptr AVCodec): cint {.importc,
@@ -366,8 +353,8 @@ proc av_codec_is_encoder*(codec: ptr AVCodec): cint {.importc,
 proc av_codec_is_decoder*(codec: ptr AVCodec): cint {.importc,
     header: "<libavcodec/codec.h>".}
 proc avcodec_get_supported_config*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
-  config: AVCodecConfig, flags: cuint, out_configs: ptr pointer,
-  out_num_configs: ptr cint): cint {.importc, header: "<libavcodec/avcodec.h>".}
+    config: AVCodecConfig, flags: cuint, out_configs: ptr pointer,
+    out_num_configs: ptr cint): cint {.importc, header: "<libavcodec/avcodec.h>".}
 
 const FF_COMPLIANCE_STRICT*: cint = 1
 const FF_COMPLIANCE_NORMAL*: cint = 0
@@ -434,7 +421,7 @@ proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
 
 type
   # https://ffmpeg.org/doxygen/8.0/structAVFrame.html
-  AVFrame* {.importc, completeStruct, header: "<libavutil/frame.h>"} = object
+  AVFrame* {.importc, completeStruct, header: "<libavutil/frame.h>".} = object
     data*: array[8, ptr uint8]
     linesize*: array[8, cint]
     extended_data*: ptr ptr uint8
@@ -492,7 +479,6 @@ type
     AVCHROMA_LOC_BOTTOMLEFT,
     AVCHROMA_LOC_BOTTOM
 
-# Packets
 proc av_packet_alloc*(): ptr AVPacket {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_clone*(src: ptr AVPacket): ptr AVPacket {.importc,
     header: "<libavcodec/packet.h>".}
@@ -508,8 +494,6 @@ proc av_packet_side_data_get*(sd: ptr AVPacketSideData, nb_sd: cint,
 proc av_packet_side_data_new*(psd: ptr ptr AVPacketSideData, pnb_sd: ptr cint,
     `type`: cint, size: csize_t, flags: cint): ptr AVPacketSideData {.importc,
     header: "<libavcodec/packet.h>".}
-
-# Frames
 proc avcodec_send_packet*(avctx: ptr AVCodecContext,
     avpkt: ptr AVPacket): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc avcodec_receive_frame*(avctx: ptr AVCodecContext,
@@ -526,8 +510,6 @@ proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_clone*(src: ptr AVFrame): ptr AVFrame {.importc,
     header: "<libavutil/frame.h>".}
-
-# Codec
 proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_find_decoder_by_name*(name: cstring): ptr AVCodec {.importc,
@@ -539,8 +521,9 @@ proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
 
 # Hardware device probing
-type AVBufferRef* {.importc, incompleteStruct, header: "<libavutil/buffer.h>".} = object
-type AVHWDeviceType* {.importc: "enum AVHWDeviceType", header: "<libavutil/hwcontext.h>".} = enum
+type AVBufferRef* {.importc, header: "<libavutil/buffer.h>".} = object
+type AVHWDeviceType* {.importc: "enum AVHWDeviceType",
+    header: "<libavutil/hwcontext.h>".} = enum
   AV_HWDEVICE_TYPE_NONE
 
 proc av_hwdevice_ctx_create*(device_ctx: ptr ptr AVBufferRef, t: AVHWDeviceType,
@@ -554,8 +537,8 @@ type AVCodecHWConfig* {.importc, header: "<libavcodec/avcodec.h>".} = object
   methods*: cint
   device_type*: AVHWDeviceType
 
-proc avcodec_get_hw_config*(codec: ptr AVCodec, index: cint): ptr AVCodecHWConfig {.
-    importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_get_hw_config*(codec: ptr AVCodec,
+    index: cint): ptr AVCodecHWConfig {.importc, header: "<libavcodec/avcodec.h>".}
 
 # Error
 template MKTAG*(a, b, c, d: static[char]): cint =
@@ -580,25 +563,23 @@ proc av_err2str*(errnum: cint): string =
   errbuf.setLen(errbuf.cstring.len)
   return errbuf
 
-# Audio FIFO function declarations
-type AVAudioFifo* {.importc, incompleteStruct, header: "<libavutil/audio_fifo.h>".} = object
+type AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
 
 proc av_audio_fifo_alloc*(sample_fmt: AVSampleFormat, channels: cint,
-    nb_samples: cint): ptr AVAudioFifo {.importc,
-    header: "<libavutil/audio_fifo.h>".}
+    nb_samples: cint): ptr AVAudioFifo {.importc, header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_free*(af: ptr AVAudioFifo) {.importc.}
 proc av_audio_fifo_write*(af: ptr AVAudioFifo, data: pointer,
     nb_samples: cint): cint {.importc, header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer,
-    nb_samples: cint): cint {.importc,
-    header: "<libavutil/audio_fifo.h>".}
+    nb_samples: cint): cint {.importc, header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc.}
 
 # Audio sample allocation and conversion utilities
-proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint,
-    nb_channels: cint, nb_samples: cint, sample_fmt: AVSampleFormat,
-    align: cint): cint {.importc, header: "<libavutil/samplefmt.h>".}
+proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint, nb_channels,
+    nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc,
+    header: "<libavutil/samplefmt.h>".}
 
+proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 
 type SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
@@ -639,7 +620,6 @@ type
 proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
     got_sub_ptr: ptr cint, avpkt: ptr AVPacket): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
-
 proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
@@ -669,13 +649,9 @@ func isPCM*(id: AVCodecID): bool =
 
 # Convert fourcc string to 32-bit integer (little-endian)
 template fourccToInt*(fourcc: static[string]): cuint =
-  when fourcc.len != 4:
-    {.error: "FOURCC must be exactly 4 characters long".}
-  else:
-    cuint(fourcc[0].ord) or
-    (cuint(fourcc[1].ord) shl 8) or
-    (cuint(fourcc[2].ord) shl 16) or
-    (cuint(fourcc[3].ord) shl 24)
+  when fourcc.len != 4: {.error: "FOURCC must be exactly 4 characters long".}
+  else: cuint(fourcc[0].ord) or (cuint(fourcc[1].ord) shl 8) or (cuint(fourcc[
+      2].ord) shl 16) or (cuint(fourcc[3].ord) shl 24)
 
 type AVProfile* {.importc, header: "<libavcodec/avcodec.h>".} = object
   profile*: cint
@@ -704,30 +680,25 @@ proc avcodec_descriptor_get_by_name*(name: cstring): ptr AVCodecDescriptor {.imp
 proc avcodec_descriptor_get*(id: AVCodecID): ptr AVCodecDescriptor {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
-    codec: ptr AVCodecContext): cint {.importc,
-        header: "<libavcodec/avcodec.h>".}
+    codec: ptr AVCodecContext): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc avcodec_find_best_pix_fmt_of_list*(pix_fmts: ptr UncheckedArray[AVPixelFormat],
     src_pix_fmt: AVPixelFormat, has_alpha: cint,
-    loss_ptr: ptr cint): AVPixelFormat {.importc,
-        header: "<libavcodec/avcodec.h>".}
+    loss_ptr: ptr cint): AVPixelFormat {.importc, header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_copy*(dst: ptr AVCodecParameters,
-    src: ptr AVCodecParameters): cint {.importc,
-        header: "<libavcodec/avcodec.h>".}
+    src: ptr AVCodecParameters): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc avio_open*(s: ptr pointer, filename: cstring, flags: cint): cint {.importc,
     header: "<libavformat/avio.h>".}
-proc avio_closep*(s: ptr pointer): cint {.importc,
-    header: "<libavformat/avio.h>".}
-proc avformat_write_header*(s: ptr AVFormatContext,
-    options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
+proc avio_closep*(s: ptr pointer): cint {.importc, header: "<libavformat/avio.h>".}
+proc avformat_write_header*(s: ptr AVFormatContext, options: pointer): cint {.importc,
+    header: "<libavformat/avformat.h>".}
 proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
     header: "<libavformat/avformat.h>".}
-proc av_guess_format*(short_name: cstring, filename: cstring,
-    mime_type: cstring): ptr AVOutputFormat {.importc,
+proc av_guess_format*(short_name, filename, mime_type: cstring): ptr AVOutputFormat {.importc,
     header: "<libavformat/avformat.h>".}
 proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
-proc avcodec_send_frame*(avctx: ptr AVCodecContext,
-    frame: ptr AVFrame): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_send_frame*(avctx: ptr AVCodecContext, frame: ptr AVFrame): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
 proc avcodec_receive_packet*(avctx: ptr AVCodecContext,
     avpkt: ptr AVPacket): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_interleaved_write_frame*(s: ptr AVFormatContext,
@@ -739,14 +710,14 @@ proc av_rescale_q*(a: int64, bq, cq: AVRational): int64 {.importc,
 
 # Filters
 type
-  AVFilterGraph* {.importc, incompleteStruct, header: "<libavfilter/avfilter.h>".} = object
+  AVFilterGraph* {.importc, header: "<libavfilter/avfilter.h>".} = object
     filters*: ptr UncheckedArray[ptr AVFilterContext]
     nb_filters*: cuint
     scale_sws_opts*: cstring
     thread_type*: cint
     nb_threads*: cint
 
-  AVFilterContext* {.importc, incompleteStruct, header: "<libavfilter/avfilter.h>".} = object
+  AVFilterContext* {.importc, header: "<libavfilter/avfilter.h>".} = object
     filter*: ptr AVFilter
     name*: cstring
     input_pads*: pointer
@@ -765,7 +736,7 @@ type
     priv_class: pointer
     flags*: cint
 
-  AVFilterLink* {.importc, incompleteStruct, header: "<libavfilter/avfilter.h>".} = object
+  AVFilterLink* {.importc, header: "<libavfilter/avfilter.h>".} = object
     src*: ptr AVFilterContext
     srcpad*: pointer
     dst*: ptr AVFilterContext
@@ -784,36 +755,25 @@ type
     pad_idx*: cint
     next*: ptr AVFilterInOut
 
-# Constants
-const
-  AV_BUFFERSRC_FLAG_NO_CHECK_FORMAT* = 1
-  AV_BUFFERSRC_FLAG_PUSH* = 4
-
 # Filter graph management
 proc avfilter_graph_alloc*(): ptr AVFilterGraph {.importc,
     header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_free*(graph: ptr ptr AVFilterGraph) {.importc,
     header: "<libavfilter/avfilter.h>".}
-proc avfilter_graph_create_filter*(filt_ctx: ptr ptr AVFilterContext,
-    filt: ptr AVFilter, name: cstring, args: cstring, opaque: pointer,
-    graph_ctx: ptr AVFilterGraph): cint {.importc,
+proc avfilter_graph_create_filter*(filt_ctx: ptr ptr AVFilterContext, filt: ptr AVFilter,
+    name, args: cstring, opaque: pointer, graph_ctx: ptr AVFilterGraph): cint {.importc,
     header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_parse_ptr*(graph: ptr AVFilterGraph, filters: cstring,
     inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_config*(graphctx: ptr AVFilterGraph,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
-proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint,
-    dst: ptr AVFilterContext, dstpad: cuint): cint {.importc,
-    header: "<libavfilter/avfilter.h>".}
-
-# Filter lookup
+proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint, dst: ptr AVFilterContext,
+    dstpad: cuint): cint {.importc, header: "<libavfilter/avfilter.h>".}
 proc avfilter_get_by_name*(name: cstring): ptr AVFilter {.importc,
     header: "<libavfilter/avfilter.h>".}
 proc av_filter_iterate*(opaque: ptr pointer): ptr AVFilter {.importc,
     header: "<libavfilter/avfilter.h>".}
-
-# Filter input/output management
 proc avfilter_inout_alloc*(): ptr AVFilterInOut {.importc,
     header: "<libavfilter/avfilter.h>".}
 proc avfilter_inout_free*(inout: ptr ptr AVFilterInOut) {.importc,
@@ -826,25 +786,20 @@ proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersink.h>".}
 proc av_buffersink_set_frame_size*(ctx: ptr AVFilterContext,
     frame_size: cuint) {.importc, header: "<libavfilter/buffersink.h>".}
-proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
-    frame: ptr AVFrame, flags: cint): cint {.importc,
-    header: "<libavfilter/buffersink.h>".}
-
-# String utilities for filters
-proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
+proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext, frame: ptr AVFrame,
+    flags: cint): cint {.importc, header: "<libavfilter/buffersink.h>".}
 
 const AVSEEK_FLAG_BACKWARD* = 1
 const AV_PKT_FLAG_KEY* = 0x0001
 const AV_PKT_FLAG_DISCARD* = 0x0004
+const AVINDEX_KEYFRAME* = 0x0001
 
 proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
     flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 
-type AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+type AVIndexEntry* {.importc, header: "<libavformat/avformat.h>".} = object
   pos*: int64       # byte position in file
   timestamp*: int64 # timestamp in stream time_base units
-
-const AVINDEX_KEYFRAME* = 0x0001
 
 proc avformat_index_get_entries_count*(st: ptr AVStream): cint {.importc,
     header: "<libavformat/avformat.h>".}
@@ -855,8 +810,7 @@ proc avformat_index_get_entry*(st: ptr AVStream, idx: cint): ptr AVIndexEntry {.
 proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
   {.emit: "result = (`entry`->flags & AVINDEX_KEYFRAME) != 0;".}
 
-# SwScale context and functions
-type SwsContext* {.importc, header: "<libswscale/swscale.h>", incompleteStruct.} = object
+type SwsContext* {.importc, header: "<libswscale/swscale.h>".} = object
 
 proc sws_alloc_context*(): ptr SwsContext {.importc, header: "<libswscale/swscale.h>".}
 proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
