@@ -17,7 +17,7 @@ func defaultVid*(self: Rules): AVCodecID =
 func defaultAud*(self: Rules): AVCodecID =
   self.ofmt.audio_codec
 
-func defaultSub*(self: Rules): AVCodecID =
+proc defaultSub*(self: Rules): AVCodecID =
   if self.ofmt.name == "mp4": ID_MOV_TEXT else: self.ofmt.subtitle_codec
 
 proc initRules*(name: string): Rules =

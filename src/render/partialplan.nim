@@ -37,63 +37,60 @@ func vp9IsKeyframe(data: ptr uint8, size: int): bool =
     return false
   return readBit(bytes, size, pos) == 0
 
-func isNalCodec(codecId: AVCodecID): bool =
+proc isNalCodec(codecId: AVCodecID): bool =
   ## H.264 and HEVC carry parameter sets in NAL units, so copied and re-encoded
   ## regions have to agree on a length-prefixed layout. VP9 and AV1 don't.
   codecId == ID_H264 or codecId == ID_HEVC
 
-func parameterSetsFor(codecId: AVCodecID, data: ptr uint8, size: int): seq[uint8] =
+proc parameterSetsFor(codecId: AVCodecID, data: ptr uint8, size: int): seq[uint8] =
   if codecId == ID_H264: parameterSetsToAvcc(data, size)
   elif codecId == ID_HEVC: parameterSetsToHvcc(data, size)
   else: @[]
 
-func supportsContainer(codecId: AVCodecID, formatName: string): bool =
+proc supportsContainer(codecId: AVCodecID, formatName: string): bool =
   let isWebm = formatName == "webm"
   let isMatroska = "matroska" in formatName
-  case codecId
-  of ID_H264, ID_HEVC:
+  if codecId == ID_H264 or codecId == ID_HEVC:
     formatName.isIsoBmff or isMatroska
-  of ID_VP9:
+  elif codecId == ID_VP9:
     isWebm
-  of ID_AV1:
+  elif codecId == ID_AV1:
     isWebm or isMatroska or formatName.isIsoBmff
   else:
     false
 
-func supportsStream(stream: ptr AVStream, encoder: ptr AVCodec,
+proc supportsStream(stream: ptr AVStream, encoder: ptr AVCodec,
     codecId: AVCodecID): bool =
   let pixelFormat = AVPixelFormat(stream.codecpar.format)
-  case codecId
-  of ID_H264:
+  if codecId == ID_H264:
     stream.h264SupportsPartialLossless
-  of ID_HEVC:
+  elif codecId == ID_HEVC:
     stream.hevcSupportsPartialLossless(encoder)
-  of ID_VP9:
+  elif codecId == ID_VP9:
     pixelFormat == AV_PIX_FMT_YUV420P
-  of ID_AV1:
+  elif codecId == ID_AV1:
     encoder.encoderSupports(pixelFormat)
   else:
     false
 
-func packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool =
+proc packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool =
   ## FFmpeg's AV1 parser marks only independently decodable packets as key.
   ## VP9's container flag is less strict, so also inspect its frame header.
-  case codecId
-  of ID_H264:
+  if codecId == ID_H264:
     h264IsCopyBoundary(data, size)
-  of ID_HEVC:
+  elif codecId == ID_HEVC:
     hevcIsCopyBoundary(data, size)
-  of ID_VP9:
+  elif codecId == ID_VP9:
     vp9IsKeyframe(data, size)
-  of ID_AV1:
+  elif codecId == ID_AV1:
     true
   else:
     false
 
-func codecLabel(codecId: AVCodecID): string =
+proc codecLabel(codecId: AVCodecID): string =
   if codecId == ID_H264: "H.264" else: ($avcodec_get_name(codecId)).toUpperAscii
 
-func normalizedCopyDts*(codecId: AVCodecID, first: bool, pts, dts: int64): int64 =
+proc normalizedCopyDts*(codecId: AVCodecID, first: bool, pts, dts: int64): int64 =
   ## Matroska can leave DTS unset on the first H.264 packet returned after a
   ## seek. A closed random-access packet has no decode dependency before it, so
   ## its shifted PTS is also the decode-time anchor for the copied span.

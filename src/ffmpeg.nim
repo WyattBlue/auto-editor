@@ -624,21 +624,23 @@ proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcod
 proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
 
+let
+  ID_NONE* {.importc: "AV_CODEC_ID_NONE", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_JPEG* {.importc: "AV_CODEC_ID_MJPEG", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_H264* {.importc: "AV_CODEC_ID_H264", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_PNG* {.importc: "AV_CODEC_ID_PNG", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_BMP* {.importc: "AV_CODEC_ID_BMP", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_TIFF* {.importc: "AV_CODEC_ID_TIFF", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_VP8* {.importc: "AV_CODEC_ID_VP8", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_VP9* {.importc: "AV_CODEC_ID_VP9", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_WEBP* {.importc: "AV_CODEC_ID_WEBP", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_HEVC* {.importc: "AV_CODEC_ID_HEVC", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_AV1* {.importc: "AV_CODEC_ID_AV1", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_PCM_S16LE* {.importc: "AV_CODEC_ID_PCM_S16LE", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_AAC* {.importc: "AV_CODEC_ID_AAC", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_MOV_TEXT* {.importc: "AV_CODEC_ID_MOV_TEXT", header: "<libavcodec/codec_id.h>".}: AVCodecID
+
 const
-  ID_NONE* = AVCodecID(0)
-  ID_JPEG* = AVCodecID(7)
-  ID_H264* = AVCodecID(27)
-  ID_PNG* = AVCodecID(61)
-  ID_BMP* = AVCodecID(78)
-  ID_TIFF* = AVCodecID(96)
-  ID_VP8* = AVCodecID(139)
-  ID_VP9* = AVCodecID(166)
-  ID_WEBP* = AVCodecID(170)
-  ID_HEVC* = AVCodecID(172)
-  ID_AV1* = AVCodecID(222)
-  ID_PCM_S16LE* = AVCodecID(65536)
-  ID_AAC* = AVCodecID(86018)
-  ID_MOV_TEXT* = AVCodecID(0x17000 + 5)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
   AV_DISPOSITION_ATTACHED_PIC* = 0x0400.cint

@@ -191,7 +191,7 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
 
   return (&"{root}{ext}", myExport)
 
-func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
+proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     isUrl = false): string {.raises: [].} =
   if inCodec != "auto":
     return inCodec
