@@ -1,4 +1,4 @@
-import std/[envvars, json, strformat, strutils, times]
+import std/[envvars, json, strformat, strutils]
 
 import ./log
 import ./util/fun
@@ -7,12 +7,12 @@ import vendor/libp2p/ed25519
 const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
 const LICENSE_PERIOD_YEARS = 3
 const LICENSE_EXPIRY_YEARS = 4
+const buildDate = CompileDate  # in "yyyy-MM-dd" text so `<` is chronological.
 const
   FREE_RENDER_LONG_SIDE* = 3200'i32
   FREE_RENDER_SHORT_SIDE* = 1800'i32
   FREE_MULTI_SOURCE_LONG_SIDE* = 720'i32
   FREE_MULTI_SOURCE_SHORT_SIDE* = 576'i32
-let buildDate = parse(CompileDate, "yyyy-MM-dd")
 
 func fitsFreeRenderResolution*(width, height: int32): bool {.raises: [].} =
   max(width, height) <= FREE_RENDER_LONG_SIDE and
@@ -60,21 +60,28 @@ proc validateKey*(val: string): (bool, string) {.raises: [].} =
     return (true, cast[string](payloadBytes))
   return (false, "Incorrect key")
 
-proc addYears(issued: DateTime, years: int): DateTime =
-  let expiresYear = issued.year + years
-  let expiresDay = min(issued.monthday, getDaysInMonth(issued.month, expiresYear))
-  dateTime(expiresYear, issued.month, expiresDay, zone = local())
+func addYears*(issued: string, years: int): string =
+  ## `issued` must be a valid "yyyy-MM-dd". Feb 29 lands on Feb 28 in
+  ## non-leap years, matching what std/times' day clamping did.
+  let year = parseInt(issued[0 ..< 4]) + years
+  let isLeap = year mod 4 == 0 and (year mod 100 != 0 or year mod 400 == 0)
+  let monthDay = if issued[4 .. ^1] == "-02-29" and not isLeap: "-02-28"
+                 else: issued[4 .. ^1]
+  &"{year:04}{monthDay}"
+
+func isDate*(s: string): bool =
+  if s.len != 10 or s[4] != '-' or s[7] != '-':
+    return false
+  for i in [0, 1, 2, 3, 5, 6, 8, 9]:
+    if s[i] notin '0' .. '9':
+      return false
+  true
 
 proc warnIfOutOfPeriod(payload: JsonNode) =
-  let issuedText = payload{"issued"}.getStr
-  if issuedText == "":
+  let issued = payload{"issued"}.getStr
+  if not issued.isDate:
     return
 
-  let issued =
-    try:
-      parse(issuedText, "yyyy-MM-dd")
-    except TimeParseError:
-      return
   let expires = issued.addYears(LICENSE_PERIOD_YEARS)
   let hardExpires = issued.addYears(LICENSE_EXPIRY_YEARS)
   if buildDate >= hardExpires:
@@ -85,7 +92,7 @@ proc warnIfOutOfPeriod(payload: JsonNode) =
     )
     error "License is expired."
   if buildDate >= expires:
-    warning &"License update period ended on {expires.format(\"yyyy-MM-dd\")}. " &
+    warning &"License update period ended on {expires}. " &
       "Newer auto-editor releases may require a renewal."
 
 proc requireLicense*(args: mainArgs, feature: string) =
