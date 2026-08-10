@@ -44,6 +44,7 @@ else:
   switch("passL", &"-L./{buildPath}/lib")
   when defined(emscripten):
     switch("define", "noSignalHandler")
+    switch("passL", "-sDEFAULT_TO_CXX")
     switch("passC", "-pthread")
     switch("passC", "-msimd128")
     switch("passC", "-mfma")
