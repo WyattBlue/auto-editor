@@ -8,6 +8,19 @@ var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 when defined(danger) or defined(release):
   switch("panics", "on")
+
+# hostOS/hostCPU are the *target* here
+let buildPath = (
+  if defined(dynamic): "build_dyn"
+  elif hostCPU == "wasm32": "build_wasm"
+  elif defined(emscripten): "build_wasm64"
+  elif hostOS == "windows" and hostCPU == "arm64": "build_winarm"
+  elif hostOS == "windows" and hostCPU != "arm64": "build_win"
+  elif hostOS == "linux" and hostCPU == "arm": "build_armv7"
+  else: "build"
+)
+switch("nimcache", &"{buildPath}/nimcache")
+
 when defined(flto):
   switch("passC", "-flto")
   switch("passL", "-flto")
@@ -27,14 +40,6 @@ when defined(dynamic):
     switch("passC", whisperCflags.output.strip())
     switch("passL", whisperLibs.output.strip())
 else:
-  let buildPath = (
-    if hostCPU == "wasm32": "build_wasm"
-    elif defined(emscripten): "build_wasm64"
-    elif hostOS == "windows" and hostCPU == "arm64": "build_winarm"
-    elif hostOS == "windows" and hostCPU != "arm64": "build_win"
-    elif hostOS == "linux" and hostCPU == "arm": "build_armv7"
-    else: "build"
-  )
   switch("passC", &"-I./{buildPath}/include")
   switch("passL", &"-L./{buildPath}/lib")
   when defined(emscripten):
