@@ -120,9 +120,10 @@ func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[Rang
 
 func `$`*(r: RangeDoc): string =
   ## e.g. "(0.0, 99999.0)", "each [-1.0, 1.0]"
-  (if r.each: "each " else: "") &
-    (if r.loIncl: "[" else: "(") & $r.lo & ", " & $r.hi &
-    (if r.hiIncl: "]" else: ")")
+  let each = (if r.each: "each " else: "")
+  let open = (if r.loIncl: "[" else: "(")
+  let close = (if r.hiIncl: "]" else: ")")
+  &"{each}{open}{r.lo}, {r.hi}{close}"
 
 func `$`*(f: ActionFlags): string =
   if afAudio in f: result &= "A"
@@ -218,7 +219,7 @@ const actionNames* = block:
 func actionDidYouMean*(val: string): string =
   let colon = val.find(':')
   let name = if colon == -1: val else: val[0 ..< colon]
-  didYouMean(name, actionNames)
+  &"{val}{didYouMean(name, actionNames)}"
 
 # Effects whose value can be a keyframe ramp (the `afAnimatable` actions).
 const animScalar* = block:
@@ -249,7 +250,7 @@ const
 
 func brightnessLutExpr*(brightness: float32): string =
   ## FFmpeg LUT expression used by the renderer and editor exports.
-  "val+" & $(brightness * 255.0'f32)
+  &"val+{brightness * 255.0'f32}"
 
 func luvLutExprs*(brightness, contrast, saturation: float32): tuple[y, u, v: string] =
   ## Keep exported color adjustment math identical to the renderer.
@@ -491,7 +492,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     for idx in 0 ..< 4:
       let n = pInt(parts[idx + 1])
       if n < low(int32).int or n > high(int32).int:
-        raise newException(ActionParseError, "drawbox value out of range: " & parts[idx + 1])
+        raise newException(ActionParseError,
+          &"drawbox value out of range: {parts[idx + 1]}")
       coords[idx] = int32(n)
     if coords[2] <= 0 or coords[3] <= 0:
       raise newException(ActionParseError, "drawbox width and height must be positive")
@@ -499,19 +501,20 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       try:
         parseColor(parts[5])
       except ValueError:
-        raise newException(ActionParseError, "Invalid color: " & parts[5])
+        raise newException(ActionParseError, &"Invalid color: {parts[5]}")
     )
     return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
       dbW: coords[2], dbH: coords[3], dbColor: col)
 
   if parts[0] in ["colorkey", "chromakey"]:
     if parts.len < 2 or parts.len > 4:
-      raise newException(ActionParseError, parts[0] & " requires color[:similar:blend]")
+      raise newException(ActionParseError,
+        &"{parts[0]} requires color[:similar:blend]")
     let col = (
       try:
         parseColor(parts[1])
       except ValueError:
-        raise newException(ActionParseError, "Invalid color: " & parts[1])
+        raise newException(ActionParseError, &"Invalid color: {parts[1]}")
     )
     var vals = [toUnorm16(0.25'f32), toUnorm16(0.0'f32)]
     for idx in 2 ..< parts.len:
@@ -585,7 +588,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         let p = parts[idx]
         let eq = p.find('=')
         if eq < 0:
-          raise newException(ActionParseError, "aberration: expected key=value, got " & p)
+          raise newException(ActionParseError, &"aberration: expected key=value, got {p}")
 
         let key = p[0 ..< eq]
         let value = p[eq + 1 .. ^1]
@@ -600,7 +603,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         of "gv": gv = n
         of "bh": bh = n
         of "bv": bv = n
-        else: raise newException(ActionParseError, "Unknown aberration key: " & key)
+        else: raise newException(ActionParseError, &"Unknown aberration key: {key}")
     return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv), abGh: chk(gh),
         abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
 
@@ -626,7 +629,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len > idx:
       if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
-        raise newException(ActionParseError, &"Unknown action: {val}{actionDidYouMean(val)}")
+        raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
       hasE = true
       curve = parseEasing(parts[idx])
       if parts.len == idx + 2:
@@ -659,7 +662,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len >= 3:
       if not parts[2].startsWith("ease=") or parts.len > 4:
-        raise newException(ActionParseError, &"Unknown action: {val}{actionDidYouMean(val)}")
+        raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
       hasE = true
       curve = parseEasing(parts[2])
       if parts.len == 4:
@@ -714,16 +717,16 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         saturation: effectVal)
     else: discard
 
-  raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
+  raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
 
 func easeSuffix(a: Action): string =
   ## The trailing ":ease=..." for an animated action, or "" if it has none.
   if not a.hasEase: return ""
-  result = ":ease=" & easeName(a.easeCurve)
+  result = &":ease={easeName(a.easeCurve)}"
   case a.easeDurUnit
   of duClip: discard
-  of duSec: result &= ":" & $a.easeDur & "sec"
-  of duFrames: result &= ":" & $a.easeDur
+  of duSec: result.add &":{a.easeDur}sec"
+  of duFrames: result.add &":{a.easeDur}"
 
 func kfStr(a: Action): string =
   ## Keyframes as "a..b..c", formatted in each effect's native value type.
@@ -736,12 +739,12 @@ func kfStr(a: Action): string =
   parts.join("..")
 
 func maskStr(a: Action, name: string): string =
-  result = name & ":" & $a.mX & ":" & $a.mY & ":" & $a.mW & ":" & $a.mH
+  result = &"{name}:{a.mX}:{a.mY}:{a.mW}:{a.mH}"
   # radius (0 = rect, default) only needs emitting when set or to hold feather's
   # positional slot; feather then follows so both round-trip positionally.
-  if a.mRadius != 0 or a.mFeather > 0'u8: result &= ":" & $a.mRadius
-  if a.mFeather > 0'u8: result &= ":" & $int(a.mFeather)
-  if a.mInvert: result &= ":invert"
+  if a.mRadius != 0 or a.mFeather > 0'u8: result.add &":{a.mRadius}"
+  if a.mFeather > 0'u8: result.add &":{a.mFeather}"
+  if a.mInvert: result.add ":invert"
 
 when not defined(nimscript):
   func `$`*(act: Action): string =
@@ -751,66 +754,59 @@ when not defined(nimscript):
     of actVflip: "vflip"
     of actLoop: "loop"
     of actErosion: "erosion"
-    of actSpeed: "speed:" & $act.val
-    of actVarispeed: "varispeed:" & $act.val
-    of actVolume: "volume:" & kfStr(act) & easeSuffix(act)
-    of actDeesser:
-      let i = act.intensity
-      let m = act.maxd
-      let f = act.freq
-      "deesser:" & $i & ":" & $m & ":" & $f
-    of actPitch: "pitch:" & $(act.pCents.float32 / 100.0'f32)
-    of actDuck:
-      "duck:" & $act.duckAmount & ":" & $act.duckThresh & ":" &
-        $int(act.duckAttack) & ":" & $int(act.duckRelease)
-    of actZoom: "zoom:" & kfStr(act) & easeSuffix(act)
-    of actOpacity: "opacity:" & kfStr(act) & easeSuffix(act)
-    of actBlur: "blur:" & kfStr(act) & easeSuffix(act)
-    of actBrightness: "brightness:" & kfStr(act) & easeSuffix(act)
-    of actRotate: "rotate:" & $rotDeg(act.rStart)
-    of actSpin: "spin:" & $rotDeg(act.sStart) & "/" & $act.sRate
+    of actSpeed: &"speed:{act.val}"
+    of actVarispeed: &"varispeed:{act.val}"
+    of actVolume: &"volume:{kfStr(act)}{easeSuffix(act)}"
+    of actDeesser: &"deesser:{act.intensity}:{act.maxd}:{act.freq}"
+    of actPitch: &"pitch:{act.pCents.float32 / 100.0'f32}"
+    of actDuck: &"duck:{act.duckAmount}:{act.duckThresh}:{act.duckAttack}:{act.duckRelease}"
+    of actZoom: &"zoom:{kfStr(act)}{easeSuffix(act)}"
+    of actOpacity: &"opacity:{kfStr(act)}{easeSuffix(act)}"
+    of actBlur: &"blur:{kfStr(act)}{easeSuffix(act)}"
+    of actBrightness: &"brightness:{kfStr(act)}{easeSuffix(act)}"
+    of actRotate: &"rotate:{rotDeg(act.rStart)}"
+    of actSpin: &"spin:{rotDeg(act.sStart)}/{act.sRate}"
     of actLuv:
       var parts: seq[string]
-      if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $act.brighthue
-      if act.contrast != luvContrastId: parts.add "contrast:" & $act.contrast
-      if act.saturation != luvSaturationId: parts.add "saturation:" & $act.saturation
+      let hue = act.brighthue
+      if hue != luvBrighthueId: parts.add &"brighthue:{hue}"
+      if act.contrast != luvContrastId: parts.add &"contrast:{act.contrast}"
+      if act.saturation != luvSaturationId: parts.add &"saturation:{act.saturation}"
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
-    of actLens: "lens:" & $act.k1 & ":" & $act.k2
-    of actDrawbox:
-      "drawbox:" & $act.dbX & ":" & $act.dbY & ":" & $act.dbW & ":" &
-        $act.dbH & ":" & act.dbColor.toString
+    of actLens: &"lens:{act.k1}:{act.k2}"
+    of actDrawbox: &"drawbox:{act.dbX}:{act.dbY}:{act.dbW}:{act.dbH}:{act.dbColor.toString}"
     of actPos:
       var xs, ys, ss: seq[string]
       for v in act.pxKf: xs.add $int(round(v))   # x/y are whole pixels
       for v in act.pyKf: ys.add $int(round(v))
       for v in act.pscaleKf: ss.add $v
-      "pos:" & xs.join("..") & ":" & ys.join("..") & ":" & ss.join("..") &
-        easeSuffix(act)
-    of actColorKey: "colorkey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
-    of actChromaKey: "chromakey:" & act.color.toString & ":" & $act.similar & ":" & $act.blend
-    of actChoke: "choke:" & $int(act.chokeN)
+      &"""pos:{xs.join("..")}:{ys.join("..")}:{ss.join("..")}{easeSuffix(act)}"""
+    of actColorKey, actChromaKey:
+      let name = (if act.kind == actColorKey: "colorkey" else: "chromakey")
+      &"{name}:{act.color.toString}:{act.similar}:{act.blend}"
+    of actChoke: &"choke:{act.chokeN}"
     of actAberration:
       # A symmetric, green-free, smear split round-trips as the positional shorthand.
-      if not act.abWrap and act.abGh == 0 and act.abGv == 0 and
-          act.abRh >= 0 and act.abBh == -act.abRh and act.abBv == -act.abRv:
-        if act.abRv == 0: "aberration:" & $act.abRh
-        else: "aberration:" & $act.abRh & ":" & $act.abRv
+      if not act.abWrap and act.abGh == 0 and act.abGv == 0 and act.abRh >= 0 and
+          act.abBh == -act.abRh and act.abBv == -act.abRv:
+        if act.abRv == 0: &"aberration:{act.abRh}"
+        else: &"aberration:{act.abRh}:{act.abRv}"
       else:
         var ps: seq[string]
-        if act.abRh != 0: ps.add "rh=" & $act.abRh
-        if act.abRv != 0: ps.add "rv=" & $act.abRv
-        if act.abGh != 0: ps.add "gh=" & $act.abGh
-        if act.abGv != 0: ps.add "gv=" & $act.abGv
-        if act.abBh != 0: ps.add "bh=" & $act.abBh
-        if act.abBv != 0: ps.add "bv=" & $act.abBv
+        if act.abRh != 0: ps.add &"rh={act.abRh}"
+        if act.abRv != 0: ps.add &"rv={act.abRv}"
+        if act.abGh != 0: ps.add &"gh={act.abGh}"
+        if act.abGv != 0: ps.add &"gv={act.abGv}"
+        if act.abBh != 0: ps.add &"bh={act.abBh}"
+        if act.abBv != 0: ps.add &"bv={act.abBv}"
         if act.abWrap: ps.add "edge=wrap"
-        "aberration:" & ps.join(":")
+        &"""aberration:{ps.join(":")}"""
     of actMask: maskStr(act, "mask")
     of actConfine:
       if act.mReset: "confine" else: maskStr(act, "confine")
     of actPixelate:
-      if act.pixW == act.pixH: "pixelate:" & $int(act.pixW)
-      else: "pixelate:" & $int(act.pixW) & ":" & $int(act.pixH)
+      if act.pixW == act.pixH: &"pixelate:{act.pixW}"
+      else: &"pixelate:{act.pixW}:{act.pixH}"
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -1198,9 +1194,8 @@ when not defined(nimscript):
         action.easeDurUnit = pendUnit
         action.easeDur = pendDur
       if action.kind == actLuv:
-        # Adjacent-fusion: collapse this actLuv into the previous one if it's
-        # also actLuv. Per field, the non-identity value wins; later wins on
-        # genuine conflicts.
+        # Adjacent-fusion: collapse this actLuv into previous one if it's also actLuv.
+        # Per field, the non-identity value wins; later wins on genuine conflicts.
         if list.len > 0 and list[^1].kind == actLuv:
           var prev = list[^1]
           if action.brighthue != luvBrighthueId: prev.brighthue = action.brighthue

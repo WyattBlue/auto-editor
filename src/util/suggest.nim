@@ -5,10 +5,8 @@ func didYouMean*(input: string, choices: openArray[string]): string =
   when defined(emscripten) or defined(nimscript):
     ""
   else:
-    var
-      best = ""
-      bestDist = high(int)
-
+    var best = ""
+    var bestDist = high(int)
     for choice in choices:
       let dist = editDistance(input, choice)
       if dist < bestDist:
@@ -19,7 +17,5 @@ func didYouMean*(input: string, choices: openArray[string]): string =
       return ""
 
     let limit = max(3, input.len div 3)
-    if bestDist <= limit:
-      "\nDid you mean " & best & "?"
-    else:
-      ""
+    if bestDist <= limit: "\nDid you mean " & best & "?"
+    else: ""
