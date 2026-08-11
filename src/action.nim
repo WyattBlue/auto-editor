@@ -1,4 +1,4 @@
-import std/[math, strutils, options]
+import std/[math, strformat, strutils, options]
 import ./util/[dnorm16, color, suggest]
 
 template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
@@ -254,14 +254,13 @@ func brightnessLutExpr*(brightness: float32): string =
 func luvLutExprs*(brightness, contrast, saturation: float32): tuple[y, u, v: string] =
   ## Keep exported color adjustment math identical to the renderer.
   let shift = brightness * 255.0'f32
-  result.y = "(val-128)*" & $contrast & "+128+" & $shift
-  result.u = "(val-128)*" & $saturation & "+128"
+  result.y = &"(val-128)*{contrast}+128+{shift}"
+  result.u = &"(val-128)*{saturation}+128"
   result.v = result.u
 
 func clipT*(local, animLen: int): float32 =
   ## Normalized time over an animation of `animLen` steps (frames or samples),
-  ## reaching 1.0 on the last step and holding there once the animation
-  ## completes.
+  ## reaching 1.0 on the last step and holding there once the animation completes.
   let l = min(local, max(animLen - 1, 0))
   float32(l) / float32(max(animLen - 1, 1))
 
@@ -282,6 +281,14 @@ func easeName(e: Easing): string =
   of easeOut: "out"
   of easeInOut: "inout"
 
+proc pFloat(s: string): float32 {.raises: [ActionParseError].} =
+  try: parseFloat(s).float32
+  except ValueError: raise newException(ActionParseError, &"Invalid float value: {s}")
+
+proc pInt(s: string, what = "integer value"): int {.raises: [ActionParseError].} =
+  try: parseInt(s)
+  except ValueError: raise newException(ActionParseError, &"Invalid {what}: {s}")
+
 proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError].} =
   ## "2sec" -> (2, duSec); "30" or "30frames" -> (30, duFrames).
   var s = spec
@@ -296,10 +303,8 @@ proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError
       if s.endsWith(suf):
         s = s[0 ..< s.len - suf.len]
         break
-  try:
-    (parseFloat(s).float32, unit)
-  except ValueError:
-    raise newException(ActionParseError, "Invalid duration: " & spec)
+  try: (parseFloat(s).float32, unit)
+  except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
 
 func rotDeg*(code: Unorm16): float32 =
   ## Decode a circular rotate angle back into [0, 360) degrees.
@@ -314,10 +319,7 @@ func rotCode(deg: float32): uint16 =
 proc parseKeyframes*(spec: string): seq[float32] {.raises: [ActionParseError].} =
   ## "2" -> @[2]; "1..0.5..1" -> @[1, 0.5, 1] (keyframes spread across the section).
   for part in spec.split(".."):
-    try:
-      result.add parseFloat(part).float32
-    except ValueError:
-      raise newException(ActionParseError, "Invalid float value:" & part)
+    result.add pFloat(part)
   # The packed action form stores the keyframe count in a single byte.
   if result.len > 255:
     raise newException(ActionParseError, "Too many keyframes (max 255)")
@@ -337,7 +339,7 @@ proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   of "in": easeIn
   of "out": easeOut
   of "inout", "in-out": easeInOut
-  else: raise newException(ActionParseError, "Unknown easing: " & spec)
+  else: raise newException(ActionParseError, &"Unknown easing: {spec}")
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
@@ -350,7 +352,7 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
   var inv = false
   var nextPos = 0                    # next unfilled positional slot
 
-  proc slotOf(key: string): int =
+  func slotOf(key: string): int =
     case key
     of "x": 0
     of "y": 1
@@ -364,9 +366,9 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     try:
       vals[i] = parseInt(raw)
     except ValueError:
-      raise newException(ActionParseError, name & ": invalid integer: " & ctx)
+      raise newException(ActionParseError, &"{name}: invalid integer: {ctx}")
     if vals[i] < low(int32).int or vals[i] > high(int32).int:
-      raise newException(ActionParseError, name & ": value out of range: " & ctx)
+      raise newException(ActionParseError, &"{name}: value out of range: {ctx}")
     seen[i] = true
 
   for idx in 1 ..< parts.len:
@@ -378,23 +380,23 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
       let key = p[0 ..< eq]
       let s = slotOf(key)
       if s < 0:
-        raise newException(ActionParseError, name & ": unknown key: " & key)
+        raise newException(ActionParseError, &"{name}: unknown key: {key}")
       setSlot(s, p[eq + 1 .. ^1], p)
     else:
       while nextPos < slots.len and seen[nextPos]: inc nextPos
       if nextPos >= slots.len:
-        raise newException(ActionParseError, name & ": too many values: " & p)
+        raise newException(ActionParseError, &"{name}: too many values: {p}")
       setSlot(nextPos, p, p)
 
   for i in 0 ..< 4:
     if not seen[i]:
-      raise newException(ActionParseError, name & " requires " & slots[i])
+      raise newException(ActionParseError, &"{name} requires {slots[i]}")
   if vals[2] <= 0 or vals[3] <= 0:
-    raise newException(ActionParseError, name & " width and height must be positive")
+    raise newException(ActionParseError, &"{name} width and height must be positive")
   if vals[4] < -1:
-    raise newException(ActionParseError, name & " radius must be -1 (ellipse) or >= 0")
+    raise newException(ActionParseError, &"{name} radius must be -1 (ellipse) or >= 0")
   if vals[5] < 0 or vals[5] > 255:
-    raise newException(ActionParseError, name & " feather must be in [0, 255]")
+    raise newException(ActionParseError, &"{name} feather must be in [0, 255]")
 
   result = Action(kind: kind)  # branch fields assigned after (shared by both kinds)
   result.mX = int32(vals[0])
@@ -430,24 +432,14 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
     var vals = [toUnorm16(0.0), halfUnorm16, halfUnorm16]
     for idx in 1 ..< parts.len:
-      vals[idx - 1] = (
-        try:
-          toUnorm16(parseFloat(parts[idx]).float32)
-        except ValueError:
-          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
-      )
+      vals[idx - 1] = toUnorm16(pFloat(parts[idx]))
     return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
 
   # duck takes positional args: [amount[:threshold[:attack[:release]]]]
   if parts[0] == "duck" and parts.len <= 5:
     var vals = [0.85'f32, 0.04'f32, 100.0'f32, 500.0'f32]
     for idx in 1 ..< parts.len:
-      vals[idx - 1] = (
-        try:
-          parseFloat(parts[idx]).float32
-        except ValueError:
-          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
-      )
+      vals[idx - 1] = pFloat(parts[idx])
     # `not (a and b)` so NaN fails the checks too; uint16(NaN) is UB.
     if not (vals[0] >= 0.0 and vals[0] <= 1.0):
       raise newException(ActionParseError, "duck amount must be in [0.0, 1.0]")
@@ -467,12 +459,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       return Action(kind: actLens, k1: toSnorm16(-0.5'f32), k2: toSnorm16(0.0'f32))
     var k = [0.0'f32, 0.0'f32]
     for idx in 1 ..< parts.len:
-      k[idx - 1] = (
-        try:
-          parseFloat(parts[idx]).float32
-        except ValueError:
-          raise newException(ActionParseError, "Invalid float value: " & parts[idx])
-      )
+      k[idx - 1] = pFloat(parts[idx])
     for v in k:
       if v < -1.0 or v > 1.0:
         raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
@@ -483,11 +470,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if '/' in parts[1]:
       raise newException(ActionParseError,
         "rotate takes a fixed angle (rotate:deg); use spin:deg/rate for a continuous spin")
-    try:
-      return Action(kind: actRotate,
-        rStart: Unorm16(rotCode(parseFloat(parts[1]).float32)))
-    except ValueError:
-      raise newException(ActionParseError, "Invalid float value:" & parts[1])
+    return Action(kind: actRotate, rStart: Unorm16(rotCode(pFloat(parts[1]))))
 
   # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
   # `rate` degrees/second.
@@ -496,12 +479,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     let slash = spec.find('/')
     if slash < 0:
       raise newException(ActionParseError, "spin requires spin:deg/rate")
-    try:
-      return Action(kind: actSpin,
-        sStart: Unorm16(rotCode(parseFloat(spec[0 ..< slash]).float32)),
-        sRate: parseFloat(spec[slash + 1 .. ^1]).float32)
-    except ValueError:
-      raise newException(ActionParseError, "Invalid float value")
+    return Action(kind: actSpin,
+      sStart: Unorm16(rotCode(pFloat(spec[0 ..< slash]))),
+      sRate: pFloat(spec[slash + 1 .. ^1]))
 
   # drawbox takes positional args: x:y:w:h:color (color is RGB only).
   if parts[0] == "drawbox":
@@ -509,12 +489,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "drawbox requires x:y:w:h:color")
     var coords: array[4, int32]
     for idx in 0 ..< 4:
-      let n = (
-        try:
-          parseInt(parts[idx + 1])
-        except ValueError:
-          raise newException(ActionParseError, "Invalid integer value")
-      )
+      let n = pInt(parts[idx + 1])
       if n < low(int32).int or n > high(int32).int:
         raise newException(ActionParseError, "drawbox value out of range: " & parts[idx + 1])
       coords[idx] = int32(n)
@@ -540,12 +515,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     )
     var vals = [toUnorm16(0.25'f32), toUnorm16(0.0'f32)]
     for idx in 2 ..< parts.len:
-      vals[idx - 2] = (
-        try:
-          toUnorm16(parseFloat(parts[idx]).float32)
-        except ValueError:
-          raise newException(ActionParseError, "Invalid float value:" & parts[idx])
-      )
+      vals[idx - 2] = toUnorm16(pFloat(parts[idx]))
     if vals[0] < toUnorm16(0.01'f32):
       vals[0] = toUnorm16(0.01'f32)
 
@@ -557,12 +527,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts[0] == "choke" and parts.len <= 2:
     if parts.len == 1:
       return Action(kind: actChoke, chokeN: 1)
-    let n = (
-      try:
-        parseInt(parts[1])
-      except ValueError:
-        raise newException(ActionParseError, "Invalid integer value: " & parts[1])
-    )
+    let n = pInt(parts[1])
     if n < 1 or n > 16:
       raise newException(ActionParseError, "choke must be in [1, 16]")
     return Action(kind: actChoke, chokeN: uint8(n))
@@ -571,12 +536,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts[0] == "pixelate" and parts.len <= 3:
     var wh = [16, 16]
     for idx in 1 ..< parts.len:
-      let n = (
-        try:
-          parseInt(parts[idx])
-        except ValueError:
-          raise newException(ActionParseError, "Invalid integer value: " & parts[idx])
-      )
+      let n = pInt(parts[idx])
       if n < 1 or n > 1024:
         raise newException(ActionParseError, "pixelate block size must be in [1, 1024]")
       if parts.len == 2: wh = [n, n]  # single value = square blocks
@@ -614,10 +574,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         if p == "smear" or p == "wrap":
           wrap = toEdge(p)
         else:
-          try:
-            nums.add parseInt(p)
-          except ValueError:
-            raise newException(ActionParseError, "Invalid aberration value: " & p)
+          nums.add pInt(p, "aberration value")
       if nums.len > 2:
         raise newException(ActionParseError, "aberration takes at most h:v positional shifts")
       let h = (if nums.len >= 1: nums[0] else: 5)
@@ -629,17 +586,13 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         let eq = p.find('=')
         if eq < 0:
           raise newException(ActionParseError, "aberration: expected key=value, got " & p)
+
         let key = p[0 ..< eq]
         let value = p[eq + 1 .. ^1]
         if key == "edge":
           wrap = toEdge(value)
           continue
-        let n = (
-          try:
-            parseInt(value)
-          except ValueError:
-            raise newException(ActionParseError, "Invalid aberration value: " & value)
-        )
+        let n = pInt(value, "aberration value")
         case key
         of "rh": rh = n
         of "rv": rv = n
@@ -648,8 +601,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         of "bh": bh = n
         of "bv": bv = n
         else: raise newException(ActionParseError, "Unknown aberration key: " & key)
-    return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv),
-      abGh: chk(gh), abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
+    return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv), abGh: chk(gh),
+        abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
 
   # pos: overlay placement, each field an animatable ramp:
   #   pos:x:y   pos:x:y:scale   pos:0..600:300:1..0.5:ease=inout
@@ -673,7 +626,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len > idx:
       if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
-        raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
+        raise newException(ActionParseError, &"Unknown action: {val}{actionDidYouMean(val)}")
       hasE = true
       curve = parseEasing(parts[idx])
       if parts.len == idx + 2:
@@ -706,7 +659,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var dur = 0.0'f32
     if parts.len >= 3:
       if not parts[2].startsWith("ease=") or parts.len > 4:
-        raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
+        raise newException(ActionParseError, &"Unknown action: {val}{actionDidYouMean(val)}")
       hasE = true
       curve = parseEasing(parts[2])
       if parts.len == 4:
@@ -731,19 +684,13 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
 
   if parts.len == 2:
     let effectType = parts[0]
-    let effectVal = (
-      try:
-        parseFloat(parts[1]).float32
-      except ValueError:
-        raise newException(ActionParseError, "Invalid float value: " & parts[1])
-    )
+    let effectVal = pFloat(parts[1])
     case effectType
     of "speed", "varispeed":
       # `not (a and b)` instead of `<= or >=` so NaN fails the check too;
       # speed <= 0 makes the renderer's atempo decomposition loop forever.
       if not (effectVal > 0.0 and effectVal < 99999.0):
-        raise newException(ActionParseError,
-          effectType & " must be in range (0, 99999)")
+        raise newException(ActionParseError, &"{effectType} must be in range (0, 99999)")
       if effectType == "speed":
         return Action(kind: actSpeed, val: effectVal)
       return Action(kind: actVarispeed, val: effectVal)
@@ -753,18 +700,18 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         raise newException(ActionParseError, "pitch must be in [-24.0, 24.0] semitones")
       return Action(kind: actPitch, pCents: int16(round(effectVal * 100.0'f32)))
     of "brighthue":
-      return Action(kind: actLuv, brighthue: effectVal,
-        contrast: luvContrastId, saturation: luvSaturationId)
+      return Action(kind: actLuv, brighthue: effectVal, contrast: luvContrastId,
+        saturation: luvSaturationId)
     of "contrast":
       if effectVal < -2.0 or effectVal > 2.0:
         raise newException(ActionParseError, "contrast must be in [-2.0, 2.0]")
-      return Action(kind: actLuv, brighthue: luvBrighthueId,
-        contrast: effectVal, saturation: luvSaturationId)
+      return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: effectVal,
+        saturation: luvSaturationId)
     of "saturation":
       if effectVal < 0.0 or effectVal > 3.0:
         raise newException(ActionParseError, "saturation must be in [0.0, 3.0]")
-      return Action(kind: actLuv, brighthue: luvBrighthueId,
-        contrast: luvContrastId, saturation: effectVal)
+      return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: luvContrastId,
+        saturation: effectVal)
     else: discard
 
   raise newException(ActionParseError, "Unknown action: " & val & actionDidYouMean(val))
