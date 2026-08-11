@@ -284,6 +284,21 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
         totalSamples < targetSamples:
       processFrame()
 
+func atempoChain(speed: float): seq[string] =
+  ## atempo only behaves over a limited factor range, so a big tempo change is
+  ## decomposed into a chain of smaller ones.
+  const maxAtempo = 6.0
+  const minAtempo = 0.5
+  var rem = speed
+  while rem > maxAtempo:
+    result.add &"atempo={maxAtempo}"
+    rem = rem / maxAtempo
+  while rem < minAtempo:
+    result.add &"atempo={minAtempo}"
+    rem = rem / minAtempo
+  if rem != 1.0:
+    result.add &"atempo={rem}"
+
 proc createFilterGraph(effects: openArray[Action], sr: cint,
     layout: ref AVChannelLayout):
   (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
@@ -308,30 +323,34 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
     error &"Cannot create audio buffer sink: {ret}"
 
   var filters: seq[string] = @[]
-  # Build filter chain from all effects in the group
+  var rate = 1.0   # asetrate
+  var tempo = 1.0  # atempo
+  var at = -1      # track asetrate/atempo's position
   for effect in effects:
     case effect.kind
     of actSpeed:
-      const maxAtempo = 6.0
-      const minAtempo = 0.5
-      var remainingSpeed = effect.val
-      while remainingSpeed > maxAtempo:
-        filters.add &"atempo={maxAtempo}"
-        remainingSpeed = remainingSpeed / maxAtempo
-      while remainingSpeed < minAtempo:
-        filters.add &"atempo={minAtempo}"
-        remainingSpeed = remainingSpeed / minAtempo
-
-      if remainingSpeed != 1.0:
-        filters.add &"atempo={remainingSpeed}"
-
+      if at < 0: at = filters.len
+      tempo *= effect.val
     of actVarispeed:
-      let clampedSpeed = max(0.2, min(100.0, effect.val))
-      filters.add &"asetrate={sr}*{clampedSpeed}"
-      filters.add &"aresample={sr}"
+      if at < 0: at = filters.len
+      rate *= max(0.2, min(100.0, effect.val))
+    of actPitch:
+      if at < 0: at = filters.len
+      let ratio = pow(2.0, effect.pCents.float / 1200.0)
+      rate *= ratio
+      tempo = tempo / ratio
     of actDeesser:
       filters.add &"deesser=i={effect.intensity}:m={effect.maxd}:f={effect.freq}"
     else: discard
+
+  var speedFx: seq[string] = @[]
+  if rate != 1.0:
+    speedFx.add &"asetrate={sr}*{rate}"
+    speedFx.add &"aresample={sr}"  # asetrate leaves the rate changed
+  speedFx.add atempoChain(tempo)
+  if speedFx.len > 0:
+    let i = max(at, 0)
+    filters = filters[0 ..< i] & speedFx & filters[i ..< filters.len]
 
   # Pin the chain's output to s16p. Some filters (e.g. deesser) emit dblp, which
   # the frame-readback in processAudioClip can't convert, yielding silence.
@@ -526,7 +545,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
   var pending: seq[Action]
   for effect in ef[clip.effects]:
     case effect.kind
-    of actSpeed, actVarispeed, actDeesser:
+    of actSpeed, actVarispeed, actDeesser, actPitch:
       pending.add effect
     of actVolume:
       if pending.len > 0:

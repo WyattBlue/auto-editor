@@ -27,6 +27,7 @@ below works as the value of any `-w:N`.
 | `cut` | remove section | — |
 | `speed` | time-stretch, **pitch preserved** | `speed:8`, `speed:0.5` |
 | `varispeed` | speed via pitch shift (tape/vinyl) | `varispeed:2` (0.2–100) |
+| `pitch` | shift pitch only, **duration preserved** | `pitch:12` (octave up), `pitch:-7` (−24–24 semitones) |
 | `volume` | scale volume (1=normal, 0.5=−6dB) | `volume:0.2` |
 | `deesser` | reduce sibilance | `deesser:intensity[:max[:freq]]` (each 0–1) |
 | `invert` | invert pixels | — |
@@ -103,6 +104,7 @@ auto-editor :mic -w:1 deesser:0.8:0.7:0.4         # record, then clean up speech
 auto-editor podcast.mp3 -w:0 cut -w:1 speed:1.15      # cut silence, tighten speech
 auto-editor video.mp4 -w:0 volume:0.3                 # duck (not cut) the silence
 auto-editor video.mp4 -w:1 varispeed:1.25             # nightcore (speed + pitch up)
+auto-editor video.mp4 -w:0 pitch:12                   # chipmunk the silence, same length
 auto-editor video.mp4 -w:0 speed:6,volume:0.4         # fast, quiet silent sections
 ```
 

@@ -11,8 +11,8 @@ type
     actSpeed, actVarispeed,
     # Can add 2 more [VA] actions
     actVolume = 4,
-    actDeesser, actDuck,
-    # Can add 13 more [A] actions
+    actDeesser, actDuck, actPitch,
+    # Can add 12 more [A] actions
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
@@ -56,6 +56,9 @@ type
       kf*: seq[float32]      # keyframes in native units; len >= 1
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
+    of actPitch:
+      # Semitones x 100. Cent buckets round-trip as exact decimal semitones
+      pCents*: int16
     of actDuck:
       # Cross-track sidechain: rendered at the mix stage, not in the clip chain.
       duckAmount*, duckThresh*: Unorm16  # 0..1; gain floor = 1 - amount
@@ -149,6 +152,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: """
 Autoduck (sidechain): lower this clip's audio wherever the louder audio layers beneath it (higher track indices) are active, e.g. tuck a music/desktop track under a voice track. Cross-track, so it is applied when the audio layers are mixed; a no-op on the bottom-most layer and on single-layer audio.
 Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to silence, default 0.85), `threshold` the key loudness 0.0..1.0 that engages the duck (default 0.04), and `attack`/`release` the duck-down/recover times in milliseconds (defaults 100 and 500)."""),
+  ActionDef(name: "pitch", flags: {afAudio}, argSpec: "semitones", range: rng(-24.0, 24.0),
+    help: "Shift the pitch of the section without changing its speed. `12` is one octave up, `-12` one octave down, `0` leaves it unchanged, and fractional values work (`pitch:0.5` is a quarter tone). Implemented by resampling and then time-stretching back with ffmpeg's `asetrate` and `atempo` filters, so large shifts pick up the usual time-stretch artifacts. To change speed and pitch together, use `varispeed` instead."),
   ActionDef(name: "invert", flags: {afVideo},
     help: "Invert every pixel in the section, producing a photo-negative."),
   ActionDef(name: "hflip", flags: {afVideo},
@@ -742,6 +747,11 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       if effectType == "speed":
         return Action(kind: actSpeed, val: effectVal)
       return Action(kind: actVarispeed, val: effectVal)
+    of "pitch":
+      # `not (a and b)` so NaN fails the check too; int16(NaN) is UB.
+      if not (effectVal >= -24.0 and effectVal <= 24.0):
+        raise newException(ActionParseError, "pitch must be in [-24.0, 24.0] semitones")
+      return Action(kind: actPitch, pCents: int16(round(effectVal * 100.0'f32)))
     of "brighthue":
       return Action(kind: actLuv, brighthue: effectVal,
         contrast: luvContrastId, saturation: luvSaturationId)
@@ -802,6 +812,7 @@ when not defined(nimscript):
       let m = act.maxd
       let f = act.freq
       "deesser:" & $i & ":" & $m & ":" & $f
+    of actPitch: "pitch:" & $(act.pCents.float32 / 100.0'f32)
     of actDuck:
       "duck:" & $act.duckAmount & ":" & $act.duckThresh & ":" &
         $int(act.duckAttack) & ":" & $int(act.duckRelease)
@@ -860,7 +871,7 @@ when not defined(nimscript):
     case a.kind
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
-    of actRotate: 3
+    of actRotate, actPitch: 3
     of actLens, actSpeed, actVarispeed: 5
     of actDeesser, actSpin: 7
     of actDuck: 9
@@ -904,6 +915,11 @@ when not defined(nimscript):
           var st: Unorm16
           copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
           yield Action(kind: actRotate, rStart: st)
+          i += 3
+        of actPitch:
+          var cents: int16
+          copyMem(addr cents, addr base[i + 1], sizeof(int16))
+          yield Action(kind: actPitch, pCents: cents)
           i += 3
         of actLens:
           var k1v, k2v: Snorm16
@@ -1087,6 +1103,9 @@ when not defined(nimscript):
         i += 1
       of actRotate:
         base.writeAt(i, 1, a.rStart)
+        i += 3
+      of actPitch:
+        base.writeAt(i, 1, a.pCents)
         i += 3
       of actLens:
         base.writeAt(i, 1, a.k1)

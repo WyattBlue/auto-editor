@@ -96,6 +96,25 @@ auto-editor video.mp4 -w:0 varispeed:2
 auto-editor video.mp4 -w:1 varispeed:0.5
 ```
 
+### pitch
+
+Shift the pitch of the section in semitones, leaving its speed and duration alone.
+- **Value range:** -24.0 to 24.0 semitones
+- **12** = one octave up, **-12** = one octave down, **0** = unchanged
+
+```sh
+# Chipmunk the silent sections
+auto-editor video.mp4 -w:0 pitch:12
+
+# Drop active sections a fifth
+auto-editor video.mp4 -w:1 pitch:-7
+
+# Subtle detune (a quarter tone)
+auto-editor video.mp4 -w:1 pitch:0.5
+```
+
+To change speed and pitch together, use `varispeed` instead.
+
 ### volume
 
 Adjust the audio volume level.

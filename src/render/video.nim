@@ -794,8 +794,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     for effect in effects:
       confineThis = confineActive and effect.kind in confinable
       case effect.kind:
-      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPos, actRotate,
-          actLoop: discard
+      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPitch, actPos,
+          actRotate, actLoop: discard
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
