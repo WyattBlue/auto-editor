@@ -141,7 +141,7 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
     actionIndex[i] = value
 
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
-    isUrl = false): (string, ExportKind) {.raises: [].} =
+    isUrl = false, hasVideo = false): (string, ExportKind) {.raises: [].} =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
@@ -183,6 +183,17 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
     of exV2: ext = ".v2"
     of exV3: ext = ".v3"
     else: discard
+
+  # A timeline with video needs a container that can hold it. The default name
+  # copies the input's extension, so an audio-only input that gained a video
+  # layer (`song.mp3 -w:1 add:...`) would land in an .mp3 and lose the video
+  # without a word. Pick mp4 instead; if the name came from the user, keep it
+  # and say what is being dropped rather than overriding their choice.
+  if hasVideo and myExport == exDefault and not holdsVideo("x" & ext):
+    if userOut != "" and userOut != "-" and agSplitFile(userOut).ext != "":
+      warning &"{ext} can't hold a video stream; it will be dropped"
+    else:
+      ext = ".mp4"
 
   if userOut == "-":
     return ("-", myExport)
@@ -417,15 +428,18 @@ proc editMedia*(args: var mainArgs) =
 
   var exportKind: ExportKind
   var tlName, fcpVersion: string
+  let hasVideo = tlV3.v.len > 0 and not args.vn
   if args.`export`.kind == exAuto:
-    (output, exportKind) = setOutput(args.output, exAuto, usePath, args.urlInput)
+    (output, exportKind) = setOutput(args.output, exAuto, usePath, args.urlInput,
+      hasVideo)
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
   else:
     exportKind = args.`export`.kind
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
-    (output, _) = setOutput(args.output, exportKind, usePath, args.urlInput)
+    (output, _) = setOutput(args.output, exportKind, usePath, args.urlInput,
+      hasVideo)
 
   if args.preview:
     preview(tlV3)

@@ -317,6 +317,12 @@ created when there is an active section for the overlay to sit on: e.g.
 edit leaves no active sections (so the `-w:1` overlay matches nothing) the
 output stays audio-only.
 
+Because the default output name copies the input's extension, that video would
+land in a container that cannot hold it (`song.mp3` → `song_ALTERED.mp3`), so
+when the timeline gains video the default name switches to `.mp4` instead. Name
+the file yourself and your choice is kept: `-o out.mp3` still writes an MP3, with
+a warning that the video is being dropped.
+
 ## Multiple Actions (Chaining)
 
 You can combine multiple actions using commas. Actions are applied in the order specified.
