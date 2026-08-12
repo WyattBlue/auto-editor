@@ -240,7 +240,9 @@ proc applyAdds(tl: var v3, args: mainArgs,
     tl.v.add base
 
   for spec in args.adds:
-    let srcPtr = interner.intern(spec.path)
+    # A generator layer has no source: the renderer hands it a transparent
+    # canvas that its own action paints, which then composites over the picture.
+    let srcPtr = (if spec.generator.len > 0: nil else: interner.intern(spec.path))
     # The overlay's effects group: an optional `pos` placement action followed by
     # any actions chained after `add:` (which apply to this layer, not the base).
     var acts: seq[Action]
@@ -249,6 +251,9 @@ proc applyAdds(tl: var v3, args: mainArgs,
         pscaleKf: spec.scaleKf)
     var group = aNil
     try:
+      if spec.generator.len > 0:
+        # Ahead of the chained actions, so those operate on the drawn confetti.
+        acts.add parseAction(spec.generator)
       if spec.effects.len > 0:
         block:
           let parsed = parseActions(spec.effects)

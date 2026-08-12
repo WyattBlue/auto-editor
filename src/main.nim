@@ -330,7 +330,12 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
             error "add: scale must be greater than 0.0"
       else:
         spec.path = segs.join(":")
-      if spec.path.len == 0:
+      # `add:confetti...` names a generator, not a file: the layer is drawn onto
+      # a transparent canvas rather than decoded from a source.
+      if spec.path == "confetti" or spec.path.startsWith("confetti:"):
+        spec.generator = spec.path
+        spec.path = ""
+      elif spec.path.len == 0:
         error "add: missing path"
       args.adds.add spec
       curAdd = args.adds.len - 1

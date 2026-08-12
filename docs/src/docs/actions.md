@@ -257,7 +257,11 @@ Overlay an image or video on top of the matched sections, `add:path` or
 `add:path:x:y:scale`:
 
 - **path** — a media file (e.g. a PNG logo or a video). Still images are held
-  for the whole section.
+  for the whole section. In place of a file, the single word `confetti` (with
+  its usual arguments) names a **generator**: instead of decoding a source, the
+  layer starts as a transparent canvas that the action paints, so the picture
+  below shows through everywhere it did not draw. See
+  [confetti](/ref/actions#confetti).
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
   (above). When omitted, the overlay is scaled to fit the canvas (preserving
   aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
@@ -278,6 +282,15 @@ auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25
 
 # Overlay only over a specific time range (frames where 1s..2s plays)
 auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
+
+# Confetti on its own layer, over the picture rather than baked into it
+auto-editor video.mp4 -w:1 add:confetti:300
+
+# Draw it white, then recolor the layer without touching the video below
+auto-editor video.mp4 -w:1 add:confetti:300:white,invert
+
+# Audio plus a confetti layer: a video with no footage at all
+auto-editor song.mp3 -w:1 add:confetti:300:white
 ```
 
 Unlike the other actions, `add` is **virtual**: it is not a per-frame effect but

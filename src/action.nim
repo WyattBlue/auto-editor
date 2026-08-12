@@ -16,11 +16,18 @@ type
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
-    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate
-    # Can add 86 more [V] actions
+    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate,
+    actConfetti
+    # Can add 85 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
+
+  ConfettiScheme* = enum  # confetti color palette
+    csParty, csWhite, csGold, csNeon
+
+  ConfettiOrigin* = enum  # where confetti pieces launch from
+    coBottom, coTop, coCenter, coSides
 
   DurUnit* = enum  # how an ease duration is measured
     duClip,    # the whole clip/section (the default)
@@ -90,6 +97,13 @@ type
       mX*, mY*, mW*, mH*: int32
     of actPixelate:
       pixW*, pixH*: uint16   # mosaic block size in px (square when equal)
+    of actConfetti:
+      cCount*: uint16        # number of pieces
+      # Gravity in frame-heights per second^2, so the throw looks the same at
+      # any resolution. float32, not Unorm16: the range is [0, 20], not [0, 1].
+      cGravity*: float32
+      cScheme*: ConfettiScheme
+      cOrigin*: ConfettiOrigin
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -114,6 +128,15 @@ type
     help*: string
 
 const easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
+
+const
+  confettiSchemeNames*: array[ConfettiScheme, string] =
+    ["party", "white", "gold", "neon"]
+  confettiOriginNames*: array[ConfettiOrigin, string] =
+    ["bottom", "top", "center", "sides"]
+  confettiCountId = 200'u16
+  confettiGravityId = 1.0'f32
+  confettiOriginId = coSides
 
 func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[RangeDoc] =
   some(RangeDoc(lo: lo, hi: hi, loIncl: loIncl, hiIncl: hiIncl, each: each))
@@ -208,6 +231,14 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
   ActionDef(name: "pixelate", flags: {afVideo}, argSpec: "[w[:h]]", range: rng(1.0, 1024.0, each = true),
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
+  ActionDef(name: "confetti", flags: {afVideo}, argSpec: "[count[:gravity][:scheme][:origin]]",
+    help: """
+Throw colorful confetti over the picture. The whole charge goes off in one burst when the section starts, like a party popper, ripping out over about half a second, and none of it is replaced as the pieces fall out of frame, so the burst plays out and is over; put the action on a short section where you want the pop. Each piece is a small four-sided chip, cut a little differently from the next, that arcs over and flutters down under gravity with air drag, spinning and tumbling in 3D as it falls so it turns edge-on to a sliver and opens back out. With no arguments, 200 party-colored pieces fire inward from two cannons at the bottom corners.
+Every argument is optional and the four may be given in any order, e.g. `confetti:neon:top` and `confetti:top:neon` are the same. Bare numbers fill `count` first, then `gravity`.
+`count` is how many pieces to throw, 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.0), measured in frame-heights per second squared, so a given value looks the same at any resolution: lower values leave the pieces hanging in the air, higher ones snap them down. Each piece also gets its own share of air resistance, so they do not come down together: the draggiest fall at under a third the speed of the slipperiest, and a burst that leaves as one sheet fans out into a ragged front on the way down.
+`scheme` is the color palette, one of `party` (the default, six vivid hues around the color wheel), `white` (plain white paper), `gold` (metallic), or `neon`.
+`origin` is where the pieces launch from: `sides` (the default, two cannons at the bottom corners firing inward in a wide fan), `bottom` (a cannon firing straight up from below the frame), `top` (a shower released just above the frame), or `center` (a radial burst from the middle).
+The burst restarts with each section, so its timing follows the clip, not the timeline. Rendered by drawing directly onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
 
 const actionNames* = block:
@@ -546,6 +577,52 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       else: wh[idx - 1] = n
     return Action(kind: actPixelate, pixW: uint16(wh[0]), pixH: uint16(wh[1]))
 
+  # confetti: [count[:gravity][:scheme][:origin]]. Scheme and origin are name
+  # tokens, so every argument can be given in any order; bare numbers fill
+  # count then gravity.
+  if parts[0] == "confetti":
+    var count = confettiCountId
+    var gravity = confettiGravityId
+    var scheme = csParty
+    var origin = confettiOriginId
+    var numsSeen = 0
+    var schemeSeen = false
+    var originSeen = false
+    for idx in 1 ..< parts.len:
+      let p = parts[idx]
+      let asScheme = confettiSchemeNames.find(p)
+      let asOrigin = confettiOriginNames.find(p)
+      if asScheme >= 0:
+        if schemeSeen:
+          raise newException(ActionParseError, "confetti: scheme given twice")
+        scheme = ConfettiScheme(asScheme)
+        schemeSeen = true
+      elif asOrigin >= 0:
+        if originSeen:
+          raise newException(ActionParseError, "confetti: origin given twice")
+        origin = ConfettiOrigin(asOrigin)
+        originSeen = true
+      elif p.len == 0 or p[0] notin {'0' .. '9', '-', '+', '.'}:
+        # Not a number, so it was meant as a scheme or origin name.
+        raise newException(ActionParseError, &"confetti: unknown scheme or origin: {p}" &
+          didYouMean(p, @confettiSchemeNames & @confettiOriginNames))
+      elif numsSeen == 0:
+        let n = pInt(p, "confetti count")
+        if n < 1 or n > 400:
+          raise newException(ActionParseError, "confetti count must be in [1, 400]")
+        count = uint16(n)
+        numsSeen = 1
+      elif numsSeen == 1:
+        gravity = pFloat(p)
+        # `not (a and b)` so NaN fails the check too.
+        if not (gravity >= 0.0'f32 and gravity <= 20.0'f32):
+          raise newException(ActionParseError, "confetti gravity must be in [0.0, 20.0]")
+        numsSeen = 2
+      else:
+        raise newException(ActionParseError, &"confetti: unexpected value: {p}")
+    return Action(kind: actConfetti, cCount: count, cGravity: gravity,
+      cScheme: scheme, cOrigin: origin)
+
   # aberration: per-channel chromatic split. Positional shorthand (no '=') is the
   # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
   # explicit per-channel form, which starts every channel at 0.
@@ -807,6 +884,10 @@ when not defined(nimscript):
     of actPixelate:
       if act.pixW == act.pixH: &"pixelate:{act.pixW}"
       else: &"pixelate:{act.pixW}:{act.pixH}"
+    of actConfetti:
+      # All four fields, so the count/gravity positional slots stay filled.
+      &"confetti:{act.cCount}:{act.cGravity}:" &
+        &"{confettiSchemeNames[act.cScheme]}:{confettiOriginNames[act.cOrigin]}"
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -826,6 +907,7 @@ when not defined(nimscript):
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
     of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
     of actPixelate: 5           # header + 2x uint16 (block w, h)
+    of actConfetti: 9           # header + uint16 + float32 + scheme + origin
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -929,6 +1011,15 @@ when not defined(nimscript):
           copyMem(addr h, addr base[i + 3], sizeof(uint16))
           yield Action(kind: actPixelate, pixW: w, pixH: h)
           i += 5
+        of actConfetti:
+          var count: uint16
+          var gravity: float32
+          copyMem(addr count, addr base[i + 1], sizeof(uint16))
+          copyMem(addr gravity, addr base[i + 3], sizeof(float32))
+          yield Action(kind: actConfetti, cCount: count, cGravity: gravity,
+            cScheme: ConfettiScheme(base[i + 7].int),
+            cOrigin: ConfettiOrigin(base[i + 8].int))
+          i += 9
         of actAberration:
           yield Action(kind: actAberration,
             abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
@@ -1094,6 +1185,13 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.pixW)
         base.writeAt(i, 3, a.pixH)
         i += 5
+      of actConfetti:
+        base.writeAt(i, 1, a.cCount)
+        base.writeAt(i, 3, a.cGravity)
+        # A bare Nim enum is int-sized, so narrow explicitly like easeCurve.
+        base[i + 7] = uint8(ord(a.cScheme))
+        base[i + 8] = uint8(ord(a.cOrigin))
+        i += 9
       of actAberration:
         base.writeAt(i, 1, a.abRh)
         base.writeAt(i, 2, a.abRv)

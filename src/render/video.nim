@@ -1,5 +1,5 @@
 import std/[sets, strformat, tables]
-from std/math import round, hypot, ceil, floor
+from std/math import round, hypot, ceil, floor, exp, sin, cos
 from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
@@ -9,6 +9,7 @@ type VideoFrame = object
   index: int
   src: ptr string
   effects: Actions
+  gen: bool      # source-less overlay (`add:confetti`): draw on a clear canvas
   local: int     # frame offset within the clip, for animated effects
   dur: int       # clip length in frames
   x: float32     # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
@@ -204,6 +205,33 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   return newFrame
 
+func toYuv(color: RGBColor): tuple[y, u, v: uint8] =
+  ## BT.601 RGB -> YUV, shared by every solid-color write into a planar frame.
+  let r = color.red.float
+  let g = color.green.float
+  let b = color.blue.float
+  (uint8(clamp(0.299 * r + 0.587 * g + 0.114 * b, 0.0, 255.0)),
+   uint8(clamp(-0.169 * r - 0.331 * g + 0.5 * b + 128, 0.0, 255.0)),
+   uint8(clamp(0.5 * r - 0.419 * g - 0.081 * b + 128, 0.0, 255.0)))
+
+proc makeClear(width: cint, height: cint): ptr AVFrame =
+  ## A fully transparent RGBA canvas: the starting picture for a generator layer
+  ## (`add:confetti`), so only what it draws survives the composite.
+  let frame: ptr AVFrame = av_frame_alloc()
+  if frame == nil:
+    return nil
+  frame.format = AV_PIX_FMT_RGBA.cint
+  frame.width = width
+  frame.height = height
+  if av_frame_get_buffer(frame, 32) < 0:
+    error "Bad buffer"
+  if av_frame_make_writable(frame) < 0:
+    error "Can't make frame writable"
+  for y in 0 ..< height:
+    zeroMem(cast[pointer](cast[int](frame.data[0]) + y.int * frame.linesize[0].int),
+      width.int * 4)
+  return frame
+
 proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   let frame: ptr AVFrame = av_frame_alloc()
   if frame == nil:
@@ -219,11 +247,10 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   if av_frame_make_writable(frame) < 0:
     error "Can't make frame writable"
 
+  let (yValue, uValue, vValue) = toYuv(color)
+
   let yData: ptr uint8 = frame.data[0]
   let yLinesize: cint = frame.linesize[0]
-  # Convert RGB to Y (luma): Y = 0.299*R + 0.587*G + 0.114*B
-  let yValue = uint8(0.299 * color.red.float + 0.587 * color.green.float + 0.114 *
-      color.blue.float)
 
   for y in 0 ..< height:
     let row: ptr uint8 = cast[ptr uint8](cast[int](yData) + y.int * yLinesize.int)
@@ -233,9 +260,6 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   let uData: ptr uint8 = frame.data[1]
   let uLinesize: cint = frame.linesize[1]
-  # Convert RGB to U: U = -0.169*R - 0.331*G + 0.5*B + 128
-  let uValue = uint8(max(0.0, min(255.0, -0.169 * color.red.float - 0.331 *
-      color.green.float + 0.5 * color.blue.float + 128)))
 
   for y in 0 ..< (height div 2):
     let row: ptr uint8 = cast[ptr uint8](cast[int](uData) + y.int * uLinesize.int)
@@ -245,9 +269,6 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   let vData: ptr uint8 = frame.data[2]
   let vLinesize: cint = frame.linesize[2]
-  # Convert RGB to V: V = 0.5*R - 0.419*G - 0.081*B + 128
-  let vValue = uint8(max(0.0, min(255.0, 0.5 * color.red.float - 0.419 *
-      color.green.float - 0.081 * color.blue.float + 128)))
 
   for y in 0 ..< (height div 2):
     let row: ptr uint8 = cast[ptr uint8](cast[int](vData) + y.int * vLinesize.int)
@@ -256,6 +277,259 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
       rowArray[x] = vValue
 
   return frame
+
+# Confetti is drawn straight into the frame rather than by a filter: ffmpeg's
+# drawbox has no time or frame-number variable (its `t` is thickness), so its
+# geometry is evaluated once at init and cannot animate, and `geq` can animate
+# but costs a per-pixel expression evaluation.
+
+const confettiPalettes: array[ConfettiScheme, seq[uint32]] = [
+  # party: six fully saturated hues around the wheel
+  @[0xff0040'u32, 0xff7a00'u32, 0xffe000'u32, 0x00e04b'u32, 0x0091ff'u32,
+    0xc800ff'u32],
+  @[0xffffff'u32],
+  @[0xffd700'u32, 0xffb300'u32, 0xfff3b0'u32, 0xe0a63c'u32],
+  @[0x00fff0'u32, 0xff00d4'u32, 0xb6ff00'u32, 0xff7a00'u32],
+]
+
+func unpackRGB(v: uint32): RGBColor =
+  RGBColor(red: uint8((v shr 16) and 0xff), green: uint8((v shr 8) and 0xff),
+    blue: uint8(v and 0xff))
+
+func hashUnit(i, salt: uint32): float32 =
+  ## A value in [0, 1) for piece `i`, channel `salt`. A hash rather than an RNG:
+  ## nothing to seed or carry between frames, and two renders of the same
+  ## command produce identical confetti.
+  var h = i * 0x9E3779B1'u32 + salt * 0x85EBCA6B'u32 + 0x165667B1'u32
+  h = (h xor (h shr 16)) * 0x7FEB352D'u32
+  h = (h xor (h shr 15)) * 0x846CA68B'u32
+  h = h xor (h shr 16)
+  float32(h shr 8) / 16777216.0'f32
+
+const tau = 6.2831855'f32
+
+type Chip = array[4, tuple[x, y: float32]]  # a piece's four corners
+
+func chipOutline(n: uint32, rx, ry: float32, v: var Chip) =
+  ## The piece's flat shape before it is turned. A quad, but cut irregularly —
+  ## trapezoids, kites and rhombi rather than a screenful of identical
+  ## rectangles. Each corner only ever moves within its own quadrant, so the
+  ## outline stays convex and every scanline is a single span.
+  const cx = [-1.0'f32, 1.0'f32, 1.0'f32, -1.0'f32]
+  const cy = [-1.0'f32, -1.0'f32, 1.0'f32, 1.0'f32]
+  for j in 0 ..< 4:
+    let u = uint32(j)
+    v[j] = (cx[j] * rx * (0.55'f32 + 0.45'f32 * hashUnit(n, 20 + u)),
+            cy[j] * ry * (0.55'f32 + 0.45'f32 * hashUnit(n, 24 + u)))
+
+proc fillRect(frame: ptr AVFrame, rx, ry, rw, rh: int, color: RGBColor) =
+  ## Fill an axis-aligned rect with a solid color, clipped to the frame. Covers
+  ## the two formats a clip's chain works in: yuv420p, and rgba for a layer
+  ## carrying alpha.
+  let x0 = max(rx, 0)
+  let y0 = max(ry, 0)
+  let x1 = min(rx + rw, frame.width.int)
+  let y1 = min(ry + rh, frame.height.int)
+  if x0 >= x1 or y0 >= y1:
+    return
+
+  if AVPixelFormat(frame.format) == AV_PIX_FMT_RGBA:
+    for y in y0 ..< y1:
+      let row = cast[ptr UncheckedArray[uint8]](
+        cast[int](frame.data[0]) + y * frame.linesize[0].int)
+      for x in x0 ..< x1:
+        row[x * 4] = color.red
+        row[x * 4 + 1] = color.green
+        row[x * 4 + 2] = color.blue
+        row[x * 4 + 3] = 255'u8
+    return
+
+  let (yv, uv, vv) = toYuv(color)
+  for y in y0 ..< y1:
+    let row = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[0]) + y * frame.linesize[0].int)
+    for x in x0 ..< x1:
+      row[x] = yv
+
+  # Chroma is half resolution on both axes: round the covered luma span outward
+  # so a piece thinner than 2px still gets a chroma sample and keeps its color.
+  for cy in (y0 div 2) ..< ((y1 - 1) div 2 + 1):
+    let uRow = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[1]) + cy * frame.linesize[1].int)
+    let vRow = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[2]) + cy * frame.linesize[2].int)
+    for cx in (x0 div 2) ..< ((x1 - 1) div 2 + 1):
+      uRow[cx] = uv
+      vRow[cx] = vv
+
+proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
+  ## Scanline-fill the piece's projected outline. Convex, so each row is a
+  ## single span between the leftmost and rightmost edge crossing.
+  var xMin, xMax = poly[0].x
+  var yMin, yMax = poly[0].y
+  for j in 1 ..< 4:
+    xMin = min(xMin, poly[j].x)
+    xMax = max(xMax, poly[j].x)
+    yMin = min(yMin, poly[j].y)
+    yMax = max(yMax, poly[j].y)
+
+  # Spans round to nearest rather than truncating, so an edge lands on the pixel
+  # it actually covers instead of biting a step out of the outline.
+  template span(lo, hi: float32): (int, int) =
+    let a = int(round(lo))
+    (a, max(a + 1, int(round(hi))))
+
+  if xMax - xMin < 1.0'f32 or yMax - yMin < 1.0'f32:
+    # Turned edge-on: the projection is thinner than a pixel, and every scanline
+    # would miss it. Draw the sliver so a tumbling piece never blinks out.
+    let (xa, xb) = span(xMin, xMax)
+    let (ya, yb) = span(yMin, yMax)
+    fillRect(frame, xa, ya, xb - xa, yb - ya, color)
+    return
+
+  for y in max(int(floor(yMin)), 0) ..< min(int(ceil(yMax)), frame.height.int):
+    let yc = float32(y) + 0.5'f32
+    var lo = 1e30'f32
+    var hi = -1e30'f32
+    for j in 0 ..< 4:
+      let a = poly[j]
+      let b = poly[(j + 1) and 3]
+      # A horizontal edge fails this test on both ends, so the slope below can
+      # never divide by zero.
+      if (a.y <= yc) != (b.y <= yc):
+        let x = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y)
+        lo = min(lo, x)
+        hi = max(hi, x)
+    if lo <= hi:
+      let (xa, xb) = span(lo, hi)
+      fillRect(frame, xa, y, xb - xa, 1, color)
+
+proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
+  ## One frame of the confetti animation.
+  ##
+  ## Motion is linear-drag ballistics: with drag `k` and gravity `g` a piece
+  ## launched at `v0` has v(t) = vt + (v0 - vt)e^-kt for terminal velocity
+  ## vt = g/k, so it rises, decelerates, arcs over, then settles into a steady
+  ## drift instead of accelerating off-screen. Every length and speed is a
+  ## fraction of the frame height, so the effect looks the same at any
+  ## resolution.
+  ##
+  ## `k` is per piece, not shared: a real handful of confetti is not cut to one
+  ## weight, so the draggier pieces brake harder out of the throw and then hang,
+  ## drifting down at a fraction of the speed of the ones that catch less air.
+  let w = frame.width.float32
+  let h = frame.height.float32
+  let palette = confettiPalettes[act.cScheme]
+  let t0 = float32(local) / float32(max(fps, 1.0))
+
+  for i in 0 ..< act.cCount.int:
+    let n = uint32(i)
+    let uPos = hashUnit(n, 1)
+    let uSpeed = hashUnit(n, 2)
+    let uAim = hashUnit(n, 3)
+    let uSize = hashUnit(n, 4)
+    let uSway = hashUnit(n, 5)
+    let uSpin = hashUnit(n, 6)
+    let uWhen = hashUnit(n, 7)
+    let uShape = hashUnit(n, 9)
+    let uTumble = hashUnit(n, 10)
+    let uPhase = hashUnit(n, 11)
+    let uRoll = hashUnit(n, 12)
+
+    # Air resistance, 1/s. Spread wide on purpose: the draggiest piece falls at
+    # under a third the speed of the slipperiest, so a burst that leaves as one
+    # sheet fans out into a ragged front on the way down. Drag also shortens the
+    # throw, so the draggy ones stay nearer the cannon and peak lower.
+    let k = 1.6'f32 + 3.2'f32 * hashUnit(n, 13)
+    # One popper shoves every piece about equally hard, so the ones that catch
+    # more air leave faster and brake sooner instead of all starting level.
+    # Without this the light-and-fast pieces would compound into a few outliers
+    # that clear the top of the frame and take the whole burst to come back.
+    let shove = 0.55'f32 + 0.45'f32 * (k / 3.2'f32)
+    let vt = act.cGravity / k     # terminal fall speed, frame-heights/s
+
+    var x0, y0, vx0, vy0: float32
+    case act.cOrigin
+    of coBottom:
+      x0 = w * (0.02'f32 + 0.96'f32 * uPos)
+      y0 = h * 1.02'f32
+      vy0 = -(1.9'f32 + 1.2'f32 * uSpeed)
+      vx0 = (uAim * 2.0'f32 - 1.0'f32) * 0.7'f32
+    of coSides:
+      # A wide fan: aim runs from a flat shot that crosses the whole frame all
+      # the way down to barely any sideways push, so the shallowest pieces climb
+      # and fall along the edge they left from instead of the middle emptying
+      # the sides out.
+      let right = (i mod 2) == 1
+      x0 = (if right: w * 1.02'f32 else: w * -0.02'f32)
+      y0 = h * (0.90'f32 + 0.14'f32 * uPos)
+      vy0 = -(1.7'f32 + 1.3'f32 * uSpeed)
+      vx0 = (0.15'f32 + 3.0'f32 * uAim) * (if right: -1.0'f32 else: 1.0'f32)
+    of coCenter:
+      x0 = w * 0.5'f32
+      y0 = h * 0.5'f32
+      let angle = uPos * tau
+      let speed = 1.3'f32 + 1.4'f32 * uSpeed
+      vx0 = cos(angle) * speed
+      vy0 = sin(angle) * speed
+    of coTop:
+      x0 = w * (0.02'f32 + 0.96'f32 * uPos)
+      y0 = h * -0.06'f32
+      vy0 = 0.6'f32 + 0.5'f32 * uSpeed
+      vx0 = (uAim * 2.0'f32 - 1.0'f32) * 0.15'f32
+
+    vx0 *= shove
+    vy0 *= shove
+
+    # One popper, fired once at the top of the section: nothing is replaced
+    # after it falls out of frame. The launch is staggered across a fraction of
+    # a second, short against the several-second burst so it still reads as a
+    # single pop, but long enough that the charge visibly rips out rather than
+    # appearing as one clean sheet.
+    let t = t0 - uWhen * 0.4'f32
+    if t <= 0.0'f32:
+      continue
+
+    let decay = (1.0'f32 - exp(-k * t)) / k
+    let sway = h * (0.010'f32 + 0.020'f32 * uSway)
+    let freq = 0.5'f32 + uSpin
+    let px = x0 + vx0 * decay * h + sway * sin(tau * freq * t + uSway * tau)
+    let py = y0 + (vt * t + (vy0 - vt) * decay) * h
+
+    let size = h * (0.024'f32 + 0.024'f32 * uSize)
+
+    # Positive on-screen test, so a piece that somehow went non-finite is
+    # dropped rather than reaching an unchecked float -> int conversion. `size`
+    # bounds the outline, which is drawn within a half-`size` radius of px/py.
+    if not (px + size >= 0.0'f32 and px - size <= w and
+            py + size >= 0.0'f32 and py - size <= h):
+      continue
+
+    # Turn the flat chip in 3D and project it. It spins in its own plane (Rz)
+    # while tumbling end over end (Rx) and edge to edge (Ry); since the chip is
+    # flat its local z is 0, which collapses the three matrices to this. The
+    # projection is orthographic, i.e. just dropping z, so a chip turning away
+    # foreshortens to a sliver and opens back out.
+    let spinZ = (1.5'f32 + 4.0'f32 * uSpin) * t + uPhase * tau
+    let turnX = (2.0'f32 + 5.0'f32 * uTumble) * t + uSize * tau
+    let turnY = (1.5'f32 + 4.0'f32 * uRoll) * t + uAim * tau
+    let ca = cos(spinZ)
+    let sa = sin(spinZ)
+    let cb = cos(turnX)
+    let sb = sin(turnX)
+    let cc = cos(turnY)
+    let sc = sin(turnY)
+
+    var poly: Chip
+    # uShape sets the cut's proportions, from a narrow strip to nearly square.
+    chipOutline(n, size * 0.5'f32, size * (0.22'f32 + 0.28'f32 * uShape), poly)
+    for j in 0 ..< 4:
+      let lx = poly[j].x * ca - poly[j].y * sa
+      let ly = poly[j].x * sa + poly[j].y * ca
+      poly[j] = (px + lx * cc + ly * sb * sc, py + ly * cb)
+
+    let idx = min(palette.len - 1, int(hashUnit(n, 8) * float32(palette.len)))
+    fillChip(frame, poly, unpackRGB(palette[idx]))
 
 proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     bg: RGBColor): ptr AVFrame =
@@ -432,12 +706,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       firstSrc = s
       break
 
-  let src = myCache.cns[firstSrc]
   # Don't inherit color tags / SAR from a still image. PNGs are tagged full-range
   # (which makes the H.264 encoder emit deprecated yuvj420p), so when the only
   # reference is a still (e.g. an audio-only `add` over a synthesized canvas),
-  # keep the encoder's limited-range yuv420p defaults instead.
-  if not srcs[firstSrc].isStill:
+  # keep the encoder's limited-range yuv420p defaults instead. firstSrc is nil
+  # when nothing in the timeline carries video at all, e.g. audio plus a lone
+  # `add:confetti` generator; the same defaults cover that.
+  if firstSrc != nil and not srcs[firstSrc].isStill:
+    let src = myCache.cns[firstSrc]
     let color_range = src.video[0].codecpar.color_range
     let colorspace = src.video[0].codecpar.color_space
     let color_prim = src.video[0].codecpar.color_primaries
@@ -455,6 +731,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let sar = src.video[0].codecpar.sample_aspect_ratio
     if sar.isValid:
       encoderCtx.sample_aspect_ratio = sar
+
+  # The format frames will arrive in, or NONE when the timeline carries no video
+  # source at all and every frame is synthesized.
+  let srcPixFmt =
+    if firstSrc != nil: AVPixelFormat(myCache.cns[firstSrc].video[0].codecpar.format)
+    else: AV_PIX_FMT_NONE
 
   if args.videoBitrate >= 0:
     encoderCtx.bit_rate = args.videoBitrate
@@ -578,7 +860,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # Create a persistent sws context for the per-frame pixel format conversion.
   # Reusing it avoids the per-frame alloc/init overhead of the new sws API.
   var reformatCtx: ptr SwsContext = nil
-  if pix_fmt != AVPixelFormat(src.video[0].codecpar.format):
+  if pix_fmt != srcPixFmt:
     reformatCtx = sws_alloc_context()
     if reformatCtx == nil:
       error "Failed to allocate reformat sws context"
@@ -1016,6 +1298,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let filt = fxGraph.add("pixelize", &"width={w}:height={h}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+      of actConfetti:
+        # Drawn in the layer's own working format, so an overlay's alpha
+        # survives; anything more exotic is converted first since fillRect only
+        # writes yuv420p and rgba.
+        let want = (if hasAlpha(AVPixelFormat(frame.format)): AV_PIX_FMT_RGBA
+                    else: AV_PIX_FMT_YUV420P)
+        let conv = frame.reformat(want)
+        if conv != frame:
+          av_frame_free(addr frame)
+          frame = conv
+        # Required, not defensive: the single-layer path caches the pre-effects
+        # frame with av_frame_clone and the decoder holds its own refs, so this
+        # buffer is shared and an in-place draw would compound into the cache.
+        if av_frame_make_writable(frame) < 0:
+          error "Could not make frame writable for confetti"
+        drawConfetti(frame, effect, local, fps)
       of actConfine:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset
@@ -1026,6 +1324,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## Decode one clip's frame at its native resolution (after any static
     ## rotation), maintaining per-source seek state. Still images decode once
     ## and return clones. Caller owns the returned frame.
+    if obj.gen: # generator overlay: a clear canvas for its action to paint
+      return (makeClear(targetWidth, targetHeight), true)
     if obj.src == nil: # synthesized background base (audio-only `add`)
       return (av_frame_clone(nullFrame), true)
     let st = srcs[obj.src]
@@ -1330,7 +1630,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr df)
       decodedCache.clear()
 
-      for layer in tl.v:
+      for layerIdx, layer in tl.v:
         for obj in layer:
           if index >= obj.start and index < (obj.start + obj.dur):
             # Convert timeline position from target framerate to source framerate
@@ -1368,7 +1668,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 else:
                   int(timelinePos)
             let i = int(round(float(sourceFramePos) * speed))
+            # A nil src on the base track is the synthesized `-bg` canvas for an
+            # audio-only timeline; on a layer above it, it is a generator.
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
+              gen: obj.src == nil and layerIdx > 0,
               local: int(index - obj.start), dur: int(obj.dur),
               x: ox, y: oy, scale: oscale, fit: not hasPos)
 
