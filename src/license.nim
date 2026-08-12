@@ -61,8 +61,7 @@ proc validateKey*(val: string): (bool, string) {.raises: [].} =
   return (false, "Incorrect key")
 
 func addYears*(issued: string, years: int): string =
-  ## `issued` must be a valid "yyyy-MM-dd". Feb 29 lands on Feb 28 in
-  ## non-leap years, matching what std/times' day clamping did.
+  ## `issued` must be a valid "yyyy-MM-dd". Feb 29 lands on Feb 28 in non-leap years.
   let year = parseInt(issued[0 ..< 4]) + years
   let isLeap = year mod 4 == 0 and (year mod 100 != 0 or year mod 400 == 0)
   let monthDay = if issued[4 .. ^1] == "-02-29" and not isLeap: "-02-28"

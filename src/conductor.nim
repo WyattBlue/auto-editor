@@ -354,10 +354,10 @@ proc editMedia*(args: var mainArgs) =
         let minclip = toTb(args.smooth[1], tbf)
 
         # Margin and smoothing act on the binary keep/cut boundary (active = any
-        # non-silent label). Run them on that mask, then fold the result back into
-        # the labels: where margin/mincut turned silence active, call it label 1
-        # (normal); where minclip cut a short active clip, set it silent (0). With
-        # only labels 0/1 present this reproduces the previous behavior exactly.
+        # non-silent label). Run them on that mask, then fold the result back into the
+        # labels: where margin/mincut turned silence active, call it label 1 (normal);
+        # where minclip cut a short active clip, set it silent (0). Labels 0/1 alone
+        # round-trip through this mask unchanged.
         var active = newSeq[bool](labels.len)
         for i in 0 ..< labels.len:
           active[i] = labels[i] != 0'u8

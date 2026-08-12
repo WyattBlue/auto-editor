@@ -480,9 +480,8 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
   let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
 
-  # clipitem ids run V1, V2, ... then audio. Overlay tracks (v[1..]) used to be
-  # dropped entirely; emitting them means audio ids must start past every video
-  # clip, not just v[0]'s.
+  # clipitem ids run V1, V2, ... then audio. Audio ids start past every video clip
+  # across all tracks, not just v[0]'s, so <link> refs stay unambiguous.
   var videoTrackStart = newSeq[int](tl.v.len)
   var nextVideoId = 1
   for k in 0 ..< tl.v.len:

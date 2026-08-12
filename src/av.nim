@@ -341,9 +341,9 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
 
 iterator flushDecode*(container: InputContainer, index: cint,
     codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
-  ## Drain-first decode loop. Always pulls all available frames out of the
-  ## decoder before sending more packets, so we never hit AVERROR(EAGAIN) on
-  ## send (which would silently drop the packet under the previous pattern).
+  ## Drain-first decode loop. Always pulls all available frames out of the decoder
+  ## before sending more packets, so we never hit AVERROR(EAGAIN) on send, which would
+  ## silently drop the packet.
   var ret: cint
   var packet = container.packet
   var flushed = false
