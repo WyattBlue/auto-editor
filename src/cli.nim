@@ -36,22 +36,18 @@ type OptKind* = enum
   Special # args.`export` = parseExportString("$datum")
 
 type CliOption* = enum
-  coNone
-  coIsDebug, coSplitWords, coLanguage, coFormat, coOutput, coTranslate, coQueue,
-    coPrompt, coThreads, coThreshold
-  coIsJson, coEncoders, coDecoders, coCodecs
-  coEdit, coTimebase, coDisplay, coNoCache, coAsJson
-  coStream, coChannel, coSamplesPerBucket, coStartSample, coLengthSamples
-  coShell, coWhenActive, coWhenInactive, coMargin, coSmooth, coTransition,
-    coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed, coVideoSpeed
-  coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
+  coNone, coIsDebug, coSplitWords, coLanguage, coFormat, coOutput, coTranslate, coQueue,
+    coPrompt, coThreads, coThreshold, coIsJson, coEncoders, coDecoders, coCodecs, coEdit,
+    coTimebase, coDisplay, coNoCache, coAsJson, coStream, coChannel, coSamplesPerBucket,
+    coStartSample, coLengthSamples, coShell, coWhenActive, coWhenInactive, coMargin,
+    coSmooth, coTransition, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
+    coVideoSpeed, coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
-    coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn,
-    coSn, coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented,
-    coVcodec, coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale,
-    coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate,
-    coMixAudioStreams, coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion,
-    coWebCodecs, coWhen
+    coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
+    coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coVcodec,
+    coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coNoSeek,
+    coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
+    coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
 
 type OptDef* = object
   names*: string
@@ -460,20 +456,11 @@ macro genCmdCases*(keyIdent: untyped): untyped =
     branch.add(newStrLitNode(cmd.name))
 
     # Build: commandLineParams()[1..^1]
-    let sliceExpr = newNimNode(nnkInfix).add(
-      ident(".."),
-      newIntLitNode(1),
-      newNimNode(nnkPrefix).add(ident("^"), newIntLitNode(1))
-    )
-    let argsExpr = newNimNode(nnkBracketExpr).add(
-      newCall(ident("commandLineParams")),
-      sliceExpr
-    )
+    let sliceExpr = newNimNode(nnkInfix).add(ident(".."), newIntLitNode(1), newNimNode(
+        nnkPrefix).add(ident("^"), newIntLitNode(1)))
+    let argsExpr = newNimNode(nnkBracketExpr).add(newCall(ident("commandLineParams")), sliceExpr)
     let handlerName = if cmd.handler == "": cmd.name else: cmd.handler
-    let handlerCall = newCall(
-      newDotExpr(ident(handlerName), ident("main")),
-      argsExpr
-    )
+    let handlerCall = newCall(newDotExpr(ident(handlerName), ident("main")), argsExpr)
 
     var stmtList = newStmtList()
     if cmd.help != "" and cmd.requiresArgs:
