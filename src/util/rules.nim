@@ -21,10 +21,9 @@ proc defaultSub*(self: Rules): AVCodecID =
   if self.ofmt.name == "mp4": ID_MOV_TEXT else: self.ofmt.subtitle_codec
 
 proc holdsVideo*(name: string): bool =
-  ## Whether the container `name`'s extension implies can carry a real video
-  ## stream. Audio containers report a still-image codec for cover art (mp3 says
-  ## PNG), which is not a stream frames can be rendered into, so this matches the
-  ## `includeVideo` test in render/format rather than just checking for NONE.
+  ## Whether the container implied by `name` can carry a real video stream. Audio
+  ## containers report a still-image codec for cover art (mp3 says PNG), so this
+  ## matches the `includeVideo` test in render/format, not just NONE.
   let format = av_guess_format(nil, cstring(name), nil)
   format != nil and format.video_codec notin [ID_NONE, ID_PNG]
 

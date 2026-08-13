@@ -135,7 +135,7 @@ const
   confettiOriginNames*: array[ConfettiOrigin, string] =
     ["bottom", "top", "center", "sides"]
   confettiCountId = 200'u16
-  confettiGravityId = 1.0'f32
+  confettiGravityId = 1.4'f32
   confettiOriginId = coSides
 
 func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[RangeDoc] =
@@ -233,12 +233,11 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
   ActionDef(name: "confetti", flags: {afVideo}, argSpec: "[count[:gravity][:scheme][:origin]]",
     help: """
-Throw colorful confetti over the picture. The whole charge goes off in one burst when the section starts, like a party popper, ripping out over about half a second, and none of it is replaced as the pieces fall out of frame, so the burst plays out and is over; put the action on a short section where you want the pop. Each piece is a small four-sided chip, cut a little differently from the next, that arcs over and flutters down under gravity with air drag, spinning and tumbling in 3D as it falls so it turns edge-on to a sliver and opens back out. With no arguments, 200 party-colored pieces fire inward from two cannons at the bottom corners.
-Every argument is optional and the four may be given in any order, e.g. `confetti:neon:top` and `confetti:top:neon` are the same. Bare numbers fill `count` first, then `gravity`.
-`count` is how many pieces to throw, 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.0), measured in frame-heights per second squared, so a given value looks the same at any resolution: lower values leave the pieces hanging in the air, higher ones snap them down. Each piece also gets its own share of air resistance, so they do not come down together: the draggiest fall at under a third the speed of the slipperiest, and a burst that leaves as one sheet fans out into a ragged front on the way down.
-`scheme` is the color palette, one of `party` (the default, six vivid hues around the color wheel), `white` (plain white paper), `gold` (metallic), or `neon`.
-`origin` is where the pieces launch from: `sides` (the default, two cannons at the bottom corners firing inward in a wide fan), `bottom` (a cannon firing straight up from below the frame), `top` (a shower released just above the frame), or `center` (a radial burst from the middle).
-The burst restarts with each section, so its timing follows the clip, not the timeline. Rendered by drawing directly onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
+Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
+All four arguments are optional and may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
+`count` is 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.4), in frame-heights per second squared so it looks the same at any resolution. It sets how fast the pieces come back rather than how high they go: each is thrown to its own fraction of the way up the frame, and each catches its own amount of air, so they do not come down together.
+`scheme` is `party` (default), `white`, `gold`, or `neon`. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
+Drawn onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
 
 const actionNames* = block:

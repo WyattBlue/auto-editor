@@ -74,9 +74,8 @@ type AddSpec* = object
   selector*: int
   setActionRef*: int = -1
   path*: string
-  generator*: string # `add:confetti...`: draw a layer instead of overlaying a
-                     # file. The layer has no source (a transparent canvas), and
-                     # this action string is what paints it. `path` is empty.
+  generator*: string # `add:confetti...`: the action painting a source-less
+                     # layer, instead of a file to overlay. `path` is empty.
   hasPos*: bool # whether x:y:scale were given (else origin, native size)
   xKf*, yKf*, scaleKf*: seq[float32] # placement ramps (len 1 = static), fed to pos
   followBase*: bool = true # mirror the base clip's offset (stay time-synced) vs.

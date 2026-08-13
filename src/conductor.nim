@@ -184,11 +184,9 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
     of exV3: ext = ".v3"
     else: discard
 
-  # A timeline with video needs a container that can hold it. The default name
-  # copies the input's extension, so an audio-only input that gained a video
-  # layer (`song.mp3 -w:1 add:...`) would land in an .mp3 and lose the video
-  # without a word. Pick mp4 instead; if the name came from the user, keep it
-  # and say what is being dropped rather than overriding their choice.
+  # The default name copies the input's extension, so an audio-only input that
+  # gained a video layer would silently lose it. Prefer mp4; if the user named
+  # the file, keep their choice and say what is being dropped.
   if hasVideo and myExport == exDefault and not holdsVideo("x" & ext):
     if userOut != "" and userOut != "-" and agSplitFile(userOut).ext != "":
       warning &"{ext} can't hold a video stream; it will be dropped"
@@ -251,8 +249,7 @@ proc applyAdds(tl: var v3, args: mainArgs,
     tl.v.add base
 
   for spec in args.adds:
-    # A generator layer has no source: the renderer hands it a transparent
-    # canvas that its own action paints, which then composites over the picture.
+    # A generator layer has no source; the renderer gives it a clear canvas.
     let srcPtr = (if spec.generator.len > 0: nil else: interner.intern(spec.path))
     # The overlay's effects group: an optional `pos` placement action followed by
     # any actions chained after `add:` (which apply to this layer, not the base).
@@ -263,7 +260,7 @@ proc applyAdds(tl: var v3, args: mainArgs,
     var group = aNil
     try:
       if spec.generator.len > 0:
-        # Ahead of the chained actions, so those operate on the drawn confetti.
+        # First, so the chained actions operate on what it drew.
         acts.add parseAction(spec.generator)
       if spec.effects.len > 0:
         block:

@@ -257,11 +257,10 @@ Overlay an image or video on top of the matched sections, `add:path` or
 `add:path:x:y:scale`:
 
 - **path** — a media file (e.g. a PNG logo or a video). Still images are held
-  for the whole section. In place of a file, the single word `confetti` (with
-  its usual arguments) names a **generator**: instead of decoding a source, the
-  layer starts as a transparent canvas that the action paints, so the picture
-  below shows through everywhere it did not draw. See
-  [confetti](/ref/actions#confetti).
+  for the whole section. In place of a file, `confetti` (with its usual
+  arguments) names a **generator**: the layer starts as a transparent canvas
+  that the action paints, so the picture below shows through everywhere it did
+  not draw. See [confetti](/ref/actions#confetti).
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
   (above). When omitted, the overlay is scaled to fit the canvas (preserving
   aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
@@ -286,10 +285,10 @@ auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
 # Confetti on its own layer, over the picture rather than baked into it
 auto-editor video.mp4 -w:1 add:confetti:300
 
-# Draw it white, then recolor the layer without touching the video below
+# Recolor the layer without touching the video below
 auto-editor video.mp4 -w:1 add:confetti:300:white,invert
 
-# Audio plus a confetti layer: a video with no footage at all
+# Audio plus a confetti layer: a video with no footage
 auto-editor song.mp3 -w:1 add:confetti:300:white
 ```
 
@@ -317,11 +316,9 @@ created when there is an active section for the overlay to sit on: e.g.
 edit leaves no active sections (so the `-w:1` overlay matches nothing) the
 output stays audio-only.
 
-Because the default output name copies the input's extension, that video would
-land in a container that cannot hold it (`song.mp3` → `song_ALTERED.mp3`), so
-when the timeline gains video the default name switches to `.mp4` instead. Name
-the file yourself and your choice is kept: `-o out.mp3` still writes an MP3, with
-a warning that the video is being dropped.
+The default output name copies the input's extension, which could not hold that
+video (`song.mp3` → `song_ALTERED.mp3`), so it switches to `.mp4` instead. An
+explicit `-o out.mp3` is still honored, with a warning that the video is dropped.
 
 ## Multiple Actions (Chaining)
 

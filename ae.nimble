@@ -554,7 +554,7 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
 
   let sourceDir = absolutePath(".")
   withDir mesonBuildDir:
-    exec ("meson setup " & mesonArgs.join(" ") & " " & sourceDir)
+    exec ("meson setup --reconfigure " & mesonArgs.join(" ") & " " & sourceDir)
     exec "ninja"
     exec "ninja install"
 
