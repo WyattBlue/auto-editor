@@ -96,12 +96,12 @@ type
     of actPixelate:
       pixW*, pixH*: uint16   # mosaic block size in px (square when equal)
     of actConfetti:
-      cCount*: uint16        # number of pieces
-      # Gravity in frame-heights per second^2, so the throw looks the same at
-      # any resolution. float32, not Unorm16: the range is [0, 20], not [0, 1].
+      cCount*: uint16
       cGravity*: float32
       cScheme*: ConfettiScheme
+      cShimmer*: bool
       cOrigin*: ConfettiOrigin
+      cSeed*: uint16
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -125,7 +125,15 @@ type
     range*: Option[RangeDoc]
     help*: string
 
-const easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
+const
+  easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
+  schemeMask = 0x07'u8
+  originMask = 0x03'u8
+  originShift = 3
+  shimmerFlag = 0x80'u8
+static:
+  assert ord(high(ConfettiScheme)) <= schemeMask.int, "scheme outgrew 3 bits"
+  assert ord(high(ConfettiOrigin)) <= originMask.int, "origin outgrew 2 bits"
 
 const
   confettiSchemeNames*: array[ConfettiScheme, string] =
@@ -229,12 +237,12 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
   ActionDef(name: "pixelate", flags: {afVideo}, argSpec: "[w[:h]]", range: rng(1.0, 1024.0, each = true),
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
-  ActionDef(name: "confetti", flags: {afVideo}, argSpec: "[count[:gravity][:scheme][:origin]]",
+  ActionDef(name: "confetti", flags: {afVideo}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
     help: """
 Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
-All four arguments are optional and may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
-`count` is 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.4), in frame-heights per second squared so it looks the same at any resolution. It sets how fast the pieces come back rather than how high they go: each is thrown to its own fraction of the way up the frame, and each catches its own amount of air, so they do not come down together.
-`scheme` is `party` (default), `neon`, `gold`, `duotone`, or `white`. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
+Every argument is optional and they may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
+`count` is 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.4), in frame-heights per second squared so it looks the same at any resolution. It sets how fast the pieces come back rather than how high they go: each is thrown to its own fraction of the way up the frame, and each catches its own amount of air, so they do not come down together. `seed=N` (0 to 65535, default 0) reshuffles the arrangement and changes nothing else, so bump it if you do not like how one landed.
+`scheme` is `party` (default), `neon`, `gold`, `duotone`, or `white`. A chip flashes white as it turns edge-on, catching the light like foil; add `no-shimmer` to keep every piece its flat color. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
 Drawn onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
 
@@ -582,9 +590,13 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var gravity = confettiGravityId
     var scheme = csParty
     var origin = confettiOriginId
+    var shimmer = true
+    var seed = 0'u16
     var numsSeen = 0
     var schemeSeen = false
     var originSeen = false
+    var shimmerSeen = false
+    var seedSeen = false
     for idx in 1 ..< parts.len:
       let p = parts[idx]
       let asScheme = confettiSchemeNames.find(p)
@@ -599,10 +611,24 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           raise newException(ActionParseError, "confetti: origin given twice")
         origin = ConfettiOrigin(asOrigin)
         originSeen = true
+      elif p.startsWith("seed="):
+        if seedSeen:
+          raise newException(ActionParseError, "confetti: seed given twice")
+        let v = pInt(p[5 .. ^1], "confetti seed")
+        if v < 0 or v > 65535:
+          raise newException(ActionParseError, "confetti seed must be in [0, 65535]")
+        seed = uint16(v)
+        seedSeen = true
+      elif p == "shimmer" or p == "no-shimmer":
+        if shimmerSeen:
+          raise newException(ActionParseError, "confetti: shimmer given twice")
+        shimmer = p == "shimmer"
+        shimmerSeen = true
       elif p.len == 0 or p[0] notin {'0' .. '9', '-', '+', '.'}:
-        # Not a number, so it was meant as a scheme or origin name.
-        raise newException(ActionParseError, &"confetti: unknown scheme or origin: {p}" &
-          didYouMean(p, @confettiSchemeNames & @confettiOriginNames))
+        # Not a number, so it was meant as one of the name tokens.
+        raise newException(ActionParseError, &"confetti: unknown value: {p}" &
+          didYouMean(p, @confettiSchemeNames & @confettiOriginNames &
+            @["shimmer", "no-shimmer"]))
       elif numsSeen == 0:
         let n = pInt(p, "confetti count")
         if n < 1 or n > 400:
@@ -618,7 +644,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       else:
         raise newException(ActionParseError, &"confetti: unexpected value: {p}")
     return Action(kind: actConfetti, cCount: count, cGravity: gravity,
-      cScheme: scheme, cOrigin: origin)
+      cScheme: scheme, cOrigin: origin, cShimmer: shimmer, cSeed: seed)
 
   # aberration: per-channel chromatic split. Positional shorthand (no '=') is the
   # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
@@ -882,9 +908,10 @@ when not defined(nimscript):
       if act.pixW == act.pixH: &"pixelate:{act.pixW}"
       else: &"pixelate:{act.pixW}:{act.pixH}"
     of actConfetti:
-      # All four fields, so the count/gravity positional slots stay filled.
       &"confetti:{act.cCount}:{act.cGravity}:" &
-        &"{confettiSchemeNames[act.cScheme]}:{confettiOriginNames[act.cOrigin]}"
+        &"{confettiSchemeNames[act.cScheme]}:{confettiOriginNames[act.cOrigin]}" &
+        (if act.cSeed == 0'u16: "" else: &":seed={act.cSeed}") &
+        (if act.cShimmer: "" else: ":no-shimmer")
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
 
@@ -893,18 +920,17 @@ when not defined(nimscript):
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
     of actRotate, actPitch: 3
-    of actLens, actSpeed, actVarispeed: 5
+    of actLens, actSpeed, actVarispeed, actPixelate: 5
     of actDeesser, actSpin: 7
-    of actDuck: 9
     of actColorKey, actChromaKey, actAberration: 8
+    of actDuck: 9
+    of actConfetti: 10
     of actLuv: 11
-    of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
     of actDrawbox: 20
+    of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
+    of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
-    of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
-    of actPixelate: 5           # header + 2x uint16 (block w, h)
-    of actConfetti: 9           # header + uint16 + float32 + scheme + origin
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -1009,14 +1035,18 @@ when not defined(nimscript):
           yield Action(kind: actPixelate, pixW: w, pixH: h)
           i += 5
         of actConfetti:
-          var count: uint16
+          var count, seed: uint16
           var gravity: float32
           copyMem(addr count, addr base[i + 1], sizeof(uint16))
           copyMem(addr gravity, addr base[i + 3], sizeof(float32))
+          copyMem(addr seed, addr base[i + 8], sizeof(uint16))
+          let flags = base[i + 7]
           yield Action(kind: actConfetti, cCount: count, cGravity: gravity,
-            cScheme: ConfettiScheme(base[i + 7].int),
-            cOrigin: ConfettiOrigin(base[i + 8].int))
-          i += 9
+            cScheme: ConfettiScheme((flags and schemeMask).int),
+            cShimmer: (flags and shimmerFlag) != 0'u8,
+            cOrigin: ConfettiOrigin(((flags shr originShift) and originMask).int),
+            cSeed: seed)
+          i += 10
         of actAberration:
           yield Action(kind: actAberration,
             abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
@@ -1186,9 +1216,11 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.cCount)
         base.writeAt(i, 3, a.cGravity)
         # A bare Nim enum is int-sized, so narrow explicitly like easeCurve.
-        base[i + 7] = uint8(ord(a.cScheme))
-        base[i + 8] = uint8(ord(a.cOrigin))
-        i += 9
+        base[i + 7] = uint8(ord(a.cScheme)) or
+          (uint8(ord(a.cOrigin)) shl originShift) or
+          (if a.cShimmer: shimmerFlag else: 0'u8)
+        base.writeAt(i, 8, a.cSeed)
+        i += 10
       of actAberration:
         base.writeAt(i, 1, a.abRh)
         base.writeAt(i, 2, a.abRv)

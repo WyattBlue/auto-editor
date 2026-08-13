@@ -291,6 +291,13 @@ func unpackRGB(v: uint32): RGBColor =
   RGBColor(red: uint8((v shr 16) and 0xff), green: uint8((v shr 8) and 0xff),
     blue: uint8(v and 0xff))
 
+func towardWhite(c: RGBColor, t: float32): RGBColor =
+  ## Mix `c` toward white by `t` in [0, 1].
+  let f = clamp(t, 0.0'f32, 1.0'f32)
+  func mix(v: uint8): uint8 =
+    uint8(float32(v) + (255.0'f32 - float32(v)) * f)
+  RGBColor(red: mix(c.red), green: mix(c.green), blue: mix(c.blue))
+
 func hashUnit(i, salt: uint32): float32 =
   ## A value in [0, 1) for piece `i`, channel `salt`. A hash, not an RNG: no
   ## state to seed, and two renders of one command match.
@@ -327,47 +334,44 @@ func chipOutline(n: uint32, rx, ry: float32, v: var Chip) =
     v[j] = (cx[j] * rx * (0.55'f32 + 0.45'f32 * hashUnit(n, 20 + u)),
             cy[j] * ry * (0.55'f32 + 0.45'f32 * hashUnit(n, 24 + u)))
 
-proc fillRect(frame: ptr AVFrame, rx, ry, rw, rh: int, color: RGBColor) =
-  ## Solid-fill a rect, clipped to the frame. Handles the two formats a clip's
-  ## chain works in: yuv420p, and rgba for a layer carrying alpha.
-  let x0 = max(rx, 0)
-  let y0 = max(ry, 0)
-  let x1 = min(rx + rw, frame.width.int)
-  let y1 = min(ry + rh, frame.height.int)
-  if x0 >= x1 or y0 >= y1:
+type Cov = array[512, float32]
+  ## Per-row coverage scratch. A chip spans at most ~0.05 of the frame height, so
+  ## this holds one up to a ~10k-tall frame; wider than that just clips.
+
+func chipArea(poly: Chip): float32 =
+  var a = 0.0'f32
+  for j in 0 ..< 4:
+    let b = poly[(j + 1) and 3]
+    a += poly[j].x * b.y - b.x * poly[j].y
+  abs(a) * 0.5'f32
+
+func addSpan(poly: Chip, yc: float32, x0, n: int, weight: float32,
+    cov: var Cov) =
+  ## Add `weight` times the polygon's horizontal coverage at height `yc` into
+  ## `cov`, indexed from pixel `x0`. Exact in x: a pixel the span crosses partway
+  ## takes only that fraction, which is what softens the left and right edges.
+  var lo = 1e30'f32
+  var hi = -1e30'f32
+  for j in 0 ..< 4:
+    let a = poly[j]
+    let b = poly[(j + 1) and 3]
+    # A horizontal edge fails at both ends, so the slope cannot divide by 0.
+    if (a.y <= yc) != (b.y <= yc):
+      let x = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y)
+      lo = min(lo, x)
+      hi = max(hi, x)
+  if lo >= hi:
     return
-
-  if AVPixelFormat(frame.format) == AV_PIX_FMT_RGBA:
-    for y in y0 ..< y1:
-      let row = cast[ptr UncheckedArray[uint8]](
-        cast[int](frame.data[0]) + y * frame.linesize[0].int)
-      for x in x0 ..< x1:
-        row[x * 4] = color.red
-        row[x * 4 + 1] = color.green
-        row[x * 4 + 2] = color.blue
-        row[x * 4 + 3] = 255'u8
-    return
-
-  let (yv, uv, vv) = toYuv(color)
-  for y in y0 ..< y1:
-    let row = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[0]) + y * frame.linesize[0].int)
-    for x in x0 ..< x1:
-      row[x] = yv
-
-  # Chroma is half resolution, so round outward: a piece thinner than 2px still
-  # needs one sample to keep its color.
-  for cy in (y0 div 2) ..< ((y1 - 1) div 2 + 1):
-    let uRow = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[1]) + cy * frame.linesize[1].int)
-    let vRow = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[2]) + cy * frame.linesize[2].int)
-    for cx in (x0 div 2) ..< ((x1 - 1) div 2 + 1):
-      uRow[cx] = uv
-      vRow[cx] = vv
+  for k in max(int(floor(lo)) - x0, 0) ..< min(int(ceil(hi)) - x0, n):
+    let px = float32(x0 + k)
+    let overlap = min(hi, px + 1.0'f32) - max(lo, px)
+    if overlap > 0.0'f32:
+      cov[k] += weight * overlap
 
 proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
-  ## Scanline-fill the projected outline. Convex, so each row is one span.
+  ## Draw the projected outline, blended by how much of each pixel it covers.
+  ## Coverage comes from four sub-scanlines a row, each measured exactly in x, so
+  ## both the sloped edges and the ends of a turning chip come out smooth.
   var xMin, xMax = poly[0].x
   var yMin, yMax = poly[0].y
   for j in 1 ..< 4:
@@ -376,34 +380,84 @@ proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
     yMin = min(yMin, poly[j].y)
     yMax = max(yMax, poly[j].y)
 
-  # Round to nearest, not truncate, or edges bite steps out of the outline.
-  template span(lo, hi: float32): (int, int) =
-    let a = int(round(lo))
-    (a, max(a + 1, int(round(hi))))
-
-  if xMax - xMin < 1.0'f32 or yMax - yMin < 1.0'f32:
-    # Edge-on and thinner than a pixel, so every scanline would miss it: draw
-    # the sliver instead of letting the piece blink out mid-tumble.
-    let (xa, xb) = span(xMin, xMax)
-    let (ya, yb) = span(yMin, yMax)
-    fillRect(frame, xa, ya, xb - xa, yb - ya, color)
+  let x0 = max(int(floor(xMin)), 0)
+  let y0 = max(int(floor(yMin)), 0)
+  let x1 = min(int(ceil(xMax)) + 1, frame.width.int)
+  let y1 = min(int(ceil(yMax)) + 1, frame.height.int)
+  if x0 >= x1 or y0 >= y1:
     return
+  let n = min(x1 - x0, 512)
 
-  for y in max(int(floor(yMin)), 0) ..< min(int(ceil(yMax)), frame.height.int):
-    let yc = float32(y) + 0.5'f32
-    var lo = 1e30'f32
-    var hi = -1e30'f32
-    for j in 0 ..< 4:
-      let a = poly[j]
-      let b = poly[(j + 1) and 3]
-      # A horizontal edge fails at both ends, so the slope cannot divide by 0.
-      if (a.y <= yc) != (b.y <= yc):
-        let x = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y)
-        lo = min(lo, x)
-        hi = max(hi, x)
-    if lo <= hi:
-      let (xa, xb) = span(lo, hi)
-      fillRect(frame, xa, y, xb - xa, 1, color)
+  # Turned nearly edge-on, so it is thinner than the sub-scanline spacing and
+  # sampling can miss it outright. Lay its area over the footprint, so a sliver
+  # dims as it turns.
+  let flat = xMax - xMin < 1.0'f32 or yMax - yMin < 1.0'f32
+  let flatCov =
+    if flat: clamp(chipArea(poly) / float32(n * (y1 - y0)), 0.0'f32, 1.0'f32)
+    else: 0.0'f32
+
+  let rgba = AVPixelFormat(frame.format) == AV_PIX_FMT_RGBA
+  let (yv, uv, vv) = toYuv(color)
+  var cov: array[2, Cov]
+
+  # Paired luma rows, because both share one chroma row and it must only be
+  # blended once.
+  for cy in (y0 div 2) .. ((y1 - 1) div 2):
+    var hit = false
+    for half in 0 .. 1:
+      let y = cy * 2 + half
+      for k in 0 ..< n:
+        cov[half][k] = 0.0'f32
+      if y < y0 or y >= y1:
+        continue
+      if flat:
+        for k in 0 ..< n:
+          cov[half][k] = flatCov
+        hit = flatCov > 0.0'f32
+      else:
+        for sub in 0 ..< 4:
+          addSpan(poly, float32(y) + (float32(sub) + 0.5'f32) * 0.25'f32,
+            x0, n, 0.25'f32, cov[half])
+      let row = cast[ptr UncheckedArray[uint8]](
+        cast[int](frame.data[0]) + y * frame.linesize[0].int)
+      for k in 0 ..< n:
+        let c = cov[half][k]
+        if c <= 0.002'f32:
+          continue
+        hit = true
+        let x = x0 + k
+        if rgba:
+          # Non-premultiplied source-over, so pieces layered on the clear canvas
+          # of a generator layer keep a correct alpha.
+          let dstA = float32(row[x * 4 + 3]) / 255.0'f32
+          let outA = dstA + (1.0'f32 - dstA) * c
+          if outA <= 0.0'f32:
+            continue
+          for ch, src in [color.red, color.green, color.blue]:
+            let dst = float32(row[x * 4 + ch])
+            row[x * 4 + ch] = uint8((float32(src) * c +
+              dst * dstA * (1.0'f32 - c)) / outA + 0.5'f32)
+          row[x * 4 + 3] = uint8(outA * 255.0'f32 + 0.5'f32)
+        else:
+          row[x] = uint8(float32(row[x]) * (1.0'f32 - c) +
+            float32(yv) * c + 0.5'f32)
+    if rgba or not hit:
+      continue
+    # Chroma is half resolution, so one sample stands for a 2x2 luma block. Take
+    # the block's strongest coverage, or a thin sliver would lose its color.
+    let uRow = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[1]) + cy * frame.linesize[1].int)
+    let vRow = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[2]) + cy * frame.linesize[2].int)
+    for cx in (x0 div 2) .. ((x1 - 1) div 2):
+      var c = 0.0'f32
+      for k in (cx * 2 - x0) .. (cx * 2 + 1 - x0):
+        if k >= 0 and k < n:
+          c = max(c, max(cov[0][k], cov[1][k]))
+      if c <= 0.002'f32:
+        continue
+      uRow[cx] = uint8(float32(uRow[cx]) * (1.0'f32 - c) + float32(uv) * c + 0.5'f32)
+      vRow[cx] = uint8(float32(vRow[cx]) * (1.0'f32 - c) + float32(vv) * c + 0.5'f32)
 
 proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
   ## One frame of the confetti animation.
@@ -418,7 +472,7 @@ proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
   let t0 = float32(local) / float32(max(fps, 1.0))
 
   for i in 0 ..< act.cCount.int:
-    let n = uint32(i)
+    let n = uint32(i) + uint32(act.cSeed) * 7919'u32
     let uPos = hashUnit(n, 1)
     let uSpeed = hashUnit(n, 2)
     let uAim = hashUnit(n, 3)
@@ -518,7 +572,16 @@ proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
       poly[j] = (px + lx * cc + ly * sb * sc, py + ly * cb)
 
     let idx = min(palette.len - 1, int(hashUnit(n, 8) * float32(palette.len)))
-    fillChip(frame, poly, unpackRGB(palette[idx]))
+    var color = unpackRGB(palette[idx])
+    if act.cShimmer:
+      # cb*cc is how square-on the chip is to the viewer, so near 0 is edge-on:
+      # the angle that catches a light off to the side. Ramped, so the glint
+      # rolls through the turn.
+      const glintBelow = 0.25'f32
+      let facing = abs(cb * cc)
+      if facing < glintBelow:
+        color = towardWhite(color, (glintBelow - facing) / glintBelow)
+    fillChip(frame, poly, color)
 
 proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     bg: RGBColor): ptr AVFrame =
