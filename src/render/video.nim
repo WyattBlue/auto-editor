@@ -278,13 +278,13 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
+# Indexed by ConfettiScheme, so the rows must stay in enum order.
 const confettiPalettes: array[ConfettiScheme, seq[uint32]] = [
-  # party: six fully saturated hues around the wheel
-  @[0xff0040'u32, 0xff7a00'u32, 0xffe000'u32, 0x00e04b'u32, 0x0091ff'u32,
-    0xc800ff'u32],
+  @[0xff0040'u32, 0xff7a00'u32, 0xffe000'u32, 0x00e04b'u32, 0x0091ff'u32, 0xc800ff'u32],
+  @[0x00fff0'u32, 0xff00d4'u32, 0xb6ff00'u32, 0xff7a00'u32, 0x9d00ff'u32],
+  @[0xffd700'u32, 0xffb300'u32, 0xe0a63c'u32],
+  @[0xff3366'u32, 0x33ccff'u32],
   @[0xffffff'u32],
-  @[0xffd700'u32, 0xffb300'u32, 0xfff3b0'u32, 0xe0a63c'u32],
-  @[0x00fff0'u32, 0xff00d4'u32, 0xb6ff00'u32, 0xff7a00'u32],
 ]
 
 func unpackRGB(v: uint32): RGBColor =

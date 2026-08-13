@@ -16,17 +16,15 @@ type
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
-    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate,
-    actConfetti
+    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate, actConfetti
     # Can add 85 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
 
-  ConfettiScheme* = enum  # confetti color palette
-    csParty, csWhite, csGold, csNeon
-
-  ConfettiOrigin* = enum  # where confetti pieces launch from
+  ConfettiScheme* = enum
+    csParty, csNeon, csGold, csDuotone, csWhite
+  ConfettiOrigin* = enum
     coBottom, coTop, coCenter, coSides
 
   DurUnit* = enum  # how an ease duration is measured
@@ -131,7 +129,7 @@ const easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
 
 const
   confettiSchemeNames*: array[ConfettiScheme, string] =
-    ["party", "white", "gold", "neon"]
+    ["party", "neon", "gold", "duotone", "white"]
   confettiOriginNames*: array[ConfettiOrigin, string] =
     ["bottom", "top", "center", "sides"]
   confettiCountId = 200'u16
@@ -236,7 +234,7 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
 Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
 All four arguments are optional and may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
 `count` is 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.4), in frame-heights per second squared so it looks the same at any resolution. It sets how fast the pieces come back rather than how high they go: each is thrown to its own fraction of the way up the frame, and each catches its own amount of air, so they do not come down together.
-`scheme` is `party` (default), `white`, `gold`, or `neon`. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
+`scheme` is `party` (default), `neon`, `gold`, `duotone`, or `white`. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
 Drawn onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
 
