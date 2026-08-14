@@ -230,8 +230,8 @@ let x264 = Package(
 )
 let x265 = Package(
   name: "x265",
-  sourceUrl: "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.2.tar.gz",
-  sha256: "40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210",
+  sourceUrl: "https://github.com/Multicorewareinc/x265/releases/download/4.3/x265_4.3.tar.gz",
+  sha256: "83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121",
   buildSystem: "x265",
   ffFlag: "--enable-libx265"
 )

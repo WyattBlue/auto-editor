@@ -1,40 +1,58 @@
 --- a/source/CMakeLists.txt
 +++ b/source/CMakeLists.txt
-@@ -56,7 +56,7 @@
- set(POWER_ALIASES powerpc64 powerpc64le ppc64 ppc64le)
+@@ -58,7 +58,7 @@
  list(FIND POWER_ALIASES "${SYSPROC}" POWERMATCH)
  list(FIND RISCV64_ALIASES "${SYSPROC}" RISCV64MATCH)
+ list(FIND LOONGARCH64_ALIASES "${SYSPROC}" LOONGARCH64MATCH)
 -if(X86MATCH GREATER "-1")
 +if(X86MATCH GREATER "-1" AND NOT EMSCRIPTEN)
      set(X86 1)
      add_definitions(-DX265_ARCH_X86=1)
      if(CMAKE_CXX_FLAGS STREQUAL "-m32")
-@@ -292,7 +292,7 @@
-         else()
-             add_definitions(-march=native)
-         endif()
--    elseif(X86 AND NOT X64)
-+    elseif(X86 AND NOT X64 AND NOT EMSCRIPTEN)
-         string(FIND "${CMAKE_CXX_FLAGS}" "-march" marchPos)
-         if(marchPos LESS "0")
-             add_definitions(-march=i686)
 --- a/source/common/cpu.cpp
 +++ b/source/common/cpu.cpp
-@@ -159,0 +160,3 @@
+@@ -177,6 +177,10 @@
+ 
+ uint32_t cpu_detect(bool benableavx512 )
+ {
 +#if defined(__APPLE__) && X86_64
-+    (void)benableavx512;
++    /* No AVX-512 kernels are assembled here, see strip_avx512_asm.nim */
++    benableavx512 = false;
 +#endif
-@@ -219,0 +223 @@
-+#if !defined(__APPLE__) || !X86_64
-@@ -230,0 +235 @@
-+#endif
+ 
+     uint32_t cpu = 0;
+     uint32_t eax, ebx, ecx, edx;
 --- a/source/common/x86/asm-primitives.cpp
 +++ b/source/common/x86/asm-primitives.cpp
-@@ -2364,0 +2365 @@
+@@ -2359,6 +2359,7 @@
+     }
+     if (cpuMask & X265_CPU_AVX512)
+     {
 +#if !defined(__APPLE__) || !X86_64
-@@ -3201,0 +3203 @@
+         p.cu[BLOCK_16x16].var = PFX(pixel_var_16x16_avx512);
+         p.cu[BLOCK_32x32].calcresidual[NONALIGNED] = PFX(getResidual32_avx512);
+         p.cu[BLOCK_32x32].calcresidual[ALIGNED] = PFX(getResidual_aligned32_avx512);
+@@ -3193,6 +3194,7 @@
+         p.chroma[X265_CSP_I422].cu[BLOCK_422_32x64].sse_pp = (pixel_sse_t)PFX(pixel_ssd_32x64_avx512);
+         p.planecopy_sp_shl = PFX(upShift_16_avx512);
+ 
 +#endif
-@@ -4756,0 +4759 @@
+     }
+ #endif
+ }
+@@ -4744,6 +4746,7 @@
+     }
+     if (cpuMask & X265_CPU_AVX512)
+     {
 +#if !defined(__APPLE__) || !X86_64
-@@ -5450,0 +5454 @@
+         p.pu[LUMA_32x8].sad = PFX(pixel_sad_32x8_avx512);
+       //  p.pu[LUMA_32x16].sad = PFX(pixel_sad_32x16_avx512);
+         p.pu[LUMA_32x24].sad = PFX(pixel_sad_32x24_avx512);
+@@ -5434,6 +5437,7 @@
+         p.cu[BLOCK_16x16].count_nonzero = PFX(count_nonzero_16x16_avx512);
+         p.cu[BLOCK_32x32].count_nonzero = PFX(count_nonzero_32x32_avx512);
+ 
 +#endif
+     }
+ #endif
+ }
