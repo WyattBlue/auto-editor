@@ -1203,6 +1203,7 @@ proc buildFFmpegForWasm(buildPath: string, kind: CrossKind) =
     exec (&"""PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{buildPath}" \
       --cc=emcc \
       --cxx=em++ \
+      --ld=em++ \
       --ar=emar \
       --ranlib=emranlib \
       --nm=emnm \
