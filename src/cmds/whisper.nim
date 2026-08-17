@@ -1,6 +1,7 @@
 import std/[os, strformat, strutils]
 import ../[av, cli, ffmpeg, log, transcribe]
-import ../util/[dnorm16, fun]
+import ../util/fun
+import ../lib/dnorm16
 import ./help
 when defined(macosx) or defined(windows) or
     (defined(linux) and not defined(emscripten)):

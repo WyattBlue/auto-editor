@@ -4,7 +4,8 @@ when defined(emscripten) or defined(amd64) or defined(i386):
   import std/bitops
 
 import ../[av, cache, ffmpeg, log]
-import ../util/[bar, rational, dnorm16]
+import ../util/[bar, rational]
+import ../lib/dnorm16
 
 when defined(arm64) or defined(aarch64):
   type Vec8x16 {.importc: "uint8x16_t", header: "<arm_neon.h>".} = object

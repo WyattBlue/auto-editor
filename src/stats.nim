@@ -4,6 +4,7 @@ import csort
 
 import ./[action, av, ffmpeg, log, timeline]
 import ./util/[fun, rational]
+import ./lib/cliputil
 
 type f64 = float64
 
@@ -63,21 +64,7 @@ func allCuts(tl: v3, inLen: int64): seq[int64] =
     let oldOffset = clip.offset.f64 * speed
     clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.f64 * speed)))
 
-  var cutLens: seq[int64] = @[]
-  if clipSpans.len > 0 and clipSpans[0][0] > 0:
-    cutLens.add(clipSpans[0][0])
-
-  for i in 0 ..< len(clipSpans) - 1:
-    let cutLen = clipSpans[i + 1][0] - clipSpans[i][1]
-    if cutLen > 0:
-      cutLens.add(cutLen)
-
-  if clipSpans.len > 0:
-    let trailingCut = inLen - clipSpans[^1][1]
-    if trailingCut > 0:
-      cutLens.add(trailingCut)
-
-  return cutLens
+  cutLengths(clipSpans, inLen)
 
 
 proc preview*(tl: var v3) =

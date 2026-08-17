@@ -3,7 +3,8 @@ from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt
 from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
-import ../util/[color, dnorm16, rational]
+import ../util/[color, rational]
+import ../lib/dnorm16
 
 type VideoFrame = object
   index: int

@@ -1,7 +1,8 @@
 import std/[algorithm, options, os, streams, strformat, strutils, times]
 
 import ./[about, ffmpeg, log]
-import ./util/[fun, rational, dnorm16]
+import ./util/[fun, rational]
+import ./lib/dnorm16
 
 import nimcrypto/sha
 

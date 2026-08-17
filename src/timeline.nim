@@ -3,6 +3,7 @@ from std/math import round, ceil
 
 import ./[action, av, ffmpeg, media, log, wavutil]
 import ./util/[color, fun, lang, rational]
+import ./lib/cliputil
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -148,12 +149,6 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
     tl.layout = initLayout("stereo")
   tl.updateNumberOfSrc()
 
-
-func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
-  if round(float64(endFrame - startFrame) / speed) == 0:
-    return (0'i64, 0'i64)
-  let offset = int64(ceil(float64(startFrame) / speed))
-  (offset, int64(ceil(float64(endFrame) / speed)) - offset)
 
 proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
     start: int64, clips2: var seq[Clip2]): seq[Clip] {.inline.} =

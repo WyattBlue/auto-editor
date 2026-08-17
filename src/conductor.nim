@@ -3,14 +3,13 @@ when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
 
-import ./[av, action, edit, ffmpeg, license, log, media, timeline]
-import util/[color, bar, fun, lang, rules, rational]
+import ./[av, action, edit, ffmpeg, license, log, media, stats, timeline]
+import ./lib/editutil
+import ./util/[color, bar, fun, lang, rules, rational]
 
-import imports/[fcp7, json]
-import exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
-import render/format
-import render/subtitle
-import stats
+import ./imports/[fcp7, json]
+import ./exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
+import ./render/[format, subtitle]
 
 proc freeActions(args: mainArgs, tl: v3) =
   ## CLI actions are copied into the timeline, so release each shared buffer

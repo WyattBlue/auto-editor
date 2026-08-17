@@ -1,7 +1,8 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log]
-import ../util/[bar, rational, dnorm16]
+import ../util/[bar, rational]
+import ../lib/dnorm16
 import ./motion # reuse the generic VideoProcessor + videoPipeline frame pump
 
 iterator blackness*(processor: var VideoProcessor, pixelBlack: float32): Unorm16 =

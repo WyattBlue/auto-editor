@@ -1,5 +1,6 @@
 import std/[math, strformat, strutils, options]
-import ./util/[dnorm16, color, suggest]
+import ./util/[color, suggest]
+import ./lib/dnorm16
 
 template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
   var temp = val

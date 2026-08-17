@@ -1,6 +1,7 @@
 import std/[options, strformat, strutils]
 
-import ../util/[rational, dnorm16]
+import ../util/rational
+import ../lib/dnorm16
 import ../[av, cache, cli, editparse, ffmpeg, log]
 import ../analyze/[audio, blackdetect, motion, subtitle]
 import ../lib/audioutil
