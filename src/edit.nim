@@ -1,6 +1,7 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editlexer, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
+import ./lib/audioutil
 import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre

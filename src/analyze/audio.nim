@@ -1,27 +1,22 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log, resampler]
+import ../lib/audioutil
 import ../util/[bar, rational, dnorm16]
 
 when defined(arm64) or defined(aarch64):
-  type
-    Vec16x8 {.importc: "int16x8_t", header: "<arm_neon.h>".} = object
+  type Vec16x8 {.importc: "int16x8_t", header: "<arm_neon.h>".} = object
 
-  proc neonLoad16(p: ptr int16): Vec16x8 {.importc: "vld1q_s16",
-      header: "<arm_neon.h>".}
-  proc neonDup16(x: int16): Vec16x8 {.importc: "vdupq_n_s16",
-      header: "<arm_neon.h>".}
+  proc neonLoad16(p: ptr int16): Vec16x8 {.importc: "vld1q_s16", header: "<arm_neon.h>".}
+  proc neonDup16(x: int16): Vec16x8 {.importc: "vdupq_n_s16", header: "<arm_neon.h>".}
   # Saturating abs: clamps -32768 -> 32767 rather than wrapping
-  proc neonQAbs16(v: Vec16x8): Vec16x8 {.importc: "vqabsq_s16",
-      header: "<arm_neon.h>".}
-  proc neonMax16(a, b: Vec16x8): Vec16x8 {.importc: "vmaxq_s16",
-      header: "<arm_neon.h>".}
+  proc neonQAbs16(v: Vec16x8): Vec16x8 {.importc: "vqabsq_s16", header: "<arm_neon.h>".}
+  proc neonMax16(a, b: Vec16x8): Vec16x8 {.importc: "vmaxq_s16", header: "<arm_neon.h>".}
   proc neonMaxAcross16(v: Vec16x8): int16 {.importc: "vmaxvq_s16",
       header: "<arm_neon.h>".}
 
 elif defined(emscripten):
-  type
-    V128 {.importc: "v128_t", header: "<wasm_simd128.h>".} = object
+  type V128 {.importc: "v128_t", header: "<wasm_simd128.h>".} = object
 
   proc wasmSplat16(x: int16): V128 {.importc: "wasm_i16x8_splat",
       header: "<wasm_simd128.h>".}
@@ -39,19 +34,15 @@ elif defined(emscripten):
       wasmSplat16(0), v))
 
 elif defined(amd64) or defined(i386):
-  type
-    M128i {.importc: "__m128i", header: "<emmintrin.h>".} = object
+  type M128i {.importc: "__m128i", header: "<emmintrin.h>".} = object
 
-  proc sseZero(): M128i {.importc: "_mm_setzero_si128",
-      header: "<emmintrin.h>".}
-  proc sseLoad(p: pointer): M128i {.importc: "_mm_loadu_si128",
-      header: "<emmintrin.h>".}
+  proc sseZero(): M128i {.importc: "_mm_setzero_si128", header: "<emmintrin.h>".}
+  proc sseLoad(p: pointer): M128i {.importc: "_mm_loadu_si128", header: "<emmintrin.h>".}
   proc sseStore(p: pointer, v: M128i) {.importc: "_mm_storeu_si128",
       header: "<emmintrin.h>".}
   proc sseSubs16(a, b: M128i): M128i {.importc: "_mm_subs_epi16",
       header: "<emmintrin.h>".}
-  proc sseMax16(a, b: M128i): M128i {.importc: "_mm_max_epi16",
-      header: "<emmintrin.h>".}
+  proc sseMax16(a, b: M128i): M128i {.importc: "_mm_max_epi16", header: "<emmintrin.h>".}
   # Saturating abs: max(v, 0 - v) clamps -32768 -> 32767 (subs saturates).
   proc sseAbs16(v: M128i): M128i {.inline.} = sseMax16(v, sseSubs16(sseZero(), v))
 
@@ -75,29 +66,7 @@ type
     channel*: int = -1
     chunkDuration*: float64
 
-const audioChannelNames* = [
-  ("left", "FL"), ("right", "FR"), ("center", "FC"), ("lfe", "LFE"),
-  ("back-left", "BL"), ("back-right", "BR"),
-  ("front-left-of-center", "FLC"), ("front-right-of-center", "FRC"),
-  ("back-center", "BC"), ("side-left", "SL"), ("side-right", "SR"),
-  ("top-center", "TC"), ("top-front-left", "TFL"),
-  ("top-front-center", "TFC"), ("top-front-right", "TFR"),
-  ("top-back-left", "TBL"), ("top-back-center", "TBC"),
-  ("top-back-right", "TBR"), ("stereo-left", "DL"),
-  ("stereo-right", "DR"), ("wide-left", "WL"), ("wide-right", "WR"),
-  ("surround-direct-left", "SDL"), ("surround-direct-right", "SDR"),
-  ("lfe-2", "LFE2"), ("top-side-left", "TSL"),
-  ("top-side-right", "TSR"), ("bottom-front-center", "BFC"),
-  ("bottom-front-left", "BFL"), ("bottom-front-right", "BFR"),
-]
-
-func audioChannelCode*(name: string): string {.raises: [].} =
-  for (friendly, code) in audioChannelNames:
-    if name == friendly:
-      return code
-
-func resolveAudioChannel*(layout: ptr AVChannelLayout,
-    name: string): int {.raises: [].} =
+func resolveAudioChannel*(layout: ptr AVChannelLayout, name: string): int {.raises: [].} =
   ## Resolve a friendly semantic name to its interleaved channel index.
   ## A mono signal is treated as left, right, and center.
   if name == "all":
@@ -120,8 +89,7 @@ func resolveAudioChannelOrDefault*(layout: ptr AVChannelLayout,
     var fallback: AVChannelLayout
     {.cast(noSideEffect).}:
       av_channel_layout_default(addr fallback, layout.nb_channels)
-    result = av_channel_layout_index_from_string(addr fallback,
-        code.cstring).int
+    result = av_channel_layout_index_from_string(addr fallback, code.cstring).int
 
 proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
     chunkDuration: float64, channel = -1): AudioIterator =
@@ -171,7 +139,6 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
 
       # Free the resampled frame (since AudioResampler allocated it)
       av_frame_free(addr resampledFrame)
-
   except ValueError as e:
     error &"Error resampling audio frame: {e.msg}"
 

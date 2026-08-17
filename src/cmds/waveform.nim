@@ -3,6 +3,7 @@ import std/[options, sequtils, strformat, strutils]
 import ../util/[rational, dnorm16]
 import ../[av, cache, cli, ffmpeg, log]
 import ../analyze/audio
+import ../lib/audioutil
 import ./help
 
 const waveformArgumentOptions = {
