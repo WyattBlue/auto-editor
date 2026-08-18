@@ -488,13 +488,13 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
         # (crashes on noise_util.c); nnan flags let the check exit early
         args &= @[
           "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
-          &"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory -msimd128 -mfma -fno-honor-nans{memArg}\"",
-          &"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory -msimd128 -mfma -fno-honor-nans{memArg}\"",
+          &"\"-DCMAKE_C_FLAGS=-matomics -msimd128 -mfma -fno-honor-nans{memArg}\"",
+          &"\"-DCMAKE_CXX_FLAGS=-matomics -msimd128 -mfma -fno-honor-nans{memArg}\"",
         ]
       else:
         args &= package.buildArguments
-        args &= @[&"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory -msimd128 -mfma{memArg}\"",
-                  &"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory -msimd128 -mfma{memArg}\""]
+        args &= @[&"\"-DCMAKE_C_FLAGS=-matomics -msimd128 -mfma{memArg}\"",
+                  &"\"-DCMAKE_CXX_FLAGS=-matomics -msimd128 -mfma{memArg}\""]
       exec "emcmake cmake " & sourceDir & " " & args.join(" ")
     exec "make -j4 && make install"
 
@@ -540,7 +540,7 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   if kind == wasm32 or kind == wasm64:
     mesonArgs.add "-Denable_asm=false"
     let memArg = if kind == wasm64: " -m64" else: ""
-    mesonArgs.add &"-Dc_args=\"-matomics -mbulk-memory -msimd128 -mfma{memArg}\""
+    mesonArgs.add &"-Dc_args=\"-matomics -msimd128 -mfma{memArg}\""
     if kind == wasm64:
       mesonArgs.add "-Dc_link_args=\"-m64\""
     let bits = (if kind == wasm64: "64" else: "32")
@@ -609,8 +609,8 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   ]
 
   if isWasm:
-    commonArgs.add(&"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory -msimd128 -mfma -pthread{memArg}\"")
-    commonArgs.add(&"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory -msimd128 -mfma -pthread{memArg}\"")
+    commonArgs.add(&"\"-DCMAKE_C_FLAGS=-matomics -msimd128 -mfma -pthread{memArg}\"")
+    commonArgs.add(&"\"-DCMAKE_CXX_FLAGS=-matomics -msimd128 -mfma -pthread{memArg}\"")
     if kind == wasm64:
       commonArgs.add("\"-DCMAKE_EXE_LINKER_FLAGS=-m64\"")
 
@@ -689,7 +689,7 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
     case package.name
     of "x264":
       if not fileExists("config.mak"):
-        exec &"""CFLAGS="-matomics -mbulk-memory -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-interlaced --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-pthread" """
+        exec &"""CFLAGS="-matomics -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-interlaced --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-pthread" """
         # x264 has no wasm asm, so the C path is all we get. Its configure
         # force-appends -fno-tree-vectorize last, which suppresses LLVM
         # autovectorization. Rewrite it in-place to enable wasm SIMD and
@@ -701,7 +701,7 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
       exec "make install"
     of "libvpx":
       if not fileExists("Makefile"):
-        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory -msimd128 -mfma{memArg}" """
+        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --enable-vp9-highbitdepth --extra-cflags="-matomics -msimd128 -mfma{memArg}" """
       makeInstall()
     of "zlib":
       # zlib ships a hand-written configure (not autotools): it reads CFLAGS
@@ -712,13 +712,13 @@ proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wa
       # ignoring emconfigure's AR=emar (native libtool can't archive wasm
       # objects); spoofing uname keeps it on the generic path.
       if not fileExists("Makefile"):
-        exec &"""CFLAGS="-matomics -mbulk-memory -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --static --uname=Linux """
+        exec &"""CFLAGS="-matomics -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --static --uname=Linux """
       makeInstall()
     else:
       let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
       if not fileExists("Makefile"):
         let args = (package.buildArguments & extraArgs).join(" ")
-        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" """
+        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -msimd128 -mfma{memArg}" LDFLAGS="{ldFlags}" """
       makeInstall()
 
 proc makeBuild(buildPath: string, kind: CrossKind) =
@@ -739,9 +739,9 @@ proc makeBuild(buildPath: string, kind: CrossKind) =
   let wasmCflags =
     case kind
     of wasm32:
-      " CFLAGS=\"-matomics -mbulk-memory -msimd128 -mfma\""
+      " CFLAGS=\"-matomics -msimd128 -mfma\""
     of wasm64:
-      " CFLAGS=\"-matomics -mbulk-memory -msimd128 -mfma -m64\" LDFLAGS=\"-m64\""
+      " CFLAGS=\"-matomics -msimd128 -mfma -m64\" LDFLAGS=\"-m64\""
     else:
       ""
   exec &"{envPrefix}make clean"
@@ -1216,8 +1216,8 @@ proc buildFFmpegForWasm(buildPath: string, kind: CrossKind) =
       --enable-pthreads \
       --disable-w32threads \
       --disable-os2threads \
-      --extra-cflags="-I{buildPath}/include -matomics -mbulk-memory -msimd128 -mfma -pthread{memArg}" \
-      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -msimd128 -pthread{memArg}" \""" & "\n" & setupCommonFlags(packages, kind))
+      --extra-cflags="-I{buildPath}/include -matomics -msimd128 -mfma -pthread{memArg}" \
+      --extra-ldflags="-L{buildPath}/lib -matomics -msimd128 -pthread{memArg}" \""" & "\n" & setupCommonFlags(packages, kind))
     makeInstall()
 
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
