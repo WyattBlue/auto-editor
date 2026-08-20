@@ -12,8 +12,8 @@ type
     actSpeed,
     # Can add 3 more [VA] actions
     actVolume = 4,
-    actDeesser, actDuck, actPitch,
-    # Can add 12 more [A] actions
+    actDeesser, actDuck, actPitch, actTone,
+    # Can add 11 more [A] actions
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
@@ -22,6 +22,9 @@ type
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
+
+  Waveform* = enum  # tone timbre; the order is part of the API
+    wSine, wSaw, wSquare, wTriangle
 
   ConfettiScheme* = enum
     csParty, csNeon, csGold, csDuotone, csWhite
@@ -66,6 +69,9 @@ type
     of actPitch:
       # Semitones x 100. Cent buckets round-trip as exact decimal semitones
       pCents*: int16
+    of actTone:
+      note*: uint8           # MIDI note number; 69 = A4 = 440 Hz
+      wave*: Waveform        # timbre (sine unless given)
     of actDuck:
       # Cross-track sidechain: rendered at the mix stage, not in the clip chain.
       duckAmount*, duckThresh*: Unorm16  # 0..1; gain floor = 1 - amount
@@ -140,6 +146,8 @@ static:
   assert ord(high(ConfettiOrigin)) <= originMask.int, "origin outgrew 2 bits"
 
 const
+  waveformNames*: array[Waveform, string] =
+    ["sine", "saw", "square", "triangle"]
   confettiSchemeNames*: array[ConfettiScheme, string] =
     ["party", "neon", "gold", "duotone", "white"]
   confettiOriginNames*: array[ConfettiOrigin, string] =
@@ -189,6 +197,8 @@ Autoduck (sidechain): lower this clip's audio wherever the louder audio layers b
 Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to silence, default 0.85), `threshold` the key loudness 0.0..1.0 that engages the duck (default 0.04), and `attack`/`release` the duck-down/recover times in milliseconds (defaults 100 and 500)."""),
   ActionDef(name: "pitch", flags: {afAudio}, argSpec: "semitones", range: rng(-24.0, 24.0),
     help: "Shift the pitch of the section without changing its speed. `12` is one octave up, `-12` one octave down, `0` leaves it unchanged, and fractional values work (`pitch:0.5` is a quarter tone). Implemented by resampling and then time-stretching back with ffmpeg's `asetrate` and `atempo` filters, so large shifts pick up the usual time-stretch artifacts. To change speed and pitch together, use `varispeed` instead."),
+  ActionDef(name: "tone", flags: {afAudio, afGenerator}, argSpec: "midi-note[:waveform]", range: rng(0.0, 127.0),
+    help: "Synthesize a wave at a MIDI note's pitch, as a generator: it stands in for a file in `add:`, adding its own audio layer rather than altering existing audio. `69` is A4 (440 Hz), `60` middle C; each step is a semitone. `waveform` is `sine` (default), `saw`, `square`, or `triangle`; the harmonic-rich ones are band-limited, so they stay clean instead of aliasing at high notes. It has no envelope of its own — chain the animatable `volume` action for fades and decays, e.g. `add:tone:60,volume:1..0:ease=out`. Stack several `add:tone` layers for a chord; the mix sums them. `speed`/`varispeed` only stretch the tone, they do not change its pitch — change the note instead. Examples: `add:tone:69`, `add:tone:36:saw`, `add:tone:48:square,volume:0.4`."),
   ActionDef(name: "invert", flags: {afVideo},
     help: "Invert every pixel in the section, producing a photo-negative."),
   ActionDef(name: "hflip", flags: {afVideo},
@@ -275,6 +285,14 @@ const generatorActions* = block:
   var names: seq[string]
   for a in actionDefs:
     if afGenerator in a.flags:
+      names.add a.name
+  names
+
+# Generators that paint audio rather than pixels: they land on an audio layer.
+const audioGeneratorActions* = block:
+  var names: seq[string]
+  for a in actionDefs:
+    if afGenerator in a.flags and afVideo notin a.flags:
       names.add a.name
   names
 
@@ -514,6 +532,24 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       if v < -1.0 or v > 1.0:
         raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
     return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
+
+  # tone: a MIDI note plus an optional waveform name, "tone:note[:waveform]".
+  if parts[0] == "tone" and parts.len <= 3:
+    if parts.len == 1:
+      raise newException(ActionParseError, "tone requires a MIDI note (tone:69 is A4)")
+    let n = pFloat(parts[1])
+    # `not (a and b)` so NaN fails the check too; uint8(NaN) is UB. Whole notes
+    # only: a fraction would round away silently and stop round-tripping.
+    if not (n >= 0.0 and n <= 127.0 and n == round(n)):
+      raise newException(ActionParseError, "tone must be a whole MIDI note in [0, 127]")
+    var wave = wSine
+    if parts.len == 3:
+      let idx = waveformNames.find(parts[2])
+      if idx < 0:
+        raise newException(ActionParseError, &"tone: unknown waveform: {parts[2]}" &
+          didYouMean(parts[2], @waveformNames))
+      wave = Waveform(idx)
+    return Action(kind: actTone, note: uint8(n), wave: wave)
 
   # rotate: a fixed angle "rotate:deg" (static, expands the canvas).
   if parts[0] == "rotate" and parts.len == 2:
@@ -871,6 +907,9 @@ when not defined(nimscript):
     of actVolume: &"volume:{kfStr(act)}{easeSuffix(act)}"
     of actDeesser: &"deesser:{act.intensity}:{act.maxd}:{act.freq}"
     of actPitch: &"pitch:{act.pCents.float32 / 100.0'f32}"
+    of actTone:
+      if act.wave == wSine: &"tone:{act.note}"
+      else: &"tone:{act.note}:{waveformNames[act.wave]}"
     of actDuck: &"duck:{act.duckAmount}:{act.duckThresh}:{act.duckAttack}:{act.duckRelease}"
     of actZoom: &"zoom:{kfStr(act)}{easeSuffix(act)}"
     of actOpacity: &"opacity:{kfStr(act)}{easeSuffix(act)}"
@@ -931,7 +970,7 @@ when not defined(nimscript):
     case a.kind
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
-    of actRotate, actPitch: 3
+    of actRotate, actPitch, actTone: 3
     of actLens, actSpeed, actPixelate: 5
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
@@ -980,6 +1019,10 @@ when not defined(nimscript):
           var cents: int16
           copyMem(addr cents, addr base[i + 1], sizeof(int16))
           yield Action(kind: actPitch, pCents: cents)
+          i += 3
+        of actTone:
+          yield Action(kind: actTone, note: base[i + 1],
+            wave: Waveform(base[i + 2].int))
           i += 3
         of actLens:
           var k1v, k2v: Snorm16
@@ -1180,6 +1223,11 @@ when not defined(nimscript):
         i += 3
       of actPitch:
         base.writeAt(i, 1, a.pCents)
+        i += 3
+      of actTone:
+        base[i + 1] = a.note
+        # A bare Nim enum is int-sized, so narrow explicitly like easeCurve.
+        base[i + 2] = uint8(ord(a.wave))
         i += 3
       of actLens:
         base.writeAt(i, 1, a.k1)

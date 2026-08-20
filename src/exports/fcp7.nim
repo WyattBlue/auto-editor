@@ -213,6 +213,8 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
     let transitions = (if t < tl.at.len: tl.at[t] else: @[])
     let transitionLinks = transitionPlan(alayer, transitions)
     for j, aclip in alayer.pairs:
+      if aclip.src == nil:
+        continue
       if transitionLinks[j].incoming >= 0:
         let transition = transitions[transitionLinks[j].incoming]
         if transition.alignment == taStart:
@@ -298,7 +300,7 @@ proc planPremiereAudio(tl: v3, ptrToMi: Table[ptr string, MediaInfo],
   var channelOffset = 0
   for layerIdx, alayer in tl.a:
     var channels = 1
-    if alayer.len > 0:
+    if alayer.len > 0 and alayer[0].src != nil:
       let mi = ptrToMi[alayer[0].src]
       let st = alayer[0].stream.int
       if st >= 0 and st < mi.a.len:
@@ -346,6 +348,8 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       track.add elem("outputchannelindex", $(atrack.explodedIndex + 1))
 
     for j, aclip in alayer.pairs:
+      if aclip.src == nil:
+        continue
       if transitionLinks[j].incoming >= 0:
         let t = transitions[transitionLinks[j].incoming]
         if t.alignment == taStart:

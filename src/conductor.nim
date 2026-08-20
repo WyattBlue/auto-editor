@@ -211,9 +211,9 @@ proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     return $avcodec_get_name(codecId)
   return $avcodec_get_name(rule.defaultVid)
 
-proc applyAdds(tl: var v3, args: mainArgs,
+proc applyAdds(tl: var v3, args: var mainArgs,
     interner: var StringInterner) {.raises: [].} =
-  ## Inject `add:` overlays as new video layers. Each spec overlays its source on
+  ## Inject `add:` overlays as new layers. Each spec overlays its source on
   ## every base-layer (v[0]) clip whose section matches the spec's selector
   ## (0 = silent, 1 = normal), spanning the same timeline range. With
   ## `follow-base` (default), the overlay mirrors the base clip's source offset,
@@ -221,18 +221,39 @@ proc applyAdds(tl: var v3, args: mainArgs,
   ## camera angle (matching the app); with `follow-base=0` it restarts from frame
   ## 0 each section (logo/gif use). Placement (when given) is carried by a `pos`
   ## action in the overlay clip's effects group.
+  ##
+  ## An `add:` contributes every stream its source holds: a file with picture and
+  ## sound becomes a video layer plus one audio layer per audio stream (mirroring
+  ## the same sections, so the two stay in sync), an audio-only file or an audio
+  ## generator (`add:tone`) becomes audio layers alone, and a still image or a
+  ## video generator becomes a video layer alone.
   if args.adds.len == 0:
     return
+
+  func isAudioGen(spec: AddSpec): bool =
+    spec.generator.len > 0 and spec.generator.split(':')[0] in audioGeneratorActions
+
+  # Probe each source up front: what it holds decides which layers it gets, and
+  # a soundless spec must not drag in a video canvas it does not need.
+  var mis = newSeq[MediaInfo](args.adds.len)
+  var soundOnly = newSeq[bool](args.adds.len)
+  for i, spec in args.adds:
+    if spec.generator.len > 0:
+      soundOnly[i] = isAudioGen(spec)
+    else:
+      mis[i] = initMediaInfo(spec.path)
+      soundOnly[i] = mis[i].v.len == 0
 
   # Audio-only timeline: synthesize a background base video track so the
   # overlays have a canvas — but only if some kept section matches an add's
   # selector. With no "active" portion (e.g. `--edit all` + `-w:1 add`), there
   # is nothing to draw on, so no video stream is produced.
-  if tl.v.len == 0:
+  if tl.v.len == 0 and soundOnly.anyIt(not it):
     if tl.a.len == 0:
       return
     var matches = false
-    for spec in args.adds:
+    for i, spec in args.adds:
+      if soundOnly[i]: continue # no picture, so it needs no canvas
       for clip in tl.a[0]:
         if clip.effects.int == spec.selector:
           matches = true
@@ -247,7 +268,16 @@ proc applyAdds(tl: var v3, args: mainArgs,
     tl.langs.insert(toLang("und"), 0) # video lang precedes audio langs
     tl.v.add base
 
-  for spec in args.adds:
+  # Every spec mirrors the same base sections. Snapshot the layer: the loop
+  # appends to both v and a, and a[0] would otherwise start naming an added one.
+  let refLayer = (if tl.v.len > 0: tl.v[0]
+                  elif tl.a.len > 0: tl.a[0]
+                  else: newSeq[Clip]())
+
+  for i, spec in args.adds:
+    let audioGen = isAudioGen(spec)
+    if audioGen and spec.hasPos:
+      error "add: " & spec.generator.split(':')[0] & " is audio, it cannot be placed"
     # A generator layer has no source; the renderer gives it a clear canvas.
     let srcPtr = (if spec.generator.len > 0: nil else: interner.intern(spec.path))
     # The overlay's effects group: an optional `pos` placement action followed by
@@ -279,15 +309,37 @@ proc applyAdds(tl: var v3, args: mainArgs,
       group.free()
     let eIdx = uint32(idx)
     var track: seq[Clip]
-    for clip in tl.v[0]:
+    # A generator has no source timeline, so `offset` (and `follow-base` with it)
+    # is meaningless for one: it renders from its position on the timeline.
+    let follows = spec.followBase and spec.generator.len == 0
+    for clip in refLayer:
       if clip.effects.int == spec.selector:
         track.add Clip(src: srcPtr, start: clip.start, dur: clip.dur,
-          offset: (if spec.followBase: clip.offset else: 0), effects: eIdx,
-          stream: 0)
+          offset: (if follows: clip.offset else: 0), effects: eIdx, stream: 0)
     if track.len == 0:
       continue
-    tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
-    tl.v.add track
+
+    if not soundOnly[i]:
+      tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
+      tl.v.add track
+
+    # An added layer is an overlay, so its sound has to be heard over the base
+    # rather than written beside it as a second stream (which .wav/.mp3 can't
+    # hold). Audio langs come last, so append.
+    if audioGen:
+      tl.langs.add toLang("und")
+      tl.a.add track
+      args.mixAudioStreams = true
+    else:
+      # The overlay's own audio, one layer per stream, on the same sections as
+      # its picture so the two stay in sync.
+      for stream in 0 ..< mis[i].a.len:
+        var atrack = track
+        for clip in atrack.mitems:
+          clip.stream = int16(stream)
+        tl.langs.add mis[i].a[stream].lang
+        tl.a.add atrack
+        args.mixAudioStreams = true
   tl.updateNumberOfSrc()
 
 proc editMedia*(args: var mainArgs) =

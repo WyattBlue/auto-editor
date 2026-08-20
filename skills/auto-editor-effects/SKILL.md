@@ -30,13 +30,14 @@ below works as the value of any `-w:N`.
 | `pitch` | shift pitch only, **duration preserved** | `pitch:12` (octave up), `pitch:-7` (−24–24 semitones) |
 | `volume` | scale volume (1=normal, 0.5=−6dB) | `volume:0.2` |
 | `deesser` | reduce sibilance | `deesser:intensity[:max[:freq]]` (each 0–1) |
+| `tone` | wave from a MIDI note (`add:` generator) | `add:tone:69`, `add:tone:36:saw` |
 | `invert` | invert pixels | — |
 | `zoom` | zoom factor (1=none) | `zoom:2`, `zoom:0.5` (>0–100) |
 | `rotate` | fixed clockwise rotation, expands so nothing clips | `rotate:90` (pair with `--resolution`) |
 | `spin` | continuous spin `deg/rate` (deg per sec) | `spin:0/120`, `spin:90/-45` |
 | `drawbox` | filled rectangle | `drawbox:x:y:w:h:color` |
 | `pos` | place an overlay clip `x:y[:scale]` | mainly used inside `add` / v3 |
-| `add` | overlay an image/video layer | `add:path[:x:y:scale]` |
+| `add` | overlay a layer: every stream the file holds | `add:path[:x:y:scale]` |
 
 ```bash
 auto-editor video.mp4 -w:1 deesser:0.8:0.7:0.4
@@ -49,13 +50,24 @@ auto-editor video.mp4 -w:1 drawbox:0:0:1920:200:#000000       # redact a strip
 `add` is **virtual**: it adds an overlay layer rather than a per-frame effect.
 Still images hold for the whole section; PNG alpha is preserved. Omit placement
 to scale-to-fit and center. Actions chained **after** an `add` apply to that new
-overlay, not the base.
+overlay, not the base. `add` brings **every stream** the file holds: a video with
+sound gets a video layer plus its audio layers (mixed in, not a second stream),
+an audio-only file adds sound with no picture, an image adds picture with no
+sound. In place of a file it takes a **generator** action: `confetti`/`drawbox`
+paint a video layer, `tone` synthesizes an audio one (so `add:tone` layers stack
+into a chord).
 
 ```bash
 auto-editor video.mp4 -w:1 add:./logo.png             # centered, fit to canvas
-auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25  # quarter-size PiP in the corner
+auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25  # PiP in the corner, audio included
+auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25,volume:0.3  # ...tucked under the base
+auto-editor video.mp4 -w:1 add:./music.mp3,volume:0.4 # background music, no picture added
 auto-editor video.mp4 -w:1 add:./logo.png,spin:0/-30  # the logo spins, not the base video
 auto-editor song.mp3 -bg white -w:1 add:./cover.png   # audio + image → video
+auto-editor video.mp4 -w:1 add:tone:69                # 440 Hz tone over the audio
+auto-editor video.mp4 -w:0 nil,add:tone:81            # beep the silence, don't cut it
+auto-editor video.mp4 -w:1 add:tone:60,volume:1..0:ease=out  # a plucked, decaying note
+auto-editor video.mp4 -w:1 add:tone:36:saw            # buzzy bass (sine|saw|square|triangle)
 ```
 
 Overlays appear only where their section is kept, so for silent sections use

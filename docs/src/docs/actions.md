@@ -115,6 +115,45 @@ auto-editor video.mp4 -w:1 pitch:0.5
 
 To change speed and pitch together, use `varispeed` instead.
 
+### tone
+
+Synthesize a wave at the pitch of a MIDI note, `tone:note[:waveform]`:
+
+- **note** — a whole MIDI note number, 0 to 127. `69` is A4 (440 Hz) and `60`
+  is middle C; each step is a semitone, so `f = 440 * 2^((note-69)/12)`.
+- **waveform** — `sine` (the default), `saw`, `square`, or `triangle`.
+
+`tone` is a **generator action**: it does not alter existing audio, it stands in for a file in `add:` and lays the note on its own audio layer (see [add](#add) below). Because it adds a layer rather than a second output stream, the tone is mixed into the audio you already have.
+
+```sh
+# A 440 Hz reference tone over every kept section
+auto-editor video.mp4 -w:1 add:tone:69
+
+# Beep the silent sections instead of cutting them
+auto-editor video.mp4 -w:0 nil,add:tone:81
+
+# A C major chord: one layer per note, summed by the mix
+auto-editor video.mp4 -w:1 add:tone:60,add:tone:64,add:tone:67
+
+# A buzzy bass instead of a pure tone
+auto-editor video.mp4 -w:1 add:tone:36:saw
+
+# Square for a chiptune blip, triangle for something softer
+auto-editor video.mp4 -w:1 add:tone:84:square
+auto-editor video.mp4 -w:1 add:tone:72:triangle
+```
+
+It has no envelope of its own, so a bare `tone` holds flat for the whole
+section. Chain the animatable `volume` action for fades and decays:
+
+```sh
+# A plucked note that decays away
+auto-editor video.mp4 -w:1 add:tone:60,volume:1..0:ease=out
+
+# Quieter, so it sits under the program audio
+auto-editor video.mp4 -w:1 add:tone:69,volume:0.3
+```
+
 ### volume
 
 Adjust the audio volume level.
@@ -256,16 +295,17 @@ the `add` action below.
 
 ### add
 
-Overlay an image or video on top of the matched sections, `add:path` or
+Overlay a media file on top of the matched sections, `add:path` or
 `add:path:x:y:scale`:
 
-- **path** — a media file (e.g. a PNG logo or a video). Still images are held
-  for the whole section. In place of a file, a **generator action** (with its
+- **path** — a media file (e.g. a PNG logo, a video, or an audio file). Still
+  images are held for the whole section. In place of a file, a **generator action** (with its
   usual arguments) may be given: the layer starts as a transparent canvas that
   the action paints, so the picture below shows through everywhere it did not
-  draw. The generators are [confetti](/ref/actions#confetti) and
-  [drawbox](/ref/actions#drawbox) (marked `G` in the
-  [quick reference](/ref/actions#quick-reference)).
+  draw. The video generators are [confetti](/ref/actions#confetti) and
+  [drawbox](/ref/actions#drawbox); [tone](/ref/actions#tone) is an audio
+  generator, and adds an audio layer instead of a picture (all are marked `G`
+  in the [quick reference](/ref/actions#quick-reference)).
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
   (above). When omitted, the overlay is scaled to fit the canvas (preserving
   aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
@@ -298,7 +338,34 @@ auto-editor song.mp3 -w:1 add:confetti:300:white
 
 # A box on its own layer, so later actions hit only the box
 auto-editor video.mp4 -w:1 add:drawbox:100:100:400:200:red,opacity:0.5
+
+# A tone on its own audio layer, mixed under the video's own audio
+auto-editor video.mp4 -w:1 add:tone:69,volume:0.3
 ```
+
+`add` brings **every stream** the source holds, so an added clip sounds like it
+looks. A video with sound becomes a video layer plus one audio layer per audio
+stream, on exactly the same sections, so picture and sound stay together. A file
+with no picture (an mp3, a wav) adds only sound — handy for background music —
+and grows no video stream; a still image adds only picture. Actions chained after
+the `add` reach whichever of the two exist, so `add:pip.mp4,volume:0.3` tucks the
+overlay's audio under the base while leaving the base's own audio alone.
+
+```sh
+# Picture-in-picture that you can also hear
+auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25
+
+# ...with its audio tucked under the original
+auto-editor video.mp4 -w:1 add:./pip.mp4:900:60:0.25,volume:0.3
+
+# Background music over the whole edit (no picture added)
+auto-editor video.mp4 -w:1 add:./music.mp3,volume:0.4
+```
+
+An added layer is an overlay, so its audio is **mixed into** the output's audio
+rather than written beside it as a second stream — which is also why several
+`add:tone` layers stack into a chord, and why `-o out.wav` still works. An audio
+generator likewise needs no canvas and never grows a video stream.
 
 Unlike the other actions, `add` is **virtual**: it is not a per-frame effect but
 adds an overlay layer to the timeline (the same compositing used by stacked v3

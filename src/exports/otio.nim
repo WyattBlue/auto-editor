@@ -494,16 +494,17 @@ proc otioWrite*(name, output: string, tl: v3) =
       "kind": "Video"
     }
 
-  # LinkID groups the parts of one linked A/V clip in Premiere. The base video
-  # clip j and the audio clips at index j (the same cut) share LinkID j+1;
-  # independent `add:` overlay clips must get unique IDs past that range, or
-  # Premiere fuses them with the audio (showing it as "[V]" and muting it).
-  var maxAligned = 0
-  if tl.v.len > 0:
-    maxAligned = max(maxAligned, tl.v[0].len)
-  for atrack in tl.a:
-    maxAligned = max(maxAligned, atrack.len)
-  var nextOverlayLink = maxAligned
+  # LinkID groups the parts of one linked A/V clip in Premiere: the picture and
+  # the sound of one source at one point on the timeline are one clip and share
+  # an ID. Anything else must get its own, or Premiere fuses unrelated clips
+  # (showing the audio as "[V]" and muting it) — which is why this keys on the
+  # source and the start rather than on the clip's index within its layer.
+  var linkIds = initTable[(ptr string, int64), int]()
+  proc linkIdFor(clip: Clip): int =
+    let key = (clip.src, clip.start)
+    if key notin linkIds:
+      linkIds[key] = linkIds.len + 1
+    linkIds[key]
 
   for vIdx, track in tl.v:
     let clipArr = newJArray()
@@ -516,12 +517,6 @@ proc otioWrite*(name, output: string, tl: v3) =
       # nothing to reference here. Skip it (and any track left empty).
       if clip.src == nil:
         continue
-      var linkId: int
-      if vIdx == 0:
-        linkId = j + 1
-      else:
-        inc nextOverlayLink
-        linkId = nextOverlayLink
       if transitionLinks[j].incoming >= 0:
         let t = transitions[transitionLinks[j].incoming]
         if t.alignment == taStart:
@@ -530,7 +525,7 @@ proc otioWrite*(name, output: string, tl: v3) =
       if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
       let actions = tl.effects[clip.effects]
       clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = true, linkId = linkId, nbCh = nbCh, res = tl.res)
+        isVideo = true, linkId = linkIdFor(clip), nbCh = nbCh, res = tl.res)
       cursor = clip.start + clip.dur
       if transitionLinks[j].outgoing >= 0:
         let t = transitions[transitionLinks[j].outgoing]
@@ -558,6 +553,8 @@ proc otioWrite*(name, output: string, tl: v3) =
     let transitionLinks = transitionPlan(track, transitions)
     var cursor = 0'i64
     for j, clip in track:
+      if clip.src == nil:
+        continue
       if transitionLinks[j].incoming >= 0:
         let t = transitions[transitionLinks[j].incoming]
         if t.alignment == taStart:
@@ -566,7 +563,7 @@ proc otioWrite*(name, output: string, tl: v3) =
       if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
       let actions = tl.effects[clip.effects]
       clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = false, linkId = j + 1, nbCh = nbCh, res = tl.res)
+        isVideo = false, linkId = linkIdFor(clip), nbCh = nbCh, res = tl.res)
       cursor = clip.start + clip.dur
       if transitionLinks[j].outgoing >= 0:
         let t = transitions[transitionLinks[j].outgoing]

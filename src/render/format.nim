@@ -37,6 +37,8 @@ proc resolveAudioCodec(layer: seq[Clip], rules: Rules, cache: MediaCache): AVCod
     return rules.defaultAud
 
   let firstClip = layer[0]
+  if firstClip.src == nil:
+    return rules.defaultAud
   let stream = int(firstClip.stream)
 
   var codec: AVCodecID

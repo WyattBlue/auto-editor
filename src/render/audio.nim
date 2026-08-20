@@ -107,6 +107,67 @@ type
 func clamp16(v: int32): int16 {.inline.} =
   int16(max(-32768'i32, min(32767'i32, v)))
 
+const
+  toneTableLen = 2048  # one cycle; lerp error at this size is below -110 dBFS
+  tonePeak = 8191.0    # -12 dBFS, so four stacked layers sum without clipping
+
+func noteFreq(note: uint8): float = 440.0 * pow(2.0, (note.float - 69.0) / 12.0)
+
+func toneTable(wave: Waveform, freq: float, sr: cint): seq[float32] =
+  ## One cycle of a band-limited waveform, built additively: harmonics are summed
+  ## only up to Nyquist, so none fold back as inharmonic aliasing the way a naive
+  ## ramp or step would at high notes. Normalized to unit peak, so every timbre
+  ## renders at the same level despite its own Gibbs overshoot.
+  var acc = newSeq[float](toneTableLen)
+  let maxK = max(1, int(sr.float / (2.0 * freq)))
+  for k in 1 .. maxK:
+    # saw: every harmonic at 1/k. square: odd only, 1/k. triangle: odd only,
+    # 1/k^2 with alternating sign.
+    let amp =
+      case wave
+      of wSine: (if k == 1: 1.0 else: 0.0)
+      of wSaw: 1.0 / k.float
+      of wSquare: (if k mod 2 == 0: 0.0 else: 1.0 / k.float)
+      of wTriangle:
+        if k mod 2 == 0: 0.0
+        else: (if (k div 2) mod 2 == 0: 1.0 else: -1.0) / (k * k).float
+    if amp == 0.0: continue
+    for i in 0 ..< toneTableLen:
+      acc[i] += amp * sin(2.0 * PI * k.float * i.float / toneTableLen.float)
+  var peak = 0.0
+  for v in acc:
+    peak = max(peak, abs(v))
+  if peak == 0.0: peak = 1.0
+  result = newSeq[float32](toneTableLen)
+  for i in 0 ..< toneTableLen:
+    result[i] = float32(acc[i] / peak)
+
+func synthTone(table: seq[float32], freq: float, startSample, count: int,
+    channels: cint, sr: cint): seq[int16] =
+  ## Play `table` at `freq`, the same on every channel. Phase is taken from the
+  ## absolute output-sample index rather than carried in state, so it stays
+  ## continuous across the producer's chunk boundaries and across adjacent clips
+  ## holding the same note.
+  let cyclesPerSample = freq / sr.float
+  result = newSeq[int16](count * channels)
+  for i in 0 ..< count:
+    let ph = float(startSample + i) * cyclesPerSample
+    let pos = (ph - floor(ph)) * toneTableLen.float
+    let i0 = min(int(pos), toneTableLen - 1)
+    let i1 = (if i0 + 1 == toneTableLen: 0 else: i0 + 1)
+    let frac = pos - i0.float
+    let v = clamp16(int32(round((table[i0].float * (1.0 - frac) +
+      table[i1].float * frac) * tonePeak)))
+    for ch in 0 ..< channels:
+      result[i * channels + ch] = v
+
+func toneOf(effects: Actions, act: var Action): bool =
+  ## The `tone` a synthesized layer carries; false means plain silence.
+  for e in effects:
+    if e.kind == actTone:
+      act = e
+      return true
+
 func channels(self: Getter): cint =
   self.layout.nb_channels
 
@@ -670,9 +731,20 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       for clip in tl.a[layerIndex]:
+        if clip.src == nil:
+          continue
         let key = (clip.src[], clip.stream)
         if key notin samples:
           samples[key] = newGetter(clip.src[], clip.stream, sr)
+
+  # A low note sums thousands of harmonics per table point, and a timeline can
+  # hold hundreds of tone clips (one per kept section), so build each table once.
+  var toneTables = initTable[(Waveform, uint8), seq[float32]]()
+  proc tableFor(act: Action): seq[float32] =
+    let key = (act.wave, act.note)
+    if key notin toneTables:
+      toneTables[key] = toneTable(act.wave, noteFreq(act.note), sr)
+    toneTables[key]
 
   # Calculate total duration across specified layers
   var totalDuration: int64 = 0
@@ -728,9 +800,6 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let lo = max(cStart, startSample)
         let hi = min(cStart + cDur, startSample + count)
         if hi <= lo: continue
-        let key = (clip.src[], clip.stream)
-        if key notin samples: continue
-        let getter = samples[key]
         let effectGroup = tl.effects[clip.effects]
         var speed = 1.0
         var duckAct: Action
@@ -741,14 +810,29 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           elif e.kind == actDuck:
             duckAct = e
             hasDuck = true
-        let sourceSr = getter.stream.codecpar.sample_rate.float64
-        let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
-        let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
-        let srcData = getter.get(sampStart, sampEnd)
+        var srcData: seq[int16]
+        var srcSr = sr
+        var srcLayout = tl.layout
+        if clip.src == nil:
+          var tone: Action
+          if not toneOf(effectGroup, tone):
+            continue # silent base layer: contributes nothing
+          srcData = synthTone(tableFor(tone), noteFreq(tone.note), cStart,
+            int(round(cDur.float64 * speed)), targetChannels, sr)
+        else:
+          let key = (clip.src[], clip.stream)
+          if key notin samples: continue
+          let getter = samples[key]
+          srcSr = getter.stream.codecpar.sample_rate
+          srcLayout = getter.layout
+          let sourceSr = srcSr.float64
+          let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
+          let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
+          srcData = getter.get(sampStart, sampEnd)
         var processed = processAudioClip(tl.effects, clip, srcData,
-            getter.stream.codecpar.sample_rate, sr, getter.layout, tb.float)
+            srcSr, sr, srcLayout, tb.float)
         if processed.len == 0: continue
-        let srcCh = getter.channels
+        let srcCh = srcLayout.nb_channels
         let avail = processed.len div srcCh
         if hasDuck:
           let above = activeLayers.filterIt(it > li)
@@ -830,27 +914,47 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let fadeOutEdge = idx == tl.a[bestLi].len - 1 or
           not sameRun(tl.effects, clip, tl.a[bestLi][idx + 1])
 
-        let key = (clip.src[], clip.stream)
         let effectGroup = tl.effects[clip.effects]
         var speed = 1.0
         for effect in effectGroup:
           if effect.kind == actSpeed:
             speed *= effect.val
 
-        if key in samples:
-          let getter = samples[key]
-          let sourceSr = getter.stream.codecpar.sample_rate.float64
-          let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
-          let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
-          let srcData = getter.get(sampStart, sampEnd)
-          let (startSample, durSamples) =
-            audioSampleSpan(clip.start, clip.dur, sr, tb)
+        let (startSample, durSamples) =
+          audioSampleSpan(clip.start, clip.dur, sr, tb)
 
+        # A source-less clip is a synthesized layer (`add:tone`) or the silent
+        # base that carries one; there is no getter to read from.
+        var srcData: seq[int16]
+        var srcSr = sr
+        var srcLayout = tl.layout
+        var haveData = false
+        if clip.src == nil:
+          var tone: Action
+          if toneOf(effectGroup, tone):
+            # Match the source path's speed-scaled span, so a chained `atempo`
+            # lands back on `dur` instead of leaving a gap.
+            srcData = synthTone(tableFor(tone), noteFreq(tone.note), startSample,
+              int(round(durSamples.float64 * speed)), targetChannels, sr)
+            haveData = true
+        else:
+          let key = (clip.src[], clip.stream)
+          if key in samples:
+            let getter = samples[key]
+            srcSr = getter.stream.codecpar.sample_rate
+            srcLayout = getter.layout
+            let sourceSr = srcSr.float64
+            let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
+            let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
+            srcData = getter.get(sampStart, sampEnd)
+            haveData = true
+
+        if haveData:
           let processedData = processAudioClip(tl.effects, clip, srcData,
-              getter.stream.codecpar.sample_rate, sr, getter.layout, tb.float)
+              srcSr, sr, srcLayout, tb.float)
 
           if processedData.len > 0:
-            let sourceChannels = getter.channels
+            let sourceChannels = srcLayout.nb_channels
             let numSamples = processedData.len div sourceChannels
             let n = min(durSamples, numSamples)
             # Autoduck: scale this clip by the sidechain (active layers above it).
