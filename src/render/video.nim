@@ -1272,7 +1272,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let col = effect.dbColor.toString
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("drawbox",
-            &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}:color={col}:t=fill")
+            # replace=1: on a generator/keyed layer the canvas alpha is 0, and
+            # compositing an opaque box over it would leave it invisible.
+            &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}" &
+              &":color={col}:t=fill:replace=1")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
       of actColorKey, actChromaKey:

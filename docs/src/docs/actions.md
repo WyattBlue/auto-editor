@@ -235,6 +235,9 @@ auto-editor video.mp4 -w:1 drawbox:100:100:400:200:red
 auto-editor video.mp4 -w:1 drawbox:0:0:1920:200:#000000
 ```
 
+`drawbox` is also a **generator action**: `add:drawbox:...` paints the box on
+its own overlay layer instead of onto the picture (see [add](#add) below).
+
 **How it works:** Uses FFmpeg's `drawbox` filter with `t=fill`, so the
 rectangle is filled rather than outlined. Only RGB colors are supported.
 
@@ -257,10 +260,12 @@ Overlay an image or video on top of the matched sections, `add:path` or
 `add:path:x:y:scale`:
 
 - **path** — a media file (e.g. a PNG logo or a video). Still images are held
-  for the whole section. In place of a file, `confetti` (with its usual
-  arguments) names a **generator**: the layer starts as a transparent canvas
-  that the action paints, so the picture below shows through everywhere it did
-  not draw. See [confetti](/ref/actions#confetti).
+  for the whole section. In place of a file, a **generator action** (with its
+  usual arguments) may be given: the layer starts as a transparent canvas that
+  the action paints, so the picture below shows through everywhere it did not
+  draw. The generators are [confetti](/ref/actions#confetti) and
+  [drawbox](/ref/actions#drawbox) (marked `G` in the
+  [quick reference](/ref/actions#quick-reference)).
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
   (above). When omitted, the overlay is scaled to fit the canvas (preserving
   aspect ratio) and centered, like a full-frame layer. Each may be a **ramp**
@@ -290,6 +295,9 @@ auto-editor video.mp4 -w:1 add:confetti:300:white,invert
 
 # Audio plus a confetti layer: a video with no footage
 auto-editor song.mp3 -w:1 add:confetti:300:white
+
+# A box on its own layer, so later actions hit only the box
+auto-editor video.mp4 -w:1 add:drawbox:100:100:400:200:red,opacity:0.5
 ```
 
 Unlike the other actions, `add` is **virtual**: it is not a per-frame effect but

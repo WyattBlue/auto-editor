@@ -29,7 +29,8 @@ proc renderAction(a: ActionDef): string =
 
 proc renderTable(): string =
   result.add "<h2 id=\"quick-reference\" style=\"text-decoration:underline;\">Quick reference</h2>\n"
-  result.add "<p>Type: A=audio, V=video, *=animatable.</p>\n\n"
+  result.add "<p>Type: A=audio, V=video, *=animatable, G=generator " &
+    "(usable as an <code>add:</code> layer).</p>\n\n"
   result.add "| Action | Arguments | Range | Type | Summary |\n"
   result.add "| --- | --- | --- | --- | --- |\n"
   for a in actionDefs:

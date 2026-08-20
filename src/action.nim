@@ -113,6 +113,7 @@ type
     afAudio,
     afVideo,
     afAnimatable       # value can be a keyframe ramp (`a..b..c`) with easing
+    afGenerator        # may stand in for a file in `add:`, painting a clear canvas
   ActionFlags* = set[ActionFlag]
 
   RangeDoc* = object
@@ -159,6 +160,7 @@ func `$`*(f: ActionFlags): string =
   if afAudio in f: result &= "A"
   if afVideo in f: result &= "V"
   if afAnimatable in f: result &= "*"
+  if afGenerator in f: result &= "G"
 
 const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "nil", flags: {afAudio, afVideo},
@@ -211,8 +213,8 @@ Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to 
     help: "Rotate the picture clockwise about its center by a fixed `deg` angle, expanding the frame so nothing is clipped and filling the exposed corners with the background color. Good for aspect flips, e.g. `rotate:90`. For a continuous spin, use `spin` instead."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
-  ActionDef(name: "drawbox", flags: {afVideo}, argSpec: "x:y:w:h:color",
-    help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
+  ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
+    help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. As a generator it can take a file's place in `add:`, painting the box on its own overlay layer, e.g. `add:drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
   ActionDef(name: "pos", flags: {afVideo, afAnimatable}, argSpec: "x:y[:scale]",
     help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`. Animatable: each of `x`, `y`, and `scale` accepts a keyframe ramp `a..b..c` interpolated across the section, optionally eased with `:ease=`, e.g. `pos:0..600:300:1..0.5:ease=inout` slides the overlay across while shrinking it."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
@@ -238,13 +240,13 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
   ActionDef(name: "pixelate", flags: {afVideo}, argSpec: "[w[:h]]", range: rng(1.0, 1024.0, each = true),
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
-  ActionDef(name: "confetti", flags: {afVideo}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
+  ActionDef(name: "confetti", flags: {afVideo, afGenerator}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
     help: """
 Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
 Every argument is optional and they may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
 `count` is 1 to 400 (default 200). `gravity` is 0 to 20 (default 1.4), in frame-heights per second squared so it looks the same at any resolution. It sets how fast the pieces come back rather than how high they go: each is thrown to its own fraction of the way up the frame, and each catches its own amount of air, so they do not come down together. `seed=N` (0 to 65535, default 0) reshuffles the arrangement and changes nothing else, so bump it if you do not like how one landed.
 `scheme` is `party` (default), `neon`, `gold`, `duotone`, or `white`. A chip flashes white as it turns edge-on, catching the light like foil; add `no-shimmer` to keep every piece its flat color. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
-Drawn onto the frame, so it is not carried into video-editor exports. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
+Drawn onto the frame, so it is not carried into video-editor exports. As a generator it can take a file's place in `add:`, painting the confetti on its own overlay layer, e.g. `add:confetti:300`. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
 
 const actionNames* = block:
@@ -263,6 +265,14 @@ const animScalar* = block:
   var names: seq[string]
   for a in actionDefs:
     if afAnimatable in a.flags:
+      names.add a.name
+  names
+
+# Actions that can take a file's place in `add:` (the `afGenerator` actions).
+const generatorActions* = block:
+  var names: seq[string]
+  for a in actionDefs:
+    if afGenerator in a.flags:
       names.add a.name
   names
 
