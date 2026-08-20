@@ -160,7 +160,7 @@ proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
       speed = 99999.0
     else:
       for action in actionGroup:
-        if action.kind in [actSpeed, actVarispeed]:
+        if action.kind == actSpeed:
           speed *= action.val
 
     let effectIndex = chunk[2]
@@ -232,7 +232,7 @@ proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
       continue
     var speed = 1.0
     for effect in effectGroup:
-      if effect.kind == actSpeed or effect.kind == actVarispeed:
+      if effect.kind == actSpeed:
         speed *= effect.val
 
     let (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
@@ -336,7 +336,7 @@ proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
     for i, clip in clips:
       speeds[i] = 1.0
       for action in timelineEffects[clip.effects]:
-        if action.kind in [actSpeed, actVarispeed]: speeds[i] *= action.val
+        if action.kind == actSpeed: speeds[i] *= action.val
 
     var centers: seq[Transition]
     for i in 0 ..< clips.len - 1:

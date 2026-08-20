@@ -1129,7 +1129,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     for effect in effects:
       confineThis = confineActive and effect.kind in confinable
       case effect.kind:
-      of actSpeed, actVarispeed, actVolume, actDeesser, actDuck, actPitch, actPos,
+      of actSpeed, actVolume, actDeesser, actDuck, actPitch, actPos,
           actRotate, actLoop: discard
       of actSpin:
         let rate = effect.sRate
@@ -1697,7 +1697,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             var oscale = 1.0'f32
             var hasPos = false
             for effect in effectGroup:
-              if effect.kind in [actSpeed, actVarispeed]:
+              if effect.kind == actSpeed:
                 speed *= effect.val
               elif effect.kind == actPos:
                 hasPos = true

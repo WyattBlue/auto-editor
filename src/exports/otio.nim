@@ -301,7 +301,7 @@ proc clipSpeed(actions: Actions): float =
   # round-trip regardless of how we write the file.
   result = 1.0
   for a in actions:
-    if a.kind in [actSpeed, actVarispeed]:
+    if a.kind == actSpeed:
       result *= a.val.float
 
 proc hasAction(actions: Actions, kind: ActionKind): bool =

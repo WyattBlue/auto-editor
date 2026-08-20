@@ -9,8 +9,8 @@ template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
 type
   # The order is part of the API
   ActionKind* = enum
-    actSpeed, actVarispeed,
-    # Can add 2 more [VA] actions
+    actSpeed,
+    # Can add 3 more [VA] actions
     actVolume = 4,
     actDeesser, actDuck, actPitch,
     # Can add 12 more [A] actions
@@ -56,8 +56,9 @@ type
       sRate*: float32        # spin rate in degrees/second (continuous)
     of actLens:
       k1*, k2*: Snorm16
-    of actSpeed, actVarispeed:
+    of actSpeed:
       val*: float32
+      varispeed*: bool
     of actZoom, actBlur, actOpacity, actBrightness, actVolume:
       kf*: seq[float32]      # keyframes in native units; len >= 1
     of actDeesser:
@@ -129,6 +130,7 @@ type
 
 const
   easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
+  varispeedFlag = 0x80'u8  # same bit on a speed action's header byte
   schemeMask = 0x07'u8
   originMask = 0x03'u8
   originShift = 3
@@ -805,9 +807,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       # speed <= 0 makes the renderer's atempo decomposition loop forever.
       if not (effectVal > 0.0 and effectVal < 99999.0):
         raise newException(ActionParseError, &"{effectType} must be in range (0, 99999)")
-      if effectType == "speed":
-        return Action(kind: actSpeed, val: effectVal)
-      return Action(kind: actVarispeed, val: effectVal)
+      return Action(kind: actSpeed, val: effectVal,
+        varispeed: effectType == "varispeed")
     of "pitch":
       # `not (a and b)` so NaN fails the check too; int16(NaN) is UB.
       if not (effectVal >= -24.0 and effectVal <= 24.0):
@@ -865,8 +866,8 @@ when not defined(nimscript):
     of actVflip: "vflip"
     of actLoop: "loop"
     of actErosion: "erosion"
-    of actSpeed: &"speed:{act.val}"
-    of actVarispeed: &"varispeed:{act.val}"
+    of actSpeed:
+      if act.varispeed: &"varispeed:{act.val}" else: &"speed:{act.val}"
     of actVolume: &"volume:{kfStr(act)}{easeSuffix(act)}"
     of actDeesser: &"deesser:{act.intensity}:{act.maxd}:{act.freq}"
     of actPitch: &"pitch:{act.pCents.float32 / 100.0'f32}"
@@ -931,7 +932,7 @@ when not defined(nimscript):
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
     of actRotate, actPitch: 3
-    of actLens, actSpeed, actVarispeed, actPixelate: 5
+    of actLens, actSpeed, actPixelate: 5
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
     of actDuck: 9
@@ -986,10 +987,11 @@ when not defined(nimscript):
           copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
           yield Action(kind: actLens, k1: k1v, k2: k2v)
           i += 5
-        of actSpeed, actVarispeed:
+        of actSpeed:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
-          yield Action(kind: kind, val: v)
+          yield Action(kind: actSpeed, val: v,
+            varispeed: (base[i] and varispeedFlag) != 0'u8)
           i += 5
         of actDeesser:
           var iu, mu, fu: Unorm16
@@ -1183,7 +1185,8 @@ when not defined(nimscript):
         base.writeAt(i, 1, a.k1)
         base.writeAt(i, 3, a.k2)
         i += 5
-      of actSpeed, actVarispeed:
+      of actSpeed:
+        if a.varispeed: base[i] = base[i] or varispeedFlag
         base.writeAt(i, 1, a.val)
         i += 5
       of actDeesser:

@@ -111,7 +111,7 @@ proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
           speed = 99999.0
         else:
           for effect in effectGroup:
-            if effect.kind == actSpeed or effect.kind == actVarispeed:
+            if effect.kind == actSpeed:
               speed *= effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)

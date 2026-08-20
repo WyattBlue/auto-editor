@@ -137,7 +137,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
   for i, clip in clips:
     let effectGroup = tl.effects[clip.effects]
     for effect in effectGroup:
-      if effect.kind in [actSpeed, actVarispeed]:
+      if effect.kind == actSpeed:
         warpedClips.add(i)
         break
 
@@ -151,9 +151,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
       var speedVal = 1.0
       var warpPitch = false
       for effect in effectGroup:
-        if effect.kind == actSpeed or effect.kind == actVarispeed:
+        if effect.kind == actSpeed:
           speedVal = effect.val
-          warpPitch = effect.kind == actSpeed
+          warpPitch = not effect.varispeed
           break
 
       let prod = newElement("producer")

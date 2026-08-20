@@ -231,10 +231,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
     for effect in effectGroup:
       if effect.kind == actSpeed:
         speedVal *= effect.val
-        lastSpeedWasVarispeed = false
-      elif effect.kind == actVarispeed:
-        speedVal *= effect.val
-        lastSpeedWasVarispeed = true
+        lastSpeedWasVarispeed = effect.varispeed
 
     var node: XmlNode
     if speedVal != 1.0:

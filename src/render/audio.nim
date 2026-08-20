@@ -331,10 +331,8 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
     case effect.kind
     of actSpeed:
       if at < 0: at = filters.len
-      tempo *= effect.val
-    of actVarispeed:
-      if at < 0: at = filters.len
-      rate *= max(0.2, min(100.0, effect.val))
+      if effect.varispeed: rate *= max(0.2, min(100.0, effect.val))
+      else: tempo *= effect.val
     of actPitch:
       if at < 0: at = filters.len
       let ratio = pow(2.0, effect.pCents.float / 1200.0)
@@ -546,7 +544,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
   var pending: seq[Action]
   for effect in ef[clip.effects]:
     case effect.kind
-    of actSpeed, actVarispeed, actDeesser, actPitch:
+    of actSpeed, actDeesser, actPitch:
       pending.add effect
     of actVolume:
       if pending.len > 0:
@@ -631,7 +629,7 @@ const audioFadeMs = 3.0
 func clipSpeed(effs: seq[Actions], clip: Clip): float64 =
   result = 1.0
   for e in effs[clip.effects]:
-    if e.kind in [actSpeed, actVarispeed]:
+    if e.kind == actSpeed:
       result *= e.val
 
 func sameRun(effs: seq[Actions], a, b: Clip): bool =
@@ -738,7 +736,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         var duckAct: Action
         var hasDuck = false
         for e in effectGroup:
-          if e.kind in [actSpeed, actVarispeed]:
+          if e.kind == actSpeed:
             speed *= e.val
           elif e.kind == actDuck:
             duckAct = e
@@ -836,7 +834,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let effectGroup = tl.effects[clip.effects]
         var speed = 1.0
         for effect in effectGroup:
-          if effect.kind in [actSpeed, actVarispeed]:
+          if effect.kind == actSpeed:
             speed *= effect.val
 
         if key in samples:

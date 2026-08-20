@@ -136,8 +136,7 @@ func clipFilters(effects: Actions, isVideo: bool, inFrame, outFrame, dur: int64,
     if a.kind in seen: continue
     seen.incl a.kind
     case a.kind
-    of actSpeed, actVarispeed:
-      seen.incl {actSpeed, actVarispeed}
+    of actSpeed:
       result.add speedup(a.val * 100)
     of actOpacity:
       if isVideo:
