@@ -204,8 +204,8 @@ let svtav1 = Package(
 )
 let whisper = Package(
   name: "whisper",
-  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.1.tar.gz",
-  sha256: "147267177eef7b22ec3d2476dd514d1b12e160e176230b740e3d1bd600118447",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.4.tar.gz",
+  sha256: "57e280cee375ab02425b806ad5146b99f6eb9357e3c2b31357c8a6af2e2e44ae",
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
@@ -214,6 +214,7 @@ let whisper = Package(
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
     "-DWHISPER_BUILD_SERVER=OFF",
+    "-DWHISPER_BUILD_IS_DEV=OFF", # Building from a release tag, not a nightly
     when defined(macosx) and hostCPU == "arm64": "-DGGML_METAL=ON" else: "-DGGML_METAL=OFF",
     when defined(macosx): "-DGGML_METAL_EMBED_LIBRARY=ON" else: "-DGGML_METAL_EMBED_LIBRARY=OFF",
     when defined(macosx): "-DGGML_BLAS=ON" else: "-DGGML_BLAS=OFF",
@@ -283,7 +284,7 @@ func dirName(package: Package): string =
   if package.name == "amf-headers":
     return "AMF-1.5.2"
   if package.name == "whisper":
-    return "whisper.cpp-1.9.1"
+    return "whisper.cpp-1.9.4"
   if package.name == "lamer":
     return "lamer-3.101.0"
 
@@ -446,7 +447,7 @@ includedir=${{prefix}}/include
 
 Name: whisper
 Description: whisper.cpp
-Version: 1.9.1
+Version: 1.9.4
 Libs: {libs}
 Libs.private: {libsPrivate}
 Cflags: -I${{includedir}}
@@ -472,6 +473,7 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
           "-DGGML_BLAS=OFF", "-DGGML_OPENMP=OFF", "-DGGML_BACKEND_DL=OFF",
           "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
           "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
+          "-DWHISPER_BUILD_IS_DEV=OFF",
         ]
         # -msimd128 enables ggml's hand-written wasm SIMD paths; -mfma exposes
         # the compatible FMA intrinsics and -mrelaxed-simd enables fused ops.
@@ -516,7 +518,7 @@ includedir=${{prefix}}/include
 
 Name: whisper
 Description: whisper.cpp
-Version: 1.9.1
+Version: 1.9.4
 Libs: -L${{libdir}} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu
 Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
