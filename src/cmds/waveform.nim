@@ -187,5 +187,5 @@ proc main*(strArgs: seq[string]) =
     echo "@offset 0"
   echo ""
 
-  if not windowed and not noCache:
+  if not windowed and not noCache and decodeErrors == 0:
     writeCache(flat, cacheTb, inputFile, "waveform", cacheArgs)

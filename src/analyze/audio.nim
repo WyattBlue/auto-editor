@@ -440,6 +440,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   let audioStream: ptr AVStream = container.audio[stream]
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
+  let errorsBefore = decodeErrors
 
   var processor = AudioProcessor(codecCtx: initDecoder(audioStream.codecpar),
     audioIndex: audioStream.index, channel: channel, chunkDuration: av_inv_q(tb))
@@ -460,5 +461,5 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  if not noCache:
+  if not noCache and decodeErrors == errorsBefore:
     writeCache(result, tb, path, "audio", cacheArgs)

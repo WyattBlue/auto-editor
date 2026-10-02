@@ -614,7 +614,7 @@ proc editMedia*(args: var mainArgs) =
   bar.destroy()
 
   let seconds = round(epochTime() - start, 2)
-  echo &"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})"
+  stderr.writeLine(&"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})")
 
   if args.noOpen:
     discard

@@ -164,14 +164,16 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
     if packet.stream_index == processor.videoIndex:
       ret = avcodec_send_packet(processor.codecCtx, packet)
       if ret < 0 and ret != AVERROR_EAGAIN:
-        error &"Error sending packet to decoder: {av_err2str(ret)}"
+        noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
+        ret = AVERROR_EAGAIN
 
       while ret >= 0:
         ret = avcodec_receive_frame(processor.codecCtx, frame)
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error &"Error receiving frame from decoder: {av_err2str(ret)}"
+          noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
+          break
 
         frame.pts = bestPts(frame)
         if frame.pts == AV_NOPTS_VALUE:
@@ -282,6 +284,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   let videoStream: ptr AVStream = container.video[stream]
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
+  let errorsBefore = decodeErrors
 
   var processor = VideoProcessor(formatCtx: container.formatContext,
     codecCtx: initDecoder(videoStream.codecpar), tb: tb,
@@ -302,5 +305,5 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  if not noCache:
+  if not noCache and decodeErrors == errorsBefore:
     writeCache(result, tb, path, "motion", cacheArgs)

@@ -152,8 +152,8 @@ proc conwrite*(msg: string) {.raises: [].} =
       else:
         let columns = terminalWidth()
         let buffer: string = " ".repeat(max(0, columns - msg.len - 3))
-        stdout.write("  " & msg & buffer & "\r")
-      stdout.flushFile()
+        stderr.write("  " & msg & buffer & "\r")
+      stderr.flushFile()
     except IOError:
       discard
 

@@ -134,8 +134,8 @@ proc progressWorker(data: ThreadData) {.thread.} =
     when defined(emscripten):
       wasmProgressWrite(output.cstring)
     else:
-      stdout.write(output & "\r")
-      stdout.flushFile()
+      stderr.write(output & "\r")
+      stderr.flushFile()
 
     lastProgress = currentProgress
     sleep(sleepRate)
@@ -207,8 +207,8 @@ func displayLen(title: string): int =
 proc start*(bar: Bar, total: float, title: string) =
   if not bar.hide:
     when defined(windows):
-      stdout.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
-      stdout.flushFile()
+      stderr.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
+      stderr.flushFile()
 
     bar.threadData.title = title
     bar.threadData.lenTitle = displayLen(title)
@@ -226,10 +226,10 @@ proc `end`*(bar: Bar) =
     while not bar.threadData.sleeping.load():
       sleep(1)
     let columns = terminalWidth()
-    stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
+    stderr.write(" ".repeat(max(0, columns - 2)) & "\r")
     when defined(windows):
-      stdout.write("\x1b[?25h") # restore cursor
-    stdout.flushFile()
+      stderr.write("\x1b[?25h") # restore cursor
+    stderr.flushFile()
   if bar.stack.len > 0:
     bar.stack.setLen(bar.stack.len - 1)
 
@@ -240,7 +240,7 @@ proc destroy*(bar: Bar) =
   when defined(windows):
     if not bar.hide:
       try:
-        stdout.write("\x1b[?25h")
-        stdout.flushFile()
+        stderr.write("\x1b[?25h")
+        stderr.flushFile()
       except IOError:
         discard

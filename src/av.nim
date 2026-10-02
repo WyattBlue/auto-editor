@@ -322,6 +322,13 @@ proc resetDiscards*(container: InputContainer) =
   for i in 0 ..< container.formatContext.nb_streams.int:
     container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
 
+var decodeErrors*: int
+
+proc noteDecodeError*(msg: string) {.raises: [].} =
+  inc decodeErrors
+  if decodeErrors == 1:
+    warning &"{msg} (skipping packet; further decode errors are only counted)"
+
 iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
     frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
@@ -337,16 +344,21 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
     if packet.stream_index == index:
       ret = avcodec_send_packet(codecCtx, packet)
       if ret < 0 and ret != AVERROR_EAGAIN:
-        error &"Error sending packet to decoder: {av_err2str(ret)}"
+        noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
+      else:
+        while true:
+          ret = avcodec_receive_frame(codecCtx, frame)
+          if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+            break
+          elif ret < 0:
+            noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
+            break
 
-      while true:
-        ret = avcodec_receive_frame(codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-          break
-        elif ret < 0:
-          error &"Error receiving frame from decoder: {av_err2str(ret)}"
+          yield frame
 
-        yield frame
+  discard avcodec_send_packet(codecCtx, nil)
+  while avcodec_receive_frame(codecCtx, frame) == 0:
+    yield frame
 
 iterator flushDecode*(container: InputContainer, index: cint,
     codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =

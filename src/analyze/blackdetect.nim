@@ -47,6 +47,7 @@ proc blackdetect*(bar: Bar, container: InputContainer, path: string, tb: AVRatio
   let videoStream: ptr AVStream = container.video[stream]
   # Rewind so a shared container can be re-read for additional streams.
   container.seek(0)
+  let errorsBefore = decodeErrors
 
   var processor = VideoProcessor(formatCtx: container.formatContext,
     codecCtx: initDecoder(videoStream.codecpar), tb: tb,
@@ -67,5 +68,5 @@ proc blackdetect*(bar: Bar, container: InputContainer, path: string, tb: AVRatio
 
   bar.`end`()
 
-  if not noCache:
+  if not noCache and decodeErrors == errorsBefore:
     writeCache(result, tb, path, "blackdetect", cacheArgs)

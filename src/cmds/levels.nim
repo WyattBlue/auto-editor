@@ -277,5 +277,9 @@ proc main*(strArgs: seq[string]) =
     for value in values:
       echo (if value: "1" else: "0")
 
-  if not noCache and editMethod notin ["subtitle", "word", "regex"]:
+  if not noCache and decodeErrors == 0 and
+      editMethod notin ["subtitle", "word", "regex"]:
     writeCache(data, tb, inputFile, editMethod, cacheArgs)
+
+  if decodeErrors > 0:
+    error &"Could not decode {decodeErrors} packet(s); levels are incomplete."
