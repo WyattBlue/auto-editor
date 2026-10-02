@@ -76,15 +76,16 @@ automatically.
 
 ## Animations — ramps `from..to`
 
-`zoom`, `opacity`, `blur`, `brightness`, `volume`, and each `pos` field accept a
-ramp. The value interpolates across the section, reaching `to` on its last frame.
-More than two points = keyframes, spread evenly.
+`zoom`, `opacity`, `blur`, `brightness`, `volume`, and each `pos` and `pixelate`
+field accept a ramp. The value interpolates across the section, reaching `to` on
+its last frame. More than two points = keyframes, spread evenly.
 
 ```bash
 auto-editor video.mp4 -w:1 zoom:1..1.5          # Ken Burns
 auto-editor video.mp4 -w:1 opacity:0..1         # fade in
 auto-editor video.mp4 -w:1 volume:0..1          # audio fade in
 auto-editor video.mp4 -w:1 zoom:1..1.5..1       # zoom in then out (keyframes)
+auto-editor video.mp4 -w:1 pixelate:1..64       # dissolve into coarser blocks
 auto-editor video.mp4 -w:1 add:./logo.png,pos:0..1200:40:1..0.5  # slide + shrink overlay
 ```
 

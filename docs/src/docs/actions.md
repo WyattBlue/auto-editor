@@ -435,8 +435,9 @@ plus `volume` for audio — accept a **ramp** instead of a single value, written
 over time. (For rotation, use the constant-speed `rotate:deg/rate` form
 described above.)
 
-`pos` is animatable too: each of its `x`, `y`, and `scale` fields takes its own
-ramp, so an overlay can slide and resize across the section.
+`pos` and `pixelate` are animatable too: each of their fields (`x`, `y` and
+`scale`; block `w` and `h`) takes its own ramp, so an overlay can slide and
+resize across the section and a mosaic can coarsen as it plays.
 
 ```sh
 # Slowly zoom in from 1x to 1.5x across the section (Ken Burns)
@@ -450,6 +451,9 @@ auto-editor video.mp4 -w:1 volume:0..1
 
 # Slide a logo across the frame while shrinking it
 auto-editor video.mp4 -w:1 add:./logo.png,pos:0..1200:40:1..0.5
+
+# Dissolve the picture into ever-coarser blocks
+auto-editor video.mp4 -w:1 pixelate:1..64
 ```
 
 The ramp reaches `to` on the section's last frame.
@@ -553,6 +557,9 @@ auto-editor video.mp4 -w:0 speed:6,volume:0.4
 
 # Censor a face/plate: pixelate only a rectangular region
 auto-editor video.mp4 -w:1 confine:400:300:200:80,pixelate:24
+
+# Ramp the censor up, easing into a 48px mosaic
+auto-editor video.mp4 -w:1 pixelate:4..48:ease=inout
 ```
 
 ## See Also

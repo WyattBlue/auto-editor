@@ -102,7 +102,10 @@ type
       mFeather*: uint8       # soft-edge width in px (0 = hard edge)
       mX*, mY*, mW*, mH*: int32
     of actPixelate:
-      pixW*, pixH*: uint16   # mosaic block size in px (square when equal)
+      # Mosaic block size in px, each an animatable ramp (len 1 = static,
+      # square blocks when the two match). Whole pixels: atf-8 packs them as
+      # uint16, so a fractional keyframe could not round-trip.
+      pixWKf*, pixHKf*: seq[float32]
     of actConfetti:
       cCount*: uint16
       cGravity*: float32
@@ -250,8 +253,8 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Cut the picture to a rounded-rectangle or ellipse, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."),
   ActionDef(name: "confine", flags: {afVideo}, argSpec: "[x:y:w:h[:radius][:feather][:invert]]",
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
-  ActionDef(name: "pixelate", flags: {afVideo}, argSpec: "[w[:h]]", range: rng(1.0, 1024.0, each = true),
-    help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter."),
+  ActionDef(name: "pixelate", flags: {afVideo, afAnimatable}, argSpec: "[w[..w...][:h[..h...]]]", range: rng(1.0, 1024.0, each = true),
+    help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter. Animatable: `w` and `h` each accept a keyframe ramp `a..b..c` of whole pixel sizes interpolated across the section, optionally eased with `:ease=`, e.g. `pixelate:1..48:ease=in` dissolves the picture into ever-coarser blocks."),
   ActionDef(name: "confetti", flags: {afVideo, afGenerator}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
     help: """
 Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
@@ -378,6 +381,13 @@ func rotDeg*(code: Unorm16): float32 =
   ## Decode a circular rotate angle back into [0, 360) degrees.
   uint16(code).float32 / 65536.0'f32 * 360.0'f32
 
+func pixCode(v: float32): uint16 =
+  ## Quantize a pixelate block size for the atf-8 form. Parsing already bounds
+  ## keyframes to whole pixels in [1, 1024]; the guard keeps a programmatically
+  ## built Action off uint16(NaN), which is UB.
+  if v != v: return 1
+  uint16(max(1.0'f32, min(1024.0'f32, round(v))))
+
 func rotCode(deg: float32): uint16 =
   ## Quantize degrees into a circular [0, 360) bucket (see the rotate action).
   let turns = deg / 360.0'f32
@@ -408,6 +418,19 @@ proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   of "out": easeOut
   of "inout", "in-out": easeInOut
   else: raise newException(ActionParseError, &"Unknown easing: {spec}")
+
+proc parseEaseTail(act: var Action, parts: seq[string], idx: int,
+    val: string) {.raises: [ActionParseError].} =
+  ## Consume an animatable action's trailing ":ease=curve[:duration]", which
+  ## starts at parts[idx]; anything else trailing there is not a valid action.
+  if idx >= parts.len:
+    return
+  if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
+    raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
+  act.hasEase = true
+  act.easeCurve = parseEasing(parts[idx])
+  if parts.len == idx + 2:
+    (act.easeDur, act.easeDurUnit) = parseDuration(parts[idx + 1])
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
@@ -620,16 +643,32 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       raise newException(ActionParseError, "choke must be in [1, 16]")
     return Action(kind: actChoke, chokeN: uint8(n))
 
-  # pixelate: bare = 16px blocks; pixelate:n = n square; pixelate:w:h = rectangular.
-  if parts[0] == "pixelate" and parts.len <= 3:
-    var wh = [16, 16]
-    for idx in 1 ..< parts.len:
-      let n = pInt(parts[idx])
-      if n < 1 or n > 1024:
-        raise newException(ActionParseError, "pixelate block size must be in [1, 1024]")
-      if parts.len == 2: wh = [n, n]  # single value = square blocks
-      else: wh[idx - 1] = n
-    return Action(kind: actPixelate, pixW: uint16(wh[0]), pixH: uint16(wh[1]))
+  # pixelate: bare = 16px blocks; pixelate:n = n square; pixelate:w:h =
+  # rectangular. Each size is a ramp with an optional ease suffix:
+  #   pixelate:24   pixelate:1..48   pixelate:8..40:8:ease=inout
+  if parts[0] == "pixelate":
+    proc blockKf(spec: string): seq[float32] {.raises: [ActionParseError].} =
+      result = parseKeyframes(spec)
+      for v in result:
+        # `not (a and b)` so NaN fails the check too; uint16(NaN) is UB.
+        if not (v >= 1.0'f32 and v <= 1024.0'f32 and v == round(v)):
+          raise newException(ActionParseError,
+            "pixelate block size must be a whole number in [1, 1024]")
+
+    var idx = 1
+    var wKf = @[16.0'f32]
+    var hKf: seq[float32] = @[]
+    if parts.len > idx and not parts[idx].startsWith("ease="):
+      wKf = blockKf(parts[idx])
+      inc idx
+      if parts.len > idx and not parts[idx].startsWith("ease="):
+        hKf = blockKf(parts[idx])
+        inc idx
+    if hKf.len == 0:  # one ramp given: square blocks
+      hKf = wKf
+    result = Action(kind: actPixelate, pixWKf: wKf, pixHKf: hKf)
+    result.parseEaseTail(parts, idx, val)
+    return result
 
   # confetti: [count[:gravity][:scheme][:origin]]. Scheme and origin are name
   # tokens, so every argument can be given in any order; bare numbers fill
@@ -772,19 +811,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     for v in sKf:
       if v <= 0.0'f32:
         raise newException(ActionParseError, "pos scale must be greater than 0.0")
-    var hasE = false
-    var curve = easeLinear
-    var unit = duClip
-    var dur = 0.0'f32
-    if parts.len > idx:
-      if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
-        raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
-      hasE = true
-      curve = parseEasing(parts[idx])
-      if parts.len == idx + 2:
-        (dur, unit) = parseDuration(parts[idx + 1])
-    return Action(kind: actPos, pxKf: xKf, pyKf: yKf, pscaleKf: sKf,
-      hasEase: hasE, easeCurve: curve, easeDurUnit: unit, easeDur: dur)
+    result = Action(kind: actPos, pxKf: xKf, pyKf: yKf, pscaleKf: sKf)
+    result.parseEaseTail(parts, idx, val)
+    return result
 
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
@@ -805,34 +834,14 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
     else: discard  # blur: any value
 
-    var hasE = false
-    var curve = easeLinear
-    var unit = duClip
-    var dur = 0.0'f32
-    if parts.len >= 3:
-      if not parts[2].startsWith("ease=") or parts.len > 4:
-        raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
-      hasE = true
-      curve = parseEasing(parts[2])
-      if parts.len == 4:
-        (dur, unit) = parseDuration(parts[3])
-
-    case parts[0]
-    of "zoom":
-      return Action(kind: actZoom, kf: kf, hasEase: hasE, easeCurve: curve,
-        easeDurUnit: unit, easeDur: dur)
-    of "blur":
-      return Action(kind: actBlur, kf: kf, hasEase: hasE, easeCurve: curve,
-        easeDurUnit: unit, easeDur: dur)
-    of "opacity":
-      return Action(kind: actOpacity, kf: kf, hasEase: hasE, easeCurve: curve,
-        easeDurUnit: unit, easeDur: dur)
-    of "volume":
-      return Action(kind: actVolume, kf: kf, hasEase: hasE, easeCurve: curve,
-        easeDurUnit: unit, easeDur: dur)
-    else:
-      return Action(kind: actBrightness, kf: kf, hasEase: hasE, easeCurve: curve,
-        easeDurUnit: unit, easeDur: dur)
+    result = case parts[0]
+      of "zoom": Action(kind: actZoom, kf: kf)
+      of "blur": Action(kind: actBlur, kf: kf)
+      of "opacity": Action(kind: actOpacity, kf: kf)
+      of "volume": Action(kind: actVolume, kf: kf)
+      else: Action(kind: actBrightness, kf: kf)
+    result.parseEaseTail(parts, 2, val)
+    return result
 
   if parts.len == 2:
     let effectType = parts[0]
@@ -956,8 +965,13 @@ when not defined(nimscript):
     of actConfine:
       if act.mReset: "confine" else: maskStr(act, "confine")
     of actPixelate:
-      if act.pixW == act.pixH: &"pixelate:{act.pixW}"
-      else: &"pixelate:{act.pixW}:{act.pixH}"
+      var ws, hs: seq[string]
+      for v in act.pixWKf: ws.add $int(round(v))   # block sizes are whole px
+      for v in act.pixHKf: hs.add $int(round(v))
+      let w = ws.join("..")
+      let h = hs.join("..")
+      let sizes = (if w == h: w else: &"{w}:{h}")
+      &"pixelate:{sizes}{easeSuffix(act)}"
     of actConfetti:
       &"confetti:{act.cCount}:{act.cGravity}:" &
         &"{confettiSchemeNames[act.cScheme]}:{confettiOriginNames[act.cOrigin]}" &
@@ -971,7 +985,7 @@ when not defined(nimscript):
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
     of actRotate, actPitch, actTone: 3
-    of actLens, actSpeed, actPixelate: 5
+    of actLens, actSpeed: 5
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
     of actDuck: 9
@@ -980,6 +994,7 @@ when not defined(nimscript):
     of actDrawbox: 20
     of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
     of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
+    of actPixelate: 3 + easeBytes(a) + (a.pixWKf.len + a.pixHKf.len) * 2
     of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
     of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
 
@@ -1085,11 +1100,27 @@ when not defined(nimscript):
             mFeather: feather, mX: x, mY: y, mW: w, mH: h)
           i += 23
         of actPixelate:
-          var w, h: uint16
-          copyMem(addr w, addr base[i + 1], sizeof(uint16))
-          copyMem(addr h, addr base[i + 3], sizeof(uint16))
-          yield Action(kind: actPixelate, pixW: w, pixH: h)
-          i += 5
+          let hasEase = (base[i] and easeFlag) != 0'u8
+          var pos = i + 1
+          var act = Action(kind: actPixelate, hasEase: hasEase)
+          if hasEase:
+            act.easeCurve = Easing(base[pos].int)
+            act.easeDurUnit = DurUnit(base[pos + 1].int)
+            copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
+            pos += 6
+          for which in 0 .. 1:  # width, then height keyframes
+            let count = base[pos].int
+            pos += 1
+            var sizes = newSeq[float32](count)
+            for c in 0 ..< count:
+              var v: uint16
+              copyMem(addr v, addr base[pos], sizeof(uint16))
+              sizes[c] = v.float32
+              pos += 2
+            if which == 0: act.pixWKf = sizes
+            else: act.pixHKf = sizes
+          yield act
+          i = pos
         of actConfetti:
           var count, seed: uint16
           var gravity: float32
@@ -1202,6 +1233,7 @@ when not defined(nimscript):
       # misalign every later field on decode.
       let maxKf = case a.kind
         of actPos: max(a.pxKf.len, max(a.pyKf.len, a.pscaleKf.len))
+        of actPixelate: max(a.pixWKf.len, a.pixHKf.len)
         of actZoom, actBlur, actOpacity, actBrightness, actVolume: a.kf.len
         else: 0
       if maxKf > 255:
@@ -1271,9 +1303,22 @@ when not defined(nimscript):
         base.writeAt(i, 19, a.mRadius)
         i += 23
       of actPixelate:
-        base.writeAt(i, 1, a.pixW)
-        base.writeAt(i, 3, a.pixH)
-        i += 5
+        if a.hasEase: base[i] = base[i] or easeFlag
+        var pos = i + 1
+        if a.hasEase:
+          base[pos] = uint8(ord(a.easeCurve))
+          base[pos + 1] = uint8(ord(a.easeDurUnit))
+          var d = a.easeDur
+          copyMem(addr base[pos + 2], addr d, sizeof(float32))
+          pos += 6
+        for sizes in [a.pixWKf, a.pixHKf]:
+          base[pos] = uint8(sizes.len)
+          pos += 1
+          for v in sizes:
+            var vv = pixCode(v)
+            copyMem(addr base[pos], addr vv, sizeof(uint16))
+            pos += 2
+        i = pos
       of actConfetti:
         base.writeAt(i, 1, a.cCount)
         base.writeAt(i, 3, a.cGravity)
@@ -1377,7 +1422,7 @@ when not defined(nimscript):
 
       var action = parseAction(trimmedPart)
       if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness,
-          actVolume, actPos} and not action.hasEase:
+          actVolume, actPos, actPixelate} and not action.hasEase:
         action.hasEase = true
         action.easeCurve = pendCurve
         action.easeDurUnit = pendUnit

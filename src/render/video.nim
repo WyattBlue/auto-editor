@@ -1345,8 +1345,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       of actPixelate:
         # Mosaic censor. Clamp the block to the frame so pixelize can't reject a
         # block larger than the plane; 1x1 blocks are a no-op.
-        let w = min(effect.pixW.int, frame.width)
-        let h = min(effect.pixH.int, frame.height)
+        let p = prog(effect)
+        let w = min(int(round(sampleKf(effect.pixWKf, p))), frame.width)
+        let h = min(int(round(sampleKf(effect.pixHKf, p))), frame.height)
         if w <= 1 and h <= 1:
           continue
         runFx(fxId(actPixelate, frame, i0 = w.int32, i1 = h.int32)):

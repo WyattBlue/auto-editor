@@ -544,8 +544,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
           ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
       of actPixelate:
         parent.addFilter("avfilter.pixelize", [
-          ("av.width", $effect.pixW), ("av.height", $effect.pixH),
-          ("av.mode", "avg"), ("av.planes", "7")])
+          ("av.width", mltAnimValue(effect, effect.pixWKf, clipDur, fps, asInt = true)),
+          ("av.height", mltAnimValue(effect, effect.pixHKf, clipDur, fps, asInt = true)),
+          ("av.mode", "avg"), ("av.planes", "7")], anim(effect, inTc, outTc))
       of actAberration:
         parent.addFilter("avfilter.rgbashift", [
           ("av.rh", $effect.abRh), ("av.rv", $effect.abRv),
