@@ -175,10 +175,18 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
   newFrame.height = dstHeight
   newFrame.pts = frame.pts
   newFrame.time_base = frame.time_base
-  newFrame.color_range = frame.color_range
   newFrame.color_primaries = frame.color_primaries
   newFrame.color_trc = frame.color_trc
-  newFrame.colorspace = frame.colorspace
+  if srcFormat.isRgb == format.isRgb:
+    newFrame.color_range = frame.color_range
+    newFrame.colorspace = frame.colorspace
+  else:
+    # The matrix and range don't carry between RGB and YUV. An RGB source's
+    # AVCOL_SPC_RGB tag on a YUV frame makes swscale copy the channels into
+    # Y/U/V unconverted, a strong green/purple shift (#1289). Leave them
+    # unspecified so swscale uses its defaults.
+    newFrame.color_range = 0 # AVCOL_RANGE_UNSPECIFIED
+    newFrame.colorspace = if format.isRgb: 0 else: 2 # AVCOL_SPC_RGB / UNSPECIFIED
 
   var ret = av_frame_get_buffer(newFrame, 32)
   if ret < 0:
@@ -873,6 +881,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # frag_keyframe only cuts a fragment at a keyframe, so the default keyint
     # would hold back the first fragment for seconds of media.
     encoderCtx.gop_size = max(1, int(round(tl.tb.float))).cint
+
+  # Tags inherited from an RGB source (matrix RGB, full range) describe the
+  # source, not a YUV encode of it; frames are converted with swscale's
+  # defaults, so leave the output's tags to match those (#1289).
+  if not pix_fmt.isRgb and encoderCtx.colorspace.int == 0: # AVCOL_SPC_RGB
+    encoderCtx.colorspace = 2 # AVCOL_SPC_UNSPECIFIED
+    encoderCtx.color_range = 0 # AVCOL_RANGE_UNSPECIFIED
 
   encoderCtx.open()
   pix_fmt = encoderCtx.pix_fmt

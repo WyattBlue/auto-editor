@@ -76,7 +76,13 @@ const AV_PIX_FMT_RGBA* = AVPixelFormat(26)
 proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.importc,
     header: "<libavutil/pixdesc.h>".}
 
+const AV_PIX_FMT_FLAG_RGB = 1'u64 shl 5
 const AV_PIX_FMT_FLAG_ALPHA = 1'u64 shl 7
+
+func isRgb*(pix_fmt: AVPixelFormat): bool =
+  ## True for RGB pixel formats (rgb24, bgr0, gbrp, ...) as opposed to YUV and gray.
+  let d = av_pix_fmt_desc_get(pix_fmt)
+  d != nil and (d.flags and AV_PIX_FMT_FLAG_RGB) != 0'u64
 
 func hasAlpha*(pix_fmt: AVPixelFormat): bool =
   ## True if the pixel format carries an alpha channel (e.g. rgba, yuva420p).
