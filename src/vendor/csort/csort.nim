@@ -28,75 +28,77 @@ when defined(arm64) or defined(aarch64):
     let mask = neonCgtS64(a, b)
     neonBslS64(mask, a, b)      # pick a where a>b, else b
 
-elif defined(amd64):
+elif defined(amd64) and defined(avx2):
   const HasSimd = true
-  const UseAvx2 = defined(avx2) or defined(macosx)
+  {.passC: "-mavx2".}
 
-  when UseAvx2:
-    {.passC: "-mavx2".}
+  # -- int32: 8-wide AVX2 --
+  const VecLen32 = 8
+  type Vec32 {.importc: "__m256i", header: "<immintrin.h>".} = object
+  proc avx2Load(p: ptr Vec32): Vec32 {.importc: "_mm256_loadu_si256", header: "<immintrin.h>".}
+  proc avx2Store(p: ptr Vec32, v: Vec32) {.importc: "_mm256_storeu_si256", header: "<immintrin.h>".}
+  proc avx2Min32(a, b: Vec32): Vec32 {.importc: "_mm256_min_epi32", header: "<immintrin.h>".}
+  proc avx2Max32(a, b: Vec32): Vec32 {.importc: "_mm256_max_epi32", header: "<immintrin.h>".}
 
-    # -- int32: 8-wide AVX2 --
-    const VecLen32 = 8
-    type Vec32 {.importc: "__m256i", header: "<immintrin.h>".} = object
-    proc avx2Load(p: ptr Vec32): Vec32 {.importc: "_mm256_loadu_si256", header: "<immintrin.h>".}
-    proc avx2Store(p: ptr Vec32, v: Vec32) {.importc: "_mm256_storeu_si256", header: "<immintrin.h>".}
-    proc avx2Min32(a, b: Vec32): Vec32 {.importc: "_mm256_min_epi32", header: "<immintrin.h>".}
-    proc avx2Max32(a, b: Vec32): Vec32 {.importc: "_mm256_max_epi32", header: "<immintrin.h>".}
+  proc neonLoad32(p: ptr int32): Vec32 {.inline.} = avx2Load(cast[ptr Vec32](p))
+  proc neonStore32(p: ptr int32, v: Vec32) {.inline.} = avx2Store(cast[ptr Vec32](p), v)
+  proc neonMin32(a, b: Vec32): Vec32 {.inline.} = avx2Min32(a, b)
+  proc neonMax32(a, b: Vec32): Vec32 {.inline.} = avx2Max32(a, b)
 
-    proc neonLoad32(p: ptr int32): Vec32 {.inline.} = avx2Load(cast[ptr Vec32](p))
-    proc neonStore32(p: ptr int32, v: Vec32) {.inline.} = avx2Store(cast[ptr Vec32](p), v)
-    proc neonMin32(a, b: Vec32): Vec32 {.inline.} = avx2Min32(a, b)
-    proc neonMax32(a, b: Vec32): Vec32 {.inline.} = avx2Max32(a, b)
+  # -- int64: 4-wide AVX2 --
+  const VecLen64 = 4
+  type Vec64 = Vec32 # same __m256i type
+  proc avx2CmpGt64(a, b: Vec64): Vec64 {.importc: "_mm256_cmpgt_epi64", header: "<immintrin.h>".}
+  proc avx2Blendv(a, b, mask: Vec64): Vec64 {.importc: "_mm256_blendv_epi8", header: "<immintrin.h>".}
 
-    # -- int64: 4-wide AVX2 --
-    const VecLen64 = 4
-    type Vec64 = Vec32 # same __m256i type
-    proc avx2CmpGt64(a, b: Vec64): Vec64 {.importc: "_mm256_cmpgt_epi64", header: "<immintrin.h>".}
-    proc avx2Blendv(a, b, mask: Vec64): Vec64 {.importc: "_mm256_blendv_epi8", header: "<immintrin.h>".}
+  proc neonLoad64(p: ptr int64): Vec64 {.inline.} = avx2Load(cast[ptr Vec32](p))
+  proc neonStore64(p: ptr int64, v: Vec64) {.inline.} = avx2Store(cast[ptr Vec32](p), v)
 
-    proc neonLoad64(p: ptr int64): Vec64 {.inline.} = avx2Load(cast[ptr Vec32](p))
-    proc neonStore64(p: ptr int64, v: Vec64) {.inline.} = avx2Store(cast[ptr Vec32](p), v)
+  proc neonMin64(a, b: Vec64): Vec64 {.inline.} =
+    let mask = avx2CmpGt64(a, b)
+    avx2Blendv(a, b, mask) # pick b where a>b, else a
 
-    proc neonMin64(a, b: Vec64): Vec64 {.inline.} =
-      let mask = avx2CmpGt64(a, b)
-      avx2Blendv(a, b, mask) # pick b where a>b, else a
+  proc neonMax64(a, b: Vec64): Vec64 {.inline.} =
+    let mask = avx2CmpGt64(a, b)
+    avx2Blendv(b, a, mask) # pick a where a>b, else b
 
-    proc neonMax64(a, b: Vec64): Vec64 {.inline.} =
-      let mask = avx2CmpGt64(a, b)
-      avx2Blendv(b, a, mask) # pick a where a>b, else b
+elif defined(amd64):
+  # No -msse4.2 here: passC reaches every C file in the build, and the program
+  # would die on CPUs without SSE4.2 (e.g. Phenom II). Instead only the SIMD
+  # sorting network is compiled with target("sse4.2"), and it is chosen at
+  # runtime. The wrappers are templates so the intrinsics expand inside that
+  # function; a plain proc would need the target attribute itself.
+  const HasSimd = true
+  const RuntimeSse42 = true
 
-  else:
-    {.passC: "-msse4.2".}
+  # -- int32: 4-wide SSE4.1 --
+  const VecLen32 = 4
+  type Vec32 {.importc: "__m128i", header: "<smmintrin.h>".} = object
+  proc sseLoad(p: ptr Vec32): Vec32 {.importc: "_mm_loadu_si128", header: "<smmintrin.h>".}
+  proc sseStore(p: ptr Vec32, v: Vec32) {.importc: "_mm_storeu_si128", header: "<smmintrin.h>".}
+  proc sseMin32(a, b: Vec32): Vec32 {.importc: "_mm_min_epi32", header: "<smmintrin.h>".}
+  proc sseMax32(a, b: Vec32): Vec32 {.importc: "_mm_max_epi32", header: "<smmintrin.h>".}
 
-    # -- int32: 4-wide SSE4.1 --
-    const VecLen32 = 4
-    type Vec32 {.importc: "__m128i", header: "<smmintrin.h>".} = object
-    proc sseLoad(p: ptr Vec32): Vec32 {.importc: "_mm_loadu_si128", header: "<smmintrin.h>".}
-    proc sseStore(p: ptr Vec32, v: Vec32) {.importc: "_mm_storeu_si128", header: "<smmintrin.h>".}
-    proc sseMin32(a, b: Vec32): Vec32 {.importc: "_mm_min_epi32", header: "<smmintrin.h>".}
-    proc sseMax32(a, b: Vec32): Vec32 {.importc: "_mm_max_epi32", header: "<smmintrin.h>".}
+  template neonLoad32(p: ptr int32): Vec32 = sseLoad(cast[ptr Vec32](p))
+  template neonStore32(p: ptr int32, v: Vec32) = sseStore(cast[ptr Vec32](p), v)
+  template neonMin32(a, b: Vec32): Vec32 = sseMin32(a, b)
+  template neonMax32(a, b: Vec32): Vec32 = sseMax32(a, b)
 
-    proc neonLoad32(p: ptr int32): Vec32 {.inline.} = sseLoad(cast[ptr Vec32](p))
-    proc neonStore32(p: ptr int32, v: Vec32) {.inline.} = sseStore(cast[ptr Vec32](p), v)
-    proc neonMin32(a, b: Vec32): Vec32 {.inline.} = sseMin32(a, b)
-    proc neonMax32(a, b: Vec32): Vec32 {.inline.} = sseMax32(a, b)
+  # -- int64: 2-wide SSE4.2 --
+  const VecLen64 = 2
+  type Vec64 = Vec32 # same __m128i type
+  proc sseCmpGt64(a, b: Vec64): Vec64 {.importc: "_mm_cmpgt_epi64", header: "<nmmintrin.h>".}
+  proc sseBlendv(a, b, mask: Vec64): Vec64 {.importc: "_mm_blendv_epi8", header: "<smmintrin.h>".}
 
-    # -- int64: 2-wide SSE4.2 --
-    const VecLen64 = 2
-    type Vec64 = Vec32 # same __m128i type
-    proc sseCmpGt64(a, b: Vec64): Vec64 {.importc: "_mm_cmpgt_epi64", header: "<nmmintrin.h>".}
-    proc sseBlendv(a, b, mask: Vec64): Vec64 {.importc: "_mm_blendv_epi8", header: "<smmintrin.h>".}
+  template neonLoad64(p: ptr int64): Vec64 = sseLoad(cast[ptr Vec32](p))
+  template neonStore64(p: ptr int64, v: Vec64) = sseStore(cast[ptr Vec32](p), v)
+  # pick b where a>b, else a
+  template neonMin64(a, b: Vec64): Vec64 = sseBlendv(a, b, sseCmpGt64(a, b))
+  # pick a where a>b, else b
+  template neonMax64(a, b: Vec64): Vec64 = sseBlendv(b, a, sseCmpGt64(a, b))
 
-    proc neonLoad64(p: ptr int64): Vec64 {.inline.} = sseLoad(cast[ptr Vec32](p))
-    proc neonStore64(p: ptr int64, v: Vec64) {.inline.} = sseStore(cast[ptr Vec32](p), v)
-
-    proc neonMin64(a, b: Vec64): Vec64 {.inline.} =
-      let mask = sseCmpGt64(a, b)
-      sseBlendv(a, b, mask) # pick b where a>b, else a
-
-    proc neonMax64(a, b: Vec64): Vec64 {.inline.} =
-      let mask = sseCmpGt64(a, b)
-      sseBlendv(b, a, mask) # pick a where a>b, else b
+  proc cpuHasSse42(): bool {.inline.} =
+    {.emit: [result, " = __builtin_cpu_supports(\"sse4.2\");"].}
 
 elif defined(wasm):
   const HasSimd = true
@@ -199,13 +201,11 @@ proc cascade[T: int32 | int64](data: ptr UncheckedArray[T], j, p, q: int) {.inli
     r = r shr 1
   data[j + p] = a
 
-# Core sorting network, templated over element type and SIMD width.
+# Core sorting network, templated over element type and SIMD use.
 # Operates directly on a raw pointer + length so float sorts can reuse it
 # after transforming their data in place via floatSortKey.
-proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
-  if n < 2: return
-
-  const vecLen = when T is int32: VecLen32 else: VecLen64
+template sortNetwork(T: typedesc, data: ptr UncheckedArray[T], n: int, useSimd: static bool) =
+  const vecLen = when not useSimd: 0 elif T is int32: VecLen32 else: VecLen64
 
   var top = 1
   while top < n - top:
@@ -217,7 +217,7 @@ proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
     var i = 0
     while i + 2 * p <= n:
       var k = 0
-      when HasSimd and vecLen > 0:
+      when vecLen > 0:
         while k + vecLen <= p:
           when T is int32:
             let aVec = neonLoad32(addr data[i + k])
@@ -237,7 +237,7 @@ proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
 
     # Loop 2: residual minmax
     var j = i
-    when HasSimd and vecLen > 0:
+    when vecLen > 0:
       while j + vecLen + p <= n:
         when T is int32:
           let aVec = neonLoad32(addr data[j])
@@ -273,7 +273,7 @@ proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
         # Loop 3: cascade groups with SIMD
         while i + p + q <= n:
           var k = 0
-          when HasSimd and vecLen > 0:
+          when vecLen > 0:
             while k + vecLen <= p:
               when T is int32:
                 var aVec = neonLoad32(addr data[i + k + p])
@@ -303,7 +303,7 @@ proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
 
         # Loop 4: residual cascades
         j = i
-        when HasSimd and vecLen > 0:
+        when vecLen > 0:
           if p >= vecLen:
             while j + vecLen + q <= n:
               when T is int32:
@@ -334,6 +334,23 @@ proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
       q = q shr 1
 
     p = p shr 1
+
+when declared(RuntimeSse42):
+  proc cSortScalar[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
+    sortNetwork(T, data, n, false)
+
+  proc cSortSse42[T: int32 | int64](data: ptr UncheckedArray[T], n: int)
+      {.codegenDecl: "__attribute__((target(\"sse4.2\"))) $# $#$#".} =
+    sortNetwork(T, data, n, true)
+
+  proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
+    if n < 2: return
+    if cpuHasSse42(): cSortSse42(data, n)
+    else: cSortScalar(data, n)
+else:
+  proc cSortCore[T: int32 | int64](data: ptr UncheckedArray[T], n: int) =
+    if n < 2: return
+    sortNetwork(T, data, n, HasSimd)
 
 {.pop.}
 
