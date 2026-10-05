@@ -1,4 +1,4 @@
-import std/[json, math, strformat, strutils, sequtils, tables]
+import std/[atomics, json, math, strformat, strutils, sequtils, tables]
 
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
 import ../util/rational
@@ -712,7 +712,11 @@ func audioSampleSpan*(start, dur: int64, sampleRate: cint,
 
 proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], norm: Norm,
-    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
+    cache: MediaCache = nil, fromSample = 0, stop: ptr Atomic[bool] = nil):
+    iterator(): (ptr AVFrame, int64) =
+  ## Samples from `fromSample` on (normalizing measures the whole timeline,
+  ## so it needs 0). A set `stop` ends the iterator at its next call, freeing
+  ## what it holds.
 
   var samples: Table[(string, int16), Getter]
   let targetChannels = tl.layout.nb_channels
@@ -861,7 +865,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       var cursors = newSeq[int](tl.a.len)
 
       var acc: seq[int32] = @[] # interleaved accumulator over [bufStart, ...)
-      var bufStart = 0 # output sample-frame index mapped to acc[0]
+      var bufStart = fromSample # output sample-frame index mapped to acc[0]
 
       template startOf(li: int): int =
         int(tl.a[li][cursors[li]].start * sr.int64 * tb.den div tb.num)
@@ -893,7 +897,16 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
             else: @[]
           bufStart += emitFrames
 
+      # Clips over before the start are never read.
+      for li in activeLayers:
+        while cursors[li] < tl.a[li].len:
+          let c = tl.a[li][cursors[li]]
+          if audioSampleSpan(c.start, c.dur, sr, tb).start +
+              audioSampleSpan(c.start, c.dur, sr, tb).dur > fromSample: break
+          inc cursors[li]
+
       while true:
+        if stop != nil and stop[].load(): return
         # Pick the not-yet-processed clip with the smallest start across layers.
         var bestLi = -1
         for li in activeLayers:
@@ -972,7 +985,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
               acc.setLen(neededFrames * targetChannels)
             for i in 0 ..< n:
               let outputSampleIndex = startSample + i
-              if outputSampleIndex < totalSamples:
+              # A clip running into the start contributes from there on.
+              if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
                 let fadeIn = (
                   if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) /
                       fadeSamples.float32
@@ -1006,7 +1020,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       flushUpTo(totalSamples, final = true)
 
   var resampler = newAudioResampler(fmt, tl.layout, sr)
-  var samplesYielded = 0
+  var samplesYielded = fromSample
   var frameIndex = 0'i64
 
   # Wrap an interleaved int16 chunk as an S16P frame, resample to the output
@@ -1130,6 +1144,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
     of nkNull:
       let produce = newTimelineProducer()
       for chunk in produce():
+        if stop != nil and stop[].load(): break
         for fr in emitChunk(chunk):
           yield fr
 

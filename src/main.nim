@@ -14,8 +14,6 @@ import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
 when defined(emscripten):
   import ./av
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
-when not defined(emscripten):
-  import cmds/preview_worker
 import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
@@ -176,9 +174,9 @@ when not defined(emscripten):
   proc wantStreams(args: mainArgs): (bool, bool) =
     ## Decide whether the video and/or audio streams are worth downloading,
     ## based on what the output format holds and what --edit needs to analyze.
-    var (editV, editA) = editNeeds(args.edit)
+    var (editV, editA) = args.edit.needs
     for le in args.labeledEdits: # union the needs of every --edit:N method
-      let (v, a) = editNeeds(le.expr)
+      let (v, a) = le.expr.needs
       editV = editV or v
       editA = editA or a
 
@@ -418,7 +416,7 @@ proc replaceAction(dest: var Actions, replacement: Actions) =
   dest.free()
   dest = replacement
 
-proc setLabeledEdit(args: var mainArgs, label: int, expr: string) =
+proc setLabeledEdit(args: var mainArgs, label: int, expr: EditExpr) =
   for e in args.labeledEdits.mitems:
     if e.label == label:
       e.expr = expr
@@ -497,9 +495,9 @@ judge making cuts.
       args.inputs.add key
     of coEdit:
       if expectingLabel == 1:
-        args.edit = key
+        args.edit = parseEdit(key)
       else:
-        setLabeledEdit(args, expectingLabel, key)
+        setLabeledEdit(args, expectingLabel, parseEdit(key))
     of coExport:
       args.`export` = parseExportString(key)
     of coOutput:

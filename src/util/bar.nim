@@ -53,8 +53,15 @@ type
     begin: float
     config: ptr BarConfig  # Share constant config via pointer
 
+  ProgressHook* = proc (title: string, current, total: float) {.nimcall, gcsafe, raises: [].}
+
   Bar* = ref object
     config: BarConfig
+    hook: ProgressHook
+    cancel: ptr Atomic[bool]
+    title: string
+    total: float
+    lastReport: float
     stack: seq[tuple[title: string, lenTitle: int, total: float, begin: float]]
     progressThread: Thread[ThreadData]
     threadData: ThreadData
@@ -140,7 +147,16 @@ proc progressWorker(data: ThreadData) {.thread.} =
     lastProgress = currentProgress
     sleep(sleepRate)
 
+var
+  progressHook* {.threadvar.}: ProgressHook
+    ## When set, bars created on this thread report here instead of drawing.
+  cancelFlag* {.threadvar.}: ptr Atomic[bool]
+    ## When set and true, the next `tick` on this thread raises "Cancelled".
+
 proc initBar*(barType: BarType): Bar =
+  if progressHook != nil:
+    return Bar(hide: true, hook: progressHook, cancel: cancelFlag)
+
   var icon = "⏳"
   var chars = @[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
   var brackets = (left: "|", right: "|")
@@ -176,7 +192,7 @@ proc initBar*(barType: BarType): Bar =
 
   let config = BarConfig(icon: icon, chars: chars, brackets: brackets,
     machine: machine, partWidth: partWidth, ampm: ampm)
-  result = Bar(hide: hide, config: config, stack: @[])
+  result = Bar(hide: hide, config: config, stack: @[], cancel: cancelFlag)
   if not hide:
     when not defined(windows):
       termResized.store(false)
@@ -188,8 +204,16 @@ proc initBar*(barType: BarType): Bar =
     createThread(result.progressThread, progressWorker, result.threadData)
 
 
-func tick*(bar: Bar, index: float) =
-  if not bar.hide:
+proc tick*(bar: Bar, index: float) {.raises: [AutoEditorError].} =
+  if bar.cancel != nil and bar.cancel[].load(moRelaxed):
+    error "Cancelled"
+  if bar.hook != nil:
+    # tick runs per frame/packet; a few reports a second is plenty.
+    let now = epochTime()
+    if now - bar.lastReport >= 0.05:
+      bar.lastReport = now
+      bar.hook(bar.title, index, bar.total)
+  elif not bar.hide:
     bar.threadData.progress.store(index)
 
 func displayLen(title: string): int =
@@ -205,6 +229,11 @@ func displayLen(title: string): int =
       inEscape = false
 
 proc start*(bar: Bar, total: float, title: string) =
+  if bar.hook != nil:
+    bar.title = title
+    bar.total = total
+    bar.lastReport = epochTime()
+    bar.hook(title, 0, total)
   if not bar.hide:
     when defined(windows):
       stderr.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
@@ -234,9 +263,12 @@ proc `end`*(bar: Bar) =
     bar.stack.setLen(bar.stack.len - 1)
 
 proc destroy*(bar: Bar) =
-  if bar.threadData != nil:
-    bar.threadData.shouldStop.store(true)
-    joinThread(bar.progressThread)
+  ## Stop the drawing thread; it reads `bar`, so this must come before `bar`
+  ## is freed. Calling it again does nothing.
+  if bar.threadData == nil: return
+  bar.threadData.shouldStop.store(true)
+  joinThread(bar.progressThread)
+  bar.threadData = nil
   when defined(windows):
     if not bar.hide:
       try:

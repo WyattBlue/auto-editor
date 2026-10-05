@@ -339,11 +339,9 @@ func `$`*(opt: CliOption): string {.raises: [].} =
 
 type CmdDef* = object
   name*: string
-  handler*: string
   help*: string
   opts*: seq[OptDef]
   files*: bool = true # Whether shell completion should offer filenames.
-  requiresArgs*: bool = true
   shellCompletion*: bool = true
 
 const commands*: seq[CmdDef] = @[
@@ -355,7 +353,7 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "levels", help: "Display loudness over time", opts: levelsOptions),
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out",
       opts: subdumpOptions),
-  CmdDef(name: "waveform", help: "Draw waveforms for GUI. Unstable interface",
+  CmdDef(name: "waveform", help: "Draw waveforms for library users. Unstable interface",
       opts: waveformOptions, shellCompletion: false),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]",
       opts: whisperOptions),
@@ -363,9 +361,6 @@ const commands*: seq[CmdDef] = @[
   when defined(emscripten): @[] else: @[
     CmdDef(name: "completion", help: "Generate completions for shells",
         opts: completionOptions, files: false),
-    CmdDef(name: "preview-worker", handler: "preview_worker",
-      help: "Run the resident preview rendering worker", opts: @[], files: false,
-      requiresArgs: false, shellCompletion: false),
   ]
 )
 
@@ -459,11 +454,10 @@ macro genCmdCases*(keyIdent: untyped): untyped =
     let sliceExpr = newNimNode(nnkInfix).add(ident(".."), newIntLitNode(1), newNimNode(
         nnkPrefix).add(ident("^"), newIntLitNode(1)))
     let argsExpr = newNimNode(nnkBracketExpr).add(newCall(ident("commandLineParams")), sliceExpr)
-    let handlerName = if cmd.handler == "": cmd.name else: cmd.handler
-    let handlerCall = newCall(newDotExpr(ident(handlerName), ident("main")), argsExpr)
+    let handlerCall = newCall(newDotExpr(ident(cmd.name), ident("main")), argsExpr)
 
     var stmtList = newStmtList()
-    if cmd.help != "" and cmd.requiresArgs:
+    if cmd.help != "":
       # if paramCount() < 2: echo help else: handler(args)
       stmtList.add(newNimNode(nnkIfStmt).add(
         newNimNode(nnkElifBranch).add(

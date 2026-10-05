@@ -1,4 +1,4 @@
-import std/[options, os, sets, sequtils, strformat, strutils, terminal, times]
+import std/[options, os, sets, sequtils, strformat, strutils, tables, terminal, times]
 when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
@@ -11,7 +11,7 @@ import ./imports/[fcp7, json]
 import ./exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
 import ./render/[format, subtitle]
 
-proc freeActions(args: mainArgs, tl: v3) =
+proc freeActions*(args: mainArgs, tl: v3) =
   ## CLI actions are copied into the timeline, so release each shared buffer
   ## exactly once.
   var freed: HashSet[int]
@@ -139,6 +139,24 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
   for i in start ..< min(stop, actionIndex.len):
     actionIndex[i] = value
 
+proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
+  ## The extension an export gets from `ext` (the one asked for, or the
+  ## input's): a timeline format's own; for media, `ext`, or mp4 when that
+  ## can't hold the video the export has (an audio-only input that gained a
+  ## video layer).
+  case myExport:
+    of exPremiere, exResolveFcp7: ".xml"
+    of exFinalCutPro, exResolve: ".fcpxml"
+    of exShotcut: ".mlt"
+    of exKdenlive: ".kdenlive"
+    of exPremiereOtio: ".otio"
+    of exV1: (if ext == ".json": ext else: ".v1")
+    of exV2: ".v2"
+    of exV3: ".v3"
+    of exDefault:
+      if hasVideo and not holdsVideo("x" & ext): ".mp4" else: ext
+    else: ext
+
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
     isUrl = false, hasVideo = false): (string, ExportKind) {.raises: [AutoEditorError].} =
   var dir, name, ext: string
@@ -170,27 +188,15 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
       of ".v3": myExport = exV3
       else: myExport = exDefault
 
-  case myExport:
-    of exPremiere, exResolveFcp7: ext = ".xml"
-    of exFinalCutPro, exResolve: ext = ".fcpxml"
-    of exShotcut: ext = ".mlt"
-    of exKdenlive: ext = ".kdenlive"
-    of exPremiereOtio: ext = ".otio"
-    of exV1:
-      if ext != ".json":
-        ext = ".v1"
-    of exV2: ext = ".v2"
-    of exV3: ext = ".v3"
-    else: discard
-
   # The default name copies the input's extension, so an audio-only input that
-  # gained a video layer would silently lose it. Prefer mp4; if the user named
-  # the file, keep their choice and say what is being dropped.
-  if hasVideo and myExport == exDefault and not holdsVideo("x" & ext):
-    if userOut != "" and userOut != "-" and agSplitFile(userOut).ext != "":
-      warning &"{ext} can't hold a video stream; it will be dropped"
-    else:
-      ext = ".mp4"
+  # gained a video layer would silently lose it: exportExt prefers mp4. If the
+  # user named the file, keep their choice and say what is being dropped.
+  let fitted = exportExt(ext, myExport, hasVideo)
+  if myExport == exDefault and fitted != ext and userOut != "" and userOut != "-" and
+      agSplitFile(userOut).ext != "":
+    warning &"{ext} can't hold a video stream; it will be dropped"
+  else:
+    ext = fitted
 
   if userOut == "-":
     return ("-", myExport)
@@ -198,6 +204,10 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
     return (&"{root}_ALTERED{ext}", myExport)
 
   return (&"{root}{ext}", myExport)
+
+proc defaultOutput*(input: string, `export`: ExportKind, hasVideo: bool): string =
+  ## Where an export of `input` goes when no output is asked for.
+  setOutput("", `export`, input, hasVideo = hasVideo)[0]
 
 proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     isUrl = false): string {.raises: [].} =
@@ -342,22 +352,87 @@ proc applyAdds(tl: var v3, args: var mainArgs,
         args.mixAudioStreams = true
   tl.updateNumberOfSrc()
 
-proc editMedia*(args: var mainArgs) =
-  av_log_set_level(AV_LOG_QUIET)
+proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
+  ## Composite `args.layers` over the edit as the desktop app's
+  ## buildOverlayJson does: the last layer lowest, the first on top, each
+  ## clamped to [start, finish) of the output.
+  if args.layers.len == 0 or (tl.v.len == 0 and tl.a.len == 0):
+    return
+  let base = (if tl.v.len > 0: tl.v[0] else: tl.a[0])
+  var total = 0'i64
+  for clip in base: total = max(total, clip.start + clip.dur)
 
+  proc group(tl: var v3, actions: seq[Action]): uint32 =
+    let g = newActions(actions)
+    let found = tl.effects.find(g)
+    if found >= 0:
+      g.free()
+      found.uint32
+    else:
+      tl.effects.add g
+      uint32(tl.effects.len - 1)
+
+  for li in countdown(args.layers.high, 0):
+    let spec = args.layers[li]
+    let first = clamp(spec.start, 0, total)
+    let last = clamp((if spec.finish < 0: total else: spec.finish), first, total)
+    if last <= first: continue
+    var own: seq[Action]
+    if spec.effects.len > 0:
+      try:
+        let parsed = parseActions(spec.effects)
+        defer: parsed.free()
+        for a in parsed: own.add a
+      except ActionParseError as e:
+        error e.msg
+    let src = interner.intern(spec.path)
+    var track: seq[Clip]
+    if spec.followCuts:
+      # The base's sections, speeds included, so the layer stays in step
+      # with the source it's laid over.
+      var groups: Table[uint32, uint32]
+      for clip in base:
+        let a = max(clip.start, first)
+        let b = min(clip.start + clip.dur, last)
+        if b <= a: continue
+        if clip.effects notin groups:
+          var acts: seq[Action]
+          for x in tl.effects[clip.effects]: acts.add x
+          acts.add own
+          groups[clip.effects] = tl.group(acts)
+        # Offsets are already in speed-scaled frames, so a trim of k output
+        # frames moves the offset by k.
+        track.add Clip(src: src, start: a, dur: b - a,
+          offset: clip.offset + (a - clip.start), effects: groups[clip.effects])
+    else:
+      track.add Clip(src: src, start: first, dur: last - first, offset: first,
+        effects: tl.group(own))
+
+    let mi = initMediaInfo(spec.path)
+    if mi.v.len > 0:
+      tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
+      tl.v.add track
+    # Its sound is heard over the base, like an `add:` layer's.
+    for stream in 0 ..< mi.a.len:
+      var atrack = track
+      for clip in atrack.mitems: clip.stream = int16(stream)
+      tl.langs.add mi.a[stream].lang
+      tl.a.add atrack
+      args.mixAudioStreams = true
+  tl.updateNumberOfSrc()
+
+type BuiltTimeline* = object
+  tl*: v3
+  usePath*: string ## the media input to name outputs after, if any
+  mi*: MediaInfo
+
+proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
+    bar: Bar): BuiltTimeline =
+  ## Analyze the inputs and decide every cut without exporting anything.
+  ## Release with `freeActions(args, result.tl)` when done.
   var tlV3: v3
-  var interner: StringInterner
-  var output: string
-  var usePath: string = ""
+  var usePath = ""
   var mi: MediaInfo
-  defer: interner.cleanup()
-  defer: freeActions(args, tlV3)
-
-  if args.progress == BarType.machine and args.output != "-":
-    conwrite "Starting"
-
-  let bar = initBar(args.progress)
-
   if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
@@ -383,6 +458,7 @@ proc editMedia*(args: var mainArgs) =
 
       let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
       var tlInitialized = false
+      var concatOffset = 0 # where this input starts, inputs laid end to end
 
       for i in 0 ..< args.inputs.len:
         var container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
@@ -450,7 +526,16 @@ proc editMedia*(args: var mainArgs) =
           # own `add` matches just that range.
           actionMap.add actionRange[0]
           let aIdx = actionMap.len - 1
-          applyToRange(actionIndex, span, tbf, aIdx, getConLen())
+          if args.setActionConcat:
+            # An editor's range, over the inputs end to end: only its part on
+            # this input applies, in this input's frames.
+            let lo = max(toTb(span[0], tbf) - concatOffset, 0)
+            let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
+            if hi > lo:
+              applyToRange(actionIndex, (pack(false, lo), pack(false, hi)), tbf, aIdx,
+                getConLen())
+          else:
+            applyToRange(actionIndex, span, tbf, aIdx, getConLen())
           if i == 0:
             for a in args.adds.mitems:
               if a.setActionRef == sIdx:
@@ -466,13 +551,75 @@ proc editMedia*(args: var mainArgs) =
         else:
           appendLinearTimeline(tlV3, interner.intern(args.inputs[i]), inputMi,
             actionIndex)
+        # As an editor's plan lays the inputs out (planEdit): by their analysis.
+        concatOffset += labels.len
 
       applyAdds(tlV3, args, interner)
+      applyLayers(tlV3, args, interner)
       tlV3.applyArgs(args)
       if args.transition.getNumber > 0:
         tlV3.addDissolveTransitions(
           toTb(args.transition, tlV3.tb.float).int64,
           toTb(args.transitionMinCut, tlV3.tb.float).int64)
+      elif args.placedTransitions.len > 0:
+        tlV3.placeTransitions(args.placedTransitions)
+
+  BuiltTimeline(tl: tlV3, usePath: usePath, mi: mi)
+
+type EditPlan* = object
+  ## Every cut of an edit, without rendering it.
+  tb*: AVRational
+  chunks*: seq[tuple[start, stop: int64, speed: float64]]
+    ## Frames at `tb`, the inputs' frames laid end to end; speed 99999 is a cut.
+  sourceFrames*: seq[int64] ## each input's length, in that order
+
+proc planEdit*(args: var mainArgs): EditPlan =
+  ## Decide every cut without rendering anything. Layers and placed
+  ## transitions are dropped from `args`: they'd make the edit more than a
+  ## list of cuts. Frees `args`' actions, as `editMedia` does.
+  args.layers = @[]
+  args.placedTransitions = @[]
+  var interner: StringInterner
+  defer: interner.cleanup()
+  let built = buildTimeline(args, interner, initBar(BarType.none))
+  defer: freeActions(args, built.tl)
+  if not built.tl.isLinear:
+    error "This edit can't be shown as a simple list of cuts"
+  result = EditPlan(tb: built.tl.tb)
+  # Each input's chunks count from its own frame 0; lay them end to end so
+  # the inputs share one frame space.
+  var offset, prevEnd = 0'i64
+  for (start, stop, speed) in built.tl.v1Chunks:
+    if start == 0 and prevEnd > 0:
+      result.sourceFrames.add prevEnd
+      offset += prevEnd
+    result.chunks.add (start + offset, stop + offset, speed)
+    prevEnd = stop
+  if prevEnd > 0: result.sourceFrames.add prevEnd
+
+proc editMedia*(args: var mainArgs, startTime: float = log.start) =
+  av_log_set_level(AV_LOG_QUIET)
+
+  var tlV3: v3
+  var interner: StringInterner
+  var output: string
+  var usePath: string = ""
+  var mi: MediaInfo
+  defer: interner.cleanup()
+  defer: freeActions(args, tlV3)
+
+  if args.progress == BarType.machine and args.output != "-":
+    conwrite "Starting"
+
+  let bar = initBar(args.progress)
+  # Early returns and errors too: in a program that outlives the job, the
+  # bar's thread would keep reading it after it's freed.
+  defer: bar.destroy()
+
+  let built = buildTimeline(args, interner, bar)
+  tlV3 = built.tl
+  usePath = built.usePath
+  mi = built.mi
 
   var exportKind: ExportKind
   var tlName, fcpVersion: string
@@ -613,8 +760,8 @@ proc editMedia*(args: var mainArgs) =
 
   bar.destroy()
 
-  let seconds = round(epochTime() - start, 2)
-  stderr.writeLine(&"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})")
+  let seconds = round(epochTime() - startTime, 2)
+  notice &"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})"
 
   if args.noOpen:
     discard

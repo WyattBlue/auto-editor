@@ -14,7 +14,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 
 {.push raises: [AutoEditorError].}
 
-func getColorspace(mi: MediaInfo): string =
+func getColorspace(mi: MediaInfo): string {.raises: [].} =
   # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
 
   if mi.v.len == 0:
@@ -35,7 +35,7 @@ func getColorspace(mi: MediaInfo): string =
 
   return "1-1-1 (Rec. 709)"
 
-func makeName(mi: MediaInfo, tb: AVRational): string =
+func makeName(mi: MediaInfo, tb: AVRational): string {.raises: [].} =
   if mi.getRes()[1] == 720'i32 and tb ~= 30:
     return "FFVideoFormat720p30"
   if mi.getRes()[1] == 720'i32 and tb ~= 25:
@@ -76,7 +76,7 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
   except ValueError as e:
     error &"Cannot parse SMPTE timecode '{val}': {e.msg}"
 
-func timecode(self: MediaInfo): string = # In SMPTE
+func timecode(self: MediaInfo): string {.raises: [].} = # In SMPTE
   for d in self.d:
     if d.timecode.len > 0:
       return d.timecode
@@ -86,7 +86,7 @@ func timecode(self: MediaInfo): string = # In SMPTE
   return "00:00:00:00"
 
 proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
-  func fraction(val: int64): string =
+  func fraction(val: int64): string {.raises: [].} =
     if val == 0:
       return "0s"
     return &"{val * tl.tb.den}/{tl.tb.num}s"
@@ -219,7 +219,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
         asset.add(timemap)
         break
 
-  proc addTransition(t: Transition) =
+  proc addTransition(t: Transition) {.raises: [].} =
     # A spine transition overlaps the edit point; the neighboring clips keep
     # their trimmed extents and the editor pulls handle media from the source.
     let tr = newElement("transition")

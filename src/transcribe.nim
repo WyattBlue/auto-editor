@@ -269,10 +269,11 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
 proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
     model, language: string, translate: bool, format, output: string,
     queue: int, threshold: float32, prompt: string, threads: cint,
-    splitWords, debug: bool, stop: ptr bool) =
+    splitWords, debug: bool, stop: ptr bool, heardMs: ptr int64 = nil) =
   ## Read `audioStream` from the open `fmtCtx` (a file or the live mic) until it
   ## ends or `stop[]` is set, transcribing each detected speech segment. Output
-  ## goes to `output` ("-" = stdout).
+  ## goes to `output` ("-" = stdout). `heardMs`, if given, follows how much
+  ## audio has been read, for a progress display.
   let useApple = model == "apple"
   let useParakeet = not useApple and isParakeetModel(model)
   var wctx: WhisperCtx
@@ -379,6 +380,7 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
       if a > peak: peak = a
     let winStart = elapsed
     elapsed += L
+    if heardMs != nil: heardMs[] = (elapsed * 1000) div Rate
 
     if peak >= threshold:
       if not inSpeech:
@@ -471,3 +473,18 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   jobs.send(Job(samples: @[])) # sentinel
   joinThread(worker)
   jobs.close()
+
+proc transcribeFile*(input, model, language: string, threads: int,
+    output: string, stop: ptr bool, heardMs: ptr int64 = nil) =
+  ## Write `input`'s first audio stream to `output` as an .srt with a cue per
+  ## word: `whisper --format srt --split-words`. `model` is a whisper or
+  ## parakeet file, or "apple"; parakeet ignores `language`.
+  var container = (try: av.open(input) except IOError: error "Could not open " &
+    input.extractFilename)
+  defer: container.close()
+  if container.audio.len == 0: error "No audio stream found"
+  let lang = if model != "apple" and isParakeetModel(model): "auto" else: language
+  run(container.formatContext, container.audio[0], model, lang,
+    translate = false, format = "srt", output = output, queue = 30,
+    threshold = 0.04, prompt = "", threads = threads.cint, splitWords = true,
+    debug = false, stop = stop, heardMs = heardMs)

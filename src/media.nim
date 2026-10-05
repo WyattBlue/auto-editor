@@ -1,3 +1,5 @@
+import std/math
+
 import ./[av, ffmpeg, log]
 import ./util/[lang, rational]
 
@@ -148,3 +150,36 @@ proc initMediaInfo*(path: string): MediaInfo =
   let formatCtx = (try: av.openFormatCtx(path) except IOError as e: error e.msg)
   result = initMediaInfo(formatCtx, path)
   avformat_close_input(addr formatCtx)
+
+func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
+  # A 0/0 rate (no declared fps) is NaN as a float; av_d2q(NaN) is degenerate.
+  if not tb.isValid:
+    return AVRational(num: 30, den: 1)
+  let tbFloat = round(tb.float64, 2)
+
+  let ntsc60 = AVRational(num: 60000, den: 1001)
+  let ntsc = AVRational(num: 30000, den: 1001)
+  let filmNtsc = AVRational(num: 24000, den: 1001)
+
+  if tbFloat == round(ntsc60.float64, 2):
+    return ntsc60
+  if tbFloat == round(ntsc.float64, 2):
+    return ntsc
+  if tbFloat == round(filmNtsc.float64, 2):
+    return filmNtsc
+  return av_d2q(tbFloat, 1000000)
+
+func recommendedTimebase*(mi: MediaInfo): AVRational {.raises: [].} =
+  ## The timebase auto-editor edits the file in when none is asked for: its
+  ## first video's frame rate, made sane, else 30/1.
+  if mi.v.len > 0: makeSaneTimebase(mi.v[0].avg_rate)
+  else: AVRational(num: 30, den: 1)
+
+proc codecName*(id: AVCodecID): string = $avcodec_get_name(id)
+
+proc mediaFrames*(path: string, tb: AVRational): int =
+  ## How many frames auto-editor gives `path` on a timeline at `tb`: the
+  ## audio's last packet, else the video's duration.
+  var container = (try: av.open(path) except IOError as e: error e.msg)
+  defer: container.close()
+  int(round((mediaLength(container) * tb).float64))

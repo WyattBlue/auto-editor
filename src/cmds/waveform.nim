@@ -1,6 +1,6 @@
 import std/[options, sequtils, strformat, strutils]
 
-import ../util/rational
+import ../util/[bar, rational]
 import ../lib/dnorm16
 import ../[av, cache, cli, ffmpeg, log]
 import ../analyze/audio
@@ -13,6 +13,52 @@ const waveformArgumentOptions = {
 }
 
 assertArgumentOptions(waveformOptions, waveformArgumentOptions)
+
+type WaveWindow* = object
+  ## Audio peaks for a stretch of one channel, one (lo, hi) pair per bucket.
+  sampleRate*: int
+  samplesPerBucket*: int
+  firstSample*: int64 ## sample index of peaks[0]
+  peaks*: seq[tuple[lo, hi: float32]]
+
+proc streamPeaks*(input: string, stream, samplesPerBucket: int,
+    startSample = 0'i64, lengthSamples = -1'i64): seq[WaveWindow] =
+  ## Peaks for every channel of audio `stream`, one window each in the
+  ## layout's order, from a single decode that seeks to `startSample`.
+  ## A negative `lengthSamples` runs to the end.
+  if samplesPerBucket < 1: error "samples-per-bucket must be positive"
+  var container = (try: av.open(input) except IOError as e: error e.msg)
+  defer: container.close()
+  if stream < 0 or stream >= container.audio.len:
+    error "Audio stream out of range: " & $stream
+  let audioStream = container.audio[stream]
+  let rate = audioStream.codecpar.sample_rate
+  if rate <= 0: error "Audio stream has invalid sample rate"
+  let n = audioStream.codecpar.ch_layout.nb_channels.int
+  var channels: seq[int]
+  for c in 0 ..< n: channels.add c
+  var processor = AudioProcessor(codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioStream.index,
+    chunkDuration: samplesPerBucket.float64 / rate.float64)
+  if startSample > 0:
+    let tb = audioStream.time_base
+    container.seek((startSample * int64(tb.den)) div (int64(rate) * int64(tb.num)),
+      stream = audioStream)
+    avcodec_flush_buffers(processor.codecCtx)
+  let endSample = if lengthSamples < 0: int64.high else: startSample + lengthSamples
+  for c in 0 ..< n:
+    result.add WaveWindow(sampleRate: rate, samplesPerBucket: samplesPerBucket,
+      firstSample: -1)
+  let bar = initBar(BarType.none) # for the cancel flag
+  for (bucketStart, peaks) in processor.channelPeaks(container, audioStream, channels):
+    bar.tick(0)
+    if bucketStart + samplesPerBucket <= startSample: continue
+    if bucketStart >= endSample: break
+    for c in 0 ..< min(n, peaks.len):
+      if result[c].firstSample < 0: result[c].firstSample = bucketStart
+      result[c].peaks.add peaks[c]
+  for w in result.mitems:
+    if w.firstSample < 0: w.firstSample = startSample
 
 proc main*(strArgs: seq[string]) =
   var

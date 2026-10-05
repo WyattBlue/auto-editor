@@ -1,6 +1,6 @@
 import std/[json, sets, strformat, strutils, tables]
 
-import ../[av, cli, ffmpeg, log, media, timeline]
+import ../[av, cli, ffmpeg, log, media]
 import ../util/[fun, lang, rational]
 import ./help
 
@@ -25,9 +25,7 @@ func fourccToString(fourcc: uint32): string =
   return $cast[cstring](addr buf[0])
 
 proc printYamlInfo(fileInfo: MediaInfo) =
-  var tb = AVRational(num: 30, den: 1)
-  if fileInfo.v.len > 0:
-    tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
+  let tb = recommendedTimebase(fileInfo)
   echo &"{fileInfo.path}:\n - recommendedTimebase: {tb.num}/{tb.den}"
 
   if fileInfo.v.len > 0:
@@ -126,9 +124,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
 proc getJsonInfo(fileInfo: MediaInfo): JsonNode =
   var varr, aarr, sarr, iarr: seq[JsonNode] = @[]
-  var tb = AVRational(num: 30, den: 1)
-  if fileInfo.v.len > 0:
-    tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
+  let tb = recommendedTimebase(fileInfo)
 
   for v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height, v.sar.num, v.sar.den)

@@ -1,4 +1,4 @@
-import std/[sets, strformat, tables]
+import std/[atomics, sets, strformat, tables]
 from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt
 from std/algorithm import upperBound
 
@@ -679,8 +679,10 @@ func scaledVideoResolution*(resolution: (int32, int32),
   )
 
 proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
-    myCache: MediaCache):
+    myCache: MediaCache, startIndex = 0'i64, stop: ptr Atomic[bool] = nil):
     (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int64)) =
+  ## Frames from `startIndex` on. A set `stop` ends the iterator at its next
+  ## call, freeing what it holds (a preview abandons a render this way).
 
   # One state object per source (decoders, seek bookkeeping, still/held frame
   # caches, loop accounting). Still-image sources (overlay logos/watermarks)
@@ -1692,7 +1694,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
-    for index in 0 ..< tl.len:
+    for index in startIndex ..< tl.len:
+      if stop != nil and stop[].load(): break
       objList = @[]
       # The (src, index) decode cache is only valid within one timeline frame.
       for _, f in decodedCache:

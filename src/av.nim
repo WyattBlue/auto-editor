@@ -1,4 +1,4 @@
-import std/[strformat, strutils, sequtils, tables]
+import std/[math, strformat, strutils, sequtils, tables]
 
 import ./[ffmpeg, log]
 import ./util/[lang, rational]
@@ -275,6 +275,19 @@ func duration*(container: InputContainer): float64 =
   if container.formatContext.duration != AV_NOPTS_VALUE:
     return float64(container.formatContext.duration) / AV_TIME_BASE
   return 0.0
+
+proc quarterTurns*(par: ptr AVCodecParameters): int =
+  ## How many times a player turns this video clockwise, by a quarter, to
+  ## show it upright (its display matrix; a phone video's, say). auto-editor
+  ## keeps the matrix on its output rather than turning the pixels.
+  if par == nil: return 0
+  let sd = av_packet_side_data_get(par.coded_side_data, par.nb_coded_side_data,
+    AV_PKT_DATA_DISPLAYMATRIX)
+  if sd == nil or sd.size < 36: return 0
+  # The matrix's angle is counter-clockwise.
+  let ccw = av_display_rotation_get(cast[ptr int32](sd.data))
+  if ccw != ccw: return 0 # NaN: not a rotation
+  floorMod(int(round(-ccw / 90)), 4)
 
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
@@ -696,6 +709,12 @@ proc close*(self: OutputContainer) =
   if self.packet != nil:
     av_packet_free(addr self.packet)
   close(self.formatCtx)
+
+proc abandon*(self: OutputContainer) =
+  ## Free a container that was never started, writing nothing.
+  if self.packet != nil:
+    av_packet_free(addr self.packet)
+  avformat_free_context(self.formatCtx)
 
 
 func name*(stream: ptr AVStream): string =

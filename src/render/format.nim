@@ -102,7 +102,7 @@ proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArg
   (result.stream, result.packets) =
     makePartialLossless(output, tl, args, plan, encoder.id)
 
-proc dropUndecodableAudio(tl: var v3, cache: MediaCache) =
+proc dropUndecodableAudio*(tl: var v3, cache: MediaCache) =
   ## A timeline can name an audio stream this build has no decoder for: the
   ## `apac` track in an iPhone Spatial Audio recording, say. The CLI drops those
   ## layers as it builds a timeline, but a v3 written elsewhere (the app builds

@@ -2,13 +2,16 @@ import std/[envvars, options, os, strformat, tables, times]
 when not defined(emscripten):
   import std/strutils
 
-import ./[action, cli]
+import ./[action, cli, editexpr]
+export editexpr
 import ./util/[color, rational, term]
 
 type
   AutoEditorError* = object of CatchableError
     ## Raised by `error`. The CLI prints it and exits; library callers
     ## catch it and keep running.
+
+  LogHook* = proc (msg: string) {.nimcall, gcsafe, raises: [].}
 
   BarType* = enum
     modern, classic, ascii, machine, none
@@ -68,6 +71,17 @@ type
     of nkPeak:
       t*: float32    # -99.0 to 0.0, default -8.0
 
+type LayerSpec* = object
+  ## An overlay layer as the desktop app models it: a file composited over the
+  ## edit between two output frames. Unlike `add:`, it isn't tied to a kind
+  ## of section, so it's library-only, with no CLI syntax.
+  path*: string
+  start*: int64 # output frames, on the edit's timebase
+  finish*: int64 = -1 # output frames; -1 runs to the end of the edit
+  followCuts*: bool = true # read at the base's source offsets, skipping and
+                           # speeding up with it, vs. play straight through
+  effects*: string # atf-8 actions applied to this layer
+
 type AddSpec* = object
   ## A "virtual" `add:` action: overlay an image/video onto the sections whose
   ## effects index matches `selector`. It does not become an atf-8 effect;
@@ -87,24 +101,35 @@ type AddSpec* = object
   effects*: string # actions chained after `add:` — applied to this overlay
                      # layer (not the base), as a comma-separated atf-8 string
 
+type PlacedTransition* = object
+  ## A dissolve an editor placed on a linear edit, in output frames; the
+  ## alignment is 0 start, 1 center, 2 end at `at`. Video goes on the first
+  ## video track, audio on every audio track.
+  at*, dur*: int64
+  align*: int
+  video*: bool
+
 type mainArgs* = object
   inputs*: seq[string]
 
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   smooth*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 100)) # 0.2s,0.1s
-  edit*: string = "audio"
+  edit*: EditExpr = edit(audioMethod())
   whenInactive*: Actions = aCut
   whenActive*: Actions = aNil
-  labeledEdits*: seq[tuple[label: int, expr: string]]
+  labeledEdits*: seq[tuple[label: int, expr: EditExpr]]
   labeledWhens*: seq[tuple[label: int, action: Actions]]
   `export`*: ExportSpec = ExportSpec(
     kind: exAuto, name: "Auto-Editor Media Group", version: "11")
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
+  setActionConcat*: bool # library-only: setAction frames run across the inputs end to end
   adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
+  layers*: seq[LayerSpec]                         # library-only overlays
   transition*: PackedInt = pack(false, 0) # 0 disables; otherwise dissolve duration
   transitionMinCut*: PackedInt = pack(true, 1000) # 1 second
+  placedTransitions*: seq[PlacedTransition] # library-only: chosen in an editor
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"
@@ -148,6 +173,9 @@ var noCache* = false
 let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
+var logHook* {.threadvar.}: LogHook
+  ## When set, warnings and notices on this thread go here instead of stderr.
+
 proc conwrite*(msg: string) {.raises: [].} =
   if not quiet:
     try:
@@ -172,7 +200,20 @@ proc debug*(msg: string) {.raises: [].} =
     except IOError:
       discard
 
+proc notice*(msg: string) {.raises: [].} =
+  ## A plain status line for the user, e.g. the render summary.
+  if logHook != nil:
+    logHook(msg)
+    return
+  try:
+    stderr.writeLine(msg)
+  except IOError:
+    discard
+
 proc warning*(msg: string) {.raises: [].} =
+  if logHook != nil:
+    logHook("Warning! " & msg)
+    return
   if not quiet:
     conwrite ""
     try:

@@ -1,4 +1,4 @@
-import std/[options, os, sets, strformat, tables]
+import std/[algorithm, options, os, sets, strformat, tables]
 from std/math import round, ceil
 
 import ./[action, av, ffmpeg, media, log, wavutil]
@@ -400,6 +400,57 @@ func spanStart*(t: Transition): int64 =
     of taCenter: t.dur div 2
     of taEnd: t.dur)
 
+proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
+  ## Dissolves an editor chose, at output frames it worked out from its own
+  ## plan. Each is snapped to the timeline's own edit point within two frames
+  ## (rounding can differ by one) and kept within its clips; one with no such
+  ## point, or that would overlap the one before, is left out.
+  proc place(clips: seq[Clip], video: bool): seq[Transition] =
+    var wanted: seq[PlacedTransition]
+    for p in placed:
+      if p.video == video and p.dur > 0 and p.align in 0 .. 2: wanted.add p
+    wanted.sort(proc (a, b: PlacedTransition): int = cmp(a.at, b.at))
+    var priorEnd = low(int64)
+    for p in wanted:
+      let align = TransitionAlignment(p.align)
+      var best = -1
+      var bestDist = 3'i64
+      for i, c in clips:
+        # Start: a clip begins here; end: one ends; center: one ends where
+        # the next begins.
+        let edge = case align
+          of taStart: c.start
+          of taEnd: c.start + c.dur
+          of taCenter: c.start
+        if align == taCenter and (i == 0 or
+            clips[i - 1].start + clips[i - 1].dur != c.start):
+          continue
+        if abs(edge - p.at) < bestDist:
+          bestDist = abs(edge - p.at)
+          best = i
+      if best < 0: continue
+      let c = clips[best]
+      var t = Transition(kind: tkDissolve, alignment: align, dur: p.dur)
+      case align
+      of taStart:
+        t.at = c.start
+        t.dur = min(t.dur, c.dur)
+      of taEnd:
+        t.at = c.start + c.dur
+        t.dur = min(t.dur, c.dur)
+      of taCenter:
+        t.at = c.start
+        let room = 2 * min(c.dur, clips[best - 1].dur)
+        t.dur = min(t.dur, room) div 2 * 2
+      if t.dur <= 0 or t.spanStart < priorEnd: continue
+      priorEnd = t.spanStart + t.dur
+      result.add t
+
+  tl.vt = newSeq[seq[Transition]](tl.v.len)
+  if tl.v.len > 0: tl.vt[0] = place(tl.v[0], true)
+  tl.at = newSeq[seq[Transition]](tl.a.len)
+  for i in 0 ..< tl.a.len: tl.at[i] = place(tl.a[i], false)
+
 proc validateTransitions*(tl: v3) {.raises: [].} =
   proc validateTrack(clips: seq[Clip], transitions: seq[Transition]) =
     var priorEnd = low(int64)
@@ -534,24 +585,6 @@ proc bakeTransitions*(source: v3): v3 =
 
 func stem(path: string): string =
   agSplitFile(path).name
-
-func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
-  # A 0/0 rate (no declared fps) is NaN as a float; av_d2q(NaN) is degenerate.
-  if not tb.isValid:
-    return AVRational(num: 30, den: 1)
-  let tbFloat = round(tb.float64, 2)
-
-  let ntsc60 = AVRational(num: 60000, den: 1001)
-  let ntsc = AVRational(num: 30000, den: 1001)
-  let filmNtsc = AVRational(num: 24000, den: 1001)
-
-  if tbFloat == round(ntsc60.float64, 2):
-    return ntsc60
-  if tbFloat == round(ntsc.float64, 2):
-    return ntsc
-  if tbFloat == round(filmNtsc.float64, 2):
-    return filmNtsc
-  return av_d2q(tbFloat, 1000000)
 
 proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
   var createdDirs = initHashSet[string]()

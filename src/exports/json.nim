@@ -84,6 +84,19 @@ func `%`*(self: v3): JsonNode {.raises: [].} =
       "a": transitionsToJson(self.at)
     }
 
+proc v1Chunks*(tlV3: v3): seq[(int64, int64, float64)] =
+  ## (start, end, speed) per clip; speed 99999 marks a cut.
+  for clip2 in tlV3.clips2:
+    var speed = 1.0
+    let effectGroup = tlV3.effects[clip2.effect]
+    if effectGroup.isCut:
+      speed = 99999.0
+    else:
+      for effect in effectGroup:
+        if effect.kind == actSpeed:
+          speed *= effect.val.float64
+    result.add (clip2.start, clip2.`end`, speed)
+
 proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
   var tlJson: JsonNode
 
@@ -103,20 +116,7 @@ proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
     if `export` == exV2:
       tlJson = %v2(source: source, tb: tb, clips: clips2, effects: tlV3.effects)
     else:
-      var chunks: seq[(int64, int64, float64)] = @[]
-      for clip2 in clips2:
-        var speed = 1.0
-        let effectGroup = tlV3.effects[clip2.effect]
-        if effectGroup.isCut:
-          speed = 99999.0
-        else:
-          for effect in effectGroup:
-            if effect.kind == actSpeed:
-              speed *= effect.val.float64
-
-        chunks.add (clip2.start, clip2.`end`, speed)
-
-      tlJson = %v1(source: source, chunks: chunks, tb: tb)
+      tlJson = %v1(source: source, chunks: tlV3.v1Chunks, tb: tb)
   else:
     tlJson = %tlV3
 

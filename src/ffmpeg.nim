@@ -495,6 +495,8 @@ proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
 let AV_PKT_DATA_DISPLAYMATRIX* {.importc, header: "<libavcodec/packet.h>".}: cint
+proc av_display_rotation_get*(matrix: ptr int32): cdouble {.importc,
+    header: "<libavutil/display.h>".}
 proc av_packet_side_data_get*(sd: ptr AVPacketSideData, nb_sd: cint,
     `type`: cint): ptr AVPacketSideData {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_side_data_new*(psd: ptr ptr AVPacketSideData, pnb_sd: ptr cint,

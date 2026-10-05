@@ -1,5 +1,5 @@
 import std/[math, options, os, sequtils, strformat, strutils]
-import ./[av, editlexer, editparse, ffmpeg, log]
+import ./[av, editexpr, editlexer, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./lib/[audioutil, dnorm16]
 import ./util/[bar, fun, rational]
@@ -71,11 +71,6 @@ proc orWithThreshold(result: var seq[bool], levels: seq[Unorm16], t: Unorm16) =
       result[i] = result[i] or (levels[i] >= t)
     for i in result.len ..< levels.len:
       result.add levels[i] >= t
-
-const
-  defaultAudioThres = toUnorm16(0.04)
-  defaultMotionThres = toUnorm16(0.02)
-  defaultBlackThres = toUnorm16(0.98)
 
 proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [AutoEditorError].} =
   try:
@@ -193,289 +188,226 @@ proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
     except IOError:
       none(InputContainer)
 
-proc editNeeds*(edit: string): tuple[video, audio: bool] =
-  ## Report whether an --edit expression analyzes video and/or audio frames, so
-  ## callers can avoid fetching streams no editing method will look at. Subtitle
-  ## methods read the subtitle stream, so they report neither.
-  var lexer = initLexer("--edit", edit)
-  var parser: Parser
-  let expressions =
-    try:
-      parser = initParser(lexer)
-      parser.parse()
-    except CatchableError:
-      return (true, true) # Malformed; interpretEdit will report the real error.
-  if expressions.len == 0:
-    return (false, false)
-
-  var video = false
-  var audio = false
-
-  proc walk(e: Expr) =
-    if e.kind == ExprList:
-      if e.elements.len == 0:
-        return
-      let head = e.elements[0]
-      if head.editSymbol(edit) in {esOr, esAnd, esXor, esNot}:
-        for i in 1 ..< e.elements.len:
-          walk(e.elements[i])
-      else:
-        walk(head)
-    elif e.kind == ExprSym:
-      case e.editSymbol(edit)
-      of esAudio: audio = true
-      of esMotion, esBlackdetect: video = true
-      else: discard # Subtitle methods do not consume video/audio frames.
-
-  walk(expressions[^1])
-  return (video, audio)
-
-proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
-    tb: AVRational, bar: Bar): seq[uint8] =
-
-  proc editEval(expr: Expr, text: string): seq[bool] =
+proc parseEdit*(source: string, filename = "--edit"): EditExpr =
+  ## The CLI's `--edit` syntax as an EditExpr. Every syntax and argument error
+  ## is raised here; only what depends on the file (a stream or channel it
+  ## doesn't have) waits for `interpretEdit`.
+  proc toExpr(expr: Expr, text: string): EditExpr =
     if expr.kind in {ExprSym, ExprNum}:
       # A bare method inside an operator, e.g. `(or audio motion)`: invoke it
       # with its default arguments.
-      return editEval(Expr(kind: ExprList, elements: @[expr],
+      return toExpr(Expr(kind: ExprList, elements: @[expr],
         `from`: expr.`from`, to: expr.to), text)
     if expr.kind != ExprList or expr.elements.len == 0:
       error "Bad kind"
 
     let node = expr.elements
     if node[0].kind == ExprList and node.len == 1:
-      return editEval(node[0], text)
-
-    var
-      threshold: Unorm16 = defaultAudioThres
-      stream: int16 = 0
-      width: int32 = 400
-      blur: int32 = 9
+      return toExpr(node[0], text)
 
     if node[0].kind == ExprNum:
       case node[0].editSymbol(text)
-      of esZero:
-        return @[]
-      of esOne:
-        let length = mediaLength(container)
-        let tbLength = (round((length * tb).float64)).int
-
-        return newSeqWith(tbLength, true)
-      else:
-        error "We only support 0 or 1 right now."
-    elif node[0].kind == ExprSym:
-      let editSymbol = node[0].editSymbol(text)
-      let operandCount = node.len - 1
-      if editSymbol == esNot and operandCount != 1:
-        error &"--edit: 'not' expects exactly 1 operand; got {operandCount}"
-      if editSymbol in {esOr, esAnd, esXor} and operandCount < 1:
-        let operator = node[0].sourceText(text)
-        error &"--edit: '{operator}' expects at least 1 operand; got {operandCount}"
-
-      case editSymbol
-      of esOr:
-        result = editEval(node[1], text)
-        for i in 2 ..< node.len:
-          result = result or editEval(node[i], text)
-      of esAnd:
-        result = editEval(node[1], text)
-        for i in 2 ..< node.len:
-          result = result and editEval(node[i], text)
-      of esXor:
-        result = editEval(node[1], text)
-        for i in 2 ..< node.len:
-          result = result xor editEval(node[i], text)
-      of esNot:
-        return not editEval(node[1], text)
-      of esAudio:
-        stream = -1 # Set to "all" by default
-        var channel = "all"
-        for (argPos, val) in checkedMethodArgs(
-            "audio", node[1 ..< node.len], text):
-          case argPos:
-          of 0: threshold = parseThres(val)
-          of 1: stream = parseStream(val)
-          of 2: channel = val
-          else: error "Too many args"
-
-        if channel != "all" and audioChannelCode(channel) == "":
-          error &"audio: unknown channel '{channel}'."
-
-        func streamChannel(i: int16): int {.raises: [].} =
-          let audioStream = container.audio[i]
-          resolveAudioChannelOrDefault(addr audioStream.codecpar.ch_layout, channel)
-
-        if stream == -1:
-          var matched = false
-          var undecodable = 0
-          for i in 0 ..< container.audio.len:
-            let codecId = container.audio[i].codecpar.codec_id
-            if not canDecode(codecId):
-              inc undecodable
-              # Analyzing "all" streams shouldn't fail on a track no decoder
-              # can read, like the `apac` one in iPhone Spatial Audio files.
-              debug &"audio: skipping stream {i}, no decoder for " &
-                $avcodec_get_name(codecId)
-              continue
-            let channelIndex = streamChannel(i.int16)
-            if channelIndex >= -1:
-              result.orWithThreshold(
-                audio(bar, container, input, tb, i.int16, channelIndex), threshold)
-              matched = true
-          if not matched:
-            if undecodable > 0 and undecodable == container.audio.len:
-              error "audio: no audio stream in this file can be decoded."
-            error &"audio: channel '{channel}' does not exist in any audio stream."
-        else:
-          if stream >= container.audio.len:
-            error &"audio: audio stream '{stream}' does not exist."
-          let channelIndex = streamChannel(stream)
-          if channelIndex < -1:
-            let layout = $addr container.audio[stream].codecpar.ch_layout
-            error &"audio: channel '{channel}' does not exist in stream {stream} ({layout})."
-          result.orWithThreshold(
-            audio(bar, container, input, tb, stream, channelIndex), threshold)
-        return result
-      of esMotion:
-        threshold = defaultMotionThres
-        var
-          x: float32 = 0.0
-          y: float32 = 0.0
-          w: float32 = 1.0
-          h: float32 = 1.0
-        for (argPos, val) in checkedMethodArgs(
-            "motion", node[1 ..< node.len], text):
-          case argPos:
-          of 0: threshold = parseThres(val)
-          of 1: stream = parseStream(val)
-          of 2: width = parseNat(val)
-          of 3: blur = parseNat(val)
-          of 4: x = parseFloatInRange(val, 0.0, 1.0)
-          of 5: y = parseFloatInRange(val, 0.0, 1.0)
-          of 6: w = parseFloatInRange(val, 0.0, 1.0)
-          of 7: h = parseFloatInRange(val, 0.0, 1.0)
-          else: error "Too many args"
-
-        if stream < 0:
-          error "motion: 'all' stream is not supported"
-        let rect = packUnorm24x4(x, y, w, h)
-        result.orWithThreshold(
-          motion(bar, container, input, tb, stream, width, blur, rect), threshold)
-        return result
-      of esBlackdetect:
-        threshold = defaultBlackThres
-        var pixelBlack: float32 = 0.10
-        for (argPos, val) in checkedMethodArgs(
-            "blackdetect", node[1 ..< node.len], text):
-          case argPos:
-          of 0: threshold = parseThres(val)
-          of 1: stream = parseStream(val)
-          of 2: pixelBlack = parseFloatInRange(val, 0.0, 1.0)
-          else: error "Too many args"
-
-        if stream < 0:
-          error "blackdetect: 'all' stream is not supported"
-        result.orWithThreshold(
-          blackdetect(bar, container, input, tb, stream, pixelBlack), threshold)
-        return result
-      of esSubtitle, esRegex:
-        var pattern = ""
-        var flags = {reUtf8}
-
-        for (argPos, val) in checkedMethodArgs(
-            "subtitle", node[1 ..< node.len], text):
-          case argPos:
-          of 0: pattern = val
-          of 1: stream = parseStream(val)
-          of 2:
-            if parseBool(val):
-              flags.incl reIgnoreCase
-          else: error "Too many args"
-
-        if stream < 0:
-          error "subtitle: 'all' stream is not supported"
-        let regexPattern = re(pattern, flags)
-        let (ret, val) = subtitle(container, tb, regexPattern, stream)
-        if ret != -1:
-          let subcontainer = findExternSubs(input)
-          if subcontainer.isNone():
-            error &"regex: subtitle stream '{ret}' does not exist."
-
-          let external = subcontainer.unsafeGet()
-          defer: external.close()
-          let index = int16(stream - container.subtitle.len)
-          let (ret2, val2) = subtitle(external, tb, regexPattern, index)
-          if ret2 != -1:
-            error &"regex: subtitle stream '{ret2}' does not exist."
-          return val2
-        return val
-      of esWord:
-        var pattern = ""
-        var ignoreCase = true
-        var flags: set[ReFlag]
-
-        for (argPos, val) in checkedMethodArgs(
-            "word", node[1 ..< node.len], text):
-          case argPos:
-          of 0: pattern = escapeRe(val)
-          of 1: stream = parseStream(val)
-          of 2: ignoreCase = parseBool(val)
-          else: error "Too many args"
-
-        if pattern == "":
-          error "word: value required"
-        if stream < 0:
-          error "word: 'all' stream is not supported"
-
-        pattern = "\\b" & pattern & "\\b"
-        if ignoreCase:
-          flags.incl reIgnoreCase
-
-        let regexPattern = re(pattern, flags)
-        let (ret, val) = subtitle(container, tb, regexPattern, stream)
-        if ret != -1:
-          let subcontainer = findExternSubs(input)
-          if subcontainer.isNone():
-            error &"word: subtitle stream '{ret}' does not exist."
-
-          let external = subcontainer.unsafeGet()
-          defer: external.close()
-          let index = int16(stream - container.subtitle.len)
-          let (ret2, val2) = subtitle(external, tb, regexPattern, index)
-          if ret2 != -1:
-            error &"word: subtitle stream '{ret2}' does not exist."
-          return val2
-        return val
-      of esNone:
-        let length = mediaLength(container)
-        let tbLength = (round((length * tb).float64)).int
-
-        return newSeqWith(tbLength, true)
-      of esAll:
-        return @[]
-      else:
-        error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
-    else:
+      of esZero: return edit(allMethod())
+      of esOne: return edit(noneMethod())
+      else: error "We only support 0 or 1 right now."
+    if node[0].kind != ExprSym:
       error &"`--edit` expects a valid expression: {node[0].sourceText(text)}"
 
-  proc evalEditString(editStr: string): seq[bool] =
-    var lexer = initLexer("--edit", editStr)
-    var parser: Parser
-    let expressions: seq[Expr] = (
-      try:
-        parser = initParser(lexer) # lexes the first token, so it can raise too
-        parser.parse()
-      except ValueError as e: error &"--edit: {e.msg}"
-    )
-    if expressions.len == 0:
-      error "--edit: expression is empty"
-    let expr = expressions[^1]
-    if expr.kind != ExprList:
-      error "Should never happen"
-    return editEval(expr, parser.lexer.sourceText)
+    let editSymbol = node[0].editSymbol(text)
+    let operandCount = node.len - 1
+    if editSymbol == esNot and operandCount != 1:
+      error &"--edit: 'not' expects exactly 1 operand; got {operandCount}"
+    if editSymbol in {esOr, esAnd, esXor} and operandCount < 1:
+      let operator = node[0].sourceText(text)
+      error &"--edit: '{operator}' expects at least 1 operand; got {operandCount}"
 
+    case editSymbol
+    of esOr, esAnd, esXor, esNot:
+      result = EditExpr(op: (case editSymbol
+        of esOr: eoOr
+        of esAnd: eoAnd
+        of esXor: eoXor
+        else: eoNot))
+      for i in 1 ..< node.len:
+        result.operands.add toExpr(node[i], text)
+    of esAudio:
+      var m = audioMethod()
+      for (argPos, val) in checkedMethodArgs("audio", node[1 ..< node.len], text):
+        case argPos:
+        of 0: m.threshold = parseThres(val)
+        of 1: m.stream = parseStream(val)
+        of 2: m.channel = val
+        else: error "Too many args"
+      if m.channel != "all" and audioChannelCode(m.channel) == "":
+        error &"audio: unknown channel '{m.channel}'."
+      return edit(m)
+    of esMotion:
+      var m = motionMethod()
+      for (argPos, val) in checkedMethodArgs("motion", node[1 ..< node.len], text):
+        case argPos:
+        of 0: m.threshold = parseThres(val)
+        of 1: m.stream = parseStream(val)
+        of 2: m.width = parseNat(val)
+        of 3: m.blur = parseNat(val)
+        of 4: m.region.x = parseFloatInRange(val, 0.0, 1.0)
+        of 5: m.region.y = parseFloatInRange(val, 0.0, 1.0)
+        of 6: m.region.w = parseFloatInRange(val, 0.0, 1.0)
+        of 7: m.region.h = parseFloatInRange(val, 0.0, 1.0)
+        else: error "Too many args"
+      if m.stream < 0:
+        error "motion: 'all' stream is not supported"
+      return edit(m)
+    of esBlackdetect:
+      var m = blackdetectMethod()
+      for (argPos, val) in checkedMethodArgs("blackdetect", node[1 ..< node.len], text):
+        case argPos:
+        of 0: m.threshold = parseThres(val)
+        of 1: m.stream = parseStream(val)
+        of 2: m.pixelBlack = parseFloatInRange(val, 0.0, 1.0)
+        else: error "Too many args"
+      if m.stream < 0:
+        error "blackdetect: 'all' stream is not supported"
+      return edit(m)
+    of esSubtitle, esRegex:
+      var m = subtitleMethod("")
+      for (argPos, val) in checkedMethodArgs("subtitle", node[1 ..< node.len], text):
+        case argPos:
+        of 0: m.pattern = val
+        of 1: m.stream = parseStream(val)
+        of 2: m.ignoreCase = parseBool(val)
+        else: error "Too many args"
+      if m.stream < 0:
+        error "subtitle: 'all' stream is not supported"
+      return edit(m)
+    of esWord:
+      var m = wordMethod("")
+      for (argPos, val) in checkedMethodArgs("word", node[1 ..< node.len], text):
+        case argPos:
+        of 0: m.pattern = val
+        of 1: m.stream = parseStream(val)
+        of 2: m.ignoreCase = parseBool(val)
+        else: error "Too many args"
+      if m.pattern == "":
+        error "word: value required"
+      if m.stream < 0:
+        error "word: 'all' stream is not supported"
+      return edit(m)
+    of esNone: return edit(noneMethod())
+    of esAll: return edit(allMethod())
+    else:
+      error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
+
+  var lexer = initLexer(filename, source)
+  var parser: Parser
+  let expressions: seq[Expr] = (
+    try:
+      parser = initParser(lexer) # lexes the first token, so it can raise too
+      parser.parse()
+    except ValueError as e: error &"{filename}: {e.msg}"
+  )
+  if expressions.len == 0:
+    error &"{filename}: expression is empty"
+  let expr = expressions[^1]
+  if expr.kind != ExprList:
+    error "Should never happen"
+  toExpr(expr, parser.lexer.sourceText)
+
+proc evalEdit(e: EditExpr, container: InputContainer, input: string,
+    tb: AVRational, bar: Bar): seq[bool] =
+  ## Which frames of `input` at `tb` `e` marks active.
+  case e.op
+  of eoOr:
+    result = evalEdit(e.operands[0], container, input, tb, bar)
+    for i in 1 ..< e.operands.len:
+      result = result or evalEdit(e.operands[i], container, input, tb, bar)
+  of eoAnd:
+    result = evalEdit(e.operands[0], container, input, tb, bar)
+    for i in 1 ..< e.operands.len:
+      result = result and evalEdit(e.operands[i], container, input, tb, bar)
+  of eoXor:
+    result = evalEdit(e.operands[0], container, input, tb, bar)
+    for i in 1 ..< e.operands.len:
+      result = result xor evalEdit(e.operands[i], container, input, tb, bar)
+  of eoNot:
+    return not evalEdit(e.operands[0], container, input, tb, bar)
+  of eoMethod:
+    let m = e.m
+    case m.kind
+    of ekAudio:
+      func streamChannel(i: int): int {.raises: [].} =
+        let audioStream = container.audio[i]
+        resolveAudioChannelOrDefault(addr audioStream.codecpar.ch_layout, m.channel)
+
+      if m.stream == -1:
+        var matched = false
+        var undecodable = 0
+        for i in 0 ..< container.audio.len:
+          let codecId = container.audio[i].codecpar.codec_id
+          if not canDecode(codecId):
+            inc undecodable
+            # Analyzing "all" streams shouldn't fail on a track no decoder
+            # can read, like the `apac` one in iPhone Spatial Audio files.
+            debug &"audio: skipping stream {i}, no decoder for " &
+              $avcodec_get_name(codecId)
+            continue
+          let channelIndex = streamChannel(i)
+          if channelIndex >= -1:
+            result.orWithThreshold(
+              audio(bar, container, input, tb, i.int16, channelIndex), m.threshold)
+            matched = true
+        if not matched:
+          if undecodable > 0 and undecodable == container.audio.len:
+            error "audio: no audio stream in this file can be decoded."
+          error &"audio: channel '{m.channel}' does not exist in any audio stream."
+      else:
+        if m.stream >= container.audio.len:
+          error &"audio: audio stream '{m.stream}' does not exist."
+        let channelIndex = streamChannel(m.stream)
+        if channelIndex < -1:
+          let layout = $addr container.audio[m.stream].codecpar.ch_layout
+          error &"audio: channel '{m.channel}' does not exist in stream {m.stream} ({layout})."
+        result.orWithThreshold(
+          audio(bar, container, input, tb, m.stream.int16, channelIndex), m.threshold)
+    of ekMotion:
+      let r = m.region
+      result.orWithThreshold(motion(bar, container, input, tb, m.stream.int16,
+        m.width.int32, m.blur.int32, packUnorm24x4(r.x, r.y, r.w, r.h)), m.threshold)
+    of ekBlackdetect:
+      result.orWithThreshold(blackdetect(bar, container, input, tb,
+        m.stream.int16, m.pixelBlack), m.threshold)
+    of ekSubtitle, ekWord:
+      let name = if m.kind == ekWord: "word" else: "regex"
+      var flags: set[ReFlag]
+      if m.kind == ekSubtitle: flags.incl reUtf8
+      if m.ignoreCase: flags.incl reIgnoreCase
+      let regexPattern =
+        if m.kind == ekWord: re("\\b" & escapeRe(m.pattern) & "\\b", flags)
+        else: re(m.pattern, flags)
+      let stream = m.stream.int16
+      let (ret, val) = subtitle(container, tb, regexPattern, stream)
+      if ret != -1:
+        let subcontainer = findExternSubs(input)
+        if subcontainer.isNone():
+          error &"{name}: subtitle stream '{ret}' does not exist."
+        let external = subcontainer.unsafeGet()
+        defer: external.close()
+        let index = int16(stream - container.subtitle.len)
+        let (ret2, val2) = subtitle(external, tb, regexPattern, index)
+        if ret2 != -1:
+          error &"{name}: subtitle stream '{ret2}' does not exist."
+        return val2
+      return val
+    of ekNone:
+      let length = mediaLength(container)
+      let tbLength = (round((length * tb).float64)).int
+      return newSeqWith(tbLength, true)
+    of ekAll:
+      return @[]
+
+proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
+    tb: AVRational, bar: Bar): seq[uint8] =
   # Label 1: the default `--edit` method. Maps the boolean mask onto 0/1.
-  let base = evalEditString(args.edit)
+  let base = evalEdit(args.edit, container, input, tb, bar)
   result = newSeq[uint8](base.len)
   for i in 0 ..< base.len:
     if base[i]:
@@ -485,7 +417,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
   # be longer than the running result (e.g. differing stream lengths); extend
   # with 0 (silent) so the merge covers every sample.
   for le in args.labeledEdits:
-    let mask = evalEditString(le.expr)
+    let mask = evalEdit(le.expr, container, input, tb, bar)
     if mask.len > result.len:
       result.setLen(mask.len)
     let lbl = uint8(le.label)
