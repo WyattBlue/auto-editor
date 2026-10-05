@@ -6,6 +6,10 @@ import ./[action, cli]
 import ./util/[color, rational, term]
 
 type
+  AutoEditorError* = object of CatchableError
+    ## Raised by `error`. The CLI prints it and exits; library callers
+    ## catch it and keep running.
+
   BarType* = enum
     modern, classic, ascii, machine, none
   ExportKind* = enum
@@ -184,7 +188,7 @@ when defined(windows):
 else:
   proc cExit(code: cint) {.importc: "_exit", header: "<unistd.h>", noreturn.}
 
-proc error*(msg: string) {.noreturn, raises: [].} =
+proc printError*(msg: string) {.raises: [].} =
   conwrite ""
   try:
     if noColor:
@@ -193,6 +197,11 @@ proc error*(msg: string) {.noreturn, raises: [].} =
       stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   except IOError:
     discard
+
+proc fatal*(msg: string) {.noreturn, raises: [].} =
+  ## Print and exit immediately. For the CLI's top level and signal handlers,
+  ## where raising isn't possible or wanted.
+  printError(msg)
   # _exit, not quit: exit() runs C++ static destructors, and ggml's Metal
   # backend asserts in one when a failed model load left buffers behind —
   # turning a clean error message into a crash dump.
@@ -202,6 +211,9 @@ proc error*(msg: string) {.noreturn, raises: [].} =
   except IOError:
     discard
   cExit(1)
+
+proc error*(msg: string) {.noreturn, raises: [AutoEditorError].} =
+  raise newException(AutoEditorError, msg)
 
 
 type StringInterner* = Table[string, ptr string]

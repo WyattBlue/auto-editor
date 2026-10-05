@@ -39,7 +39,7 @@ func prefixEquals(s, expected: string, stop: int): bool {.raises: [].} =
       return false
   true
 
-proc parseExportString*(exportStr: string): ExportSpec {.raises: [].} =
+proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorError].} =
   result.name = "Auto-Editor Media Group"
   result.version = "11"
 
@@ -128,7 +128,7 @@ func normalizeRange(span: (PackedInt, PackedInt), tb: float64,
   return (start, stop)
 
 proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
-    value: int, maxLen: int) {.raises: [].} =
+    value: int, maxLen: int) {.raises: [AutoEditorError].} =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
   if start >= stop:
@@ -140,7 +140,7 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
     actionIndex[i] = value
 
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
-    isUrl = false, hasVideo = false): (string, ExportKind) {.raises: [].} =
+    isUrl = false, hasVideo = false): (string, ExportKind) {.raises: [AutoEditorError].} =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
@@ -212,7 +212,7 @@ proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
   return $avcodec_get_name(rule.defaultVid)
 
 proc applyAdds(tl: var v3, args: var mainArgs,
-    interner: var StringInterner) {.raises: [].} =
+    interner: var StringInterner) {.raises: [AutoEditorError].} =
   ## Inject `add:` overlays as new layers. Each spec overlays its source on
   ## every base-layer (v[0]) clip whose section matches the spec's selector
   ## (0 = silent, 1 = normal), spanning the same timeline range. With

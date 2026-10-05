@@ -12,7 +12,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 
 ]#
 
-{.push raises: [].}
+{.push raises: [AutoEditorError].}
 
 func getColorspace(mi: MediaInfo): string =
   # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496

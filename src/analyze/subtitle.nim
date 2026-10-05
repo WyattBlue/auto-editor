@@ -1,3 +1,4 @@
+from ../log import AutoEditorError, error
 from std/math import floor, ceil
 
 import ../[av, ffmpeg]
@@ -5,7 +6,7 @@ import ../util/rational
 import ../vendor/tinyre/tinyre
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
-    stream: int16): (int32, seq[bool]) {.raises: [].} =
+    stream: int16): (int32, seq[bool]) {.raises: [AutoEditorError].} =
 
   if stream < 0 or stream >= container.subtitle.len:
     return (stream, @[])
@@ -17,7 +18,7 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
   let packet = av_packet_alloc()
 
   if packet == nil:
-    quit(1)
+    error "Could not allocate packet"
   defer: av_packet_free(addr packet)
 
   let subtitleStream: AVStream = container.subtitle[stream][]

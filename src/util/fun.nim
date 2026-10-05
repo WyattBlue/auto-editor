@@ -131,7 +131,7 @@ type AbsPath* = distinct string
   ## A filesystem path known to be absolute. `absPath` is the only
   ## constructor, so consumers can rely on the invariant (and stay `func`).
 
-proc absPath*(path: string): AbsPath {.raises: [].} =
+proc absPath*(path: string): AbsPath {.raises: [AutoEditorError].} =
   # absolutePath only fails if the cwd is gone or unreadable; nothing
   # downstream can recover from that.
   try:

@@ -77,7 +77,7 @@ const
   defaultMotionThres = toUnorm16(0.02)
   defaultBlackThres = toUnorm16(0.98)
 
-proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
+proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [AutoEditorError].} =
   try:
     result = parseFloat(val)
   except ValueError:

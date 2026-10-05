@@ -3,12 +3,12 @@ import std/[json, strformat]
 import ../[action, av, ffmpeg, media, log, timeline]
 import ../util/[color, lang, rational]
 
-proc parseActionOrErr(val: string): Action {.raises: [].} =
+proc parseActionOrErr(val: string): Action {.raises: [AutoEditorError].} =
   try: parseAction(val)
   except ActionParseError as e: error e.msg
 
 proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
-    Actions]): Clip {.raises: [].} =
+    Actions]): Clip {.raises: [AutoEditorError].} =
   let srcNode = node{"src"}
   if srcNode != nil and srcNode.kind == JNull:
     result.src = nil # synthesized base clip: a render canvas with no media
@@ -56,7 +56,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
     group.free()
     result.effects = uint32(effectIndex)
 
-proc parseTransition(node: JsonNode): Transition {.raises: [].} =
+proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =
   if node{"kind"}.getStr("") != "dissolve":
     error "Unsupported transition kind"
   result.kind = tkDissolve
@@ -71,7 +71,7 @@ proc parseTransition(node: JsonNode): Transition {.raises: [].} =
   else: error "Invalid transition alignment"
 
 proc parseTransitions(node: JsonNode,
-    trackCount: int): seq[seq[Transition]] {.raises: [].} =
+    trackCount: int): seq[seq[Transition]] {.raises: [AutoEditorError].} =
   if node == nil: return
   if node.kind != JArray or node.len != trackCount:
     error "Transition track count must match media track count"
@@ -81,7 +81,7 @@ proc parseTransitions(node: JsonNode,
     for transitionNode in trackNode: track.add parseTransition(transitionNode)
     result.add track
 
-proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [AutoEditorError].} =
   let tbString = jsonNode{"timebase"}.getStr("")
   if tbString == "":
     error "Expected 'timebase' key to exist"
@@ -169,7 +169,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   result.validateTransitions()
 
 
-proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [AutoEditorError].} =
   let input = jsonNode{"source"}.getStr("")
   if input == "":
     error "source is a required field"
@@ -232,7 +232,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
   result = toNonLinear2(ptrInput, tb, mi, clips, effects)
 
 
-proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [].} =
+proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [AutoEditorError].} =
   let input = jsonNode{"source"}.getStr("")
   if input == "":
     error "source is a required field"
@@ -268,7 +268,7 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: []
     tb = AVRational(num: 30, den: 1)
   result = toNonLinear(ptrInput, tb, mi, chunks)
 
-proc readJson*(jsonStr: string, interner: var StringInterner): v3 {.raises: [].} =
+proc readJson*(jsonStr: string, interner: var StringInterner): v3 {.raises: [AutoEditorError].} =
   let jsonNode = try: parseJson(jsonStr)
     except CatchableError as e: error "Invalid JSON: " & e.msg
   let version = jsonNode{"version"}.getStr("unknown")

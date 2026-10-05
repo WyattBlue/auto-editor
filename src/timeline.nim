@@ -259,7 +259,7 @@ proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
   mutHelper(result, mi, clips)
 
 proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
-    chunks: seq[(int64, int64, float64)]): v3 {.raises: [].} =
+    chunks: seq[(int64, int64, float64)]): v3 {.raises: [AutoEditorError].} =
   var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
   var effects: seq[Actions] = @[]

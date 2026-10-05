@@ -27,7 +27,7 @@ proc ctrlc() {.noconv.} =
   if micCaptureActive:
     stopMicCapture = true
   else:
-    error "Keyboard Interrupt"
+    fatal "Keyboard Interrupt"
 
 setControlCHook(ctrlc)
 
@@ -703,4 +703,7 @@ judge making cuts.
   editMedia(args)
 
 when isMainModule:
-  main()
+  try:
+    main()
+  except AutoEditorError as e:
+    fatal e.msg
