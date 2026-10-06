@@ -11,7 +11,9 @@ import ./util/rules
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
 #include <x264.h>
+#if __has_include(<x265.h>)
 #include <x265.h>
+#endif
 """.}
 
 {.emit: """
@@ -79,8 +81,14 @@ static const char *ae_codec_profile(const AVCodec *c, int k) {
 }
 static const char *ae_x264_preset(int k) { return x264_preset_names[k]; }
 static const char *ae_x264_profile(int k) { return x264_profile_names[k]; }
+#if __has_include(<x265.h>)
 static const char *ae_x265_preset(int k) { return x265_preset_names[k]; }
 static const char *ae_x265_profile(int k) { return x265_profile_names[k]; }
+#else
+/* Builds without x265 (the web's) have no libx265 to describe. */
+static const char *ae_x265_preset(int k) { (void)k; return NULL; }
+static const char *ae_x265_profile(int k) { (void)k; return NULL; }
+#endif
 """.}
 
 proc ae_opt_kind(c: ptr AVCodec, name: cstring): cint {.importc, nodecl.}
