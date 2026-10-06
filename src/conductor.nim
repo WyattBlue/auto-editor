@@ -569,8 +569,10 @@ proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
 type EditPlan* = object
   ## Every cut of an edit, without rendering it.
   tb*: AVRational
-  chunks*: seq[tuple[start, stop: int64, speed: float64]]
-    ## Frames at `tb`, the inputs' frames laid end to end; speed 99999 is a cut.
+  chunks*: seq[tuple[start, stop: int64, speed: float64, actions: seq[string]]]
+    ## Frames at `tb`, the inputs' frames laid end to end; speed 99999 is a
+    ## cut. `actions` is the section's chain as auto-editor writes it, e.g.
+    ## @["speed:2.0", "volume:0.5"], @["cut"], or empty to leave it as is.
   sourceFrames*: seq[int64] ## each input's length, in that order
 
 proc planEdit*(args: var mainArgs): EditPlan =
@@ -589,11 +591,23 @@ proc planEdit*(args: var mainArgs): EditPlan =
   # Each input's chunks count from its own frame 0; lay them end to end so
   # the inputs share one frame space.
   var offset, prevEnd = 0'i64
-  for (start, stop, speed) in built.tl.v1Chunks:
+  for clip in built.tl.clips2:
+    let (start, stop) = (clip.start, clip.`end`)
     if start == 0 and prevEnd > 0:
       result.sourceFrames.add prevEnd
       offset += prevEnd
-    result.chunks.add (start + offset, stop + offset, speed)
+    # The speed as v1Chunks reckons it, beside the whole chain.
+    let group = built.tl.effects[clip.effect]
+    var speed = 1.0
+    var actions: seq[string]
+    if group.isCut:
+      speed = 99999.0
+      actions = @["cut"]
+    else:
+      for a in group:
+        if a.kind == actSpeed: speed *= a.val.float64
+        actions.add $a
+    result.chunks.add (start + offset, stop + offset, speed, actions)
     prevEnd = stop
   if prevEnd > 0: result.sourceFrames.add prevEnd
 
