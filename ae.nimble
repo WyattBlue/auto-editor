@@ -17,7 +17,9 @@ let disableVpx = getEnv("DISABLE_VPX").len > 0
 let disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 let disableHevc = getEnv("DISABLE_HEVC").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
-let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
+# Per target below (native macOS has no Quick Sync); not `defined(macosx)`
+# here, which would also drop it from Windows builds made on a Mac.
+let enableVpl = getEnv("DISABLE_VPL").len == 0
 
 let
   nativeBuildPath = absolutePath("build")
@@ -258,7 +260,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add amfheaders
   if kind == armv7 or (kind == native and defined(linux)):
     result.add alsa
-  if enableVpl and kind != winArm and kind != armv7 and not isWasm:
+  if enableVpl and kind != winArm and kind != armv7 and not isWasm and not isMacNative:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -967,7 +969,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       enableEncoders.add "aac_at,alac_at,h264_videotoolbox,hevc_videotoolbox,prores_videotoolbox".split(",")
     elif kind != armv7 and kind != winArm:
       enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
-    if enableVpl:
+    if packages.anyIt(it.name == "libvpl"):
       enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
 
   var commonFlags = &"""
