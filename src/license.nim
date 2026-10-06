@@ -14,23 +14,29 @@ const
   FREE_MULTI_SOURCE_LONG_SIDE* = 720'i32
   FREE_MULTI_SOURCE_SHORT_SIDE* = 576'i32
 
+type SizeLimit* = tuple[long, short: int32]
+
+const
+  FREE_RENDER*: SizeLimit = (FREE_RENDER_LONG_SIDE, FREE_RENDER_SHORT_SIDE)
+  FREE_MULTI_SOURCE*: SizeLimit = (FREE_MULTI_SOURCE_LONG_SIDE,
+    FREE_MULTI_SOURCE_SHORT_SIDE)
+
+func `$`*(limit: SizeLimit): string {.raises: [].} =
+  $limit.long & "x" & $limit.short
+
+func fits*(width, height: int32, limit: SizeLimit): bool {.raises: [].} =
+  ## Long and short sides are compared so portrait gets the rotated limit.
+  max(width, height) <= limit.long and min(width, height) <= limit.short
+
 func fitsFreeRenderResolution*(width, height: int32): bool {.raises: [].} =
-  max(width, height) <= FREE_RENDER_LONG_SIDE and
-    min(width, height) <= FREE_RENDER_SHORT_SIDE
+  fits(width, height, FREE_RENDER)
 
-func fitsFreeMultiSourceResolution*(width, height: int32): bool {.raises: [].} =
-  max(width, height) <= FREE_MULTI_SOURCE_LONG_SIDE and
-    min(width, height) <= FREE_MULTI_SOURCE_SHORT_SIDE
-
-func freeMultiSourceScale*(width, height: int32): float64 {.raises: [].} =
-  ## Return the largest non-upscaling factor that fits inside an SD frame.
-  ## Compare long and short sides so portrait renders get the rotated limit.
+func fitScale*(width, height: int32, limit: SizeLimit): float64 {.raises: [].} =
+  ## The largest scale of `width`x`height` that fits inside `limit`.
   if width <= 0 or height <= 0:
     return 1.0
-  min(1.0, min(
-    FREE_MULTI_SOURCE_LONG_SIDE.float64 / max(width, height).float64,
-    FREE_MULTI_SOURCE_SHORT_SIDE.float64 / min(width, height).float64,
-  ))
+  min(limit.long.float64 / max(width, height).float64,
+    limit.short.float64 / min(width, height).float64)
 
 proc validateKey*(val: string): (bool, string) {.raises: [].} =
   if val == "":

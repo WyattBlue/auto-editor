@@ -146,31 +146,23 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
   let renderVideo = includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0
   if renderVideo:
-    var (width, height) = scaledVideoResolution(renderTl.res, video.scale)
-    if renderTl.numberOfSrc > 1 and not fitsFreeMultiSourceResolution(width, height):
-      if licenseKeyProvided(args):
-        requireLicense(args, "render video with multiple sources above 720x576")
-      else:
-        video.scale *= freeMultiSourceScale(width, height)
-        (width, height) = scaledVideoResolution(renderTl.res, video.scale)
-        warning &"Rendering multiple sources without a license is limited to " &
-          &"720x576; using --scale {video.scale} ({width}x{height})."
+    template limitTo(limit: SizeLimit, what: string) =
+      let (width, height) = scaledVideoResolution(renderTl.res, video.scale)
+      if not fits(width, height, limit):
+        # Without a key, shrink to fit, unless the size was asked for exactly.
+        if licenseKeyProvided(args) or (video.scaleSet and args.resolutionSet):
+          requireLicense(args, "render " & what & " above " & $limit)
+        else:
+          video.scale = min(video.scale,
+            fitScale(renderTl.res[0], renderTl.res[1], limit))
+          let (w, h) = scaledVideoResolution(renderTl.res, video.scale)
+          warning "Rendering " & what & " without a license is limited to " &
+            $limit & "; using --scale " & formatFloat(video.scale, ffDefault, 4) &
+            " (" & $w & "x" & $h & ")."
 
-    if not fitsFreeRenderResolution(width, height):
-      if licenseKeyProvided(args) or (video.scaleSet and args.resolutionSet):
-        requireLicense(args, "render video above 3200x1800")
-      else:
-        var scale = video.scale
-        while scale > 0.25:
-          scale = max(0.25, scale - 0.25)
-          let (scaledWidth, scaledHeight) = scaledVideoResolution(renderTl.res, scale)
-          if fitsFreeRenderResolution(scaledWidth, scaledHeight):
-            warning &"Output resolution {width}x{height} exceeds the unlicensed " &
-              &"limit; using --scale {scale} ({scaledWidth}x{scaledHeight})."
-            video.scale = scale
-            break
-        if video.scale == 1.0:
-          requireLicense(args, "render video above 3200x1800")
+    if renderTl.numberOfSrc > 1:
+      limitTo(FREE_MULTI_SOURCE, "video with multiple sources")
+    limitTo(FREE_RENDER, "video")
 
   var options: OutputOptions
   if args.fragmented and not args.noFragmented:
