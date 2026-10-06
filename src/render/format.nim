@@ -89,18 +89,19 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
   error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
-proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArgs):
+proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArgs,
+    video: VideoSettings):
     tuple[stream: ptr AVStream, packets: iterator(): (ptr AVPacket, int64)] =
-  let encoder = initCodec(args.videoCodec)
+  let encoder = initCodec(video.codec)
   if encoder == nil:
     return
 
-  let plan = output.partialLosslessPlan(tl, args, encoder.id)
+  let plan = output.partialLosslessPlan(tl, args, video, encoder.id)
   if plan.len == 0:
     return
 
   (result.stream, result.packets) =
-    makePartialLossless(output, tl, args, plan, encoder.id)
+    makePartialLossless(output, tl, video, plan, encoder.id)
 
 proc dropUndecodableAudio*(tl: var v3, cache: MediaCache) =
   ## A timeline can name an audio stream this build has no decoder for: the
@@ -128,9 +129,9 @@ proc dropUndecodableAudio*(tl: var v3, cache: MediaCache) =
           $avcodec_get_name(codecId)
     layer = kept
 
-proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rules,
-    bar: Bar, cache: MediaCache) =
-  var args = inputArgs
+proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
+    tl: var v3, outputPath: string, rules: Rules, bar: Bar, cache: MediaCache) =
+  var video = inputVideo
   # Before bakeTransitions: output streams are created from `tl` and their
   # frames come from the baked copy, so both must see the same audio layers.
   tl.dropUndecodableAudio(cache)
@@ -145,31 +146,31 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
   let renderVideo = includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0
   if renderVideo:
-    var (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+    var (width, height) = scaledVideoResolution(renderTl.res, video.scale)
     if renderTl.numberOfSrc > 1 and not fitsFreeMultiSourceResolution(width, height):
       if licenseKeyProvided(args):
         requireLicense(args, "render video with multiple sources above 720x576")
       else:
-        args.scale *= freeMultiSourceScale(width, height)
-        (width, height) = scaledVideoResolution(renderTl.res, args.scale)
+        video.scale *= freeMultiSourceScale(width, height)
+        (width, height) = scaledVideoResolution(renderTl.res, video.scale)
         warning &"Rendering multiple sources without a license is limited to " &
-          &"720x576; using --scale {args.scale} ({width}x{height})."
+          &"720x576; using --scale {video.scale} ({width}x{height})."
 
     if not fitsFreeRenderResolution(width, height):
-      if licenseKeyProvided(args) or (args.scaleSet and args.resolutionSet):
+      if licenseKeyProvided(args) or (video.scaleSet and args.resolutionSet):
         requireLicense(args, "render video above 3200x1800")
       else:
-        var scale = args.scale
+        var scale = video.scale
         while scale > 0.25:
           scale = max(0.25, scale - 0.25)
           let (scaledWidth, scaledHeight) = scaledVideoResolution(renderTl.res, scale)
           if fitsFreeRenderResolution(scaledWidth, scaledHeight):
             warning &"Output resolution {width}x{height} exceeds the unlicensed " &
               &"limit; using --scale {scale} ({scaledWidth}x{scaledHeight})."
-            args.scale = scale
+            video.scale = scale
             break
-        if args.scale == 1.0:
-          requireLicense(args, "render video above 2560x1440")
+        if video.scale == 1.0:
+          requireLicense(args, "render video above 3200x1800")
 
   var options: OutputOptions
   if args.fragmented and not args.noFragmented:
@@ -186,7 +187,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
   var audCodec = ""
   if includeAudio:
-    if args.audioCodec == "auto":
+    if audio.codec == "auto":
       for layer in tl.a:
         if layer.len > 0:
           audCodec = $avcodec_get_name(resolveAudioCodec(layer, rules, cache))
@@ -195,7 +196,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
         if audCodec == "aac" and avcodec_find_encoder_by_name("aac_at") != nil:
           audCodec = "aac_at"
     else:
-      audCodec = args.audioCodec
+      audCodec = audio.codec
 
     if audCodec in ["opus", "libopus"]:
       let snapped = opusRate(tl.sr)
@@ -215,11 +216,11 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
   if renderVideo:
     (vOutStream, videoPacketIter) =
-      output.makePartialLosslessVideo(renderTl, args)
+      output.makePartialLosslessVideo(renderTl, args, video)
     partialLosslessVideo = vOutStream != nil
     if not partialLosslessVideo:
       (vEncCtx, vOutStream, videoFrameIter) =
-        makeNewVideoFrames(output, renderTl, args, cache)
+        makeNewVideoFrames(output, renderTl, args, video, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
@@ -239,8 +240,8 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
           lang = ['u', 'n', 'd', '\0'], layout = tl.layout)
       checkAudioCtx(aEncCtx, tl.sr)
       # avcodec_open2 configures the encoder from bit_rate; set after and it's ignored.
-      if args.audioBitrate >= 0:
-        aEncCtx.bit_rate = args.audioBitrate
+      if audio.bitrate >= 0:
+        aEncCtx.bit_rate = audio.bitrate
       resolveEncoderContext(aEncCtx)
       let encoder = aEncCtx.codec
       aEncCtx.open()
@@ -250,7 +251,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
       if avcodec_parameters_from_context(aOutStream.codecpar, aEncCtx) < 0:
         error "Could not update stream parameters after opening encoder"
 
-      if args.audioBitrate >= 0:
+      if audio.bitrate >= 0:
         debug &"audio bitrate: {aEncCtx.bit_rate}"
       else:
         debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
@@ -260,7 +261,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
       let audioFrameIter = makeAudioFrames(encoder.supportedSampleFmts[0], renderTl,
-          frameSize, toSeq(0 ..< tl.a.len), args.audioNormalize, cache)
+          frameSize, toSeq(0 ..< tl.a.len), audio.normalize, cache)
       audioFrameIters.add(audioFrameIter)
   elif includeAudio:
     # Create separate streams for each timeline layer
@@ -272,8 +273,8 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
         checkAudioCtx(aEncCtx, tl.sr)
         # avcodec_open2 configures the encoder from bit_rate; setting it after
         # the call has no effect.
-        if args.audioBitrate >= 0:
-          aEncCtx.bit_rate = args.audioBitrate
+        if audio.bitrate >= 0:
+          aEncCtx.bit_rate = audio.bitrate
         resolveEncoderContext(aEncCtx)
         let encoder = aEncCtx.codec
         aEncCtx.open()
@@ -283,7 +284,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
         if avcodec_parameters_from_context(aOutStream.codecpar, aEncCtx) < 0:
           error "Could not update stream parameters after opening encoder"
 
-        if args.audioBitrate >= 0:
+        if audio.bitrate >= 0:
           debug &"audio bitrate: {aEncCtx.bit_rate}"
         else:
           debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
@@ -293,7 +294,7 @@ proc makeMedia*(inputArgs: mainArgs, tl: var v3, outputPath: string, rules: Rule
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
         let audioFrameIter = makeAudioFrames(encoder.supportedSampleFmts[0], renderTl,
-            frameSize, @[i], args.audioNormalize, cache)
+            frameSize, @[i], audio.normalize, cache)
         audioFrameIters.add(audioFrameIter)
 
   defer:

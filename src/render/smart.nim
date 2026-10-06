@@ -90,15 +90,15 @@ func smartPlanIsWorthwhile*(stats: SmartPlanStats, timelineFrames,
   let restartCost = int64(stats.encodeRuns) * max(averageGop, 1)
   return stats.encodedFrames + scanCost + restartCost < timelineFrames
 
-proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, args: mainArgs) =
-  if args.videoBitrate >= 0:
-    encoder.bit_rate = args.videoBitrate
-  if args.crf >= 0:
-    discard av_opt_set_int(encoder.priv_data, "crf", args.crf.cint, 0)
-  if args.preset != "":
-    discard av_opt_set(encoder.priv_data, "preset", cstring(args.preset), 0)
-  if args.gop >= 1:
-    encoder.gop_size = args.gop.cint
+proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, video: VideoSettings) =
+  if video.bitrate >= 0:
+    encoder.bit_rate = video.bitrate
+  if video.crf >= 0:
+    discard av_opt_set_int(encoder.priv_data, "crf", video.crf.cint, 0)
+  if video.preset != "":
+    discard av_opt_set(encoder.priv_data, "preset", cstring(video.preset), 0)
+  if video.gop >= 1:
+    encoder.gop_size = video.gop.cint
 
 func frameAt*(ts: int64, tb, fps: AVRational): int64 =
   int64(round(float(ts) * float(tb) * float(fps)))

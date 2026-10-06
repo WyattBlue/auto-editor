@@ -17,8 +17,6 @@ let disableVpx = getEnv("DISABLE_VPX").len > 0
 let disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 let disableHevc = getEnv("DISABLE_HEVC").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
-# Per target below (native macOS has no Quick Sync); not `defined(macosx)`
-# here, which would also drop it from Windows builds made on a Mac.
 let enableVpl = getEnv("DISABLE_VPL").len == 0
 
 let

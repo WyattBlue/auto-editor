@@ -33,11 +33,10 @@ proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
   ## timeline's rate, without normalization (which measures the whole
   ## timeline first). Owns `args` (its actions are freed on `close`).
   var r = PreviewRender(args: args)
-  r.args.videoCodec = "ffv1" # never encodes; it only settles the pixel format
-  r.args.scale = scale
-  r.args.audioLayout = "stereo"
-  r.args.audioNormalize = Norm(kind: nkNull)
-  let built = buildTimeline(r.args, r.interner, initBar(BarType.none))
+  # ffv1 never encodes; it only settles the pixel format.
+  let video = VideoSettings(codec: "ffv1", scale: scale)
+  let built = buildTimeline(r.args, AudioSettings(layout: "stereo"), r.interner,
+    initBar(BarType.none))
   r.tl = built.tl
   r.cache = newMediaCache()
   r.tl.dropUndecodableAudio(r.cache)
@@ -55,12 +54,12 @@ proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
     r.output = openWrite("preview.mkv")
     var stream: ptr AVStream
     (r.encoder, stream, r.video) = makeNewVideoFrames(r.output, r.renderTl,
-      r.args, r.cache, start, addr r.stop)
+      r.args, video, r.cache, start, addr r.stop)
     r.hasVideo = true
   if withAudio and r.renderTl.a.anyIt(it.len > 0):
     let fromSample = audioSampleSpan(start, 0, r.renderTl.sr, tb).start
     r.audio = makeAudioFrames(AV_SAMPLE_FMT_FLT, r.renderTl, 1024,
-      toSeq(0 ..< r.renderTl.a.len), r.args.audioNormalize, r.cache,
+      toSeq(0 ..< r.renderTl.a.len), Norm(kind: nkNull), r.cache,
       fromSample, addr r.stop)
     r.audioAt = fromSample
     r.hasAudio = true

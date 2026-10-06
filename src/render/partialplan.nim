@@ -117,12 +117,12 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
   result.keyframes.setLen(write)
 
 proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
-    codecId: AVCodecID): seq[SmartSpan] =
-  if args.noPartialLossless or args.scale != 1.0 or args.pixFmt != "" or
-      args.vprofile != "":
+    video: VideoSettings,     codecId: AVCodecID): seq[SmartSpan] =
+  if args.noPartialLossless or video.scale != 1.0 or video.pixFmt != "" or
+      video.profile != "":
     return
 
-  let encoder = initCodec(args.videoCodec)
+  let encoder = initCodec(video.codec)
   if encoder == nil or encoder.id != codecId:
     return
   let formatName = $output.formatCtx.oformat.name
@@ -172,9 +172,9 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
     return
   return plan
 
-proc initPartialEncoder(args: mainArgs, par: ptr AVCodecParameters,
+proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
     frameTb, fps: AVRational, codecId: AVCodecID): ptr AVCodecContext =
-  var (_, encoder) = initEncoder(args.videoCodec)
+  var (_, encoder) = initEncoder(video.codec)
   encoder.width = par.width
   encoder.height = par.height
   encoder.pix_fmt = AVPixelFormat(par.format)
@@ -190,17 +190,17 @@ proc initPartialEncoder(args: mainArgs, par: ptr AVCodecParameters,
   if codecId.isNalCodec:
     encoder.max_b_frames = max(par.video_delay, 0)
     encoder.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
-  elif codecId == ID_AV1 and args.crf >= 0 and args.videoBitrate < 0:
+  elif codecId == ID_AV1 and video.crf >= 0 and video.bitrate < 0:
     # SVT-AV1 rejects CRF mode when a target bitrate is also configured. The
     # bitrate above is only an automatic fallback, so do not let it conflict
     # with an explicit quality target.
     encoder.bit_rate = 0
   resolveEncoderContext(encoder)
-  encoder.applyPartialEncoderArgs(args)
+  encoder.applyPartialEncoderArgs(video)
   encoder.open()
   return encoder
 
-proc makePartialLossless*(output: var OutputContainer, tl: v3, args: mainArgs,
+proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSettings,
     spans: seq[SmartSpan], codecId: AVCodecID):
     (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
   let label = codecId.codecLabel
@@ -355,7 +355,7 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, args: mainArgs,
           yield (outPacket, orderFrame)
       else:
         if encoder == nil:
-          encoder = initPartialEncoder(args, stream.codecpar, frameTb, tl.tb,
+          encoder = initPartialEncoder(video, stream.codecpar, frameTb, tl.tb,
             codecId)
           if isNal:
             encodedParameterSets = parameterSetsFor(codecId, encoder.extradata,

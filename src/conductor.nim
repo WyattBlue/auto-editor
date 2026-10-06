@@ -426,8 +426,8 @@ type BuiltTimeline* = object
   usePath*: string ## the media input to name outputs after, if any
   mi*: MediaInfo
 
-proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
-    bar: Bar): BuiltTimeline =
+proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
+    interner: var StringInterner, bar: Bar): BuiltTimeline =
   ## Analyze the inputs and decide every cut without exporting anything.
   ## Release with `freeActions(args, result.tl)` when done.
   var tlV3: v3
@@ -436,7 +436,7 @@ proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
   if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
-    tlV3.applyArgs(args)
+    tlV3.applyArgs(args, audio)
   else:
     if args.inputs.len == 0:
       error "You need to give auto-editor an input file."
@@ -445,10 +445,10 @@ proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
 
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
       tlV3 = readJson(readFile(input), interner)
-      tlV3.applyArgs(args)
+      tlV3.applyArgs(args, audio)
     elif inputExt == ".xml":
       tlV3 = fcp7ReadXml(input, interner)
-      tlV3.applyArgs(args)
+      tlV3.applyArgs(args, audio)
       usePath = input
     else:
       usePath = input
@@ -556,7 +556,7 @@ proc buildTimeline*(args: var mainArgs, interner: var StringInterner,
 
       applyAdds(tlV3, args, interner)
       applyLayers(tlV3, args, interner)
-      tlV3.applyArgs(args)
+      tlV3.applyArgs(args, audio)
       if args.transition.getNumber > 0:
         tlV3.addDissolveTransitions(
           toTb(args.transition, tlV3.tb.float).int64,
@@ -583,7 +583,8 @@ proc planEdit*(args: var mainArgs): EditPlan =
   args.placedTransitions = @[]
   var interner: StringInterner
   defer: interner.cleanup()
-  let built = buildTimeline(args, interner, initBar(BarType.none))
+  let built = buildTimeline(args, AudioSettings(), interner,
+    initBar(BarType.none))
   defer: freeActions(args, built.tl)
   if not built.tl.isLinear:
     error "This edit can't be shown as a simple list of cuts"
@@ -611,7 +612,8 @@ proc planEdit*(args: var mainArgs): EditPlan =
     prevEnd = stop
   if prevEnd > 0: result.sourceFrames.add prevEnd
 
-proc editMedia*(args: var mainArgs, startTime: float = log.start) =
+proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
+    startTime: float = log.start) =
   av_log_set_level(AV_LOG_QUIET)
 
   var tlV3: v3
@@ -630,7 +632,7 @@ proc editMedia*(args: var mainArgs, startTime: float = log.start) =
   # bar's thread would keep reading it after it's freed.
   defer: bar.destroy()
 
-  let built = buildTimeline(args, interner, bar)
+  let built = buildTimeline(args, audio, interner, bar)
   tlV3 = built.tl
   usePath = built.usePath
   mi = built.mi
@@ -701,7 +703,8 @@ proc editMedia*(args: var mainArgs, startTime: float = log.start) =
     error "Exporting media files to stdout is not supported."
 
   let rule = initRules(output)
-  args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
+  var video = inputVideo
+  video.codec = setVideoCodec(video.codec, mi, rule, args.urlInput)
   let cache = newMediaCache()
   defer: cache.close()
 
@@ -732,11 +735,11 @@ proc editMedia*(args: var mainArgs, startTime: float = log.start) =
 
     for clipNum, clip2 in clips2.pairs:
       var myTimeline = toNonLinear2(src, tlV3.tb, mi, @[clip2], tlV3.effects)
-      applyArgs(myTimeline, args)
-      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule,
+      applyArgs(myTimeline, args, audio)
+      makeMedia(args, video, audio, myTimeline, appendFilename(output, &"-{clipNum}"), rule,
         bar, cache)
   else:
-    makeMedia(args, tlV3, output, rule, bar, cache)
+    makeMedia(args, video, audio, tlV3, output, rule, bar, cache)
 
   # Retiming embedded subtitles is handled by makeMedia. Also retime every
   # subtitle-only sibling of each original media input into its own sidecar.

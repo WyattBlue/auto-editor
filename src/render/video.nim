@@ -679,7 +679,8 @@ func scaledVideoResolution*(resolution: (int32, int32),
   )
 
 proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
-    myCache: MediaCache, startIndex = 0'i64, stop: ptr Atomic[bool] = nil):
+    video: VideoSettings, myCache: MediaCache, startIndex = 0'i64,
+    stop: ptr Atomic[bool] = nil):
     (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int64)) =
   ## Frames from `startIndex` on. A set `stop` ends the iterator at its next
   ## call, freeing what it holds (a preview abandons a render this way).
@@ -735,7 +736,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or
       vstream.nb_frames == 1
 
-  let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, args.scale)
+  let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, video.scale)
   var fxGraph: Graph = nil
   var fxKey: GraphKey
   var rotGraph: Graph = nil # static source rotation, applied before the fit
@@ -746,10 +747,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var maskMatteKey: GraphKey
   var confineMatte: ptr AVFrame = nil
   var confineMatteKey: GraphKey
-  let needsScaling = args.scale != 1.0
+  let needsScaling = video.scale != 1.0
 
-  debug &"Creating video stream with codec: {args.videoCodec}"
-  var (outputStream, encoderCtx) = output.addStream(args.videoCodec, targetFps,
+  debug &"Creating video stream with codec: {video.codec}"
+  var (outputStream, encoderCtx) = output.addStream(video.codec, targetFps,
       lang = tl.langs[0], width = targetWidth, height = targetHeight)
   var codec = encoderCtx.codec
 
@@ -801,8 +802,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if firstSrc != nil: AVPixelFormat(myCache.cns[firstSrc].video[0].codecpar.format)
     else: AV_PIX_FMT_NONE
 
-  if args.videoBitrate >= 0:
-    encoderCtx.bit_rate = args.videoBitrate
+  if video.bitrate >= 0:
+    encoderCtx.bit_rate = video.bitrate
     debug(&"video bitrate: {encoderCtx.bit_rate}")
   else:
     debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
@@ -837,11 +838,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
-  let userFmt = args.pixFmt != ""
+  let userFmt = video.pixFmt != ""
   if userFmt:
-    pix_fmt = av_get_pix_fmt(cstring(args.pixFmt))
+    pix_fmt = av_get_pix_fmt(cstring(video.pixFmt))
     if pix_fmt == AV_PIX_FMT_NONE:
-      error &"Unknown pixel format: {args.pixFmt}"
+      error &"Unknown pixel format: {video.pixFmt}"
 
   let pixFmts = codec.supportedPixFmts
   var needValidFmt = true
@@ -856,15 +857,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if needValidFmt:
     # A format the user asked for by name must not be silently swapped.
     if userFmt and pixFmts != nil:
-      error &"Encoder {codec.name} does not support pixel format: {args.pixFmt}"
+      error &"Encoder {codec.name} does not support pixel format: {video.pixFmt}"
     if pixFmts != nil:
       let best = avcodec_find_best_pix_fmt_of_list(pixFmts, pix_fmt, 0, nil)
       pix_fmt = if best != AV_PIX_FMT_NONE: best else: AV_PIX_FMT_YUV420P
     else:
       pix_fmt = AV_PIX_FMT_YUV420P
 
-  if args.vprofile != "":
-    encoderCtx.setProfileOrErr(args.vprofile)
+  if video.profile != "":
+    encoderCtx.setProfileOrErr(video.profile)
 
   encoderCtx.pix_fmt = pix_fmt
   resolveEncoderContext(encoderCtx)
@@ -872,13 +873,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   if codec.id == ID_HEVC:
     discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
-  if args.crf >= 0:
-    discard av_opt_set_int(encoderCtx.priv_data, "crf", args.crf.cint, 0)
-  if args.preset != "":
-    discard av_opt_set(encoderCtx.priv_data, "preset", cstring(args.preset), 0)
+  if video.crf >= 0:
+    discard av_opt_set_int(encoderCtx.priv_data, "crf", video.crf.cint, 0)
+  if video.preset != "":
+    discard av_opt_set(encoderCtx.priv_data, "preset", cstring(video.preset), 0)
 
-  if args.gop >= 1:
-    encoderCtx.gop_size = args.gop.cint
+  if video.gop >= 1:
+    encoderCtx.gop_size = video.gop.cint
   elif args.fragmented and not args.noFragmented:
     # frag_keyframe only cuts a fragment at a keyframe, so the default keyint
     # would hold back the first fragment for seconds of media.

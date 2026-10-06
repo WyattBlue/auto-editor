@@ -188,14 +188,11 @@ proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
       timelineStart += dur
 
 proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor,
-    mi: MediaInfo,
-  effects: seq[Actions], actionIndex: seq[int]): v3 =
+    mi: MediaInfo, effects: seq[Actions], actionIndex: seq[int]): v3 =
   var clips2: seq[Clip2]
   let clips = linearClips(src, effects, actionIndex, 0, clips2)
 
-  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2,
-      res: mi.getRes(),
-    templateFile: src)
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes(), templateFile: src)
   mutHelper(result, mi, clips)
 
 proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
@@ -298,13 +295,13 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, mi: MediaInfo,
   clips2: seq[Clip2], effects: seq[Actions]): v3 =
   initNonLinear(src, tb, mi, clips2, effects)
 
-proc applyArgs*(tl: var v3, args: mainArgs) =
+proc applyArgs*(tl: var v3, args: mainArgs, audio: AudioSettings) =
   if args.sampleRate != -1:
     tl.sr = args.sampleRate
   if args.resolution[0] != 0:
     tl.res = args.resolution
-  if args.audioLayout != "":
-    tl.layout = initLayout(args.audioLayout)
+  if audio.layout != "":
+    tl.layout = initLayout(audio.layout)
   if args.frameRate != AVRational(num: 0, den: 0):
     tl.tb = args.frameRate
   if args.background.isSome:

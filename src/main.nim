@@ -449,6 +449,8 @@ judge making cuts.
     genCmdCases(paramStr(1))
 
   var args = mainArgs()
+  var video: VideoSettings
+  var audio: AudioSettings
   var showVersion: bool = false
   var expecting = coNone
   # Label for a pending "edit"/"when" value (plain --edit => 1).
@@ -543,8 +545,8 @@ judge making cuts.
     of coYtDlpExtras:
       args.ytDlpExtras = key
     of coScale:
-      args.scale = parseNum(key, $expecting)
-      args.scaleSet = true
+      video.scale = parseNum(key, $expecting)
+      video.scaleSet = true
     of coResolution:
       args.resolution = parseResolution(key, $expecting)
       args.resolutionSet = true
@@ -556,34 +558,34 @@ judge making cuts.
     of coFrameRate:
       args.frameRate = parseFrameRate(key)
     of coVcodec:
-      args.videoCodec = key
+      video.codec = key
     of coVideoBitrate:
-      args.videoBitrate = parseBitrate(key)
+      video.bitrate = parseBitrate(key)
     of coCrf:
       var val: int
       if key.len == 0 or parseSaturatedNatural(key, val) != key.len:
         error "invalid constant rate factor: " & key
       if val > 63: error "constant rate factor is too high: " & key
-      args.crf = val.int8
+      video.crf = val.int8
     of coGop:
       var val: int
       if key.len == 0 or parseSaturatedNatural(key, val) != key.len or val < 1:
         error "invalid gop size: " & key
-      args.gop = val
+      video.gop = val
     of coVprofile:
-      args.vprofile = key
+      video.profile = key
     of coPreset:
-      args.preset = key
+      video.preset = key
     of coPixFmt:
-      args.pixFmt = key
+      video.pixFmt = key
     of coAcodec:
-      args.audioCodec = key
+      audio.codec = key
     of coLayout:
-      args.audioLayout = key
+      audio.layout = key
     of coAudioNormalize:
-      args.audioNormalize = parseNorm(key)
+      audio.normalize = parseNorm(key)
     of coAudioBitrate:
-      args.audioBitrate = parseBitrate(key)
+      audio.bitrate = parseBitrate(key)
     of coProgress:
       try:
         args.progress = parseEnum[BarType](key)
@@ -661,7 +663,7 @@ judge making cuts.
           micTempPath = tempPath
           capturePath = tempPath
         let recordingCodec = resolveRecordingCodec(keepRecording,
-          args.audioCodec)
+          audio.codec)
         if recordingCodec != "auto":
           validateAudioCodec(recordingCodec, capturePath)
         stopMicCapture = false
@@ -698,7 +700,7 @@ judge making cuts.
         error &"Option/Input file doesn't exist: {myInput}"
       error &"Input file must have an extension: {myInput}"
 
-  editMedia(args)
+  editMedia(args, video, audio)
 
 when isMainModule:
   try:

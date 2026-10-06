@@ -71,6 +71,13 @@ type
     of nkPeak:
       t*: float32    # -99.0 to 0.0, default -8.0
 
+func `==`*(a, b: Norm): bool {.raises: [].} =
+  if a.kind != b.kind: return false
+  case a.kind
+  of nkNull: true
+  of nkEbu: a.i == b.i and a.lra == b.lra and a.tp == b.tp and a.gain == b.gain
+  of nkPeak: a.t == b.t
+
 type LayerSpec* = object
   ## An overlay layer as the desktop app models it: a file composited over the
   ## edit between two output frames. Unlike `add:`, it isn't tied to a kind
@@ -109,6 +116,23 @@ type PlacedTransition* = object
   align*: int
   video*: bool
 
+type VideoSettings* = object
+  codec*: string = "auto"
+  profile*: string = ""
+  preset*: string = ""
+  pixFmt*: string = ""
+  bitrate*: int = -1
+  gop*: int = -1
+  scale*: float = 1.0
+  crf*: int8 = -1
+  scaleSet*: bool = false
+
+type AudioSettings* = object
+  codec*: string = "auto"
+  layout*: string = ""
+  bitrate*: int = -1
+  normalize*: Norm = Norm(kind: nkNull)
+
 type mainArgs* = object
   inputs*: seq[string]
 
@@ -143,22 +167,6 @@ type mainArgs* = object
   sampleRate*: cint = -1
   frameRate*: AVRational = AVRational(num: 0, den: 0)
   background*: Option[RGBColor] = none(RGBColor)
-
-  # Rendering
-  videoCodec*: string = "auto"
-  preset*: string = ""
-  vprofile*: string = ""
-  pixFmt*: string = ""
-  audioCodec*: string = "auto"
-  audioLayout*: string = ""
-  videoBitrate*: int = -1
-  audioBitrate*: int = -1
-  scale*: float = 1.0
-  scaleSet*: bool = false
-  crf*: int8 = -1
-  gop*: int = -1
-
-  audioNormalize*: Norm = Norm(kind: nkNull)
   progress*: BarType = modern
 
   # Licensing
