@@ -449,8 +449,8 @@ judge making cuts.
     genCmdCases(paramStr(1))
 
   var args = mainArgs()
-  var video: VideoSettings
-  var audio: AudioSettings
+  var video = VideoSettings()
+  var audio = AudioSettings()
   var showVersion: bool = false
   var expecting = coNone
   # Label for a pending "edit"/"when" value (plain --edit => 1).

@@ -117,7 +117,7 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
   result.keyframes.setLen(write)
 
 proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
-    video: VideoSettings,     codecId: AVCodecID): seq[SmartSpan] =
+    video: VideoSettings, codecId: AVCodecID): seq[SmartSpan] =
   if args.noPartialLossless or video.scale != 1.0 or video.pixFmt != "" or
       video.profile != "":
     return
