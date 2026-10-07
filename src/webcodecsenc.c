@@ -203,15 +203,10 @@ static int webenc_make_packet(AVCodecContext *avctx, AVPacket *pkt)
     pkt->size = size;
     pkt->pts = av_rescale_q(webenc_i64(s->ctrl, WE_TS_LO),
                             (AVRational){ 1, 1000000 }, avctx->time_base);
+    pkt->dts = pkt->pts;
     pkt->duration = av_rescale_q(webenc_i64(s->ctrl, WE_DURATION_LO),
                                  (AVRational){ 1, 1000000 },
                                  avctx->time_base);
-    /* WebCodecs never reorders, but a caller can ask for the decode delay of
-     * max_b_frames, as libx264 gives it: partial-lossless splices these
-     * packets between copied ones that have that delay, and an undelayed DTS
-     * repeats the copied DTS where the two meet. */
-    pkt->dts = pkt->pts - (int64_t)avctx->max_b_frames *
-               (pkt->duration > 0 ? pkt->duration : 1);
     if (s->ctrl[WE_FLAGS] & 1)
         pkt->flags |= AV_PKT_FLAG_KEY;
     s->may_have_output = s->ctrl[WE_MORE];

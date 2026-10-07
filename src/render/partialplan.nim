@@ -125,6 +125,10 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   let encoder = initCodec(video.codec)
   if encoder == nil or encoder.id != codecId:
     return
+  # The web build's WebCodecs encoders (h264_web and the like) don't splice
+  # into copied packets: their output decodes as garbage between copied spans.
+  if ($encoder.name).endsWith("_web"):
+    return
   let formatName = $output.formatCtx.oformat.name
   if not codecId.supportsContainer(formatName):
     return
