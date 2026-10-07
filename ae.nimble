@@ -474,6 +474,11 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
           "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
           "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
           "-DWHISPER_BUILD_IS_DEV=OFF",
+          # Emscripten's toolchain reports x86, which ggml-cpu takes for an
+          # unknown CPU: GGML_CPU_GENERIC, so no arch/wasm/quants.c and scalar
+          # code for every quantized model. The toolchain sets the processor
+          # from this variable.
+          "-DEMSCRIPTEN_SYSTEM_PROCESSOR=" & (if kind == wasm64: "wasm64" else: "wasm32"),
         ]
         # -msimd128 enables ggml's hand-written wasm SIMD paths; -mfma exposes
         # the compatible FMA intrinsics and -mrelaxed-simd enables fused ops.
