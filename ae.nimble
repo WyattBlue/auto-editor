@@ -399,6 +399,8 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
       cmakeArgs.add("-DGGML_OPENMP=OFF")
+  if package.name == "whisper" and kind != native:
+    cmakeArgs.add(["-DGGML_METAL=OFF", "-DGGML_METAL_EMBED_LIBRARY=OFF", "-DGGML_BLAS=OFF"])
 
   withDir cmakeBuildDir:
     if not fileExists("CMakeCache.txt"):
@@ -429,17 +431,19 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     # Write whisper.pc from scratch to avoid format changes breaking string substitution
     let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
     echo "Writing whisper.pc file"
-    when defined(macosx) and hostCPU == "arm64":
-      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas -lggml-metal"
-      let libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lc++"
-    elif defined(macosx):
-      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas"
-      let libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lc++"
-    else:
-      let libs = "-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu"
-      # OpenMP is disabled for Windows cross-compiles; native Linux uses libgomp
-      let libsPrivate = if kind in {winX64, winArm}: "-lpthread -lm -lstdc++"
-                        else: "-lgomp -lpthread -lm -lstdc++"
+    let (libs, libsPrivate) =
+      if kind == native and defined(macosx) and hostCPU == "arm64":
+        ("-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas -lggml-metal",
+         "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lc++")
+      elif kind == native and defined(macosx):
+        ("-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu -lggml-blas",
+         "-framework Accelerate -framework MetalKit -framework Foundation -lc++")
+      elif kind in {winX64, winArm}:
+        ("-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu",
+         "-lpthread -lm -lstdc++")
+      else:
+        ("-L${libdir} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu",
+         "-lgomp -lpthread -lm -lstdc++")
     writeFile(pcFile, &"""prefix={buildPath}
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib
@@ -474,10 +478,6 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
           "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
           "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
           "-DWHISPER_BUILD_IS_DEV=OFF",
-          # Emscripten's toolchain reports x86, which ggml-cpu takes for an
-          # unknown CPU: GGML_CPU_GENERIC, so no arch/wasm/quants.c and scalar
-          # code for every quantized model. The toolchain sets the processor
-          # from this variable.
           "-DEMSCRIPTEN_SYSTEM_PROCESSOR=" & (if kind == wasm64: "wasm64" else: "wasm32"),
         ]
         # -msimd128 enables ggml's hand-written wasm SIMD paths; -mfma exposes
@@ -921,6 +921,8 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
                   else:
                     args.add("--host=x86_64-w64-mingw32")
                   envPrefix = "CC=x86_64-w64-mingw32-clang CXX=x86_64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
+                if package.name == "zlib" and kind != native:
+                  args.add "--uname=Linux"
                 if package.name != "x264":
                   args.add "--disable-shared"
                 let cmd = &"{envPrefix}{sourceDir}/configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
@@ -975,6 +977,10 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     if packages.anyIt(it.name == "libvpl"):
       enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
 
+  var decodersOff = disableDecoders
+  if not isCrossWasm:
+    decodersOff &= "aac_webcodecs,av1_webcodecs,h264_webcodecs,hevc_webcodecs,vp8_webcodecs,vp9_webcodecs".split(",")
+
   var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -990,7 +996,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   --enable-protocol=file \
   --disable-filters \
   --enable-filter={filters.join(",")} \
-  --disable-decoder={disableDecoders.join(",")} \
+  --disable-decoder={decodersOff.join(",")} \
   --disable-encoders \
   --enable-encoder={enableEncoders.join(",")} \
   --disable-demuxers \
