@@ -417,12 +417,6 @@ proc handlePath(src: string): string =
   else:
     absPath
 
-func isStillImage(mi: MediaInfo, tb: AVRational): bool =
-  ## A source with a video stream but essentially no duration (0 or 1 frame) is a
-  ## still image. Premiere holds these for a fixed length; given a blank
-  ## `<duration>` it ignores the clip's in/out and falls back to a ~12h default.
-  mi.v.len > 0 and int64(round(mi.duration * tb.float64)) <= 1
-
 proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
     ntsc: string): XmlNode =
   let before = case t.alignment
@@ -475,7 +469,9 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     if pathurl notin fileDefs:
       let durationStr =
         if resolve: ""                        # Resolve wants it blank
-        elif isStillImage(mi, tl.tb): $tl.len # hold the still long enough
+        # Premiere holds a still for the length given; blank, it ignores the
+        # clip's in/out and falls back to a ~12h default.
+        elif mi.isStill: $tl.len
         else: ""                              # Premiere reads media length
       mediaDef(filedef, pathurl, mi, tl, timebase, ntsc, durationStr)
       fileDefs.incl(pathurl)
@@ -544,7 +540,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
           if t.alignment == taStart:
             track.add dissolveItem(t, "video", timebase, ntsc)
         let mi = ptrToMi[clip.src]
-        let still = isStillImage(mi, tl.tb)
+        let still = mi.isStill
         var startVal = $clip.start
         var endVal = $(clip.start + clip.dur)
         # A still is the same frame at every offset, so read `dur` frames from 0;

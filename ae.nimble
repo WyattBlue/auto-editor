@@ -114,7 +114,10 @@ disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,
 disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
 
 disableDecoders &= ["h261", "opus"]  # We use libopus
-disableDecoders &= ["vp8", "vp9"]  # libvpx decodes instead: ~800KB smaller, adds alpha WebM
+# libvpx decodes instead: smaller, and adds alpha WebM. FFmpeg's own VP8
+# decoder stays, since WebP images are VP8 inside and its webp decoder uses it;
+# findSoftwareDecoder still picks libvpx for VP8 video.
+disableDecoders &= ["vp9"]
 
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff,vvc_qsv".split(",")
@@ -950,7 +953,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   var enableMuxers = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
-  let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts"]
+  let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts",
+    "image_webp_pipe", "webp_anim"]
 
   var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
 

@@ -119,9 +119,12 @@ type
     flags*: cint
     codec_tag*: ptr ptr AVCodecTag
 
+  AVInputFormat* {.importc, header: "<libavformat/avformat.h>".} = object
+    name*: cstring
+
   AVFormatContext* {.importc, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
-    iformat*: pointer
+    iformat*: ptr AVInputFormat
     oformat*: ptr AVOutputFormat
     priv_data*: pointer
     pb*: pointer # ptr AVIOContext
@@ -129,7 +132,7 @@ type
     nb_streams*: cuint
     streams*: ptr UncheckedArray[ptr AVStream]
     filename*: array[1024, char]
-    url: cstring
+    url*: cstring
     start_time*: int64
     duration*: int64
     bit_rate*: int64

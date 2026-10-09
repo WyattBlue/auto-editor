@@ -146,6 +146,19 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
             timecode: timecodeStr)
       )
 
+  # WebP's demuxers don't know the length up front: read it off the packets,
+  # then rewind for whoever reads the file next.
+  if result.duration <= 0 and result.v.len > 0 and result.a.len == 0 and
+      formatContext.isWebP:
+    for i in 0 ..< formatContext.nb_streams.int:
+      let stream = formatContext.streams[i]
+      if stream.codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
+        discard av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
+        result.duration = scanVideoLength(formatContext, stream).float64
+        discard av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
+        if result.v[0].duration <= 0: result.v[0].duration = result.duration
+        break
+
 proc initMediaInfo*(path: string): MediaInfo =
   let formatCtx = (try: av.openFormatCtx(path) except IOError as e: error e.msg)
   result = initMediaInfo(formatCtx, path)
@@ -168,6 +181,14 @@ func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
   if tbFloat == round(filmNtsc.float64, 2):
     return filmNtsc
   return av_d2q(tbFloat, 1000000)
+
+func isStill*(mi: MediaInfo): bool {.raises: [].} =
+  ## A video source of at most one frame: an image. Counted at the source's
+  ## own rate, since a still's one frame (1/25 s, as image demuxers give it)
+  ## is two or more on a timeline above 37.5 fps.
+  if mi.v.len == 0: return false
+  let rate = if mi.v[0].avg_rate.isValid: mi.v[0].avg_rate.float64 else: 25.0
+  round(mi.duration * rate) <= 1
 
 func recommendedTimebase*(mi: MediaInfo): AVRational {.raises: [].} =
   ## The timebase auto-editor edits the file in when none is asked for: its

@@ -319,7 +319,7 @@ proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
   # Available media length (frames). A still has ~no real duration, so size its
   # range to cover the clip; otherwise Premiere mis-scales its keyframe times.
   let realAvail = float(int(mi.duration * tb))
-  let availDur = if mi.v.len > 0 and realAvail <= 1.0: srcStart + srcDur else: realAvail
+  let availDur = if mi.isStill: srcStart + srcDur else: realAvail
 
   let effectsArr = newJArray()
   if isVideo:

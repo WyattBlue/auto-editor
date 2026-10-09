@@ -20,3 +20,21 @@ index 732de59292..136347a0d2 100755
      gmp
      libaribb24
      liblensfun
+diff --git a/libavformat/webp_anim_dec.c b/libavformat/webp_anim_dec.c
+--- a/libavformat/webp_anim_dec.c
++++ b/libavformat/webp_anim_dec.c
+@@ -272,7 +272,13 @@
+             ret = av_get_packet(pb, pkt, size);
+             if (ret < 0)
+                 return ret;
+-            if (!ctx->cur_frame++)
++            /* The chunk's start: the generic index seeks back to pkt->pos, and
++             * from the payload this would read the frame's data as a chunk. */
++            pkt->pos = offset;
++            /* By position, not count, so a seek back to the start still marks
++             * the first frame key, which resets the decoder's canvas. */
++            ctx->cur_frame++;
++            if (offset == ctx->first_anmf_offset)
+                 pkt->flags |= AV_PKT_FLAG_KEY;
+             pkt->pts = AV_NOPTS_VALUE;
+             pkt->dts = AV_NOPTS_VALUE;

@@ -170,9 +170,12 @@ proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
   return (codec, initEnCtx(codec))
 
 proc findSoftwareDecoder(codecId: AVCodecID): ptr AVCodec =
+  # FFmpeg's own VP8 decoder is built for WebP images, and would otherwise be
+  # found first; libvpx is the one for VP8 video, with its alpha.
+  if codecId == ID_VP8:
+    let libvpx = avcodec_find_decoder_by_name("libvpx")
+    if libvpx != nil: return libvpx
   when defined(emscripten):
-    if codecId == ID_VP8:
-      return avcodec_find_decoder_by_name("libvpx")
     if codecId == ID_VP9:
       return avcodec_find_decoder_by_name("libvpx-vp9")
   return avcodec_find_decoder(codecId)
@@ -289,6 +292,30 @@ proc quarterTurns*(par: ptr AVCodecParameters): int =
   if ccw != ccw: return 0 # NaN: not a rotation
   floorMod(int(round(-ccw / 90)), 4)
 
+proc isWebP*(formatCtx: ptr AVFormatContext): bool =
+  ## WebP's demuxers, still and animated, don't know a file's length up front.
+  formatCtx.iformat != nil and $formatCtx.iformat.name in ["webp_pipe", "webp_anim"]
+
+proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRational =
+  ## A video stream's length read off its packets from where the demuxer is:
+  ## the furthest packet end, or the frame count if they have no timestamps.
+  let packet = ffmpeg.av_packet_alloc()
+  defer: ffmpeg.av_packet_free(addr packet)
+  var biggestEnd = 0'i64
+  var frames = 0'i64
+  while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
+    if packet.stream_index == video.index:
+      inc frames
+      if packet.pts != ffmpeg.AV_NOPTS_VALUE:
+        biggestEnd = max(biggestEnd, packet.pts + max(packet.duration, 1))
+    ffmpeg.av_packet_unref(packet)
+  if biggestEnd > 0:
+    return biggestEnd * video.time_base
+  if frames > 0 and video.avg_frame_rate.isValid:
+    return AVRational(num: cint(frames * video.avg_frame_rate.den),
+      den: video.avg_frame_rate.num)
+  AVRational(num: 0, den: 1)
+
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
   var formatCtx = container.formatContext
@@ -315,10 +342,13 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   if videoStreamIndex != -1:
     let video = container.video[0]
-    if video.duration == AV_NOPTS_VALUE or not video.time_base.isValid:
+    if not video.time_base.isValid:
       return AVRational(num: 0, den: 1)
-    else:
+    if video.duration != AV_NOPTS_VALUE:
       return video.duration * video.time_base
+    if formatCtx.isWebP:
+      return scanVideoLength(formatCtx, video)
+    return AVRational(num: 0, den: 1)
 
   error "No audio or video stream found"
 
@@ -717,11 +747,12 @@ proc abandon*(self: OutputContainer) =
   avformat_free_context(self.formatCtx)
 
 
-func name*(stream: ptr AVStream): string =
+proc name*(stream: ptr AVStream): string =
+  ## The decoder that would decode `stream`, as findDecoder picks it.
   if stream == nil or stream.codecpar == nil:
     return ""
 
-  let codec = avcodec_find_decoder(stream.codecpar.codec_id)
+  let codec = findDecoder(stream.codecpar.codec_id)
   if codec != nil and codec.name != nil:
     return $codec.name
 
