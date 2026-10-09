@@ -296,21 +296,25 @@ proc isWebP*(formatCtx: ptr AVFormatContext): bool =
   ## WebP's demuxers, still and animated, don't know a file's length up front.
   formatCtx.iformat != nil and $formatCtx.iformat.name in ["webp_pipe", "webp_anim"]
 
+proc scanPackets(formatCtx: ptr AVFormatContext, stream: ptr AVStream,
+    minDuration: int64): tuple[endPts, count: int64] =
+  ## Read `stream`'s packets from where the demuxer is: the furthest packet
+  ## end (a packet lasting at least `minDuration`), and how many there were.
+  let packet = ffmpeg.av_packet_alloc()
+  defer: ffmpeg.av_packet_free(addr packet)
+  while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
+    if packet.stream_index == stream.index:
+      inc result.count
+      if packet.pts != ffmpeg.AV_NOPTS_VALUE:
+        result.endPts = max(result.endPts, packet.pts + max(packet.duration, minDuration))
+    ffmpeg.av_packet_unref(packet)
+
 proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRational =
   ## A video stream's length read off its packets from where the demuxer is:
   ## the furthest packet end, or the frame count if they have no timestamps.
-  let packet = ffmpeg.av_packet_alloc()
-  defer: ffmpeg.av_packet_free(addr packet)
-  var biggestEnd = 0'i64
-  var frames = 0'i64
-  while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
-    if packet.stream_index == video.index:
-      inc frames
-      if packet.pts != ffmpeg.AV_NOPTS_VALUE:
-        biggestEnd = max(biggestEnd, packet.pts + max(packet.duration, 1))
-    ffmpeg.av_packet_unref(packet)
-  if biggestEnd > 0:
-    return biggestEnd * video.time_base
+  let (endPts, frames) = scanPackets(formatCtx, video, 1)
+  if endPts > 0:
+    return endPts * video.time_base
   if frames > 0 and video.avg_frame_rate.isValid:
     return AVRational(num: cint(frames * video.avg_frame_rate.den),
       den: video.avg_frame_rate.num)
@@ -320,27 +324,12 @@ proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
   var formatCtx = container.formatContext
   discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
-  var audioStreamIndex = if container.audio.len == 0: -1 else: container.audio[0].index
-  var videoStreamIndex = if container.video.len == 0: -1 else: container.video[0].index
 
-  if audioStreamIndex != -1:
-    let packet = ffmpeg.av_packet_alloc()
-    var biggestEnd = 0'i64
+  if container.audio.len > 0:
+    let audio = container.audio[0]
+    return scanPackets(formatCtx, audio, 0).endPts * audio.time_base
 
-    while ffmpeg.av_read_frame(formatCtx, packet) >= 0:
-      if packet.stream_index == audioStreamIndex and packet.pts !=
-          ffmpeg.AV_NOPTS_VALUE:
-        let endPts = packet.pts + max(packet.duration, 0)
-        if endPts > biggestEnd:
-          biggestEnd = endPts
-      ffmpeg.av_packet_unref(packet)
-
-    if packet != nil:
-      ffmpeg.av_packet_free(addr packet)
-
-    return biggestEnd * formatCtx.streams[audioStreamIndex].time_base
-
-  if videoStreamIndex != -1:
+  if container.video.len > 0:
     let video = container.video[0]
     if not video.time_base.isValid:
       return AVRational(num: 0, den: 1)
