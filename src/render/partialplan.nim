@@ -90,11 +90,18 @@ proc packetIsCopyBoundary(codecId: AVCodecID, data: ptr uint8, size: int): bool 
 proc codecLabel(codecId: AVCodecID): string =
   if codecId == ID_H264: "H.264" else: ($avcodec_get_name(codecId)).toUpperAscii
 
-proc normalizedCopyDts*(codecId: AVCodecID, first: bool, pts, dts: int64): int64 =
-  ## Matroska can leave DTS unset on the first H.264 packet returned after a
-  ## seek. A closed random-access packet has no decode dependency before it, so
-  ## its shifted PTS is also the decode-time anchor for the copied span.
-  if codecId == ID_H264 and first and dts == AV_NOPTS_VALUE: pts else: dts
+proc fillLeadingDts*(packets: openArray[ptr AVPacket], nextDts, frameDuration: int64) =
+  ## Matroska leaves DTS unset on the packets a reordering H.264 decoder has to
+  ## take in before it can output: the first two of a B-frame GOP, say. Space
+  ## them a frame apart up to `nextDts`, the next packet's, or, when nothing
+  ## after them has one, up to their earliest PTS so none decodes after it shows.
+  var last = nextDts
+  if last == AV_NOPTS_VALUE:
+    last = high(int64)
+    for p in packets: last = min(last, p.pts)
+    last += frameDuration
+  for i, p in packets:
+    p.dts = last - (packets.len - i).int64 * frameDuration
 
 proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
     codecId: AVCodecID): tuple[keyframes: seq[int64], sourceEnd: int64] =
@@ -296,6 +303,19 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
         var first = true
         var copied = 0'i64
         var shift = 0'i64
+        var sawDts = false
+        var undated: seq[ptr AVPacket] # leading packets awaiting a DTS
+        let frameDuration = max(1'i64, av_rescale_q(1, frameTb, stream.time_base))
+
+        template yieldCopied(p: ptr AVPacket) =
+          let orderTs = if p.dts != AV_NOPTS_VALUE: p.dts else: p.pts
+          yield (p, max(0'i64, frameAt(orderTs, stream.time_base, tl.tb)))
+
+        template flushUndated(nextDts: int64) =
+          fillLeadingDts(undated, nextDts, frameDuration)
+          for p in undated: yieldCopied(p)
+          undated.setLen(0)
+
         let reorderDelay = max(stream.codecpar.video_delay.int64, 0)
         while av_read_frame(input.formatContext, input.packet) >= 0:
           let sourcePacket = input.packet
@@ -350,18 +370,18 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
                   stream.time_base)
             if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
             if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
-            outPacket.dts = normalizedCopyDts(codecId, isFirst,
-              outPacket.pts, outPacket.dts)
             outPacket.time_base = stream.time_base
           outPacket.stream_index = outputStream.index
           if isFirst and isNal:
             outPacket.normalizeLengthPrefixed(sourceParameterSets, label)
-          let orderTs =
-            if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
-            else: outPacket.pts
-          let orderFrame = max(0'i64, frameAt(orderTs, stream.time_base, tl.tb))
           av_packet_unref(sourcePacket)
-          yield (outPacket, orderFrame)
+          if codecId == ID_H264 and not sawDts and outPacket.dts == AV_NOPTS_VALUE:
+            undated.add outPacket
+            continue
+          sawDts = true
+          if undated.len > 0: flushUndated(outPacket.dts)
+          yieldCopied(outPacket)
+        if undated.len > 0: flushUndated(AV_NOPTS_VALUE)
       else:
         if encoder == nil:
           encoder = initPartialEncoder(video, stream.codecpar, frameTb, tl.tb,
