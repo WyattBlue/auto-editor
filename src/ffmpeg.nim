@@ -510,6 +510,9 @@ proc avcodec_send_packet*(avctx: ptr AVCodecContext,
 proc avcodec_receive_frame*(avctx: ptr AVCodecContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_read_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc.}
+proc av_guess_sample_aspect_ratio*(format: ptr AVFormatContext,
+    stream: ptr AVStream, frame: ptr AVFrame): AVRational {.importc,
+    header: "<libavformat/avformat.h>".}
 proc av_frame_alloc*(): ptr AVFrame {.importc, header: "<libavutil/frame.h>".}
 proc av_frame_free*(frame: ptr ptr AVFrame) {.importc,
     header: "<libavutil/frame.h>".}

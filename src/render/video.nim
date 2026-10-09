@@ -792,7 +792,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
       encoderCtx.color_trc = color_trc
 
-    let sar = src.video[0].codecpar.sample_aspect_ratio
+    let sar = av_guess_sample_aspect_ratio(src.formatContext, src.video[0], nil)
     if sar.isValid:
       encoderCtx.sample_aspect_ratio = sar
 

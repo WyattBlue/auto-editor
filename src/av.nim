@@ -346,9 +346,8 @@ proc mediaLength*(container: InputContainer): AVRational =
       return AVRational(num: 0, den: 1)
     if video.duration != AV_NOPTS_VALUE:
       return video.duration * video.time_base
-    if formatCtx.isWebP:
-      return scanVideoLength(formatCtx, video)
-    return AVRational(num: 0, den: 1)
+    # Matroska and WebP give streams no duration of their own.
+    return scanVideoLength(formatCtx, video)
 
   error "No audio or video stream found"
 

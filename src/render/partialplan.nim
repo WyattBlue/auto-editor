@@ -225,6 +225,11 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
   outputStream.time_base = sourceStream.time_base
   outputStream.avg_frame_rate = tl.tb
+  # A SAR the container sets over the bitstream's goes with the copy.
+  let sar = av_guess_sample_aspect_ratio(templateInput.formatContext, sourceStream, nil)
+  if sar.isValid:
+    outputStream.sample_aspect_ratio = sar
+    outputStream.codecpar.sample_aspect_ratio = sar
   outputStream.duration = av_rescale_q(tl.len, av_inv_q(tl.tb),
       outputStream.time_base)
   if isNal and "matroska" notin $output.formatCtx.oformat.name:

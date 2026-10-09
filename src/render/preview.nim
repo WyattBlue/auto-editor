@@ -24,6 +24,7 @@ type PreviewRender* = ref object
   tb*: AVRational ## the timeline's frame rate
   sampleRate*: int ## audio is interleaved float32 stereo at this rate
   quarterTurns*: int ## clockwise turns to show frames upright, as the output's display matrix says
+  sar*: AVRational ## the output's sample aspect ratio; scaled frames don't carry it
   hasVideo*, hasAudio*: bool
 
 proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
@@ -55,6 +56,7 @@ proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
     var stream: ptr AVStream
     (r.encoder, stream, r.video) = makeNewVideoFrames(r.output, r.renderTl,
       r.args, video, r.cache, start, addr r.stop)
+    r.sar = r.encoder.sample_aspect_ratio
     r.hasVideo = true
   if withAudio and r.renderTl.a.anyIt(it.len > 0):
     let fromSample = audioSampleSpan(start, 0, r.renderTl.sr, tb).start

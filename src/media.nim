@@ -95,8 +95,9 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
 
-      let ctxSAR = codecCtx.sample_aspect_ratio
-      let sar = if not ctxSAR.isValid: AVRational(num: 1, den: 1) else: ctxSAR
+      # The container's SAR, else the bitstream's, as ffprobe reports.
+      let guessed = av_guess_sample_aspect_ratio(formatContext, stream, nil)
+      let sar = if not guessed.isValid: AVRational(num: 1, den: 1) else: guessed
 
       let newStream = VideoStream(
         duration: duration,
