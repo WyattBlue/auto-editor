@@ -1,5 +1,5 @@
 import std/[atomics, sets, strformat, tables]
-from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt
+from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt, floorMod, PI
 from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
@@ -45,6 +45,13 @@ func fxId(kind: ActionKind, frame: ptr AVFrame, overlay = false,
   (valid: true, kind: kind, overlay: overlay,
    w: frame.width, h: frame.height, fmt: frame.format,
    f0: f0, f1: f1, f2: f2, i0: i0, i1: i1, i2: i2, i3: i3, col: col)
+
+func scaleTurnOf(effects: Actions): tuple[scale, deg: float32] =
+  ## A chain's `scale`s multiplied and `turn`s added.
+  result = (1.0'f32, 0.0'f32)
+  for e in effects:
+    if e.kind == actScale: result.scale *= e.tScale
+    elif e.kind == actTurn: result.deg += e.tDeg
 
 func packRGB(c: RGBColor): uint32 =
   uint32(c.red) shl 16 or uint32(c.green) shl 8 or uint32(c.blue)
@@ -1111,6 +1118,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # restricted to it.
     var confineActive = false
     var confineThis = false
+    # The chain's scale and turn act as one, where the first of them is: one
+    # pass, so nothing is cut off at the edge between them.
+    var placeDone = false
     var confineEffect: Action
     # Eased progress in [0, 1] for an animated action, using its own packed
     # easing curve + duration (defaults to linear over the whole clip).
@@ -1149,6 +1159,24 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       case effect.kind:
       of actSpeed, actVolume, actDeesser, actDuck, actPitch, actTone, actPos,
           actRotate, actLoop: discard
+      of actScale, actTurn:
+        # An overlay is scaled and turned where it's placed, about its center.
+        if isOverlay or placeDone: continue
+        placeDone = true
+        let (scale, deg) = scaleTurnOf(effects)
+        if scale == 1.0'f32 and floorMod(deg, 360'f32) == 0: continue
+        let w = frame.width
+        let h = frame.height
+        let sw = max(2.cint, cint(round(w.float32 * scale))) and not 1.cint
+        let sh = max(2.cint, cint(round(h.float32 * scale))) and not 1.cint
+        runFx(fxId(actScale, frame, f0 = scale, f1 = deg)):
+          # rotate turns about the center of a frame of the canvas's size,
+          # cropping what's past it and filling what's uncovered with bg.
+          let nodes = @[fxGraph.add("buffer", bufArgsOf(frame)),
+            fxGraph.add("scale", &"{sw}:{sh}"),
+            fxGraph.add("rotate", &"a={deg}*PI/180:ow={w}:oh={h}:c={bg}"),
+            fxGraph.add("buffersink")]
+          fxGraph.linkNodes(nodes).configure()
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
@@ -1669,6 +1697,24 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       av_frame_free(addr shifted)
       if scaled != top: av_frame_free(addr scaled)
 
+  proc transformOverlay(top: ptr AVFrame; scale, deg: float32): ptr AVFrame =
+    ## `top` scaled and turned about its center, in a transparent frame just
+    ## big enough to hold it.
+    let rad = deg.float * PI / 180
+    let sw = max(2, round(top.width.float * scale))
+    let sh = max(2, round(top.height.float * scale))
+    let bw = max(2, int(ceil(sw * abs(cos(rad)) + sh * abs(sin(rad)))))
+    let bh = max(2, int(ceil(sw * abs(sin(rad)) + sh * abs(cos(rad)))))
+    top.pts = 0
+    let g = newGraph()
+    let nodes = @[g.add("buffer", bufArgsOf(top)), g.add("format", "pix_fmts=rgba"),
+      g.add("scale", &"{int(sw)}:{int(sh)}:flags=bicubic"),
+      g.add("rotate", &"a={rad}:ow={bw}:oh={bh}:c=black@0"), g.add("buffersink")]
+    g.linkNodes(nodes).configure()
+    g.push(top)
+    result = g.pull()
+    g.cleanup()
+
   proc finalizeFrame(f: ptr AVFrame; index: int64): ptr AVFrame =
     var frame = f
     if frame != nil and (frame.width <= 0 or frame.height <= 0):
@@ -1783,6 +1829,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                          acc.height.float32 / top.height.float32)
             ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
             oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
+          let (tScale, tDeg) = scaleTurnOf(o.effects)
+          if tScale != 1.0'f32 or floorMod(tDeg, 360'f32) != 0:
+            # Keep the overlay's center where it was placed. Turned at the
+            # size it's shown at, so it isn't enlarged afterwards.
+            let cx = ox + top.width.float32 * oscale / 2
+            let cy = oy + top.height.float32 * oscale / 2
+            let turned = transformOverlay(top, tScale * oscale, tDeg)
+            av_frame_free(addr top)
+            top = turned
+            oscale = 1
+            ox = cx - top.width.float32 / 2
+            oy = cy - top.height.float32 / 2
           let newAcc = overlayFrame(acc, top, ox, oy, oscale)
           av_frame_free(addr acc)
           av_frame_free(addr top)

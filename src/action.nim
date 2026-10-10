@@ -17,8 +17,9 @@ type
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
-    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate, actConfetti
-    # Can add 85 more [V] actions
+    actErosion, actChoke, actAberration, actMask, actConfine, actPixelate, actConfetti,
+    actScale, actTurn
+    # Can add 83 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -54,6 +55,10 @@ type
       chokeN*: uint8         # matte-erosion passes (px to shrink the alpha matte)
     of actRotate:
       rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
+    of actScale:
+      tScale*: float32       # about the center
+    of actTurn:
+      tDeg*: float32         # clockwise about the center, without growing the frame
     of actSpin:
       sStart*: Unorm16       # circular [0, 360) start angle
       sRate*: float32        # spin rate in degrees/second (continuous)
@@ -226,6 +231,10 @@ Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to 
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg",
     help: "Rotate the picture clockwise about its center by a fixed `deg` angle, expanding the frame so nothing is clipped and filling the exposed corners with the background color. Good for aspect flips, e.g. `rotate:90`. For a continuous spin, use `spin` instead."),
+  ActionDef(name: "scale", flags: {afVideo}, argSpec: "float32", range: rng(0.0, 100.0, loIncl = false),
+    help: "Scale the picture by val about its center, e.g. `scale:0.8`. On the base (bottom) track what grows past the edge is cut off and what shrinks away shows the background, like `zoom`; an overlay grows or shrinks about the center of where it's placed. Combines with `turn`."),
+  ActionDef(name: "turn", flags: {afVideo}, argSpec: "deg",
+    help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
@@ -581,6 +590,17 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         "rotate takes a fixed angle (rotate:deg); use spin:deg/rate for a continuous spin")
     return Action(kind: actRotate, rStart: Unorm16(rotCode(pFloat(parts[1]))))
 
+  if parts[0] == "scale" and parts.len == 2:
+    let scale = pFloat(parts[1])
+    if not (scale > 0.0 and scale <= 100.0):
+      raise newException(ActionParseError, "scale must be in (0.0, 100.0]")
+    return Action(kind: actScale, tScale: scale)
+  if parts[0] == "turn" and parts.len == 2:
+    let deg = pFloat(parts[1])
+    if classify(deg) in {fcNan, fcInf, fcNegInf}:
+      raise newException(ActionParseError, "turn takes an angle in degrees")
+    return Action(kind: actTurn, tDeg: deg)
+
   # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
   # `rate` degrees/second.
   if parts[0] == "spin" and parts.len == 2:
@@ -926,6 +946,8 @@ when not defined(nimscript):
     of actBrightness: &"brightness:{kfStr(act)}{easeSuffix(act)}"
     of actRotate: &"rotate:{rotDeg(act.rStart)}"
     of actSpin: &"spin:{rotDeg(act.sStart)}/{act.sRate}"
+    of actScale: &"scale:{act.tScale}"
+    of actTurn: &"turn:{act.tDeg}"
     of actLuv:
       var parts: seq[string]
       let hue = act.brighthue
@@ -988,6 +1010,7 @@ when not defined(nimscript):
     of actLens, actSpeed: 5
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
+    of actScale, actTurn: 5
     of actDuck: 9
     of actConfetti: 10
     of actLuv: 11
@@ -1030,6 +1053,12 @@ when not defined(nimscript):
           copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
           yield Action(kind: actRotate, rStart: st)
           i += 3
+        of actScale, actTurn:
+          var v: float32
+          copyMem(addr v, addr base[i + 1], sizeof(float32))
+          yield (if kind == actScale: Action(kind: actScale, tScale: v)
+                 else: Action(kind: actTurn, tDeg: v))
+          i += 5
         of actPitch:
           var cents: int16
           copyMem(addr cents, addr base[i + 1], sizeof(int16))
@@ -1253,6 +1282,12 @@ when not defined(nimscript):
       of actRotate:
         base.writeAt(i, 1, a.rStart)
         i += 3
+      of actScale:
+        base.writeAt(i, 1, a.tScale)
+        i += 5
+      of actTurn:
+        base.writeAt(i, 1, a.tDeg)
+        i += 5
       of actPitch:
         base.writeAt(i, 1, a.pCents)
         i += 3
