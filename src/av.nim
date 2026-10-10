@@ -292,10 +292,6 @@ proc quarterTurns*(par: ptr AVCodecParameters): int =
   if ccw != ccw: return 0 # NaN: not a rotation
   floorMod(int(round(-ccw / 90)), 4)
 
-proc isWebP*(formatCtx: ptr AVFormatContext): bool =
-  ## WebP's demuxers, still and animated, don't know a file's length up front.
-  formatCtx.iformat != nil and $formatCtx.iformat.name in ["webp_pipe", "webp_anim"]
-
 proc scanPackets(formatCtx: ptr AVFormatContext, stream: ptr AVStream,
     minDuration: int64): tuple[endPts, count: int64] =
   ## Read `stream`'s packets from where the demuxer is: the furthest packet
@@ -335,7 +331,7 @@ proc mediaLength*(container: InputContainer): AVRational =
       return AVRational(num: 0, den: 1)
     if video.duration != AV_NOPTS_VALUE:
       return video.duration * video.time_base
-    # Matroska and WebP give streams no duration of their own.
+    # Matroska, WebP and AVIF give streams no duration of their own.
     return scanVideoLength(formatCtx, video)
 
   error "No audio or video stream found"

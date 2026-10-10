@@ -147,10 +147,9 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
             timecode: timecodeStr)
       )
 
-  # WebP's demuxers don't know the length up front: read it off the packets,
-  # then rewind for whoever reads the file next.
-  if result.duration <= 0 and result.v.len > 0 and result.a.len == 0 and
-      formatContext.isWebP:
+  # Some demuxers don't know a video-only file's length up front (WebP, AVIF):
+  # read it off the packets, then rewind for whoever reads the file next.
+  if result.duration <= 0 and result.v.len > 0 and result.a.len == 0:
     for i in 0 ..< formatContext.nb_streams.int:
       let stream = formatContext.streams[i]
       if stream.codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
