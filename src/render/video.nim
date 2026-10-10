@@ -46,11 +46,13 @@ func fxId(kind: ActionKind, frame: ptr AVFrame, overlay = false,
    w: frame.width, h: frame.height, fmt: frame.format,
    f0: f0, f1: f1, f2: f2, i0: i0, i1: i1, i2: i2, i3: i3, col: col)
 
-func scaleTurnOf(effects: Actions): tuple[scale, deg: float32] =
-  ## A chain's `scale`s multiplied and `turn`s added.
-  result = (1.0'f32, 0.0'f32)
+func scaleTurnOf(effects: Actions): tuple[w, h, deg: float32] =
+  ## A chain's `scale`s multiplied, across and down, and `turn`s added.
+  result = (1.0'f32, 1.0'f32, 0.0'f32)
   for e in effects:
-    if e.kind == actScale: result.scale *= e.tScale
+    if e.kind == actScale:
+      result.w *= e.tScaleW
+      result.h *= e.tScaleH
     elif e.kind == actTurn: result.deg += e.tDeg
 
 func packRGB(c: RGBColor): uint32 =
@@ -1163,13 +1165,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # An overlay is scaled and turned where it's placed, about its center.
         if isOverlay or placeDone: continue
         placeDone = true
-        let (scale, deg) = scaleTurnOf(effects)
-        if scale == 1.0'f32 and floorMod(deg, 360'f32) == 0: continue
+        let (sx, sy, deg) = scaleTurnOf(effects)
+        if sx == 1.0'f32 and sy == 1.0'f32 and floorMod(deg, 360'f32) == 0: continue
         let w = frame.width
         let h = frame.height
-        let sw = max(2.cint, cint(round(w.float32 * scale))) and not 1.cint
-        let sh = max(2.cint, cint(round(h.float32 * scale))) and not 1.cint
-        runFx(fxId(actScale, frame, f0 = scale, f1 = deg)):
+        let sw = max(2.cint, cint(round(w.float32 * sx))) and not 1.cint
+        let sh = max(2.cint, cint(round(h.float32 * sy))) and not 1.cint
+        runFx(fxId(actScale, frame, f0 = sx, f1 = deg, f2 = sy)):
           # rotate turns about the center of a frame of the canvas's size,
           # cropping what's past it and filling what's uncovered with bg.
           let nodes = @[fxGraph.add("buffer", bufArgsOf(frame)),
@@ -1697,12 +1699,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       av_frame_free(addr shifted)
       if scaled != top: av_frame_free(addr scaled)
 
-  proc transformOverlay(top: ptr AVFrame; scale, deg: float32): ptr AVFrame =
+  proc transformOverlay(top: ptr AVFrame; sx, sy, deg: float32): ptr AVFrame =
     ## `top` scaled and turned about its center, in a transparent frame just
     ## big enough to hold it.
     let rad = deg.float * PI / 180
-    let sw = max(2, round(top.width.float * scale))
-    let sh = max(2, round(top.height.float * scale))
+    let sw = max(2, round(top.width.float * sx))
+    let sh = max(2, round(top.height.float * sy))
     let bw = max(2, int(ceil(sw * abs(cos(rad)) + sh * abs(sin(rad)))))
     let bh = max(2, int(ceil(sw * abs(sin(rad)) + sh * abs(cos(rad)))))
     top.pts = 0
@@ -1829,13 +1831,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                          acc.height.float32 / top.height.float32)
             ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
             oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
-          let (tScale, tDeg) = scaleTurnOf(o.effects)
-          if tScale != 1.0'f32 or floorMod(tDeg, 360'f32) != 0:
+          let (tw, th, tDeg) = scaleTurnOf(o.effects)
+          if tw != 1.0'f32 or th != 1.0'f32 or floorMod(tDeg, 360'f32) != 0:
             # Keep the overlay's center where it was placed. Turned at the
             # size it's shown at, so it isn't enlarged afterwards.
             let cx = ox + top.width.float32 * oscale / 2
             let cy = oy + top.height.float32 * oscale / 2
-            let turned = transformOverlay(top, tScale * oscale, tDeg)
+            let turned = transformOverlay(top, tw * oscale, th * oscale, tDeg)
             av_frame_free(addr top)
             top = turned
             oscale = 1
