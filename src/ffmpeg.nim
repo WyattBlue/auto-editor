@@ -524,6 +524,22 @@ proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_clone*(src: ptr AVFrame): ptr AVFrame {.importc,
     header: "<libavutil/frame.h>".}
+
+type
+  AVTXContext* {.importc, header: "<libavutil/tx.h>", incompleteStruct.} = object
+  AVComplexFloat* {.importc, header: "<libavutil/tx.h>".} = object
+    re*, im*: cfloat
+  av_tx_fn* = proc(s: ptr AVTXContext, output, input: pointer,
+    stride: int) {.cdecl.}
+
+const
+  AV_TX_FLOAT_RDFT* = 6.cint
+  AV_TX_UNALIGNED* = 2'u64
+
+proc av_tx_init*(ctx: ptr ptr AVTXContext, tx: ptr av_tx_fn, `type`: cint,
+    inv, len: cint, scale: pointer, flags: uint64): cint {.importc,
+    header: "<libavutil/tx.h>".}
+proc av_tx_uninit*(ctx: ptr ptr AVTXContext) {.importc, header: "<libavutil/tx.h>".}
 proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_find_decoder_by_name*(name: cstring): ptr AVCodec {.importc,

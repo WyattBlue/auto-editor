@@ -3,6 +3,7 @@ import std/[atomics, json, math, strformat, strutils, sequtils, tables]
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
 import ../util/rational
 import ../lib/dnorm16
+import ./convolve
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
@@ -597,9 +598,10 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
   # Apply the clip's audio effects in their declared order, at the source
   # sample rate. Graph-backed effects (speed/varispeed/deesser) run as ffmpeg
   # filter chains; `volume` is applied per-sample in Nim so keyframe ramps and
-  # easing follow the video effects' progress rules. The chain is split at each
-  # volume action so ordering is preserved (e.g. `volume:0.5,deesser` applies
-  # the gain before the deesser sees the signal).
+  # easing follow the video effects' progress rules, and `convolve` in Nim since
+  # the filter build has no afir. The chain is split at each of those so
+  # ordering is preserved (e.g. `volume:0.5,deesser` applies the gain before the
+  # deesser sees the signal).
   var processedData = data
   let channels = layout.nb_channels
   var pending: seq[Action]
@@ -612,6 +614,11 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
         processedData = runFilterChain(processedData, pending, sourceSr, layout)
         pending.setLen(0)
       applyVolume(processedData, effect, channels.int, sourceSr, fps)
+    of actConvolve:
+      if pending.len > 0:
+        processedData = runFilterChain(processedData, pending, sourceSr, layout)
+        pending.setLen(0)
+      applyConvolve(processedData, effect.irPath, channels.int, sourceSr)
     else: discard
   if pending.len > 0:
     processedData = runFilterChain(processedData, pending, sourceSr, layout)

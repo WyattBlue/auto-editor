@@ -1159,8 +1159,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     for effect in effects:
       confineThis = confineActive and effect.kind in confinable
       case effect.kind:
-      of actSpeed, actVolume, actDeesser, actDuck, actPitch, actTone, actPos,
-          actRotate, actLoop: discard
+      of actSpeed, actVolume, actDeesser, actDuck, actPitch, actTone, actConvolve,
+          actPos, actRotate, actLoop: discard
       of actScale, actTurn:
         # An overlay is scaled and turned where it's placed, about its center.
         if isOverlay or placeDone: continue

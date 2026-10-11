@@ -12,8 +12,8 @@ type
     actSpeed,
     # Can add 3 more [VA] actions
     actVolume = 4,
-    actDeesser, actDuck, actPitch, actTone,
-    # Can add 11 more [A] actions
+    actDeesser, actDuck, actPitch, actTone, actConvolve,
+    # Can add 10 more [A] actions
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
@@ -78,6 +78,8 @@ type
     of actTone:
       note*: uint8           # MIDI note number; 69 = A4 = 440 Hz
       wave*: Waveform        # timbre (sine unless given)
+    of actConvolve:
+      irPath*: string        # impulse response file, or a folder of H_LL/H_LR/H_RL/H_RR.wav
     of actDuck:
       # Cross-track sidechain: rendered at the mix stage, not in the clip chain.
       duckAmount*, duckThresh*: Unorm16  # 0..1; gain floor = 1 - amount
@@ -208,6 +210,13 @@ Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to 
     help: "Shift the pitch of the section without changing its speed. `12` is one octave up, `-12` one octave down, `0` leaves it unchanged, and fractional values work (`pitch:0.5` is a quarter tone). Implemented by resampling and then time-stretching back with ffmpeg's `asetrate` and `atempo` filters, so large shifts pick up the usual time-stretch artifacts. To change speed and pitch together, use `varispeed` instead."),
   ActionDef(name: "tone", flags: {afAudio, afGenerator}, argSpec: "midi-note[:waveform]", range: rng(0.0, 127.0),
     help: "Synthesize a wave at a MIDI note's pitch, as a generator: it stands in for a file in `add:`, adding its own audio layer rather than altering existing audio. `69` is A4 (440 Hz), `60` middle C; each step is a semitone. `waveform` is `sine` (default), `saw`, `square`, or `triangle`; the harmonic-rich ones are band-limited, so they stay clean instead of aliasing at high notes. It has no envelope of its own — chain the animatable `volume` action for fades and decays, e.g. `add:tone:60,volume:1..0:ease=out`. Stack several `add:tone` layers for a chord; the mix sums them. `speed`/`varispeed` only stretch the tone, they do not change its pitch — change the note instead. Examples: `add:tone:69`, `add:tone:36:saw`, `add:tone:48:square,volume:0.4`."),
+  ActionDef(name: "convolve", flags: {afAudio}, argSpec: "path",
+    help: """
+Make headphone audio sound farther from the ears: with Saq's spatial-stereo impulse responses (https://github.com/mTvare6/saqol/tree/main/crates/saq-dsp/assets/spatial-stereo), the processed version feels less "on the ear", so it feels less "blocked" after listening to music for a while. Download that folder and pass it as `path`, e.g. `convolve:spatial-stereo`.
+More generally, this runs the audio through any measured impulse response (IR), like a convolution reverb or a cabinet sim. `path` is an audio file or a folder.
+A file is one IR per channel: a mono IR is applied to every channel, one with as many channels as the audio is applied channel by channel, and a 4-channel IR on stereo audio is a true-stereo matrix in the order LL, LR, RL, RR, where LR is what the right input contributes to the left output.
+A folder holds that matrix as `H_LL.wav`, `H_LR.wav`, `H_RL.wav`, and `H_RR.wav`, as Saq's does; a missing file is silence for that path, so `H_LL.wav` and `H_RR.wav` alone filter each side on its own. On audio that isn't stereo, the matrix is folded to the one IR mono audio would get.
+IRs are resampled to the audio's rate and used at their own level, so a normalized reverb IR can be loud; chain `volume` to taste. Each section is convolved alone, so the tail is cut at its end. The path can't contain a comma."""),
   ActionDef(name: "invert", flags: {afVideo},
     help: "Invert every pixel in the section, producing a photo-negative."),
   ActionDef(name: "hflip", flags: {afVideo},
@@ -528,6 +537,15 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return parseShapeRegion(parts, actMask, "mask")
   if parts[0] == "confine":
     return parseShapeRegion(parts, actConfine, "confine")
+
+  if parts[0] == "convolve":
+    # The path is everything after the name, so a Windows drive colon stays put.
+    let path = parts[1 .. ^1].join(":")
+    if path.len == 0:
+      raise newException(ActionParseError, "convolve needs a path")
+    if path.len > 4096:
+      raise newException(ActionParseError, "convolve path is too long")
+    return Action(kind: actConvolve, irPath: path)
 
   # deesser takes positional args: intensity[:max[:freq]]
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
@@ -943,6 +961,7 @@ when not defined(nimscript):
       if act.wave == wSine: &"tone:{act.note}"
       else: &"tone:{act.note}:{waveformNames[act.wave]}"
     of actDuck: &"duck:{act.duckAmount}:{act.duckThresh}:{act.duckAttack}:{act.duckRelease}"
+    of actConvolve: &"convolve:{act.irPath}"
     of actZoom: &"zoom:{kfStr(act)}{easeSuffix(act)}"
     of actOpacity: &"opacity:{kfStr(act)}{easeSuffix(act)}"
     of actBlur: &"blur:{kfStr(act)}{easeSuffix(act)}"
@@ -1017,6 +1036,7 @@ when not defined(nimscript):
     of actScale: 10
     of actTurn: 5
     of actDuck: 9
+    of actConvolve: 3 + a.irPath.len  # header + uint16 length + bytes
     of actConfetti: 10
     of actLuv: 11
     of actDrawbox: 20
@@ -1107,6 +1127,13 @@ when not defined(nimscript):
           yield Action(kind: actDuck, duckAmount: amt, duckThresh: thr,
             duckAttack: atk, duckRelease: rel)
           i += 9
+        of actConvolve:
+          var n: uint16
+          copyMem(addr n, addr base[i + 1], sizeof(uint16))
+          var path = newString(n.int)
+          if n > 0: copyMem(addr path[0], addr base[i + 3], n.int)
+          yield Action(kind: actConvolve, irPath: path)
+          i += 3 + n.int
         of actSpin:
           var st: Unorm16
           var rate: float32
@@ -1327,6 +1354,11 @@ when not defined(nimscript):
         base.writeAt(i, 5, a.duckAttack)
         base.writeAt(i, 7, a.duckRelease)
         i += 9
+      of actConvolve:
+        base.writeAt(i, 1, uint16(a.irPath.len))
+        if a.irPath.len > 0:
+          copyMem(addr base[i + 3], unsafeAddr a.irPath[0], a.irPath.len)
+        i += 3 + a.irPath.len
       of actSpin:
         base.writeAt(i, 1, a.sStart)
         base.writeAt(i, 3, a.sRate)
