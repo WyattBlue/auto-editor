@@ -18,13 +18,6 @@ type VideoFrame = object
   scale: float32 # overlay size multiplier; 1.0 for the base layer
   fit: bool      # no explicit `pos`: fit-and-center to the canvas like the base
 
-func envAnimLen(unit: DurUnit, mag: float32, clipDur: int, fps: float): int =
-  ## Resolve an ease duration to a frame count for the current clip.
-  case unit
-  of duClip: clipDur
-  of duSec: max(1, int(round(mag.float * fps)))
-  of duFrames: max(1, int(round(mag.float)))
-
 # Identity of a configured effect filter graph: everything that determines the
 # graph's topology and arguments, as a flat value so the per-frame reuse check
 # is a field compare instead of string formatting. Run-constants (bg color,
@@ -1124,11 +1117,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # pass, so nothing is cut off at the edge between them.
     var placeDone = false
     var confineEffect: Action
-    # Eased progress in [0, 1] for an animated action, using its own packed
-    # easing curve + duration (defaults to linear over the whole clip).
-    template prog(e: Action): float32 =
-      applyEase(e.easeCurve,
-        clipT(local, envAnimLen(e.easeDurUnit, e.easeDur, clipDur, fps)))
+    # An animated action's ramp at this frame, eased and timed as it says
+    # (by default linear over the whole clip).
+    template sample(e: Action, kf: seq[float32], kt: seq[KfTime]): float32 =
+      e.ramp(kf, kt, frameSpan(clipDur, fps)).at(local)
 
     # Run `frame` through the effect graph identified by `key`, reusing the
     # previous graph when the key matches; `build` must add nodes to `fxGraph`
@@ -1210,7 +1202,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             av_frame_free(addr frame)
             frame = fitted
       of actZoom:
-        let z = sampleKf(effect.kf, prog(effect))
+        let z = sample(effect, effect.kf, effect.kt)
         if z == 1.0:
           continue
         let origW = frame.width
@@ -1242,7 +1234,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
       of actBlur:
-        let sigma = sampleKf(effect.kf, prog(effect))
+        let sigma = sample(effect, effect.kf, effect.kt)
         if sigma <= 0.0:
           continue
         runFx(fxId(actBlur, frame, f0 = sigma)):
@@ -1251,7 +1243,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
       of actBrightness:
-        let b = sampleKf(effect.kf, prog(effect))
+        let b = sample(effect, effect.kf, effect.kt)
         if b == 0.0'f32:
           continue
         let shift = b * 255.0'f32
@@ -1281,7 +1273,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
       of actOpacity:
-        let o = sampleKf(effect.kf, prog(effect))
+        let o = sample(effect, effect.kf, effect.kt)
         if o >= 1.0'f32:
           continue
         if isOverlay:
@@ -1393,9 +1385,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       of actPixelate:
         # Mosaic censor. Clamp the block to the frame so pixelize can't reject a
         # block larger than the plane; 1x1 blocks are a no-op.
-        let p = prog(effect)
-        let w = min(int(round(sampleKf(effect.pixWKf, p))), frame.width)
-        let h = min(int(round(sampleKf(effect.pixHKf, p))), frame.height)
+        let w = min(int(round(sample(effect, effect.pixWKf, effect.pixWKt))), frame.width)
+        let h = min(int(round(sample(effect, effect.pixHKf, effect.pixHKt))), frame.height)
         if w <= 1 and h <= 1:
           continue
         runFx(fxId(actPixelate, frame, i0 = w.int32, i1 = h.int32)):
@@ -1772,12 +1763,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 # Sample the placement ramps at this frame's progress, eased like
                 # the other animatable effects; static pos has 1-keyframe seqs.
                 # Kept as floats so overlayFrame can place at a sub-pixel offset.
-                let pp = applyEase(effect.easeCurve, clipT(int(index - obj.start),
-                  envAnimLen(effect.easeDurUnit, effect.easeDur, int(obj.dur),
-                    tl.tb.float)))
-                ox = sampleKf(effect.pxKf, pp)
-                oy = sampleKf(effect.pyKf, pp)
-                oscale = sampleKf(effect.pscaleKf, pp)
+                let span = frameSpan(int(obj.dur), tl.tb.float)
+                let local = int(index - obj.start)
+                ox = effect.ramp(effect.pxKf, effect.pxKt, span).at(local)
+                oy = effect.ramp(effect.pyKf, effect.pyKt, span).at(local)
+                oscale = effect.ramp(effect.pscaleKf, effect.pscaleKt, span).at(local)
 
             # A synthesized background base (nil src) has no source frame.
             let sourceFramePos =

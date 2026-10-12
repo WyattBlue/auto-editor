@@ -78,8 +78,8 @@ proc addActionFilters(parent: XmlNode, effects: Actions, clipDur: int,
         ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
     of actPixelate:
       parent.addFilter("avfilter.pixelize", [
-        ("av.width", mltAnimValue(effect, effect.pixWKf, clipDur, fps, asInt = true)),
-        ("av.height", mltAnimValue(effect, effect.pixHKf, clipDur, fps, asInt = true)),
+        ("av.width", mltAnimValue(effect, effect.pixWKf, effect.pixWKt, clipDur, fps, asInt = true)),
+        ("av.height", mltAnimValue(effect, effect.pixHKf, effect.pixHKt, clipDur, fps, asInt = true)),
         ("av.mode", "avg"), ("av.planes", "7")], "", anim(effect))
     of actAberration:
       parent.addFilter("avfilter.rgbashift", [

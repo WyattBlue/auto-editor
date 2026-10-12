@@ -65,6 +65,11 @@ func speedup(speed: float): XmlNode =
 func rampPoints(act: Action, dur: int64, fps: float): seq[(float32, float32)] =
   if act.kf.len <= 1:
     return @[(0.0'f32, (if act.kf.len == 1: act.kf[0] else: 1.0'f32))]
+  if act.kt.len > 0:
+    let denom = float32(max(1, int(dur) - 1))
+    for (f, v) in act.timedKeys(act.kf, act.kt, int(dur), fps):
+      result.add (float32(f) / denom, v)
+    return
   if not act.hasEase:
     for i, v in act.kf:
       result.add (float32(i) / float32(act.kf.len - 1), v)

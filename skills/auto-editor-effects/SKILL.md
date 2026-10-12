@@ -99,6 +99,18 @@ auto-editor video.mp4 -w:1 opacity:0..1:ease=in:2sec        # ease over 2s, then
 auto-editor video.mp4 -w:1 ease:out,zoom:1..1.3,brightness:0..0.3
 ```
 
+Timed keyframes — `value@time` puts a keyframe at a time from the section's
+start: a bare frame count, `sec`, or `%` of the section. The value holds before
+the first and after the last; an untimed keyframe among timed ones sits evenly
+between its neighbors. An ease curve then eases each step between keyframes
+(no ease duration with timed keyframes).
+
+```bash
+auto-editor video.mp4 -w:1 zoom:1@0..2@1.5sec..1@100%      # in by 1.5s, out by the end
+auto-editor video.mp4 -w:1 volume:0@0..0@2sec..1@4sec      # silent 2s, then fade in
+auto-editor video.mp4 -w:1 opacity:1@80%..0:ease=in        # fade out over the last 20%
+```
+
 ## Target a time range — `--set-action`
 
 `--set-action ACTION,START,END` overrides defaults for a range (range syntax;

@@ -29,8 +29,8 @@ func mltFadeAnim*(a, b: string, dur: int64): string =
   if dur <= 1: a
   else: &"0={a};{dur - 1}={b}"
 
-func mltAnimValue*(a: Action, kf: seq[float32], clipDur: int, fps: float64,
-    asDb = false, asInt = false): string =
+func mltAnimValue*(a: Action, kf: seq[float32], kt: seq[KfTime], clipDur: int,
+    fps: float64, asDb = false, asInt = false): string =
   ## An MLT property value for one of `a`'s keyframe ramps: a plain value when
   ## static, otherwise an animation string "frame=value;..." with positions
   ## relative to the owning filter's `in` (0 .. clipDur-1). MLT interpolates
@@ -45,7 +45,10 @@ func mltAnimValue*(a: Action, kf: seq[float32], clipDur: int, fps: float64,
 
   let denom = max(1, clipDur - 1)
   var parts: seq[string]
-  if not a.hasEase:
+  if kt.len > 0:
+    for (f, v) in a.timedKeys(kf, kt, clipDur, fps):
+      parts.add &"{f}={fmtVal(v)}"
+  elif not a.hasEase:
     if kf.len - 1 <= denom:
       for i in 0 ..< kf.len:
         let f = int(round(i.float / float(kf.len - 1) * denom.float))
@@ -70,4 +73,4 @@ func mltAnimValue*(a: Action, kf: seq[float32], clipDur: int, fps: float64,
 
 func mltAnimValue*(a: Action, clipDur: int, fps: float64, asDb = false): string =
   ## The scalar `kf` ramp of an animatable action (zoom/blur/volume/...).
-  mltAnimValue(a, a.kf, clipDur, fps, asDb)
+  mltAnimValue(a, a.kf, a.kt, clipDur, fps, asDb)

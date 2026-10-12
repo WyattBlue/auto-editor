@@ -205,7 +205,11 @@ proc opacityKeyframes(act: Action, srcStart, srcDur: float, clipDur: int,
   template kfNode(p: float, v: float): JsonNode =
     %*{"Position": rationalTime(rate, srcStart + round(p * (srcDur - 1.0))),
        "Value": pctVal(v)}
-  if not act.hasEase:
+  if act.kt.len > 0 and n > 1:
+    let denom = max(1, clipDur - 1)
+    for (f, v) in act.timedKeys(act.kf, act.kt, clipDur, rate):
+      result.add kfNode(f.float / denom.float, v.float)
+  elif not act.hasEase:
     for i in 0 ..< n:
       let p = (if n == 1: 0.0 else: i.float / float(n - 1))
       result.add kfNode(p, act.kf[i].float)

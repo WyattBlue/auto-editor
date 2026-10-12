@@ -1,4 +1,4 @@
-import std/[math, strformat, strutils, options]
+import std/[algorithm, math, strformat, strutils, options]
 import ./util/[color, suggest]
 import ./lib/dnorm16
 
@@ -37,6 +37,15 @@ type
     duSec,     # seconds
     duFrames   # timeline frames
 
+  KfUnit* = enum  # where a timed keyframe sits; the order is part of atf-8
+    kuAuto,    # between its timed neighbors (the first and last: the section's ends)
+    kuPercent, # percent of the section
+    kuSec,     # seconds from the section's start
+    kuFrames   # timeline frames from the section's start
+  KfTime* = object
+    at*: float32
+    unit*: KfUnit
+
   # Represents a full-sized action. Animatable scalar effects hold a list of
   # keyframes (one value = static, several = a ramp interpolated across the
   # section) plus an optional easing curve + duration packed inline.
@@ -70,6 +79,7 @@ type
       varispeed*: bool
     of actZoom, actBlur, actOpacity, actBrightness, actVolume:
       kf*: seq[float32]      # keyframes in native units; len >= 1
+      kt*: seq[KfTime]       # each keyframe's time, or empty: spread evenly
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
     of actPitch:
@@ -95,6 +105,7 @@ type
       # Overlay placement ramps: top-left x/y in canvas px and a size multiplier
       # (1.0 = native). Each is a keyframe seq (len 1 = static) like the scalars.
       pxKf*, pyKf*, pscaleKf*: seq[float32]
+      pxKt*, pyKt*, pscaleKt*: seq[KfTime] # as `kt`
     of actColorKey, actChromaKey:
       color*: RGBColor
       similar*, blend*: Unorm16
@@ -114,6 +125,7 @@ type
       # square blocks when the two match). Whole pixels: atf-8 packs them as
       # uint16, so a fractional keyframe could not round-trip.
       pixWKf*, pixHKf*: seq[float32]
+      pixWKt*, pixHKt*: seq[KfTime] # as `kt`
     of actConfetti:
       cCount*: uint16
       cGravity*: float32
@@ -195,7 +207,8 @@ const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
     help: """
 Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
-The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`."""),
+The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`.
+Keyframes can also say when they are, as `value@time`: a bare frame count, `sec`, or `%` of the section, e.g. `zoom:1@0..2@1.5sec..1@100%`. The value holds before the first and after the last, a keyframe without a time sits evenly between its timed neighbors, and the curve eases each step between keyframes. A duration can't be given with timed keyframes."""),
   ActionDef(name: "volume", flags: {afAudio, afAnimatable}, argSpec: "v[..v...]",
     help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB). Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
   ActionDef(name: "deesser", flags: {afAudio}, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
@@ -396,6 +409,18 @@ proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError
   try: (parseFloat(s).float32, unit)
   except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
 
+proc parseKfTime(spec: string): KfTime {.raises: [ActionParseError].} =
+  ## "50%" -> percent of the section; otherwise a duration, as parseDuration.
+  if spec.endsWith("%"):
+    result = KfTime(at: pFloat(spec[0 ..< spec.len - 1]), unit: kuPercent)
+    if not (result.at >= 0.0'f32 and result.at <= 100.0'f32):
+      raise newException(ActionParseError, &"Keyframe time must be in [0%, 100%]: {spec}")
+  else:
+    let (at, unit) = parseDuration(spec)
+    result = KfTime(at: at, unit: (if unit == duSec: kuSec else: kuFrames))
+    if not (result.at >= 0.0'f32):
+      raise newException(ActionParseError, &"Keyframe time must not be negative: {spec}")
+
 func rotDeg*(code: Unorm16): float32 =
   ## Decode a circular rotate angle back into [0, 360) degrees.
   uint16(code).float32 / 65536.0'f32 * 360.0'f32
@@ -421,6 +446,25 @@ proc parseKeyframes*(spec: string): seq[float32] {.raises: [ActionParseError].} 
   if result.len > 255:
     raise newException(ActionParseError, "Too many keyframes (max 255)")
 
+proc parseRamp*(spec: string): tuple[kf: seq[float32], kt: seq[KfTime]] {.
+    raises: [ActionParseError].} =
+  ## parseKeyframes, where a keyframe may say when it is: "1@0..2@1.5sec..1@100%".
+  ## A keyframe without a time, in a ramp where another has one, sits evenly
+  ## between its timed neighbors. `kt` is empty when none has a time.
+  var timed = false
+  for part in spec.split(".."):
+    let at = part.find('@')
+    if at < 0:
+      result.kf.add pFloat(part)
+      result.kt.add KfTime(unit: kuAuto)
+    else:
+      timed = true
+      result.kf.add pFloat(part[0 ..< at])
+      result.kt.add parseKfTime(part[at + 1 .. ^1])
+  if result.kf.len > 255:
+    raise newException(ActionParseError, "Too many keyframes (max 255)")
+  if not timed: result.kt.setLen(0)
+
 func sampleKf*(kf: seq[float32], p: float32): float32 =
   ## Piecewise-linear sample of keyframes at progress p in [0, 1].
   if kf.len <= 1:
@@ -428,6 +472,90 @@ func sampleKf*(kf: seq[float32], p: float32): float32 =
   let x = clamp(p, 0.0'f32, 1.0'f32) * float32(kf.len - 1)
   let seg = min(int(x), kf.len - 2)
   kf[seg] + (kf[seg + 1] - kf[seg]) * (x - float32(seg))
+
+type
+  AnimSpan* = object
+    ## A section an animation plays over, measured in steps: frames when
+    ## rendering video, samples for audio.
+    len*: int
+    perSec*, perFrame*: float64 # steps in a second, and in a timeline frame
+  Ramp* = object
+    ## One keyframe ramp of an action, ready to sample across an AnimSpan.
+    kf: seq[float32]
+    at: seq[float64] # each keyframe's step; empty when spread evenly
+    curve: Easing
+    easeLen: int
+
+func frameSpan*(len: int, fps: float64): AnimSpan =
+  AnimSpan(len: len, perSec: fps, perFrame: 1.0)
+
+func kfSteps*(kt: seq[KfTime], span: AnimSpan): seq[float64] =
+  ## Each timed keyframe's step from the section's start: untimed ones are
+  ## spread between their neighbors, and none comes before the one before it.
+  if kt.len == 0: return
+  let last = float64(max(span.len - 1, 0))
+  result = newSeq[float64](kt.len)
+  var known = newSeq[bool](kt.len)
+  for i, t in kt:
+    known[i] = t.unit != kuAuto
+    case t.unit
+    of kuAuto: discard
+    of kuPercent: result[i] = t.at.float64 / 100.0 * last
+    of kuSec: result[i] = t.at.float64 * span.perSec
+    of kuFrames: result[i] = t.at.float64 * span.perFrame
+  if not known[0]: (result[0], known[0]) = (0.0, true)
+  if not known[^1]: (result[^1], known[^1]) = (last, true)
+  var i = 1
+  while i < kt.len:
+    if not known[i]:
+      var j = i
+      while not known[j]: inc j
+      let a = i - 1
+      for k in i ..< j:
+        result[k] = result[a] + (result[j] - result[a]) * float64(k - a) / float64(j - a)
+      i = j
+    inc i
+  for k in 1 ..< result.len:
+    result[k] = max(result[k], result[k - 1])
+
+func ramp*(a: Action, kf: seq[float32], kt: seq[KfTime], span: AnimSpan): Ramp =
+  ## `kf` (with its times `kt`) as `a` animates it. An untimed ramp spreads
+  ## across the ease duration (the section by default), eased as a whole; a
+  ## timed one eases each step between keyframes.
+  result = Ramp(kf: kf, curve: a.easeCurve, at: kfSteps(kt, span))
+  result.easeLen = case a.easeDurUnit
+    of duClip: span.len
+    of duSec: max(1, int(round(a.easeDur.float64 * span.perSec)))
+    of duFrames: max(1, int(round(a.easeDur.float64 * span.perFrame)))
+
+func at*(r: Ramp, local: int): float32 =
+  ## The ramp's value `local` steps into the section.
+  if r.at.len == 0 or r.kf.len <= 1:
+    return sampleKf(r.kf, applyEase(r.curve, clipT(local, r.easeLen)))
+  let x = local.float64
+  if x <= r.at[0]: return r.kf[0]
+  for i in 1 ..< r.kf.len:
+    if x < r.at[i]:
+      let u = float32((x - r.at[i - 1]) / (r.at[i] - r.at[i - 1]))
+      return r.kf[i - 1] + (r.kf[i] - r.kf[i - 1]) * applyEase(r.curve, u)
+  r.kf[^1]
+
+func timedKeys*(a: Action, kf: seq[float32], kt: seq[KfTime], clipDur: int,
+    fps: float64): seq[(int, float32)] =
+  ## Control points (frame, value) that trace a timed ramp over a clip of
+  ## `clipDur` frames when joined linearly, as editors do: its keyframes, and
+  ## when it's eased, samples between them.
+  let last = max(1, clipDur - 1)
+  let r = a.ramp(kf, kt, frameSpan(clipDur, fps))
+  var frames = @[0, last]
+  for s in r.at: frames.add clamp(int(round(s)), 0, last)
+  if a.easeCurve != easeLinear:
+    let samples = min(last, 60)
+    for s in 0 .. samples:
+      frames.add int(round(s.float / samples.float * last.float))
+  frames.sort()
+  for f in frames:
+    if result.len == 0 or result[^1][0] != f: result.add (f, r.at(f))
 
 proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   let name = if spec.startsWith("ease="): spec[5 .. ^1] else: spec
@@ -450,6 +578,21 @@ proc parseEaseTail(act: var Action, parts: seq[string], idx: int,
   act.easeCurve = parseEasing(parts[idx])
   if parts.len == idx + 2:
     (act.easeDur, act.easeDurUnit) = parseDuration(parts[idx + 1])
+
+func isTimed*(a: Action): bool =
+  ## Whether any of the action's keyframes says when it is.
+  case a.kind
+  of actZoom, actBlur, actOpacity, actBrightness, actVolume: a.kt.len > 0
+  of actPos: a.pxKt.len > 0 or a.pyKt.len > 0 or a.pscaleKt.len > 0
+  of actPixelate: a.pixWKt.len > 0 or a.pixHKt.len > 0
+  else: false
+
+proc checkTimedEase(a: Action) {.raises: [ActionParseError].} =
+  # Timed keyframes say how long the animation takes; an ease duration would
+  # say it again.
+  if a.isTimed and a.easeDurUnit != duClip:
+    raise newException(ActionParseError,
+      "An ease duration can't be given with timed keyframes")
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
@@ -688,27 +831,30 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   # rectangular. Each size is a ramp with an optional ease suffix:
   #   pixelate:24   pixelate:1..48   pixelate:8..40:8:ease=inout
   if parts[0] == "pixelate":
-    proc blockKf(spec: string): seq[float32] {.raises: [ActionParseError].} =
-      result = parseKeyframes(spec)
-      for v in result:
+    proc blockKf(spec: string): tuple[kf: seq[float32], kt: seq[KfTime]] {.
+        raises: [ActionParseError].} =
+      result = parseRamp(spec)
+      for v in result.kf:
         # `not (a and b)` so NaN fails the check too; uint16(NaN) is UB.
         if not (v >= 1.0'f32 and v <= 1024.0'f32 and v == round(v)):
           raise newException(ActionParseError,
             "pixelate block size must be a whole number in [1, 1024]")
 
     var idx = 1
-    var wKf = @[16.0'f32]
-    var hKf: seq[float32] = @[]
+    var w = (kf: @[16.0'f32], kt: newSeq[KfTime]())
+    var h = (kf: newSeq[float32](), kt: newSeq[KfTime]())
     if parts.len > idx and not parts[idx].startsWith("ease="):
-      wKf = blockKf(parts[idx])
+      w = blockKf(parts[idx])
       inc idx
       if parts.len > idx and not parts[idx].startsWith("ease="):
-        hKf = blockKf(parts[idx])
+        h = blockKf(parts[idx])
         inc idx
-    if hKf.len == 0:  # one ramp given: square blocks
-      hKf = wKf
-    result = Action(kind: actPixelate, pixWKf: wKf, pixHKf: hKf)
+    if h.kf.len == 0:  # one ramp given: square blocks
+      h = w
+    result = Action(kind: actPixelate, pixWKf: w.kf, pixHKf: h.kf,
+      pixWKt: w.kt, pixHKt: h.kt)
     result.parseEaseTail(parts, idx, val)
+    result.checkTimedEase()
     return result
 
   # confetti: [count[:gravity][:scheme][:origin]]. Scheme and origin are name
@@ -841,25 +987,27 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts[0] == "pos":
     if parts.len < 3:
       raise newException(ActionParseError, "pos requires x:y[:scale]")
-    let xKf = parseKeyframes(parts[1])
-    let yKf = parseKeyframes(parts[2])
+    let x = parseRamp(parts[1])
+    let y = parseRamp(parts[2])
     # parts[3] is the scale ramp unless it's the ease suffix.
-    var sKf = @[1.0'f32]
+    var s = (kf: @[1.0'f32], kt: newSeq[KfTime]())
     var idx = 3
     if parts.len > 3 and not parts[3].startsWith("ease="):
-      sKf = parseKeyframes(parts[3])
+      s = parseRamp(parts[3])
       idx = 4
-    for v in sKf:
+    for v in s.kf:
       if v <= 0.0'f32:
         raise newException(ActionParseError, "pos scale must be greater than 0.0")
-    result = Action(kind: actPos, pxKf: xKf, pyKf: yKf, pscaleKf: sKf)
+    result = Action(kind: actPos, pxKf: x.kf, pyKf: y.kf, pscaleKf: s.kf,
+      pxKt: x.kt, pyKt: y.kt, pscaleKt: s.kt)
     result.parseEaseTail(parts, idx, val)
+    result.checkTimedEase()
     return result
 
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
   if parts[0] in animScalar and parts.len >= 2:
-    let kf = parseKeyframes(parts[1])
+    let (kf, kt) = parseRamp(parts[1])
     case parts[0]
     of "zoom":
       for v in kf:
@@ -876,12 +1024,13 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     else: discard  # blur: any value
 
     result = case parts[0]
-      of "zoom": Action(kind: actZoom, kf: kf)
-      of "blur": Action(kind: actBlur, kf: kf)
-      of "opacity": Action(kind: actOpacity, kf: kf)
-      of "volume": Action(kind: actVolume, kf: kf)
-      else: Action(kind: actBrightness, kf: kf)
+      of "zoom": Action(kind: actZoom, kf: kf, kt: kt)
+      of "blur": Action(kind: actBlur, kf: kf, kt: kt)
+      of "opacity": Action(kind: actOpacity, kf: kf, kt: kt)
+      of "volume": Action(kind: actVolume, kf: kf, kt: kt)
+      else: Action(kind: actBrightness, kf: kf, kt: kt)
     result.parseEaseTail(parts, 2, val)
+    result.checkTimedEase()
     return result
 
   if parts.len == 2:
@@ -926,6 +1075,18 @@ func easeSuffix(a: Action): string =
   of duSec: result.add &":{a.easeDur}sec"
   of duFrames: result.add &":{a.easeDur}"
 
+func rampStr(values: seq[string], kt: seq[KfTime]): string =
+  ## Formatted keyframes as "a..b..c", each with its time when it has one.
+  var parts = values
+  if kt.len == values.len:
+    for i, t in kt:
+      case t.unit
+      of kuAuto: discard
+      of kuPercent: parts[i].add &"@{t.at}%"
+      of kuSec: parts[i].add &"@{t.at}sec"
+      of kuFrames: parts[i].add &"@{t.at}"
+  parts.join("..")
+
 func kfStr(a: Action): string =
   ## Keyframes as "a..b..c", formatted in each effect's native value type.
   var parts: seq[string]
@@ -934,7 +1095,7 @@ func kfStr(a: Action): string =
     of actOpacity: parts.add $toUnorm16(v)
     of actBrightness: parts.add $toSnorm16(v)
     else: parts.add $v
-  parts.join("..")
+  rampStr(parts, a.kt)
 
 func maskStr(a: Action, name: string): string =
   result = &"{name}:{a.mX}:{a.mY}:{a.mW}:{a.mH}"
@@ -985,7 +1146,8 @@ when not defined(nimscript):
       for v in act.pxKf: xs.add $int(round(v))   # x/y are whole pixels
       for v in act.pyKf: ys.add $int(round(v))
       for v in act.pscaleKf: ss.add $v
-      &"""pos:{xs.join("..")}:{ys.join("..")}:{ss.join("..")}{easeSuffix(act)}"""
+      &"pos:{rampStr(xs, act.pxKt)}:{rampStr(ys, act.pyKt)}:" &
+        &"{rampStr(ss, act.pscaleKt)}{easeSuffix(act)}"
     of actColorKey, actChromaKey:
       let name = (if act.kind == actColorKey: "colorkey" else: "chromakey")
       &"{name}:{act.color.toString}:{act.similar}:{act.blend}"
@@ -1013,8 +1175,8 @@ when not defined(nimscript):
       var ws, hs: seq[string]
       for v in act.pixWKf: ws.add $int(round(v))   # block sizes are whole px
       for v in act.pixHKf: hs.add $int(round(v))
-      let w = ws.join("..")
-      let h = hs.join("..")
+      let w = rampStr(ws, act.pixWKt)
+      let h = rampStr(hs, act.pixHKt)
       let sizes = (if w == h: w else: &"{w}:{h}")
       &"pixelate:{sizes}{easeSuffix(act)}"
     of actConfetti:
@@ -1024,6 +1186,52 @@ when not defined(nimscript):
         (if act.cShimmer: "" else: ":no-shimmer")
 
   func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
+
+  # A timed ramp is marked by a zero before its keyframe count, and is followed
+  # by each keyframe's unit and time. An untimed ramp's count is never zero: an
+  # empty ramp takes the mark too, with no times.
+  func marked(n: int, kt: seq[KfTime]): bool = kt.len > 0 or n == 0
+
+  func timeBytes(n: int, kt: seq[KfTime]): int =
+    (if marked(n, kt): 1 else: 0) + kt.len * 5
+
+  func timeBytes(a: Action): int =
+    case a.kind
+    of actPos: timeBytes(a.pxKf.len, a.pxKt) + timeBytes(a.pyKf.len, a.pyKt) +
+      timeBytes(a.pscaleKf.len, a.pscaleKt)
+    of actPixelate: timeBytes(a.pixWKf.len, a.pixWKt) + timeBytes(a.pixHKf.len, a.pixHKt)
+    of actZoom, actBlur, actOpacity, actBrightness, actVolume: timeBytes(a.kf.len, a.kt)
+    else: 0
+
+  proc packCount(base: ptr UncheckedArray[uint8], pos: var int, n: int,
+      kt: seq[KfTime]) =
+    if marked(n, kt):
+      base[pos] = 0'u8
+      pos += 1
+    base[pos] = uint8(n)
+    pos += 1
+
+  proc packTimes(base: ptr UncheckedArray[uint8], pos: var int, kt: seq[KfTime]) =
+    for t in kt:
+      base[pos] = uint8(ord(t.unit))
+      var at = t.at
+      copyMem(addr base[pos + 1], addr at, sizeof(float32))
+      pos += 5
+
+  proc unpackCount(base: ptr UncheckedArray[uint8], pos: var int): (int, bool) =
+    ## The keyframe count, and whether times follow the keyframes.
+    let timed = base[pos] == 0'u8
+    if timed: pos += 1
+    result = (base[pos].int, timed)
+    pos += 1
+
+  proc unpackTimes(base: ptr UncheckedArray[uint8], pos: var int,
+      n: int): seq[KfTime] =
+    result = newSeq[KfTime](n)
+    for c in 0 ..< n:
+      result[c].unit = KfUnit(base[pos].int)
+      copyMem(addr result[c].at, addr base[pos + 1], sizeof(float32))
+      pos += 5
 
   func actionByteSize(a: Action): int =
     case a.kind
@@ -1041,10 +1249,11 @@ when not defined(nimscript):
     of actLuv: 11
     of actDrawbox: 20
     of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
-    of actPos: 4 + easeBytes(a) + (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
-    of actPixelate: 3 + easeBytes(a) + (a.pixWKf.len + a.pixHKf.len) * 2
-    of actBrightness, actOpacity: 2 + easeBytes(a) + a.kf.len * 2
-    of actBlur, actZoom, actVolume: 2 + easeBytes(a) + a.kf.len * 4
+    of actPos: 4 + easeBytes(a) + timeBytes(a) +
+      (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
+    of actPixelate: 3 + easeBytes(a) + timeBytes(a) + (a.pixWKf.len + a.pixHKf.len) * 2
+    of actBrightness, actOpacity: 2 + easeBytes(a) + timeBytes(a) + a.kf.len * 2
+    of actBlur, actZoom, actVolume: 2 + easeBytes(a) + timeBytes(a) + a.kf.len * 4
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -1175,16 +1384,16 @@ when not defined(nimscript):
             copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
             pos += 6
           for which in 0 .. 1:  # width, then height keyframes
-            let count = base[pos].int
-            pos += 1
+            let (count, timed) = unpackCount(base, pos)
             var sizes = newSeq[float32](count)
             for c in 0 ..< count:
               var v: uint16
               copyMem(addr v, addr base[pos], sizeof(uint16))
               sizes[c] = v.float32
               pos += 2
-            if which == 0: act.pixWKf = sizes
-            else: act.pixHKf = sizes
+            let times = (if timed: unpackTimes(base, pos, count) else: @[])
+            if which == 0: (act.pixWKf, act.pixWKt) = (sizes, times)
+            else: (act.pixHKf, act.pixHKt) = (sizes, times)
           yield act
           i = pos
         of actConfetti:
@@ -1225,16 +1434,16 @@ when not defined(nimscript):
             copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
             pos += 6
           for which in 0 .. 2:  # x, y, scale keyframe seqs in order
-            let count = base[pos].int
-            pos += 1
+            let (count, timed) = unpackCount(base, pos)
             var s = newSeq[float32](count)
             for c in 0 ..< count:
               copyMem(addr s[c], addr base[pos], sizeof(float32))
               pos += 4
+            let times = (if timed: unpackTimes(base, pos, count) else: @[])
             case which
-            of 0: act.pxKf = s
-            of 1: act.pyKf = s
-            else: act.pscaleKf = s
+            of 0: (act.pxKf, act.pxKt) = (s, times)
+            of 1: (act.pyKf, act.pyKt) = (s, times)
+            else: (act.pscaleKf, act.pscaleKt) = (s, times)
           yield act
           i = pos
         of actDrawbox:
@@ -1256,8 +1465,7 @@ when not defined(nimscript):
             act.easeDurUnit = DurUnit(base[pos + 1].int)
             copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
             pos += 6
-          let count = base[pos].int
-          pos += 1
+          let (count, timed) = unpackCount(base, pos)
           act.kf = newSeq[float32](count)
           for c in 0 ..< count:
             if kind in {actZoom, actBlur, actVolume}:
@@ -1275,6 +1483,7 @@ when not defined(nimscript):
               copyMem(addr s, addr base[pos], sizeof(Snorm16))
               act.kf[c] = s.toFloat32
               pos += 2
+          if timed: act.kt = unpackTimes(base, pos, count)
           yield act
           i = pos
 
@@ -1304,6 +1513,17 @@ when not defined(nimscript):
         else: 0
       if maxKf > 255:
         raise newException(ActionParseError, "Too many keyframes (max 255)")
+      # Times pair with keyframes one to one; packing trusts that.
+      let paired = case a.kind
+        of actPos: (a.pxKt.len in [0, a.pxKf.len]) and
+          (a.pyKt.len in [0, a.pyKf.len]) and (a.pscaleKt.len in [0, a.pscaleKf.len])
+        of actPixelate: (a.pixWKt.len in [0, a.pixWKf.len]) and
+          (a.pixHKt.len in [0, a.pixHKf.len])
+        of actZoom, actBlur, actOpacity, actBrightness, actVolume:
+          a.kt.len in [0, a.kf.len]
+        else: true
+      if not paired:
+        raise newException(ActionParseError, "Keyframe times don't match the keyframes")
       total += actionByteSize(a)
     if total > 65535:
       raise newException(ActionParseError, "atf-8 buffer overflow: too many actions")
@@ -1390,13 +1610,13 @@ when not defined(nimscript):
           var d = a.easeDur
           copyMem(addr base[pos + 2], addr d, sizeof(float32))
           pos += 6
-        for sizes in [a.pixWKf, a.pixHKf]:
-          base[pos] = uint8(sizes.len)
-          pos += 1
+        for (sizes, times) in [(a.pixWKf, a.pixWKt), (a.pixHKf, a.pixHKt)]:
+          packCount(base, pos, sizes.len, times)
           for v in sizes:
             var vv = pixCode(v)
             copyMem(addr base[pos], addr vv, sizeof(uint16))
             pos += 2
+          packTimes(base, pos, times)
         i = pos
       of actConfetti:
         base.writeAt(i, 1, a.cCount)
@@ -1430,13 +1650,14 @@ when not defined(nimscript):
           var d = a.easeDur
           copyMem(addr base[pos + 2], addr d, sizeof(float32))
           pos += 6
-        for s in [a.pxKf, a.pyKf, a.pscaleKf]:
-          base[pos] = uint8(s.len)
-          pos += 1
+        for (s, times) in [(a.pxKf, a.pxKt), (a.pyKf, a.pyKt),
+            (a.pscaleKf, a.pscaleKt)]:
+          packCount(base, pos, s.len, times)
           for v in s:
             var vv = v
             copyMem(addr base[pos], addr vv, sizeof(float32))
             pos += 4
+          packTimes(base, pos, times)
         i = pos
       of actDrawbox:
         base.writeAt(i, 1, a.dbX)
@@ -1454,8 +1675,7 @@ when not defined(nimscript):
           var d = a.easeDur
           copyMem(addr base[pos + 2], addr d, sizeof(float32))
           pos += 6
-        base[pos] = uint8(a.kf.len)
-        pos += 1
+        packCount(base, pos, a.kf.len, a.kt)
         for v in a.kf:
           if a.kind in {actZoom, actBlur, actVolume}:
             var vv = v
@@ -1469,6 +1689,7 @@ when not defined(nimscript):
             var s = toSnorm16(v)
             copyMem(addr base[pos], addr s, sizeof(Snorm16))
             pos += 2
+        packTimes(base, pos, a.kt)
         i = pos
 
     Actions(cast[int](p))
@@ -1504,8 +1725,10 @@ when not defined(nimscript):
           actVolume, actPos, actPixelate} and not action.hasEase:
         action.hasEase = true
         action.easeCurve = pendCurve
-        action.easeDurUnit = pendUnit
-        action.easeDur = pendDur
+        # Timed keyframes keep their own timing; they take only the curve.
+        if not action.isTimed:
+          action.easeDurUnit = pendUnit
+          action.easeDur = pendDur
       if action.kind == actLuv:
         # Adjacent-fusion: collapse this actLuv into previous one if it's also actLuv.
         # Per field, the non-identity value wins; later wins on genuine conflicts.

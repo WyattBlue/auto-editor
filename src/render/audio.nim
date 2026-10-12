@@ -459,12 +459,10 @@ proc applyVolume(data: var seq[int16], act: Action, channels: int, sr: cint,
   let frames = data.len div channels
   if frames == 0:
     return
-  let animLen = case act.easeDurUnit
-    of duClip: frames
-    of duSec: max(1, int(round(act.easeDur.float64 * sr.float64)))
-    of duFrames: max(1, int(round(act.easeDur.float64 * sr.float64 / fps)))
+  let ramp = act.ramp(act.kf, act.kt, AnimSpan(len: frames, perSec: sr.float64,
+    perFrame: sr.float64 / fps))
   for i in 0 ..< frames:
-    let gain = sampleKf(act.kf, applyEase(act.easeCurve, clipT(i, animLen)))
+    let gain = ramp.at(i)
     if gain == 1.0'f32:
       continue
     for ch in 0 ..< channels:
