@@ -4,6 +4,7 @@ cpp = 'x86_64-w64-mingw32-clang++'
 ar = 'llvm-ar'
 strip = 'llvm-strip'
 pkgconfig = 'pkg-config'
+nasm = 'nasm'
 
 [host_machine]
 system = 'windows'

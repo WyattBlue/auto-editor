@@ -18,6 +18,7 @@ let disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 let disableHevc = getEnv("DISABLE_HEVC").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0
+let enableLibass = getEnv("DISABLE_LIBASS").len == 0
 
 let
   nativeBuildPath = absolutePath("build")
@@ -195,6 +196,8 @@ let dav1d = Package(
   sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.4/dav1d-1.5.4.tar.bz2",
   sha256: "2abfb0c89212e6e4733a54e0ae509ec00a5b845a6360946f918806e14aedb011",
   buildSystem: "meson",
+  buildArguments: @["-Denable_docs=false", "-Denable_tools=false",
+    "-Denable_examples=false", "-Denable_tests=false"],
   ffFlag: "--enable-libdav1d",
 )
 let svtav1 = Package(
@@ -244,6 +247,62 @@ let zlib = Package(
   sha256: "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
   ffFlag: "--enable-zlib",
 )
+let freetype = Package(
+  name: "freetype",
+  sourceUrl: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz",
+  sha256: "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289",
+  buildSystem: "cmake",
+  # As gui/make-freetype.sh builds it, so the app links this one copy.
+  buildArguments: @["-DFT_DISABLE_ZLIB=ON", "-DFT_DISABLE_BZIP2=ON",
+    "-DFT_DISABLE_PNG=ON", "-DFT_DISABLE_HARFBUZZ=ON", "-DFT_DISABLE_BROTLI=ON"],
+)
+let fribidi = Package(
+  name: "fribidi",
+  sourceUrl: "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz",
+  sha256: "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c",
+  buildSystem: "meson",
+  buildArguments: @["-Ddocs=false", "-Dbin=false", "-Dtests=false"],
+)
+let harfbuzz = Package(
+  name: "harfbuzz",
+  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/11.2.1/harfbuzz-11.2.1.tar.xz",
+  sha256: "093714c8548a285094685f0bdc999e202d666b59eeb3df2ff921ab68b8336a49",
+  buildSystem: "meson",
+  buildArguments: @["--auto-features=disabled", "-Dtests=disabled",
+    "-Ddocs=disabled", "-Dutilities=disabled", "-Dintrospection=disabled",
+    "-Dbenchmark=disabled"],
+)
+let expat = Package(
+  name: "expat",
+  sourceUrl: "https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz",
+  sha256: "354552544b8f99012e5062f7d570ec77f14b412a3ff5c7d8d0dae62c0d217c30",
+  buildSystem: "cmake",
+  buildArguments: @["-DEXPAT_BUILD_TOOLS=OFF", "-DEXPAT_BUILD_EXAMPLES=OFF",
+    "-DEXPAT_BUILD_TESTS=OFF", "-DEXPAT_BUILD_DOCS=OFF", "-DEXPAT_SHARED_LIBS=OFF"],
+)
+let fontconfig = Package(
+  name: "fontconfig",
+  sourceUrl: "https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.16.2/fontconfig-2.16.2.tar.xz",
+  sha256: "165b8fd2a119864c87464b233986c4a1bc09efb09c65de1ca40cc1e85ffb77e2",
+  buildSystem: "meson",
+  # Statically linked, it reads the distro's own configuration and cache.
+  buildArguments: @["--auto-features=disabled", "-Dxml-backend=expat",
+    "-Dcache-build=disabled", "-Dtools=disabled", "-Dtests=disabled",
+    "-Ddoc=disabled", "-Dnls=disabled", "-Dbaseconfig-dir=/etc/fonts",
+    "-Dconfig-dir=/etc/fonts/conf.d", "-Dcache-dir=/var/cache/fontconfig",
+    "-Dtemplate-dir=/usr/share/fontconfig/conf.avail",
+    "-Dxml-dir=/usr/share/xml/fontconfig"],
+)
+let libass = Package(
+  name: "libass",
+  sourceUrl: "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz",
+  sha256: "78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a",
+  buildSystem: "meson",
+  buildArguments: @["--auto-features=disabled", "-Dtest=disabled",
+    "-Dcompare=disabled", "-Dprofile=disabled", "-Dfuzz=disabled",
+    "-Dcheckasm=disabled", "-Dlibunibreak=disabled"],
+  ffFlag: "--enable-libass",
+)
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
@@ -266,6 +325,11 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   if enableWhisper:
     result.add whisper
   result &= [lamer, opus, dav1d, x264, zlib]
+  if enableLibass and not isWasm:
+    result &= [freetype, fribidi, harfbuzz]
+    if kind == armv7 or (kind == native and defined(linux)):
+      result &= [expat, fontconfig]
+    result.add libass
   if not disableVpx:
     result.add vpx
   if not disableSvtAv1 and not isWasm:
@@ -386,6 +450,10 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     # the build dir and re-installs don't produce a hybrid BSD/GNU archive.
     cmakeArgs.add(&"-DCMAKE_OUTPUT_DIRECTORY={cmakeBuildDir}/Bin")
 
+  if kind in {winX64, winArm} and package.name == "freetype":
+    # windres needs the target to find mingw's headers for the version resource.
+    let triple = if kind == winX64: "x86_64-w64-mingw32" else: "aarch64-w64-mingw32"
+    cmakeArgs.add(&"-DCMAKE_RC_FLAGS=--target={triple}")
   if kind == winX64:
     let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
@@ -541,11 +609,22 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
     &"--prefix={buildPath}",
     "--buildtype=release",
     "--default-library=static",
-    "-Denable_docs=false",
-    "-Denable_tools=false",
-    "-Denable_examples=false",
-    "-Denable_tests=false"
-  ]
+    # Not Debian's lib/<triple>: libraries go where everything else is linked
+    # from, so the packages built after them find their pkg-config files.
+    "--libdir=lib",
+    # Meson ignores PKG_CONFIG_PATH when cross-compiling; this it always reads.
+    &"-Dpkg_config_path={buildPath}/lib/pkgconfig",
+  ] & package.buildArguments
+  if package.name == "libass":
+    # Where libass finds the system's fonts.
+    let isMac = defined(macosx) and kind == native
+    let isLinux = kind == armv7 or (kind == native and defined(linux))
+    mesonArgs.add("-Dcoretext=" & (if isMac: "enabled" else: "disabled"))
+    mesonArgs.add("-Ddirectwrite=" & (if kind in {winX64, winArm}: "enabled" else: "disabled"))
+    mesonArgs.add("-Dfontconfig=" & (if isLinux: "enabled" else: "disabled"))
+    # Its x86 assembly (nasm) speeds up blending; elsewhere it's plain C.
+    let x86 = kind == winX64 or (kind == native and hostCPU == "amd64")
+    mesonArgs.add("-Dasm=" & (if x86: "enabled" else: "disabled"))
   if kind == wasm32 or kind == wasm64:
     mesonArgs.add "-Denable_asm=false"
     let memArg = if kind == wasm64: " -m64" else: ""
@@ -565,7 +644,15 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   withDir mesonBuildDir:
     exec ("meson setup --reconfigure " & mesonArgs.join(" ") & " " & sourceDir)
     exec "ninja"
-    exec "ninja install"
+    if package.name == "fontconfig":
+      # Its configuration installs to /etc, which belongs to the system: stage
+      # the install and keep only the library, headers and pkg-config file.
+      let stage = mesonBuildDir / "stage"
+      rmDir stage
+      exec &"DESTDIR=\"{stage}\" ninja install"
+      exec &"cp -R \"{stage}{buildPath}/.\" \"{buildPath}/\""
+    else:
+      exec "ninja install"
 
 proc x265Build(buildPath: string, kind: CrossKind) =
   # Build x265 multiple times following the Homebrew approach:
@@ -957,6 +1044,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     "image_webp_pipe", "webp_anim"]
 
   var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
+  if packages.anyIt(it.name == "libass"):
+    filters.add "subtitles"
 
   let isCrossWasm = kind == wasm32 or kind == wasm64
   for package in packages:
@@ -1054,7 +1143,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, expat, fontconfig, libass]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

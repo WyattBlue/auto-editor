@@ -72,10 +72,10 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config nasm git
+            sudo apt-get install -y build-essential pkg-config nasm git gperf
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config git
+            sudo apt-get install -y build-essential pkg-config git gperf
           elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
@@ -202,7 +202,7 @@ jobs:
       - name: Install ARMv7 cross toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config git meson \
+          sudo apt-get install -y build-essential pkg-config git meson gperf \
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf binutils-arm-linux-gnueabihf
       - name: Build FFmpeg
         run: nimble makeffarmv7

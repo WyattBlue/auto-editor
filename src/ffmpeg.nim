@@ -694,7 +694,7 @@ type AVCodecDescriptor* {.importc, header: "<libavcodec/avcodec.h>".} = object
   `type`*: AVMediaType
   name: cstring
   long_name: cstring
-  props: cint
+  props*: cint
   mime_types: pointer
   profiles*: ptr AVProfile
 
@@ -709,6 +709,8 @@ proc avcodec_find_encoder_by_name*(name: cstring): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_descriptor_get_by_name*(name: cstring): ptr AVCodecDescriptor {.importc,
     header: "<libavcodec/avcodec.h>".}
+const AV_CODEC_PROP_TEXT_SUB* = 1.cint shl 17 ## subtitles as text, not bitmaps
+
 proc avcodec_descriptor_get*(id: AVCodecID): ptr AVCodecDescriptor {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,

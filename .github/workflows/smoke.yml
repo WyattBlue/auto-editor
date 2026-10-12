@@ -101,9 +101,9 @@ jobs:
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
-            sudo apt-get install -y build-essential pkg-config nasm git
+            sudo apt-get install -y build-essential pkg-config nasm git gperf
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
-            sudo apt-get install -y build-essential pkg-config git
+            sudo apt-get install -y build-essential pkg-config git gperf
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi

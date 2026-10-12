@@ -4,6 +4,7 @@ from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
+import ./burnsubs
 import ../lib/dnorm16
 
 type VideoFrame = object
@@ -947,6 +948,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
+  var burner = SubBurner()
   var lastFrameIndex = -1
   let isLinear = tl.isLinear
 
@@ -1153,6 +1155,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       case effect.kind:
       of actSpeed, actVolume, actDeesser, actDuck, actPitch, actTone, actConvolve,
           actPos, actRotate, actLoop: discard
+      of actBurn: discard # drawn over the finished picture (finalizeFrame)
       of actScale, actTurn:
         # An overlay is scaled and turned where it's placed, about its center.
         if isOverlay or placeDone: continue
@@ -1718,6 +1721,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         else: av_frame_clone(nullFrame)
       if frame == nil:
         error &"Failed to create fallback frame at {index}tb"
+    block:
+      # Over everything else, as the finished picture's last layer.
+      let burned = burner.burn(frame, tl, index)
+      if burned != frame:
+        av_frame_free(addr frame)
+        frame = burned
     let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
     if reformatted != nil and reformatted != frame:
       av_frame_free(addr frame)
@@ -1910,6 +1919,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       fxGraph.cleanup()
     if rotGraph != nil:
       rotGraph.cleanup()
+    burner.close()
     if maskMatte != nil: av_frame_free(addr maskMatte)
     if confineMatte != nil: av_frame_free(addr confineMatte)
     sws_free_context(addr scaleCtx)

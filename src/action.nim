@@ -18,8 +18,8 @@ type
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
     actErosion, actChoke, actAberration, actMask, actConfine, actPixelate, actConfetti,
-    actScale, actTurn
-    # Can add 83 more [V] actions
+    actScale, actTurn, actBurn
+    # Can add 82 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -31,6 +31,11 @@ type
     csParty, csNeon, csGold, csDuotone, csWhite
   ConfettiOrigin* = enum
     coBottom, coTop, coCenter, coSides
+
+  BurnPart* = enum  # what a burn's colors override; the order is part of atf-8
+    bpColor,   # the text
+    bpOutline, # its outline
+    bpBg       # a box behind each subtitle
 
   DurUnit* = enum  # how an ease duration is measured
     duClip,    # the whole clip/section (the default)
@@ -69,6 +74,11 @@ type
       tUniform*: bool        # one value for both, as `scale:v` says
     of actTurn:
       tDeg*: float32         # clockwise about the center, without growing the frame
+    of actBurn:
+      burnFont*: string      # a font file to draw subtitles with; "" keeps their own
+      burnSize*: float32     # text height, percent of the frame's; 0 keeps their own
+      burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
+      burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
     of actSpin:
       sStart*: Unorm16       # circular [0, 360) start angle
       sRate*: float32        # spin rate in degrees/second (continuous)
@@ -258,6 +268,9 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     help: "Scale the picture about its center, by `v` both ways or by `w` across and `h` down, e.g. `scale:0.8` or `scale:0.4:1`. On the base (bottom) track what grows past the edge is cut off and what shrinks away shows the background, like `zoom`; an overlay grows or shrinks about the center of where it's placed. Combines with `turn`."),
   ActionDef(name: "turn", flags: {afVideo}, argSpec: "deg",
     help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
+  ActionDef(name: "burn", flags: {afVideo},
+    argSpec: "[font][:size=pct][:color=c][:outline=c][:bg=c]",
+    help: "Draw the section's subtitles into the picture with libass, styled as the subtitles say: the clip's source's first text subtitle stream, or else a sibling .srt or .ass file. Cues follow cuts and speed changes. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, and `bg` a box behind each subtitle. Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `burn:size=6:color=yellow:bg=#00000099`, or `burn:fonts/Inter-Bold.ttf:size=5`. The font's path can't contain a comma."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
@@ -594,6 +607,21 @@ proc checkTimedEase(a: Action) {.raises: [ActionParseError].} =
     raise newException(ActionParseError,
       "An ease duration can't be given with timed keyframes")
 
+proc parseRgba(spec, what: string): uint32 {.raises: [ActionParseError].} =
+  ## A color as 0xRRGGBBAA: a name, #rgb, #rrggbb, or #rrggbbaa.
+  if spec.startsWith("#") and spec.len == 9:
+    try: return uint32(parseHexInt(spec[1 .. ^1]))
+    except ValueError: discard
+    raise newException(ActionParseError, &"{what}: invalid color {spec}")
+  let c = try: parseColor(spec)
+    except ValueError as e: raise newException(ActionParseError, &"{what}: {e.msg}")
+  (c.red.uint32 shl 24) or (c.green.uint32 shl 16) or (c.blue.uint32 shl 8) or 0xff
+
+func rgbaStr*(c: uint32): string =
+  ## #rrggbb, or #rrggbbaa when it's see-through.
+  result = "#" & toHex(int(c shr 8), 6).toLowerAscii
+  if (c and 0xff) != 0xff: result &= toHex(int(c and 0xff), 2).toLowerAscii
+
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
   ## Shared `x:y:w:h[:radius][:feather][:invert]` geometry for `mask`/`confine`.
@@ -680,6 +708,38 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return parseShapeRegion(parts, actMask, "mask")
   if parts[0] == "confine":
     return parseShapeRegion(parts, actConfine, "confine")
+
+  if parts[0] == "burn":
+    # The font comes first, unnamed, then key=value overrides. A part that
+    # isn't one goes back onto what came before it, so the colon of a Windows
+    # drive stays in the font's path.
+    const keys = ["font", "size", "color", "outline", "bg"]
+    var given: array[keys.len, string]
+    var seen: array[keys.len, bool]
+    var cur = 0
+    for part in parts[1 .. ^1]:
+      let eq = part.find('=')
+      let key = if eq > 0: keys.find(part[0 ..< eq]) else: -1
+      if key >= 0:
+        if seen[key]:
+          raise newException(ActionParseError, &"burn: {keys[key]} given twice")
+        (cur, seen[key], given[key]) = (key, true, part[eq + 1 .. ^1])
+      elif seen[cur] or cur == 0 and given[0].len > 0:
+        given[cur] &= ":" & part
+      else:
+        (seen[cur], given[cur]) = (true, part)
+    if given[0].len > 4096:
+      raise newException(ActionParseError, "burn font path is too long")
+    result = Action(kind: actBurn, burnFont: given[0])
+    if seen[1]:
+      result.burnSize = pFloat(given[1])
+      if not (result.burnSize > 0 and result.burnSize <= 100):
+        raise newException(ActionParseError, "burn size must be in (0, 100]")
+    for (k, part) in [(2, bpColor), (3, bpOutline), (4, bpBg)]:
+      if seen[k]:
+        result.burnSet.incl part
+        result.burnColors[part] = parseRgba(given[k], "burn " & keys[k])
+    return result
 
   if parts[0] == "convolve":
     # The path is everything after the name, so a Windows drive colon stays put.
@@ -1132,6 +1192,13 @@ when not defined(nimscript):
     of actScale:
       if act.tUniform: &"scale:{act.tScaleW}" else: &"scale:{act.tScaleW}:{act.tScaleH}"
     of actTurn: &"turn:{act.tDeg}"
+    of actBurn:
+      var s = "burn"
+      if act.burnFont.len > 0: s &= ":" & act.burnFont
+      if act.burnSize > 0: s &= &":size={act.burnSize}"
+      for (part, key) in [(bpColor, "color"), (bpOutline, "outline"), (bpBg, "bg")]:
+        if part in act.burnSet: s &= &":{key}={rgbaStr(act.burnColors[part])}"
+      s
     of actLuv:
       var parts: seq[string]
       let hue = act.brighthue
@@ -1243,6 +1310,8 @@ when not defined(nimscript):
     of actColorKey, actChromaKey, actAberration: 8
     of actScale: 10
     of actTurn: 5
+    # header, uint16 length + font, float32 size, set byte, three uint32 colors
+    of actBurn: 3 + a.burnFont.len + 4 + 1 + 12
     of actDuck: 9
     of actConvolve: 3 + a.irPath.len  # header + uint16 length + bytes
     of actConfetti: 10
@@ -1343,6 +1412,17 @@ when not defined(nimscript):
           if n > 0: copyMem(addr path[0], addr base[i + 3], n.int)
           yield Action(kind: actConvolve, irPath: path)
           i += 3 + n.int
+        of actBurn:
+          var n: uint16
+          copyMem(addr n, addr base[i + 1], sizeof(uint16))
+          var act = Action(kind: actBurn, burnFont: newString(n.int))
+          if n > 0: copyMem(addr act.burnFont[0], addr base[i + 3], n.int)
+          var pos = i + 3 + n.int
+          copyMem(addr act.burnSize, addr base[pos], sizeof(float32))
+          act.burnSet = cast[set[BurnPart]](base[pos + 4])
+          copyMem(addr act.burnColors, addr base[pos + 5], 12)
+          yield act
+          i = pos + 17
         of actSpin:
           var st: Unorm16
           var rate: float32
@@ -1579,6 +1659,16 @@ when not defined(nimscript):
         if a.irPath.len > 0:
           copyMem(addr base[i + 3], unsafeAddr a.irPath[0], a.irPath.len)
         i += 3 + a.irPath.len
+      of actBurn:
+        base.writeAt(i, 1, uint16(a.burnFont.len))
+        if a.burnFont.len > 0:
+          copyMem(addr base[i + 3], unsafeAddr a.burnFont[0], a.burnFont.len)
+        let pos = i + 3 + a.burnFont.len
+        base.writeAt(pos, 0, a.burnSize)
+        base[pos + 4] = cast[uint8](a.burnSet)
+        var colors = a.burnColors
+        copyMem(addr base[pos + 5], addr colors, 12)
+        i = pos + 17
       of actSpin:
         base.writeAt(i, 1, a.sStart)
         base.writeAt(i, 3, a.sRate)

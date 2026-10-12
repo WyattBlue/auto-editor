@@ -5,6 +5,7 @@ var enableSvtav1 = getEnv("DISABLE_SVTAV1").len == 0
 var enableHevc = getEnv("DISABLE_HEVC").len == 0 and not defined(emscripten)
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
+var enableLibass = getEnv("DISABLE_LIBASS").len == 0 and not defined(emscripten)
 
 when defined(danger) or defined(release):
   switch("panics", "on")
@@ -117,6 +118,18 @@ if not defined(dynamic):
     if enableVpl and not (hostCPU == "arm64" and hostOS == "windows") and
         not (hostCPU == "arm" and hostOS == "linux"):
       switch("passL", "-lvpl")
+  if enableLibass:
+    # The subtitles filter's libass, and what it uses, after what uses them.
+    when defined(linux):
+      switch("passL", "-lass -lfontconfig -lharfbuzz -lfribidi -lfreetype -lexpat")
+    else:
+      switch("passL", "-lass -lharfbuzz -lfribidi -lfreetype")
+    when defined(macosx):
+      # Core Text finds the system's fonts; iconv is macOS's own.
+      switch("passL", "-liconv -framework ApplicationServices")
+    when defined(windows):
+      # DirectWrite finds the system's fonts, with GDI's help.
+      switch("passL", "-lgdi32")
 
 when hostOS == "macosx":
   let (osVer, osVerCode) = gorgeEx("sw_vers -productVersion", "")
