@@ -75,7 +75,8 @@ type
     of actTurn:
       tDeg*: float32         # clockwise about the center, without growing the frame
     of actBurn:
-      burnFont*: string      # a font file to draw subtitles with; "" keeps their own
+      burnFile*: string      # the subtitles: an .srt, .ass, or a file with a text stream
+      burnFont*: string      # a font file to draw them with; "" keeps their own
       burnSize*: float32     # text height, percent of the frame's; 0 keeps their own
       burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
@@ -268,9 +269,9 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     help: "Scale the picture about its center, by `v` both ways or by `w` across and `h` down, e.g. `scale:0.8` or `scale:0.4:1`. On the base (bottom) track what grows past the edge is cut off and what shrinks away shows the background, like `zoom`; an overlay grows or shrinks about the center of where it's placed. Combines with `turn`."),
   ActionDef(name: "turn", flags: {afVideo}, argSpec: "deg",
     help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
-  ActionDef(name: "burn", flags: {afVideo},
-    argSpec: "[font][:size=pct][:color=c][:outline=c][:bg=c]",
-    help: "Draw the section's subtitles into the picture with libass, styled as the subtitles say: the clip's source's first text subtitle stream, or else a sibling .srt or .ass file. Cues follow cuts and speed changes. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, and `bg` a box behind each subtitle. Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `burn:size=6:color=yellow:bg=#00000099`, or `burn:fonts/Inter-Bold.ttf:size=5`. The font's path can't contain a comma."),
+  ActionDef(name: "burn", flags: {afVideo, afGenerator},
+    argSpec: "file[:font=f][:size=pct][:color=c][:outline=c][:bg=c]",
+    help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, and `bg` a box behind each subtitle. Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
@@ -710,10 +711,10 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return parseShapeRegion(parts, actConfine, "confine")
 
   if parts[0] == "burn":
-    # The font comes first, unnamed, then key=value overrides. A part that
-    # isn't one goes back onto what came before it, so the colon of a Windows
-    # drive stays in the font's path.
-    const keys = ["font", "size", "color", "outline", "bg"]
+    # The subtitle file comes first, unnamed, then key=value overrides. A part
+    # that isn't one goes back onto what came before it, so the colon of a
+    # Windows drive stays in a path.
+    const keys = ["file", "font", "size", "color", "outline", "bg"]
     var given: array[keys.len, string]
     var seen: array[keys.len, bool]
     var cur = 0
@@ -728,14 +729,16 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         given[cur] &= ":" & part
       else:
         (seen[cur], given[cur]) = (true, part)
-    if given[0].len > 4096:
-      raise newException(ActionParseError, "burn font path is too long")
-    result = Action(kind: actBurn, burnFont: given[0])
-    if seen[1]:
-      result.burnSize = pFloat(given[1])
+    if given[0].len == 0:
+      raise newException(ActionParseError, "burn needs a subtitle file")
+    if given[0].len > 4096 or given[1].len > 4096:
+      raise newException(ActionParseError, "burn path is too long")
+    result = Action(kind: actBurn, burnFile: given[0], burnFont: given[1])
+    if seen[2]:
+      result.burnSize = pFloat(given[2])
       if not (result.burnSize > 0 and result.burnSize <= 100):
         raise newException(ActionParseError, "burn size must be in (0, 100]")
-    for (k, part) in [(2, bpColor), (3, bpOutline), (4, bpBg)]:
+    for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
       if seen[k]:
         result.burnSet.incl part
         result.burnColors[part] = parseRgba(given[k], "burn " & keys[k])
@@ -1193,8 +1196,8 @@ when not defined(nimscript):
       if act.tUniform: &"scale:{act.tScaleW}" else: &"scale:{act.tScaleW}:{act.tScaleH}"
     of actTurn: &"turn:{act.tDeg}"
     of actBurn:
-      var s = "burn"
-      if act.burnFont.len > 0: s &= ":" & act.burnFont
+      var s = "burn:" & act.burnFile
+      if act.burnFont.len > 0: s &= ":font=" & act.burnFont
       if act.burnSize > 0: s &= &":size={act.burnSize}"
       for (part, key) in [(bpColor, "color"), (bpOutline, "outline"), (bpBg, "bg")]:
         if part in act.burnSet: s &= &":{key}={rgbaStr(act.burnColors[part])}"
@@ -1310,8 +1313,9 @@ when not defined(nimscript):
     of actColorKey, actChromaKey, actAberration: 8
     of actScale: 10
     of actTurn: 5
-    # header, uint16 length + font, float32 size, set byte, three uint32 colors
-    of actBurn: 3 + a.burnFont.len + 4 + 1 + 12
+    # header, the file and font each a uint16 length + bytes, float32 size,
+    # set byte, three uint32 colors
+    of actBurn: 1 + 2 + a.burnFile.len + 2 + a.burnFont.len + 4 + 1 + 12
     of actDuck: 9
     of actConvolve: 3 + a.irPath.len  # header + uint16 length + bytes
     of actConfetti: 10
@@ -1413,11 +1417,14 @@ when not defined(nimscript):
           yield Action(kind: actConvolve, irPath: path)
           i += 3 + n.int
         of actBurn:
-          var n: uint16
-          copyMem(addr n, addr base[i + 1], sizeof(uint16))
-          var act = Action(kind: actBurn, burnFont: newString(n.int))
-          if n > 0: copyMem(addr act.burnFont[0], addr base[i + 3], n.int)
-          var pos = i + 3 + n.int
+          var act = Action(kind: actBurn)
+          var pos = i + 1
+          for path in [addr act.burnFile, addr act.burnFont]:
+            var n: uint16
+            copyMem(addr n, addr base[pos], sizeof(uint16))
+            path[] = newString(n.int)
+            if n > 0: copyMem(addr path[][0], addr base[pos + 2], n.int)
+            pos += 2 + n.int
           copyMem(addr act.burnSize, addr base[pos], sizeof(float32))
           act.burnSet = cast[set[BurnPart]](base[pos + 4])
           copyMem(addr act.burnColors, addr base[pos + 5], 12)
@@ -1660,10 +1667,12 @@ when not defined(nimscript):
           copyMem(addr base[i + 3], unsafeAddr a.irPath[0], a.irPath.len)
         i += 3 + a.irPath.len
       of actBurn:
-        base.writeAt(i, 1, uint16(a.burnFont.len))
-        if a.burnFont.len > 0:
-          copyMem(addr base[i + 3], unsafeAddr a.burnFont[0], a.burnFont.len)
-        let pos = i + 3 + a.burnFont.len
+        var pos = i + 1
+        for path in [a.burnFile, a.burnFont]:
+          base.writeAt(pos, 0, uint16(path.len))
+          if path.len > 0:
+            copyMem(addr base[pos + 2], unsafeAddr path[0], path.len)
+          pos += 2 + path.len
         base.writeAt(pos, 0, a.burnSize)
         base[pos + 4] = cast[uint8](a.burnSet)
         var colors = a.burnColors

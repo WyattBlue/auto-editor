@@ -1155,7 +1155,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       case effect.kind:
       of actSpeed, actVolume, actDeesser, actDuck, actPitch, actTone, actConvolve,
           actPos, actRotate, actLoop: discard
-      of actBurn: discard # drawn over the finished picture (finalizeFrame)
       of actScale, actTurn:
         # An overlay is scaled and turned where it's placed, about its center.
         if isOverlay or placeDone: continue
@@ -1411,6 +1410,23 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if av_frame_make_writable(frame) < 0:
           error "Could not make frame writable for confetti"
         drawConfetti(frame, effect, local, fps)
+      of actBurn:
+        # Timed from the start of the clip or generator layer it draws on.
+        if hasAlpha(AVPixelFormat(frame.format)):
+          # Drawn over a picture with transparency (a generator's clear
+          # canvas), in RGBA so the subtitles' own coverage is kept.
+          let conv = frame.reformat(AV_PIX_FMT_RGBA)
+          if conv != frame:
+            av_frame_free(addr frame)
+            frame = conv
+          # The pre-effects frame is cached by clone, so its buffer is shared.
+          if av_frame_make_writable(frame) < 0:
+            error "Could not make frame writable for burn"
+          burner.burnOver(frame, effect, local.float / fps)
+        else:
+          let burned = burner.burn(frame, effect, local.float / fps)
+          av_frame_free(addr frame)
+          frame = burned
       of actConfine:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset
@@ -1721,12 +1737,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         else: av_frame_clone(nullFrame)
       if frame == nil:
         error &"Failed to create fallback frame at {index}tb"
-    block:
-      # Over everything else, as the finished picture's last layer.
-      let burned = burner.burn(frame, tl, index)
-      if burned != frame:
-        av_frame_free(addr frame)
-        frame = burned
     let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
     if reformatted != nil and reformatted != frame:
       av_frame_free(addr frame)

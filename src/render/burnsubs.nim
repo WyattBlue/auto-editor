@@ -1,26 +1,26 @@
-## The `burn` action: FFmpeg's subtitles filter (libass) draws a source's text
-## subtitles onto the frames of the sections that have it, styled as the file
-## says (SRT gets libass's defaults) but for what the action overrides: its
-## font file, size, and colors. Each frame goes through its source's filter
-## stamped with the source time it shows, so cues follow cuts and speed
-## changes.
+## The `burn` action: FFmpeg's subtitles filter (libass) draws a subtitle
+## file, on a generator layer's clear canvas (`add:burn:talk.srt`) or over a
+## section's picture, styled as the file says (SRT gets libass's defaults) but
+## for what the action overrides: font file, size, and colors. A frame goes
+## through the filter stamped with its time in the layer or clip.
 
 import std/[hashes, math, os, strformat, strutils, tables, unicode]
-import ../[action, av, ffmpeg, graph, log, timeline]
+import ../[action, av, ffmpeg, graph, log]
 import ../util/rational
 
 type
   SubGraph = object
     graph: Graph
     shape: (cint, cint, cint) # the width, height and format it was built for
-  SubFile = tuple[path: string, index: int, playResY: float]
-    ## what the subtitles filter reads, its subtitle stream among the file's
-    ## subtitle streams, and the height its script's coordinates span; ""
-    ## when the source has none
+  SubFile = tuple[index: int, playResY: float]
+    ## a file's first text subtitle stream, among its subtitle streams, and
+    ## the height its script's coordinates span
   SubBurner* = object
-    files: Table[string, SubFile] # by source
+    solids: Table[(cint, cint, uint8), ptr AVFrame]
+      ## opaque gray RGBA frames, by size and level, to draw on (burnOver)
+    files: Table[string, SubFile] # by subtitle file
     fonts: Table[string, tuple[dir, family: string]] # by font file
-    graphs: Table[(string, string), SubGraph] # by source and the burn action
+    graphs: Table[string, SubGraph] # by the burn action
 
 func playResY(header: string): float =
   ## The height an ASS script's coordinates (and font sizes) are in, as libass
@@ -38,31 +38,22 @@ func playResY(header: string): float =
   elif x > 0: x * 3 / 4
   else: 288
 
-proc subtitleFile(src: string): SubFile =
-  ## The first text subtitle stream in `src`, or else a sibling .srt or .ass,
-  ## as the subtitle edit method falls back to; ("", -1, 0) for neither. Text
-  ## other than ASS reaches libass under FFmpeg's default header, 288 tall.
-  try:
-    var container = av.open(src)
-    defer: container.close()
-    for n, st in container.subtitle:
-      let par = st.codecpar
-      let d = avcodec_descriptor_get(par.codec_id)
-      if d != nil and (d.props and AV_CODEC_PROP_TEXT_SUB) != 0:
-        var header = ""
-        if $avcodec_get_name(par.codec_id) in ["ass", "ssa"] and par.extradata_size > 0:
-          header = newString(par.extradata_size)
-          copyMem(addr header[0], par.extradata, par.extradata_size)
-        return (src, n, if header.len > 0: playResY(header) else: 288.0)
-  except IOError:
-    discard
-  for ext in ["srt", "ass"]:
-    let side = src.changeFileExt(ext)
-    if fileExists(side):
-      let res = if ext == "ass": playResY(try: readFile(side) except IOError: "")
-                else: 288.0
-      return (side, 0, res)
-  ("", -1, 0.0)
+proc subtitleFile(path: string): SubFile =
+  ## The first text subtitle stream in `path`. Text other than ASS reaches
+  ## libass under FFmpeg's default header, 288 tall.
+  var container = try: av.open(path)
+    except IOError: error &"burn: can't read the subtitles {path}"
+  defer: container.close()
+  for n, st in container.subtitle:
+    let par = st.codecpar
+    let d = avcodec_descriptor_get(par.codec_id)
+    if d != nil and (d.props and AV_CODEC_PROP_TEXT_SUB) != 0:
+      var header = ""
+      if $avcodec_get_name(par.codec_id) in ["ass", "ssa"] and par.extradata_size > 0:
+        header = newString(par.extradata_size)
+        copyMem(addr header[0], par.extradata, par.extradata_size)
+      return (n, if header.len > 0: playResY(header) else: 288.0)
+  error &"burn: {path} has no text subtitles"
 
 func assColor(c: uint32): string =
   ## 0xRRGGBBAA as ASS writes it: &HAABBGGRR, its alpha counting transparency.
@@ -128,75 +119,104 @@ func quoted(value: string): string =
   "'" & value.replace("'", "'\\''") & "'"
 
 proc close*(b: var SubBurner) =
+  for f in b.solids.values:
+    var f = f
+    av_frame_free(addr f)
+  b.solids.clear()
   for g in b.graphs.values: g.graph.cleanup()
   b.graphs.clear()
   for (dir, _) in b.fonts.values:
     try: removeDir(dir) except OSError: discard
   b.fonts.clear()
 
-proc burn*(b: var SubBurner, frame: ptr AVFrame, tl: v3, index: int64): ptr AVFrame =
-  ## `frame` (output frame `index`) with the subtitles showing at the source
-  ## frame it came from, when its section burns them: a new frame the caller
-  ## frees along with `frame`, or `frame` itself.
-  result = frame
-  # The lowest clip with a source is what the picture's base layer shows.
-  for track in tl.v:
-    for clip in track:
-      if clip.src == nil or index < clip.start or index >= clip.start + clip.dur:
-        continue
-      var burn: Action
-      var burning = false
-      var speed = 1.0
-      for effect in tl.effects[clip.effects]:
-        if effect.kind == actSpeed: speed *= effect.val
-        if effect.kind == actBurn:
-          burning = true
-          burn = effect
-      if not burning: return
+proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
+    secs: float): ptr AVFrame =
+  ## `frame` with `burn`'s subtitles as they show `secs` into its layer or
+  ## clip: a new frame the caller frees along with `frame`.
+  let shape = (frame.width, frame.height, frame.format)
+  let key = $burn
+  if key notin b.graphs or b.graphs[key].shape != shape:
+    if key in b.graphs: b.graphs[key].graph.cleanup()
+    if avfilter_get_by_name("subtitles") == nil:
+      error "burn needs FFmpeg's subtitles filter (FFmpeg built with libass)"
+    if burn.burnFile notin b.files: b.files[burn.burnFile] = subtitleFile(burn.burnFile)
+    let file = b.files[burn.burnFile]
+    var opts = &"filename={quoted(burn.burnFile)}:stream_index={file.index}"
+    var style: seq[string]
+    if burn.burnFont.len > 0:
+      let (dir, family) = b.fontDir(burn.burnFont)
+      opts &= ":fontsdir=" & quoted(dir)
+      style.add "FontName=" & family
+    if burn.burnSize > 0:
+      # A percent of the frame, in the script's own coordinates.
+      style.add &"Fontsize={burn.burnSize.float * file.playResY / 100:.2f}"
+    if bpColor in burn.burnSet:
+      style.add "PrimaryColour=" & assColor(burn.burnColors[bpColor])
+    if bpOutline in burn.burnSet:
+      style.add "OutlineColour=" & assColor(burn.burnColors[bpOutline])
+    if bpBg in burn.burnSet:
+      # libass's own border style: one box behind each subtitle, the outline
+      # kept.
+      style.add "BorderStyle=4"
+      style.add "BackColour=" & assColor(burn.burnColors[bpBg])
+    if style.len > 0: opts &= ":force_style=" & quoted(style.join(","))
+    let g = newGraph()
+    let nodes = @[
+      g.add("buffer", &"video_size={frame.width}x{frame.height}:" &
+        &"pix_fmt={frame.format}:time_base=1/1000:pixel_aspect=1/1:" &
+        &"colorspace={frame.colorspace}:range={frame.color_range}"),
+      g.add("subtitles", opts), g.add("buffersink")]
+    g.linkNodes(nodes).configure()
+    b.graphs[key] = SubGraph(graph: g, shape: shape)
 
-      let src = clip.src[]
-      if src notin b.files: b.files[src] = subtitleFile(src)
-      let file = b.files[src]
-      if file.path.len == 0: return
-      let secs = float64(clip.offset + index - clip.start) * speed *
-        tl.tb.den.float64 / tl.tb.num.float64
+  frame.pts = int64(round(secs * 1000))
+  frame.time_base = AVRational(num: 1, den: 1000)
+  let g = b.graphs[key].graph
+  g.push(frame)
+  g.pull()
 
-      let shape = (frame.width, frame.height, frame.format)
-      let key = (src, $burn)
-      if key notin b.graphs or b.graphs[key].shape != shape:
-        if key in b.graphs: b.graphs[key].graph.cleanup()
-        if avfilter_get_by_name("subtitles") == nil:
-          error "burn needs FFmpeg's subtitles filter (FFmpeg built with libass)"
-        var opts = &"filename={quoted(file.path)}:stream_index={file.index}"
-        var style: seq[string]
-        if burn.burnFont.len > 0:
-          let (dir, family) = b.fontDir(burn.burnFont)
-          opts &= ":fontsdir=" & quoted(dir)
-          style.add "FontName=" & family
-        if burn.burnSize > 0:
-          # A percent of the frame, in the script's own coordinates.
-          style.add &"Fontsize={burn.burnSize.float * file.playResY / 100:.2f}"
-        if bpColor in burn.burnSet:
-          style.add "PrimaryColour=" & assColor(burn.burnColors[bpColor])
-        if bpOutline in burn.burnSet:
-          style.add "OutlineColour=" & assColor(burn.burnColors[bpOutline])
-        if bpBg in burn.burnSet:
-          # libass's own border style: one box behind each subtitle, the
-          # outline kept.
-          style.add "BorderStyle=4"
-          style.add "BackColour=" & assColor(burn.burnColors[bpBg])
-        if style.len > 0: opts &= ":force_style=" & quoted(style.join(","))
-        let g = newGraph()
-        let nodes = @[
-          g.add("buffer", &"video_size={frame.width}x{frame.height}:" &
-            &"pix_fmt={frame.format}:time_base=1/1000:pixel_aspect=1/1:" &
-            &"colorspace={frame.colorspace}:range={frame.color_range}"),
-          g.add("subtitles", opts), g.add("buffersink")]
-        g.linkNodes(nodes).configure()
-        b.graphs[key] = SubGraph(graph: g, shape: shape)
+proc solid(b: var SubBurner, w, h: cint, level: uint8): ptr AVFrame =
+  let key = (w, h, level)
+  if key notin b.solids:
+    let f = av_frame_alloc()
+    if f == nil: error "Could not allocate frame"
+    f.format = AV_PIX_FMT_RGBA.cint
+    f.width = w
+    f.height = h
+    if av_frame_get_buffer(f, 32) < 0: error "Could not allocate frame"
+    for y in 0 ..< h.int:
+      let row = cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
+      for x in 0 ..< w.int:
+        (row[x * 4], row[x * 4 + 1], row[x * 4 + 2], row[x * 4 + 3]) = (level, level, level, 255'u8)
+    b.solids[key] = f
+  b.solids[key]
 
-      frame.pts = int64(round(secs * 1000))
-      frame.time_base = AVRational(num: 1, den: 1000)
-      let g = b.graphs[key].graph
-      g.push(frame)
-      return g.pull()
+proc burnOver*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) =
+  ## burn for a writable RGBA `frame` with transparency, such as a generator's
+  ## clear canvas, which the subtitles filter can't write alpha to: drawn on
+  ## black and on white, the two give each pixel's coverage and color, which
+  ## go over `frame` in place.
+  let (w, h) = (frame.width, frame.height)
+  var onBlack = b.burn(b.solid(w, h, 0), burn, secs)
+  var onWhite = b.burn(b.solid(w, h, 255), burn, secs)
+  defer:
+    av_frame_free(addr onBlack)
+    av_frame_free(addr onWhite)
+  for y in 0 ..< h.int:
+    template row(f: ptr AVFrame): ptr UncheckedArray[uint8] =
+      cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
+    let (dst, k, wt) = (row(frame), row(onBlack), row(onWhite))
+    for x in 0 ..< w.int:
+      let i = x * 4
+      # On white the text shows less of the background: what it covers.
+      var spread = 0
+      for c in 0 .. 2: spread += wt[i + c].int - k[i + c].int
+      let a = clamp(255 - spread div 3, 0, 255)
+      if a == 0: continue
+      let fa = a.float / 255
+      let da = dst[i + 3].float / 255
+      let oa = fa + da * (1 - fa)
+      for c in 0 .. 2:
+        let src = min(255.0, k[i + c].float / fa)
+        dst[i + c] = uint8(round((src * fa + dst[i + c].float * da * (1 - fa)) / oa))
+      dst[i + 3] = uint8(round(oa * 255))
