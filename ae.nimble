@@ -249,12 +249,13 @@ let zlib = Package(
 )
 let freetype = Package(
   name: "freetype",
-  sourceUrl: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz",
-  sha256: "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289",
+  sourceUrl: "https://download.savannah.gnu.org/releases/freetype/freetype-2.15.0.tar.xz",
+  sha256: "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5",
   buildSystem: "cmake",
   # As gui/make-freetype.sh builds it, so the app links this one copy.
   buildArguments: @["-DFT_DISABLE_ZLIB=ON", "-DFT_DISABLE_BZIP2=ON",
-    "-DFT_DISABLE_PNG=ON", "-DFT_DISABLE_HARFBUZZ=ON", "-DFT_DISABLE_BROTLI=ON"],
+    "-DFT_DISABLE_PNG=ON", "-DFT_DISABLE_HARFBUZZ=ON", "-DFT_DISABLE_BROTLI=ON",
+    "-DFT_DISABLE_HVF=ON"],
 )
 let fribidi = Package(
   name: "fribidi",
