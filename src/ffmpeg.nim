@@ -529,8 +529,10 @@ type
   AVTXContext* {.importc, header: "<libavutil/tx.h>", incompleteStruct.} = object
   AVComplexFloat* {.importc, header: "<libavutil/tx.h>".} = object
     re*, im*: cfloat
+  # Not `int`: on wasm32 that's C's int, and av_tx_fn's is ptrdiff_t (long).
+  ptrdiff_t* {.importc, header: "<stddef.h>".} = int
   av_tx_fn* = proc(s: ptr AVTXContext, output, input: pointer,
-    stride: int) {.cdecl.}
+    stride: ptrdiff_t) {.cdecl.}
 
 const
   AV_TX_FLOAT_RDFT* = 6.cint
