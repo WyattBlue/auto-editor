@@ -33,6 +33,15 @@ type GraphKey = tuple
   i0, i1, i2, i3: int32
   col: uint32
 
+type MatteKey = tuple
+  valid: bool
+  w, h: cint
+  kind: ActionKind
+  x, y, wd, ht, radius: int32
+  feather: uint8
+  invert: bool
+  polyXs, polyYs: seq[int32]
+
 func fxId(kind: ActionKind, frame: ptr AVFrame, overlay = false,
     f0 = 0'f32, f1 = 0'f32, f2 = 0'f32,
     i0 = 0'i32, i1 = 0'i32, i2 = 0'i32, i3 = 0'i32, col = 0'u32): GraphKey =
@@ -90,6 +99,84 @@ func maskGray(a: Action): string =
       # Ramp coverage across the f-px band centered on the edge (sdf=0).
       cover = &"clip(0.5-({sdf})/{f},0,1)"
   if a.mInvert: &"255*(1-({cover}))" else: &"255*({cover})"
+
+func isLeft(ax, ay, bx, by, px, py: float): float =
+  (bx - ax) * (py - ay) - (px - ax) * (by - ay)
+
+func polyInside(px, py: float, xs, ys: seq[int32]): bool =
+  var wn = 0
+  let n = xs.len
+  for i in 0 ..< n:
+    let (ax, ay) = (xs[i].float, ys[i].float)
+    let j = (i + 1) mod n
+    let (bx, by) = (xs[j].float, ys[j].float)
+    if ay <= py:
+      if by > py and isLeft(ax, ay, bx, by, px, py) > 0: inc wn
+    elif by <= py and isLeft(ax, ay, bx, by, px, py) < 0: dec wn
+  wn != 0
+
+func pointSegDist(px, py, ax, ay, bx, by: float): float =
+  let dx = bx - ax
+  let dy = by - ay
+  let lenSq = dx * dx + dy * dy
+  let t = (if lenSq < 1e-9: 0.0 else: clamp(((px - ax) * dx + (py - ay) * dy) / lenSq, 0.0, 1.0))
+  hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+func polyEdgeDist(px, py: float, xs, ys: seq[int32]): float =
+  result = 1e30
+  let n = xs.len
+  for i in 0 ..< n:
+    let j = (i + 1) mod n
+    result = min(result, pointSegDist(px, py,
+      xs[i].float, ys[i].float, xs[j].float, ys[j].float))
+
+proc buildPolyMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
+  let frame = av_frame_alloc()
+  if frame == nil: error "Bad buffer"
+  frame.format = AV_PIX_FMT_GRAY8.cint
+  frame.width = w
+  frame.height = h
+  if av_frame_get_buffer(frame, 32) < 0: error "Bad buffer"
+  if av_frame_make_writable(frame) < 0: error "Can't make frame writable"
+  let outside = (if effect.mInvert: 255'u8 else: 0'u8)
+  let data = frame.data[0]
+  let stride = frame.linesize[0].int
+  template row(y: int): ptr UncheckedArray[uint8] =
+    cast[ptr UncheckedArray[uint8]](cast[int](data) + y * stride)
+  for y in 0 ..< h.int:
+    let r = row(y)
+    for x in 0 ..< w.int: r[x] = outside
+  if effect.mPolyXs.len == 0:
+    return frame
+  var minX = effect.mPolyXs[0]
+  var maxX = minX
+  var minY = effect.mPolyYs[0]
+  var maxY = minY
+  for v in effect.mPolyXs:
+    (minX, maxX) = (min(minX, v), max(maxX, v))
+  for v in effect.mPolyYs:
+    (minY, maxY) = (min(minY, v), max(maxY, v))
+  let pad = effect.mFeather.int + 1
+  let x0 = max(0, minX.int - pad)
+  let x1 = min(w.int - 1, maxX.int + pad)
+  let y0 = max(0, minY.int - pad)
+  let y1 = min(h.int - 1, maxY.int + pad)
+  let feather = effect.mFeather.float
+  for y in y0 .. y1:
+    let r = row(y)
+    let fy = y.float + 0.5
+    for x in x0 .. x1:
+      let fx = x.float + 0.5
+      let inside = polyInside(fx, fy, effect.mPolyXs, effect.mPolyYs)
+      let cover =
+        if feather <= 0: (if inside: 1.0 else: 0.0)
+        else:
+          let d = polyEdgeDist(fx, fy, effect.mPolyXs, effect.mPolyYs)
+          let sdf = (if inside: -d else: d)
+          clamp(0.5 - sdf / feather, 0.0, 1.0)
+      let g = (if effect.mInvert: 255.0 * (1.0 - cover) else: 255.0 * cover)
+      r[x] = uint8(clamp(round(g), 0.0, 255.0))
+  frame
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
@@ -745,11 +832,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var rotGraph: Graph = nil # static source rotation, applied before the fit
   var rotKey: GraphKey
   # Cached mask/confine mattes (gray8), rebuilt only when the region/size changes
-  # so the per-pixel geq runs once, not every frame.
+  # so the per-pixel shape math runs once, not every frame.
   var maskMatte: ptr AVFrame = nil
-  var maskMatteKey: GraphKey
+  var maskMatteKey: MatteKey
   var confineMatte: ptr AVFrame = nil
-  var confineMatteKey: GraphKey
+  var confineMatteKey: MatteKey
   let needsScaling = video.scale != 1.0
 
   debug &"Creating video stream with codec: {video.codec}"
@@ -1000,17 +1087,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     g.cleanup()
     av_frame_free(addr black)
 
-  proc cachedMatte(cache: var ptr AVFrame, key: var GraphKey,
+  proc cachedMatte(cache: var ptr AVFrame, key: var MatteKey,
       frame: ptr AVFrame, effect: Action): ptr AVFrame =
     ## Return the cached matte for `effect` at `frame`'s size, rebuilding only
-    ## when the region/feather/size changes. Caller must NOT free the result.
-    let k = fxId(effect.kind, frame, f0 = effect.mRadius.float32,
-        i0 = effect.mX, i1 = effect.mY, i2 = effect.mW, i3 = effect.mH,
-        col = (if effect.mInvert: 0x100'u32 else: 0'u32) or
-          (uint32(effect.mFeather) shl 16))
+    ## when the region/feather/size/points change. Caller must NOT free the
+    ## result.
+    let k: MatteKey = (valid: true, w: frame.width, h: frame.height,
+      kind: effect.kind, x: effect.mX, y: effect.mY, wd: effect.mW, ht: effect.mH,
+      radius: effect.mRadius, feather: effect.mFeather, invert: effect.mInvert,
+      polyXs: effect.mPolyXs, polyYs: effect.mPolyYs)
     if cache == nil or key != k:
       if cache != nil: av_frame_free(addr cache)
-      cache = buildMaskMatte(frame.width, frame.height, effect)
+      cache = (if effect.kind in {actMaskPoly, actConfinePoly}:
+          buildPolyMaskMatte(frame.width, frame.height, effect)
+        else: buildMaskMatte(frame.width, frame.height, effect))
       key = k
     cache
 
@@ -1376,7 +1466,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, toRgba, shift, toOrig, bufferSink]).configure()
-      of actMask:
+      of actMask, actMaskPoly:
         # Shape the alpha from a cached matte via alphamerge (cheap per frame).
         let matte = cachedMatte(maskMatte, maskMatteKey, frame, effect)
         frame = alphamergeOnto(frame, matte)
@@ -1427,7 +1517,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let burned = burner.burn(frame, effect, local.float / fps)
           av_frame_free(addr frame)
           frame = burned
-      of actConfine:
+      of actConfine, actConfinePoly:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset
         confineEffect = effect

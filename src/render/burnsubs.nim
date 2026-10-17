@@ -127,6 +127,39 @@ func assText(text: string): string =
     of '{', '}': result.add "\\" & c
     else: result.add c
 
+func vertAlignParts(align: uint8): tuple[h, v: string] =
+  if align notin 1'u8 .. 9'u8:
+    return ("center", "middle")
+  let name = alignNames[align]
+  let h = (if "left" in name: "left" elif "right" in name: "right" else: "center")
+  let v = (if "top" in name: "top" elif "bottom" in name: "bottom" else: "middle")
+  (h, v)
+
+func verticalEvents(text: string, cell, w, h: float, align: uint8): string =
+  let lines = text.splitLines()
+  var maxChars = 0
+  for line in lines: maxChars = max(maxChars, line.runeLen)
+  let totalW = lines.len.float * cell
+  let totalH = maxChars.float * cell
+  let (mx, my) = (w * 0.05, h * 0.05)
+  let (ha, va) = vertAlignParts(align)
+  let x0 = case ha
+    of "left": mx
+    of "right": w - mx - totalW
+    else: (w - totalW) / 2
+  let y0 = case va
+    of "top": my
+    of "bottom": h - my - totalH
+    else: (h - totalH) / 2
+  for i, line in lines:
+    var j = 0
+    for ch in line.runes:
+      let cx = x0 + totalW - cell * (i.float + 1) + cell / 2
+      let cy = y0 + cell * j.float + cell / 2
+      result &= &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,," &
+        &"{{\\an5\\pos({cx:.2f},{cy:.2f})}}{assText($ch)}\n"
+      inc j
+
 proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
   if b.scripts.len == 0:
     b.scripts = getTempDir() / &"auto-editor-text-{getCurrentProcessId()}"
@@ -135,6 +168,12 @@ proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
   let size = h.float * 0.08
   let outline = max(1.0, h.float * 0.002)
   let (mx, my) = (int(w.float * 0.05), int(h.float * 0.05))
+  let events =
+    if text.burnVertical:
+      let fontsize = (if text.burnSize > 0: text.burnSize.float * h.float / 100 else: size)
+      verticalEvents(text.burnFile, fontsize * 1.15, w.float, h.float, text.burnAlign)
+    else:
+      &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{assText(text.burnFile)}\n"
   writeFile(result, &"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {w}
@@ -148,8 +187,7 @@ Style: Default,Arial,{size:.2f},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{assText(text.burnFile)}
-""")
+{events}""")
 
 proc close*(b: var SubBurner) =
   for f in b.solids.values:

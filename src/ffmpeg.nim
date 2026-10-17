@@ -72,6 +72,7 @@ const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
 const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
 const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
 const AV_PIX_FMT_RGBA* = AVPixelFormat(26)
+const AV_PIX_FMT_GRAY8* = AVPixelFormat(8)
 
 proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.importc,
     header: "<libavutil/pixdesc.h>".}

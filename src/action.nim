@@ -1,4 +1,4 @@
-import std/[algorithm, math, strformat, strutils, options]
+import std/[algorithm, math, sequtils, strformat, strutils, options]
 import ./util/[color, suggest]
 import ./lib/[dnorm16, escape]
 
@@ -18,8 +18,8 @@ type
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
     actErosion, actChoke, actAberration, actMask, actConfine, actPixelate, actConfetti,
-    actScale, actTurn, actBurn, actText
-    # Can add 82 more [V] actions
+    actScale, actTurn, actBurn, actText, actMaskPoly, actConfinePoly
+    # Can add 80 more [V] actions
 
   Easing* = enum  # interpolation curve for animations
     easeLinear, easeIn, easeOut, easeInOut
@@ -81,6 +81,7 @@ type
       burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
       burnAlign*: uint8
+      burnVertical*: bool
     of actSpin:
       sStart*: Unorm16       # circular [0, 360) start angle
       sRate*: float32        # spin rate in degrees/second (continuous)
@@ -124,7 +125,7 @@ type
     of actAberration:
       abRh*, abRv*, abGh*, abGv*, abBh*, abBv*: int8
       abWrap*: bool          # edge: wrap around (true) vs smear the border (false)
-    of actMask, actConfine:
+    of actMask, actConfine, actMaskPoly, actConfinePoly:
       # `mask` shapes the clip's alpha; `confine` restricts following effects to
       # this region. Shared geometry, in canvas pixels like drawbox.
       mRadius*: int32        # corner radius px: 0=rect, >0=rounded rect, -1=ellipse
@@ -132,6 +133,7 @@ type
       mInvert*: bool         # swap inside/outside
       mFeather*: uint8       # soft-edge width in px (0 = hard edge)
       mX*, mY*, mW*, mH*: int32
+      mPolyXs*, mPolyYs*: seq[int32]
     of actPixelate:
       # Mosaic block size in px, each an animatable ramp (len 1 = static,
       # square blocks when the two match). Whole pixels: atf-8 packs them as
@@ -172,6 +174,7 @@ type
 const
   easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
   varispeedFlag = 0x80'u8  # same bit on a speed action's header byte
+  verticalFlag = 0x80'u8
   schemeMask = 0x07'u8
   originMask = 0x03'u8
   originShift = 3
@@ -274,8 +277,8 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     argSpec: "file[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
     help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
-    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
-    help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
+    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical]",
+    help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
@@ -299,10 +302,15 @@ Simple form `aberration[:h[:v[:edge]]]`: split red and blue symmetrically by `h`
 Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`, `bv` (signed pixel shift for each channel/axis, default 0) plus `edge`, e.g. `aberration:rh=8:bh=-8:gv=2:edge=wrap`."""),
   ActionDef(name: "loop", flags: {afVideo},
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
-  ActionDef(name: "mask", flags: {afVideo}, argSpec: "x:y:w:h[:radius][:feather][:invert]",
-    help: "Cut the picture to a rounded-rectangle or ellipse, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed. On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, and crop-to-shape. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."),
-  ActionDef(name: "confine", flags: {afVideo}, argSpec: "[x:y:w:h[:radius][:feather][:invert]]",
-    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle or ellipse region, leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. `x`/`y`/`w`/`h` are in pixels; `radius` is the corner radius (`0` sharp rectangle, positive rounds the corners, `-1` a true ellipse); the optional `feather` fades the effect in over that many edge pixels, and `:invert` affects everything outside the region instead. Every field also takes a keyword form (`x=`, `radius=`/`r=`, `feather=`, ...). Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
+  ActionDef(name: "mask", flags: {afVideo},
+    argSpec: "x:y:w:h[:radius][:feather][:invert] | poly=x1/y1/x2/y2/...[:feather=N][:invert]",
+    help: """
+Cut the picture to a rounded-rectangle, ellipse, or arbitrary polygon, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed.
+The `poly=` form cuts to an arbitrary closed polygon instead: `x1/y1/x2/y2/...` is at least 3 points (canvas pixels, up to a few hundred, enough for a GUI to flatten Bezier curves into), filled with the nonzero winding rule, closing back to the first point. It takes `feather=` (keyword only here) and `:invert` same as above. Example: `mask:poly=960/200/1100/500/1300/520/1150/700/960/900/770/700/620/520/820/500`.
+On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, crop-to-shape, and star/sign/custom cutouts. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."""),
+  ActionDef(name: "confine", flags: {afVideo},
+    argSpec: "[x:y:w:h[:radius][:feather][:invert] | poly=x1/y1/x2/y2/...[:feather=N][:invert]]",
+    help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle, ellipse, or arbitrary polygon region (`mask`'s geometry, including its `poly=` form), leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
   ActionDef(name: "pixelate", flags: {afVideo, afAnimatable}, argSpec: "[w[..w...][:h[..h...]]]", range: rng(1.0, 1024.0, each = true),
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter. Animatable: `w` and `h` each accept a keyframe ramp `a..b..c` of whole pixel sizes interpolated across the section, optionally eased with `:ease=`, e.g. `pixelate:1..48:ease=in` dissolves the picture into ever-coarser blocks."),
   ActionDef(name: "confetti", flags: {afVideo, afGenerator}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
@@ -638,8 +646,14 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
   const keys = ["file", "font", "size", "color", "outline", "bg", "align"]
   var given: array[keys.len, string]
   var seen: array[keys.len, bool]
+  var vertical = false
   var cur = 0
   for part in parts[1 .. ^1]:
+    if part == "vertical":
+      if kind != actText:
+        raise newException(ActionParseError, &"{name}: vertical only applies to text")
+      vertical = true
+      continue
     let eq = part.find('=')
     let key = if eq > 0: keys.find(part[0 ..< eq]) else: -1
     if key > 0 or key == 0 and kind == actBurn:
@@ -672,6 +686,7 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
     if a < 0:
       raise newException(ActionParseError, &"{name}: unknown align: {given[6]}")
     result.burnAlign = uint8(a + 1)
+  result.burnVertical = vertical
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
@@ -739,6 +754,61 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
   result.mFeather = uint8(vals[5])
   result.mInvert = inv
 
+const maxPolyPoints = 1000
+
+proc parsePolyMask(parts: seq[string], kind: ActionKind,
+    name: string): Action {.raises: [ActionParseError].} =
+  var xs, ys: seq[int32]
+  var feather = 0'u8
+  var inv = false
+  var gotPoly = false
+
+  proc addPoint(raw, ctx: string): int32 {.raises: [ActionParseError].} =
+    let v = try: parseInt(raw)
+      except ValueError: raise newException(ActionParseError,
+        &"{name}: invalid integer: {ctx}")
+    if v < low(int32).int or v > high(int32).int:
+      raise newException(ActionParseError, &"{name}: value out of range: {ctx}")
+    int32(v)
+
+  for idx in 1 ..< parts.len:
+    let p = parts[idx]
+    if p == "invert":
+      inv = true
+    elif p.startsWith("poly="):
+      if gotPoly:
+        raise newException(ActionParseError, &"{name}: poly given twice")
+      gotPoly = true
+      let nums = p[5 .. ^1].split('/')
+      if nums.len mod 2 != 0:
+        raise newException(ActionParseError, &"{name}: poly needs x/y pairs")
+      let n = nums.len div 2
+      if n < 3:
+        raise newException(ActionParseError, &"{name}: poly needs at least 3 points")
+      if n > maxPolyPoints:
+        raise newException(ActionParseError,
+          &"{name}: poly has too many points (max {maxPolyPoints})")
+      for i in 0 ..< n:
+        xs.add addPoint(nums[2 * i], p)
+        ys.add addPoint(nums[2 * i + 1], p)
+    elif p.startsWith("feather="):
+      let v = try: parseInt(p[8 .. ^1])
+        except ValueError: raise newException(ActionParseError, &"{name}: invalid feather: {p}")
+      if v < 0 or v > 255:
+        raise newException(ActionParseError, &"{name} feather must be in [0, 255]")
+      feather = uint8(v)
+    else:
+      raise newException(ActionParseError, &"{name}: unknown key: {p}")
+
+  if not gotPoly:
+    raise newException(ActionParseError, &"{name} poly requires at least 3 points")
+
+  result = Action(kind: kind)
+  result.mPolyXs = xs
+  result.mPolyYs = ys
+  result.mFeather = feather
+  result.mInvert = inv
+
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
     return Action(kind: actInvert)
@@ -759,8 +829,12 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   let parts = val.split(":")
 
   if parts[0] == "mask":
+    if parts.anyIt(it.startsWith("poly=")):
+      return parsePolyMask(parts, actMaskPoly, "mask")
     return parseShapeRegion(parts, actMask, "mask")
   if parts[0] == "confine":
+    if parts.anyIt(it.startsWith("poly=")):
+      return parsePolyMask(parts, actConfinePoly, "confine")
     return parseShapeRegion(parts, actConfine, "confine")
 
   if parts[0] == "burn":
@@ -1190,6 +1264,15 @@ func maskStr(a: Action, name: string): string =
   if a.mFeather > 0'u8: result.add &":{a.mFeather}"
   if a.mInvert: result.add ":invert"
 
+func maskPolyStr(a: Action, name: string): string =
+  var nums: seq[string]
+  for i in 0 ..< a.mPolyXs.len:
+    nums.add $a.mPolyXs[i]
+    nums.add $a.mPolyYs[i]
+  result = &"""{name}:poly={nums.join("/")}"""
+  if a.mFeather > 0'u8: result.add &":feather={a.mFeather}"
+  if a.mInvert: result.add ":invert"
+
 when not defined(nimscript):
   func `$`*(act: Action): string =
     case act.kind
@@ -1225,6 +1308,7 @@ when not defined(nimscript):
       for (part, key) in [(bpColor, "color"), (bpOutline, "outline"), (bpBg, "bg")]:
         if part in act.burnSet: s &= &":{key}={rgbaStr(act.burnColors[part])}"
       if act.burnAlign in 1'u8 .. 9'u8: s &= ":align=" & alignNames[act.burnAlign]
+      if act.burnVertical: s &= ":vertical"
       s
     of actLuv:
       var parts: seq[string]
@@ -1265,6 +1349,8 @@ when not defined(nimscript):
     of actMask: maskStr(act, "mask")
     of actConfine:
       if act.mReset: "confine" else: maskStr(act, "confine")
+    of actMaskPoly: maskPolyStr(act, "mask")
+    of actConfinePoly: maskPolyStr(act, "confine")
     of actPixelate:
       var ws, hs: seq[string]
       for v in act.pixWKf: ws.add $int(round(v))   # block sizes are whole px
@@ -1346,6 +1432,7 @@ when not defined(nimscript):
     of actLuv: 11
     of actDrawbox: 20
     of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
+    of actMaskPoly, actConfinePoly: 5 + a.mPolyXs.len * 8
     of actPos: 4 + easeBytes(a) + timeBytes(a) +
       (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
     of actPixelate: 3 + easeBytes(a) + timeBytes(a) + (a.pixWKf.len + a.pixHKf.len) * 2
@@ -1442,6 +1529,7 @@ when not defined(nimscript):
           i += 3 + n.int
         of actBurn, actText:
           var act = if kind == actText: Action(kind: actText) else: Action(kind: actBurn)
+          act.burnVertical = (base[i] and verticalFlag) != 0'u8
           var pos = i + 1
           for path in [addr act.burnFile, addr act.burnFont]:
             var n: uint16
@@ -1486,6 +1574,21 @@ when not defined(nimscript):
             mReset: (flags and 0x2'u8) != 0, mInvert: (flags and 0x1'u8) != 0,
             mFeather: feather, mX: x, mY: y, mW: w, mH: h)
           i += 23
+        of actMaskPoly, actConfinePoly:
+          let invert = (base[i + 1] and 0x1'u8) != 0'u8
+          let feather = base[i + 2]
+          var n: uint16
+          copyMem(addr n, addr base[i + 3], sizeof(uint16))
+          var xs = newSeq[int32](n.int)
+          var ys = newSeq[int32](n.int)
+          var pos = i + 5
+          for k in 0 ..< n.int:
+            copyMem(addr xs[k], addr base[pos], sizeof(int32))
+            copyMem(addr ys[k], addr base[pos + 4], sizeof(int32))
+            pos += 8
+          yield Action(kind: kind, mFeather: feather, mInvert: invert,
+            mPolyXs: xs, mPolyYs: ys)
+          i = pos
         of actPixelate:
           let hasEase = (base[i] and easeFlag) != 0'u8
           var pos = i + 1
@@ -1692,6 +1795,7 @@ when not defined(nimscript):
           copyMem(addr base[i + 3], unsafeAddr a.irPath[0], a.irPath.len)
         i += 3 + a.irPath.len
       of actBurn, actText:
+        if a.burnVertical: base[i] = base[i] or verticalFlag
         var pos = i + 1
         for path in [a.burnFile, a.burnFont]:
           base.writeAt(pos, 0, uint16(path.len))
@@ -1726,6 +1830,16 @@ when not defined(nimscript):
         base.writeAt(i, 15, a.mH)
         base.writeAt(i, 19, a.mRadius)
         i += 23
+      of actMaskPoly, actConfinePoly:
+        base[i + 1] = (if a.mInvert: 0x1'u8 else: 0'u8)
+        base[i + 2] = a.mFeather
+        base.writeAt(i, 3, uint16(a.mPolyXs.len))
+        var pos = i + 5
+        for k in 0 ..< a.mPolyXs.len:
+          base.writeAt(pos, 0, a.mPolyXs[k])
+          base.writeAt(pos, 4, a.mPolyYs[k])
+          pos += 8
+        i = pos
       of actPixelate:
         if a.hasEase: base[i] = base[i] or easeFlag
         var pos = i + 1
