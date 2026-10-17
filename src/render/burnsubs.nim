@@ -271,3 +271,26 @@ proc burnOver*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) 
         let src = min(255.0, k[i + c].float / fa)
         dst[i + c] = uint8(round((src * fa + dst[i + c].float * da * (1 - fa)) / oa))
       dst[i + 3] = uint8(round(oa * 255))
+
+proc textBounds*(text: Action, w, h: cint): tuple[x, y, w, h: int] =
+  ## The box `text`'s pixels cover on a clear `w`x`h` canvas, outline and
+  ## all; all zero when it draws nothing.
+  var b = SubBurner()
+  defer: b.close()
+  var f = av_frame_alloc()
+  if f == nil: error "Could not allocate frame"
+  defer: av_frame_free(addr f)
+  f.format = AV_PIX_FMT_RGBA.cint
+  f.width = w
+  f.height = h
+  if av_frame_get_buffer(f, 32) < 0: error "Could not allocate frame"
+  for y in 0 ..< h.int:
+    zeroMem(cast[pointer](cast[int](f.data[0]) + y * f.linesize[0].int), w.int * 4)
+  b.burnOver(f, text, 0)
+  var (x0, y0, x1, y1) = (w.int, h.int, -1, -1)
+  for y in 0 ..< h.int:
+    let row = cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
+    for x in 0 ..< w.int:
+      if row[x * 4 + 3] != 0:
+        (x0, y0, x1, y1) = (min(x0, x), min(y0, y), max(x1, x), max(y1, y))
+  if x1 >= 0: (x0, y0, x1 - x0 + 1, y1 - y0 + 1) else: (0, 0, 0, 0)
