@@ -1410,7 +1410,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if av_frame_make_writable(frame) < 0:
           error "Could not make frame writable for confetti"
         drawConfetti(frame, effect, local, fps)
-      of actBurn:
+      of actBurn, actText:
         # Timed from the start of the clip or generator layer it draws on.
         if hasAlpha(AVPixelFormat(frame.format)):
           # Drawn over a picture with transparency (a generator's clear

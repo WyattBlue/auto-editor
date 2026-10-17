@@ -1,8 +1,10 @@
 ## The `burn` action: FFmpeg's subtitles filter (libass) draws a subtitle
 ## file, on a generator layer's clear canvas (`add:burn:talk.srt`) or over a
 ## section's picture, styled as the file says (SRT gets libass's defaults) but
-## for what the action overrides: font file, size, and colors. A frame goes
-## through the filter stamped with its time in the layer or clip.
+## for what the action overrides: font file, size, colors, and alignment. A
+## frame goes through the filter stamped with its time in the layer or clip.
+## The `text` action is a burn of a script written for it: one event, shown
+## throughout.
 
 import std/[hashes, math, os, strformat, strutils, tables, unicode]
 import ../[action, av, ffmpeg, graph, log]
@@ -20,6 +22,7 @@ type
       ## opaque gray RGBA frames, by size and level, to draw on (burnOver)
     files: Table[string, SubFile] # by subtitle file
     fonts: Table[string, tuple[dir, family: string]] # by font file
+    scripts: string # the folder of the scripts written for text, or ""
     graphs: Table[string, SubGraph] # by the burn action
 
 func playResY(header: string): float =
@@ -100,13 +103,13 @@ proc fontFamily*(data: string): string =
   except ValueError:
     ""
 
-proc fontDir(b: var SubBurner, font: string): tuple[dir, family: string] =
+proc fontDir(b: var SubBurner, font, name: string): tuple[dir, family: string] =
   ## A folder holding just `font`, for libass to look in, and its family.
   if font notin b.fonts:
     let data = try: readFile(font) except IOError:
-      error &"burn: can't read the font {font}"
+      error &"{name}: can't read the font {font}"
     let family = fontFamily(data)
-    if family.len == 0: error &"burn: {font} has no font family name"
+    if family.len == 0: error &"{name}: {font} has no font family name"
     let dir = getTempDir() / &"auto-editor-burn-{getCurrentProcessId()}-{hash(font).uint:x}"
     createDir(dir)
     writeFile(dir / extractFilename(font), data)
@@ -118,6 +121,41 @@ func quoted(value: string): string =
   ## closed, escaped, and reopened.
   "'" & value.replace("'", "'\\''") & "'"
 
+func assText(text: string): string =
+  ## `text` as an ASS event's text says it: libass would read a backslash as
+  ## an override, so a word joiner keeps it apart from what follows.
+  for c in text:
+    case c
+    of '\n': result.add "\\N"
+    of '\\': result.add "\\\u2060"
+    of '{', '}': result.add "\\" & c
+    else: result.add c
+
+proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
+  ## A script that shows `text` throughout, in a `w`x`h` frame's own pixels.
+  if b.scripts.len == 0:
+    b.scripts = getTempDir() / &"auto-editor-text-{getCurrentProcessId()}"
+    createDir(b.scripts)
+  result = b.scripts / &"{hash($text).uint:x}-{w}x{h}.ass"
+  let size = h.float * 0.08
+  let outline = max(1.0, h.float * 0.002)
+  let (mx, my) = (int(w.float * 0.05), int(h.float * 0.05))
+  writeFile(result, &"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {w}
+PlayResY: {h}
+ScaledBorderAndShadow: yes
+WrapStyle: 2
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,{size:.2f},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,{outline:.2f},0,5,{mx},{mx},{my},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{assText(text.burnFile)}
+""")
+
 proc close*(b: var SubBurner) =
   for f in b.solids.values:
     var f = f
@@ -128,6 +166,9 @@ proc close*(b: var SubBurner) =
   for (dir, _) in b.fonts.values:
     try: removeDir(dir) except OSError: discard
   b.fonts.clear()
+  if b.scripts.len > 0:
+    try: removeDir(b.scripts) except OSError: discard
+    b.scripts = ""
 
 proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
     secs: float): ptr AVFrame =
@@ -139,12 +180,17 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
     if key in b.graphs: b.graphs[key].graph.cleanup()
     if avfilter_get_by_name("subtitles") == nil:
       error "burn needs FFmpeg's subtitles filter (FFmpeg built with libass)"
-    if burn.burnFile notin b.files: b.files[burn.burnFile] = subtitleFile(burn.burnFile)
-    let file = b.files[burn.burnFile]
-    var opts = &"filename={quoted(burn.burnFile)}:stream_index={file.index}"
+    var path = burn.burnFile
+    if burn.kind == actText:
+      path = b.textScript(burn, frame.width, frame.height)
+      b.files[path] = (0, frame.height.float)
+    elif path notin b.files:
+      b.files[path] = subtitleFile(path)
+    let file = b.files[path]
+    var opts = &"filename={quoted(path)}:stream_index={file.index}"
     var style: seq[string]
     if burn.burnFont.len > 0:
-      let (dir, family) = b.fontDir(burn.burnFont)
+      let (dir, family) = b.fontDir(burn.burnFont, if burn.kind == actText: "text" else: "burn")
       opts &= ":fontsdir=" & quoted(dir)
       style.add "FontName=" & family
     if burn.burnSize > 0:
@@ -159,6 +205,11 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
       # kept.
       style.add "BorderStyle=4"
       style.add "BackColour=" & assColor(burn.burnColors[bpBg])
+    if burn.burnAlign in 1'u8 .. 9'u8:
+      # force_style takes SSA's numbering, whatever the script's: the top row
+      # is 5-7 and the middle 9-11.
+      const ssa: array[1 .. 9, int] = [1, 2, 3, 9, 10, 11, 5, 6, 7]
+      style.add &"Alignment={ssa[burn.burnAlign]}"
     if style.len > 0: opts &= ":force_style=" & quoted(style.join(","))
     let g = newGraph()
     let nodes = @[

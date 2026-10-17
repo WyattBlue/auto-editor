@@ -1,5 +1,7 @@
 {.push raises: [].}
 
+import ./lib/escape
+
 type
   TokenKind = enum
     Lparen, Rparen, Sym, Str, Num, Colon, Comma, Equal, Eof
@@ -166,20 +168,6 @@ func symbolEquals*(expr: Expr, text, expected: string): bool =
 func numberEquals*(expr: Expr, text, expected: string): bool =
   ## Compare a numeric atom without allocating a source slice.
   expr.kind == ExprNum and text.spanEquals(expr.`from`, expr.to, expected)
-
-func decodeString(text: string, `from`, to: uint32): string =
-  result = newStringOfCap(int(to - `from`))
-  var pos = `from`
-  while pos < to:
-    if text[pos] == '\\' and pos + 1 < to:
-      pos += 1
-      case text[pos]
-      of 'n': result.add('\n')
-      of 't': result.add('\t')
-      else: result.add(text[pos]) # \" \\ and others: literal
-    else:
-      result.add(text[pos])
-    pos += 1
 
 # Forward declaration
 proc expr(self: var Parser): Expr {.raises: [ValueError].}

@@ -11,6 +11,7 @@ when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+import ./lib/escape
 when defined(emscripten):
   import ./av
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
@@ -293,7 +294,7 @@ proc extractAdds(val: string, selector, setActionRef: int, args: var mainArgs): 
   ## placement. A trailing `follow-base=<bool>` option may follow either form.
   var keep: seq[string]
   var curAdd = -1 # index in args.adds that trailing actions attach to; -1 = base
-  for field in val.split(","):
+  for field in splitUnescaped(val, ',', textOnly = true):
     let f = field.strip()
     if f.startsWith("add:"):
       let rest = f[4 .. ^1]
@@ -369,7 +370,7 @@ proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
 
 proc parseActionAndRange(
     val: string, args: var mainArgs): (Actions, PackedInt, PackedInt) =
-  let parts = val.strip().split(",")
+  let parts = splitUnescaped(val.strip(), ',', textOnly = true)
   if parts.len < 3:
     error "--set-action has too few arguments"
   let actionStr = parts[0 ..< parts.len - 2].join(",")
