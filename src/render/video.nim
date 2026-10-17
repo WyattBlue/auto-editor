@@ -1438,7 +1438,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## rotation), maintaining per-source seek state. Still images decode once
     ## and return clones. Caller owns the returned frame.
     if obj.gen: # generator overlay: a clear canvas for its action to paint
-      return (makeClear(targetWidth, targetHeight), true)
+      return (makeClear(tl.res[0].cint, tl.res[1].cint), true)
     if obj.src == nil: # synthesized background base (audio-only `add`)
       return (av_frame_clone(nullFrame), true)
     let st = srcs[obj.src]
