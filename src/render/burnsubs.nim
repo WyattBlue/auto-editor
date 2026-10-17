@@ -1,10 +1,8 @@
 ## The `burn` action: FFmpeg's subtitles filter (libass) draws a subtitle
 ## file, on a generator layer's clear canvas (`add:burn:talk.srt`) or over a
 ## section's picture, styled as the file says (SRT gets libass's defaults) but
-## for what the action overrides: font file, size, colors, and alignment. A
-## frame goes through the filter stamped with its time in the layer or clip.
-## The `text` action is a burn of a script written for it: one event, shown
-## throughout.
+## for what the action overrides: font file, size, and colors. A frame goes
+## through the filter stamped with its time in the layer or clip.
 
 import std/[hashes, math, os, strformat, strutils, tables, unicode]
 import ../[action, av, ffmpeg, graph, log]
@@ -22,7 +20,7 @@ type
       ## opaque gray RGBA frames, by size and level, to draw on (burnOver)
     files: Table[string, SubFile] # by subtitle file
     fonts: Table[string, tuple[dir, family: string]] # by font file
-    scripts: string # the folder of the scripts written for text, or ""
+    scripts: string
     graphs: Table[string, SubGraph] # by the burn action
 
 func playResY(header: string): float =
@@ -122,8 +120,6 @@ func quoted(value: string): string =
   "'" & value.replace("'", "'\\''") & "'"
 
 func assText(text: string): string =
-  ## `text` as an ASS event's text says it: libass would read a backslash as
-  ## an override, so a word joiner keeps it apart from what follows.
   for c in text:
     case c
     of '\n': result.add "\\N"
@@ -132,7 +128,6 @@ func assText(text: string): string =
     else: result.add c
 
 proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
-  ## A script that shows `text` throughout, in a `w`x`h` frame's own pixels.
   if b.scripts.len == 0:
     b.scripts = getTempDir() / &"auto-editor-text-{getCurrentProcessId()}"
     createDir(b.scripts)
@@ -206,8 +201,6 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
       style.add "BorderStyle=4"
       style.add "BackColour=" & assColor(burn.burnColors[bpBg])
     if burn.burnAlign in 1'u8 .. 9'u8:
-      # force_style takes SSA's numbering, whatever the script's: the top row
-      # is 5-7 and the middle 9-11.
       const ssa: array[1 .. 9, int] = [1, 2, 3, 9, 10, 11, 5, 6, 7]
       style.add &"Alignment={ssa[burn.burnAlign]}"
     if style.len > 0: opts &= ":force_style=" & quoted(style.join(","))
@@ -273,8 +266,6 @@ proc burnOver*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) 
       dst[i + 3] = uint8(round(oa * 255))
 
 proc textBounds*(text: Action, w, h: cint): tuple[x, y, w, h: int] =
-  ## The box `text`'s pixels cover on a clear `w`x`h` canvas, outline and
-  ## all; all zero when it draws nothing.
   var b = SubBurner()
   defer: b.close()
   var f = av_frame_alloc()

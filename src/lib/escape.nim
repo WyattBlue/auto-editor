@@ -18,8 +18,6 @@ func decodeString*(text: string): string =
   text.decodeString(0, uint32(text.len))
 
 func escapeText*(text: string): string =
-  ## Text as a `text` action holds it, for decodeString to give back: a
-  ## backslash before a comma, colon, or backslash, and `\n` for a new line.
   for c in text:
     case c
     of '\\', ':', ',': result.add '\\' & c
@@ -27,9 +25,6 @@ func escapeText*(text: string): string =
     else: result.add c
 
 func splitUnescaped*(val: string, sep: char, textOnly = false): seq[string] =
-  ## `val` split at each `sep` a backslash doesn't escape, the escapes kept.
-  ## With `textOnly`, a backslash escapes only in a `text` action: elsewhere
-  ## it's a Windows path's.
   result = @[""]
   var i = 0
   while i < val.len:

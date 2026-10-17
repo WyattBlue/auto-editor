@@ -75,13 +75,12 @@ type
     of actTurn:
       tDeg*: float32         # clockwise about the center, without growing the frame
     of actBurn, actText:
-      burnFile*: string      # the subtitles: an .srt, .ass, or a file with a text stream;
-                             # for text, what it says
+      burnFile*: string      # the subtitles: an .srt, .ass, or a file with a text stream
       burnFont*: string      # a font file to draw them with; "" keeps their own
       burnSize*: float32     # text height, percent of the frame's; 0 keeps their own
       burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
-      burnAlign*: uint8      # where it sits, as a numpad key (1-9); 0 keeps its own
+      burnAlign*: uint8
     of actSpin:
       sStart*: Unorm16       # circular [0, 360) start angle
       sRate*: float32        # spin rate in degrees/second (continuous)
@@ -632,9 +631,9 @@ const alignNames*: array[1 .. 9, string] = ["bottom-left", "bottom",
   "bottom-right", "left", "center", "right", "top-left", "top", "top-right"]
 
 proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionParseError].} =
-  ## `burn`'s subtitle file or `text`'s text comes first, unnamed, then
-  ## key=value overrides. A part that isn't one goes back onto what came
-  ## before it, so the colon of a Windows drive stays in a path.
+  # The subtitle file comes first, unnamed, then key=value overrides. A part
+  # that isn't one goes back onto what came before it, so the colon of a
+  # Windows drive stays in a path.
   let name = parts[0]
   const keys = ["file", "font", "size", "color", "outline", "bg", "align"]
   var given: array[keys.len, string]
