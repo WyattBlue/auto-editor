@@ -3,6 +3,7 @@ c = 'emcc'
 cpp = 'em++'
 ar = 'emar'
 strip = 'wasm-strip'
+pkgconfig = 'pkg-config'
 
 [host_machine]
 system = 'emscripten'

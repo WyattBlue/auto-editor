@@ -5,7 +5,7 @@ var enableSvtav1 = getEnv("DISABLE_SVTAV1").len == 0
 var enableHevc = getEnv("DISABLE_HEVC").len == 0 and not defined(emscripten)
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
-var enableLibass = getEnv("DISABLE_LIBASS").len == 0 and not defined(emscripten)
+var enableLibass = getEnv("DISABLE_LIBASS").len == 0
 
 when defined(danger) or defined(release):
   switch("panics", "on")
@@ -120,7 +120,7 @@ if not defined(dynamic):
       switch("passL", "-lvpl")
   if enableLibass:
     # The subtitles filter's libass, and what it uses, after what uses them.
-    when defined(linux):
+    when defined(linux) and not defined(emscripten):
       switch("passL", "-lass -lfontconfig -lharfbuzz -lfribidi -lfreetype -lexpat")
     else:
       switch("passL", "-lass -lharfbuzz -lfribidi -lfreetype")

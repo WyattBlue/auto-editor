@@ -326,7 +326,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   if enableWhisper:
     result.add whisper
   result &= [lamer, opus, dav1d, x264, zlib]
-  if enableLibass and not isWasm:
+  if enableLibass:
     result &= [freetype, fribidi, harfbuzz]
     if kind == armv7 or (kind == native and defined(linux)):
       result &= [expat, fontconfig]
@@ -623,13 +623,17 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
     mesonArgs.add("-Dcoretext=" & (if isMac: "enabled" else: "disabled"))
     mesonArgs.add("-Ddirectwrite=" & (if kind in {winX64, winArm}: "enabled" else: "disabled"))
     mesonArgs.add("-Dfontconfig=" & (if isLinux: "enabled" else: "disabled"))
+    if kind == wasm32 or kind == wasm64:
+      mesonArgs.add("-Drequire-system-font-provider=false")
     # Its x86 assembly (nasm) speeds up blending; elsewhere it's plain C.
     let x86 = kind == winX64 or (kind == native and hostCPU == "amd64")
     mesonArgs.add("-Dasm=" & (if x86: "enabled" else: "disabled"))
   if kind == wasm32 or kind == wasm64:
-    mesonArgs.add "-Denable_asm=false"
+    if package.name == "dav1d":
+      mesonArgs.add "-Denable_asm=false"
     let memArg = if kind == wasm64: " -m64" else: ""
     mesonArgs.add &"-Dc_args=\"-matomics -msimd128 -mfma{memArg}\""
+    mesonArgs.add &"-Dcpp_args=\"-matomics -msimd128 -mfma{memArg}\""
     if kind == wasm64:
       mesonArgs.add "-Dc_link_args=\"-m64\""
     let bits = (if kind == wasm64: "64" else: "32")

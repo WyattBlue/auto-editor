@@ -23,6 +23,8 @@ type
     scripts: string
     graphs: Table[string, SubGraph] # by the burn action
 
+var fallbackFont*: string
+
 func playResY(header: string): float =
   ## The height an ASS script's coordinates (and font sizes) are in, as libass
   ## reads it: PlayResY, else from PlayResX, else 288.
@@ -222,8 +224,9 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
     let file = b.files[path]
     var opts = &"filename={quoted(path)}:stream_index={file.index}"
     var style: seq[string]
-    if burn.burnFont.len > 0:
-      let (dir, family) = b.fontDir(burn.burnFont, if burn.kind == actText: "text" else: "burn")
+    let font = if burn.burnFont.len > 0: burn.burnFont else: fallbackFont
+    if font.len > 0:
+      let (dir, family) = b.fontDir(font, if burn.kind == actText: "text" else: "burn")
       opts &= ":fontsdir=" & quoted(dir)
       style.add "FontName=" & family
     if burn.burnSize > 0:
