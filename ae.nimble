@@ -302,7 +302,6 @@ let libass = Package(
   buildArguments: @["--auto-features=disabled", "-Dtest=disabled",
     "-Dcompare=disabled", "-Dprofile=disabled", "-Dfuzz=disabled",
     "-Dcheckasm=disabled", "-Dlibunibreak=disabled"],
-  ffFlag: "--enable-libass",
 )
 let ffmpeg = Package(
   name: "ffmpeg",
@@ -1049,8 +1048,6 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
     "image_webp_pipe", "webp_anim"]
 
   var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
-  if packages.anyIt(it.name == "libass"):
-    filters.add "subtitles"
 
   let isCrossWasm = kind == wasm32 or kind == wasm64
   for package in packages:

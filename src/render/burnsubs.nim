@@ -1,68 +1,24 @@
-## The `burn` action: FFmpeg's subtitles filter (libass) draws a subtitle
-## file, on a generator layer's clear canvas (`add:burn:talk.srt`) or over a
-## section's picture, styled as the file says (SRT gets libass's defaults) but
-## for what the action overrides: font file, size, and colors. A frame goes
-## through the filter stamped with its time in the layer or clip.
+## The `burn` action: libass draws a subtitle file, on a generator layer's
+## clear canvas (`add:burn:talk.srt`) or over a section's picture, styled as
+## the file says (SRT gets FFmpeg's default header) but for what the action
+## overrides: font file, size, and colors. A frame gets the subtitles that show
+## at its time in the layer or clip.
 
-import std/[atomics, hashes, math, os, strformat, strutils, tables, unicode]
-import ../[action, av, ffmpeg, graph, log]
-import ../util/rational
+import std/[strformat, strutils, unicode]
+import ../[action, ffmpeg, log]
+when defined(libass):
+  import std/[math, os, tables]
+  import ../[av, libass]
+  import ../util/rational
 
-type
-  SubGraph = object
-    graph: Graph
-    shape: (cint, cint, cint) # the width, height and format it was built for
-  SubFile = tuple[index: int, playResY: float]
-    ## a file's first text subtitle stream, among its subtitle streams, and
-    ## the height its script's coordinates span
-  SubBurner* = object
-    solids: Table[(cint, cint, uint8), ptr AVFrame]
-      ## opaque gray RGBA frames, by size and level, to draw on (burnOver)
-    files: Table[string, SubFile] # by subtitle file
-    fonts: Table[string, tuple[dir, family: string]] # by font file
-    scripts: string
-    graphs: Table[string, SubGraph] # by the burn action
-    id: int
+type SubBurner* = object
+  when defined(libass):
+    lib: ptr ASS_Library
+    renderers: Table[(cint, cint), ptr ASS_Renderer] # by frame size
+    tracks: Table[string, ptr ASS_Track] # by the burn action
+    families: Table[string, string] # by font file
 
 var fallbackFont*: string
-var burners: Atomic[int]
-
-proc tag(b: var SubBurner): string =
-  if b.id == 0: b.id = burners.fetchAdd(1) + 1
-  &"{getCurrentProcessId()}-{b.id}"
-
-func playResY(header: string): float =
-  ## The height an ASS script's coordinates (and font sizes) are in, as libass
-  ## reads it: PlayResY, else from PlayResX, else 288.
-  var x, y = 0.0
-  for line in header.splitLines:
-    let l = line.strip
-    try:
-      if l.startsWith("PlayResY:"): y = parseFloat(l[9 .. ^1].strip)
-      elif l.startsWith("PlayResX:"): x = parseFloat(l[9 .. ^1].strip)
-    except ValueError: discard
-    if l.startsWith("[Events]"): break
-  if y > 0: y
-  elif x == 1280: 1024
-  elif x > 0: x * 3 / 4
-  else: 288
-
-proc subtitleFile(path: string): SubFile =
-  ## The first text subtitle stream in `path`. Text other than ASS reaches
-  ## libass under FFmpeg's default header, 288 tall.
-  var container = try: av.open(path)
-    except IOError: error &"burn: can't read the subtitles {path}"
-  defer: container.close()
-  for n, st in container.subtitle:
-    let par = st.codecpar
-    let d = avcodec_descriptor_get(par.codec_id)
-    if d != nil and (d.props and AV_CODEC_PROP_TEXT_SUB) != 0:
-      var header = ""
-      if $avcodec_get_name(par.codec_id) in ["ass", "ssa"] and par.extradata_size > 0:
-        header = newString(par.extradata_size)
-        copyMem(addr header[0], par.extradata, par.extradata_size)
-      return (n, if header.len > 0: playResY(header) else: 288.0)
-  error &"burn: {path} has no text subtitles"
 
 func assColor(c: uint32): string =
   ## 0xRRGGBBAA as ASS writes it: &HAABBGGRR, its alpha counting transparency.
@@ -109,24 +65,6 @@ proc fontFamily*(data: string): string =
   except ValueError:
     ""
 
-proc fontDir(b: var SubBurner, font, name: string): tuple[dir, family: string] =
-  ## A folder holding just `font`, for libass to look in, and its family.
-  if font notin b.fonts:
-    let data = try: readFile(font) except IOError:
-      error &"{name}: can't read the font {font}"
-    let family = fontFamily(data)
-    if family.len == 0: error &"{name}: {font} has no font family name"
-    let dir = getTempDir() / &"auto-editor-burn-{b.tag}-{hash(font).uint:x}"
-    createDir(dir)
-    writeFile(dir / extractFilename(font), data)
-    b.fonts[font] = (dir, family)
-  b.fonts[font]
-
-func quoted(value: string): string =
-  ## A filter option value taken literally: in single quotes, each quote
-  ## closed, escaped, and reopened.
-  "'" & value.replace("'", "'\\''") & "'"
-
 func assText(text: string): string =
   for c in text:
     case c
@@ -168,11 +106,7 @@ func verticalEvents(text: string, cell, w, h: float, align: uint8): string =
         &"{{\\an5\\pos({cx:.2f},{cy:.2f})}}{assText($ch)}\n"
       inc j
 
-proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
-  if b.scripts.len == 0:
-    b.scripts = getTempDir() / &"auto-editor-text-{b.tag}"
-    createDir(b.scripts)
-  result = b.scripts / &"{hash($text).uint:x}-{w}x{h}.ass"
+func textScript(text: Action, w, h: cint): string =
   let size = h.float * 0.08
   let outline = max(1.0, h.float * 0.002)
   let (mx, my) = (int(w.float * 0.05), int(h.float * 0.05))
@@ -182,7 +116,7 @@ proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
       verticalEvents(text.burnFile, fontsize * 1.15, w.float, h.float, text.burnAlign)
     else:
       &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{assText(text.burnFile)}\n"
-  writeFile(result, &"""[Script Info]
+  &"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {w}
 PlayResY: {h}
@@ -195,49 +129,160 @@ Style: Default,Arial,{size:.2f},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-{events}""")
+{events}"""
 
-proc close*(b: var SubBurner) =
-  for f in b.solids.values:
-    var f = f
-    av_frame_free(addr f)
-  b.solids.clear()
-  for g in b.graphs.values: g.graph.cleanup()
-  b.graphs.clear()
-  for (dir, _) in b.fonts.values:
-    try: removeDir(dir) except OSError: discard
-  b.fonts.clear()
-  if b.scripts.len > 0:
-    try: removeDir(b.scripts) except OSError: discard
-    b.scripts = ""
+proc canBurn*(format: AVPixelFormat): bool =
+  ## Whether `burn` draws on `format` as it is: little-endian RGB, YUV, or
+  ## gray of 8 to 16 bits, with alpha only where nothing is subsampled.
+  let d = av_pix_fmt_desc_get(format)
+  if d == nil or d.nb_components == 0: return false
+  const known = AV_PIX_FMT_FLAG_PLANAR or AV_PIX_FMT_FLAG_RGB or AV_PIX_FMT_FLAG_ALPHA
+  if (d.flags and not known) != 0: return false
+  if (d.flags and AV_PIX_FMT_FLAG_ALPHA) != 0 and
+      (d.log2_chroma_w != 0 or d.log2_chroma_h != 0):
+    return false
+  let bytes = (d.comp[0].depth + 7) div 8
+  for c in d.comp[0 ..< d.nb_components.int]:
+    if c.depth notin 8 .. 16 or (c.depth + 7) div 8 != bytes or c.offset mod bytes != 0:
+      return false
+    # In a sample's high or low bits, never between.
+    if c.shift != 0 and (c.shift + c.depth) mod 8 != 0: return false
+  true
 
-proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
-    secs: float): ptr AVFrame =
-  ## `frame` with `burn`'s subtitles as they show `secs` into its layer or
-  ## clip: a new frame the caller frees along with `frame`.
-  let shape = (frame.width, frame.height, frame.format)
-  let key = $burn
-  if key notin b.graphs or b.graphs[key].shape != shape:
-    if key in b.graphs: b.graphs[key].graph.cleanup()
-    if avfilter_get_by_name("subtitles") == nil:
-      error "burn needs FFmpeg's subtitles filter (FFmpeg built with libass)"
-    var path = burn.burnFile
+when defined(libass):
+  func playResY(track: ptr ASS_Track): float =
+    ## The height a script's coordinates (and font sizes) are in, as libass
+    ## takes it: PlayResY, else from PlayResX, else 288.
+    let (x, y) = (track.PlayResX, track.PlayResY)
+    if y > 0: y.float
+    elif x == 1280: 1024
+    elif x > 0: max(1, x * 3 div 4).float
+    else: 288
+
+  proc quiet(level: cint, fmt: ConstCString, args: VaList, data: pointer) {.cdecl.} =
+    # FFmpeg's own logging is off, and libass would print to stderr.
+    discard
+
+  proc library(b: var SubBurner): ptr ASS_Library =
+    if b.lib == nil:
+      b.lib = ass_library_init()
+      if b.lib == nil: error "Could not initialize libass"
+      ass_set_message_cb(b.lib, quiet, nil)
+      ass_set_extract_fonts(b.lib, 1)
+    b.lib
+
+  proc renderer(b: var SubBurner, w, h: cint): ptr ASS_Renderer =
+    # One for each size, since resizing a renderer empties its caches.
+    result = b.renderers.getOrDefault((w, h))
+    if result == nil:
+      result = ass_renderer_init(b.library)
+      if result == nil: error "Could not initialize libass's renderer"
+      ass_set_frame_size(result, w, h)
+      ass_set_storage_size(result, w, h)
+      ass_set_fonts(result, nil, nil, ASS_FONTPROVIDER_AUTODETECT, nil, 1)
+      b.renderers[(w, h)] = result
+
+  proc family(b: var SubBurner, font, name: string): string =
+    ## `font`'s family, which libass finds it by once it holds its data.
+    if font notin b.families:
+      let data = try: readFile(font) except IOError:
+        error &"{name}: can't read the font {font}"
+      let family = fontFamily(data)
+      if family.len == 0: error &"{name}: {font} has no font family name"
+      ass_add_font(b.library, extractFilename(font).cstring, data.cstring, data.len.cint)
+      b.families[font] = family
+    b.families[font]
+
+  const fontMimes = ["font/ttf", "font/otf", "font/sfnt", "font/woff",
+    "font/woff2", "application/font-sfnt", "application/font-woff",
+    "application/x-truetype-font", "application/vnd.ms-opentype",
+    "application/x-font-ttf"]
+
+  proc fontName(st: ptr AVStream): cstring =
+    ## The file name of a font attached to a container, such as a Matroska
+    ## file's for its ASS track; nil for any other stream.
+    if st.codecpar.codec_type != AVMEDIA_TYPE_ATTACHMENT: return nil
+    let mime = av_dict_get(st.metadata, "mimetype", nil, 1)
+    if mime == nil or toLowerAscii($mime.value) notin fontMimes: return nil
+    let name = av_dict_get(st.metadata, "filename", nil, 1)
+    if name != nil: name.value else: nil
+
+  proc fileTrack(b: var SubBurner, path: string): ptr ASS_Track =
+    ## The first text subtitle stream in `path`, with the fonts attached to it.
+    var container = try: av.open(path)
+      except IOError: error &"burn: can't read the subtitles {path}"
+    defer: container.close()
+    var st: ptr AVStream = nil
+    for s in container.subtitle:
+      let d = avcodec_descriptor_get(s.codecpar.codec_id)
+      if d != nil and (d.props and AV_CODEC_PROP_TEXT_SUB) != 0:
+        st = s
+        break
+    if st == nil: error &"burn: {path} has no text subtitles"
+    let fmt = container.formatContext
+    for i in 0 ..< fmt.nb_streams.int:
+      let a = fmt.streams[i]
+      let name = fontName(a)
+      if name != nil:
+        ass_add_font(b.library, name, cast[cstring](a.codecpar.extradata),
+          a.codecpar.extradata_size)
+
+    let codec = avcodec_find_decoder(st.codecpar.codec_id)
+    if codec == nil:
+      error &"burn: can't decode {avcodec_get_name(st.codecpar.codec_id)} subtitles"
+    var dec = avcodec_alloc_context3(codec)
+    if dec == nil: error "Could not allocate decoder ctx"
+    defer: avcodec_free_context(addr dec)
+    if avcodec_parameters_to_context(dec, st.codecpar) < 0:
+      error &"burn: can't decode the subtitles in {path}"
+    # What the decoder times each subtitle by; it's otherwise left unset.
+    dec.pkt_timebase = st.time_base
+    if avcodec_open2(dec, codec, nil) < 0:
+      error &"burn: can't decode the subtitles in {path}"
+
+    result = ass_new_track(b.library)
+    if result == nil: error "Could not create a libass track"
+    # Native ASS keeps the line breaking it was written for.
+    if st.codecpar.codec_id != ID_ASS:
+      discard ass_track_set_feature(result, ASS_FEATURE_WRAP_UNICODE, 1)
+    if dec.subtitle_header != nil:
+      ass_process_codec_private(result, cast[cstring](dec.subtitle_header),
+        dec.subtitle_header_size)
+    let packet = container.packet
+    while av_read_frame(fmt, packet) >= 0:
+      defer: av_packet_unref(packet)
+      if packet.stream_index != st.index: continue
+      var sub: AVSubtitle
+      var got: cint = 0
+      if avcodec_decode_subtitle2(dec, addr sub, addr got, packet) >= 0 and got != 0:
+        let start = av_rescale_q(sub.pts, AVRational(num: 1, den: AV_TIME_BASE),
+          AVRational(num: 1, den: 1000))
+        for i in 0 ..< sub.num_rects.int:
+          let line = sub.rects[i].ass
+          if line == nil: break
+          ass_process_chunk(result, line, line.len.cint, start, sub.end_display_time.clonglong)
+        avsubtitle_free(addr sub)
+
+  proc track(b: var SubBurner, burn: Action, w, h: cint): ptr ASS_Track =
+    # A text's script is written for the frame's size.
+    let key = if burn.kind == actText: &"{burn} {w}x{h}" else: $burn
+    result = b.tracks.getOrDefault(key)
+    if result != nil: return
     if burn.kind == actText:
-      path = b.textScript(burn, frame.width, frame.height)
-      b.files[path] = (0, frame.height.float)
-    elif path notin b.files:
-      b.files[path] = subtitleFile(path)
-    let file = b.files[path]
-    var opts = &"filename={quoted(path)}:stream_index={file.index}"
+      let script = textScript(burn, w, h)
+      result = ass_read_memory(b.library, script.cstring, script.len.csize_t, nil)
+      if result == nil: error "text: libass can't read its script"
+    else:
+      result = b.fileTrack(burn.burnFile)
+    b.tracks[key] = result
+
     var style: seq[string]
     let font = if burn.burnFont.len > 0: burn.burnFont else: fallbackFont
     if font.len > 0:
-      let (dir, family) = b.fontDir(font, if burn.kind == actText: "text" else: "burn")
-      opts &= ":fontsdir=" & quoted(dir)
-      style.add "FontName=" & family
+      style.add "FontName=" & b.family(font, if burn.kind == actText: "text" else: "burn")
     if burn.burnSize > 0:
       # A percent of the frame, in the script's own coordinates.
-      style.add &"Fontsize={burn.burnSize.float * file.playResY / 100:.2f}"
+      style.add &"Fontsize={burn.burnSize.float * result.playResY / 100:.2f}"
     if bpColor in burn.burnSet:
       style.add "PrimaryColour=" & assColor(burn.burnColors[bpColor])
     if bpOutline in burn.burnSet:
@@ -250,85 +295,147 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action,
     if burn.burnAlign in 1'u8 .. 9'u8:
       const ssa: array[1 .. 9, int] = [1, 2, 3, 9, 10, 11, 5, 6, 7]
       style.add &"Alignment={ssa[burn.burnAlign]}"
-    if style.len > 0: opts &= ":force_style=" & quoted(style.join(","))
-    let g = newGraph()
-    let nodes = @[
-      g.add("buffer", &"video_size={frame.width}x{frame.height}:" &
-        &"pix_fmt={frame.format}:time_base=1/1000:pixel_aspect=1/1:" &
-        &"colorspace={frame.colorspace}:range={frame.color_range}"),
-      g.add("subtitles", opts), g.add("buffersink")]
-    g.linkNodes(nodes).configure()
-    b.graphs[key] = SubGraph(graph: g, shape: shape)
+    if style.len > 0:
+      let list = allocCStringArray(style)
+      defer: deallocCStringArray(list)
+      ass_set_style_overrides(b.lib, list)
+      ass_process_force_style(result)
+      # The library keeps them, and would give them to the next script it reads.
+      ass_set_style_overrides(b.lib, nil)
 
-  frame.pts = int64(round(secs * 1000))
-  frame.time_base = AVRational(num: 1, den: 1000)
-  let g = b.graphs[key].graph
-  g.push(frame)
-  g.pull()
+  proc render(b: var SubBurner, burn: Action, w, h: cint,
+      secs: float): tuple[track: ptr ASS_Track, images: ptr ASS_Image] =
+    result.track = b.track(burn, w, h)
+    result.images = ass_render_frame(b.renderer(w, h), result.track,
+      clonglong(round(secs * 1000)), nil)
 
-proc solid(b: var SubBurner, w, h: cint, level: uint8): ptr AVFrame =
-  let key = (w, h, level)
-  if key notin b.solids:
-    let f = av_frame_alloc()
-    if f == nil: error "Could not allocate frame"
-    f.format = AV_PIX_FMT_RGBA.cint
-    f.width = w
-    f.height = h
-    if av_frame_get_buffer(f, 32) < 0: error "Could not allocate frame"
-    for y in 0 ..< h.int:
-      let row = cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
-      for x in 0 ..< w.int:
-        (row[x * 4], row[x * 4 + 1], row[x * 4 + 2], row[x * 4 + 3]) = (level, level, level, 255'u8)
-    b.solids[key] = f
-  b.solids[key]
+  proc colorIn(frame: ptr AVFrame, d: ptr AVPixFmtDescriptor, track: ptr ASS_Track,
+      color: uint32): array[3, float] =
+    ## An image's color as `frame`'s components hold it, from 0 to 1.
+    let rgb = [float(color shr 24), float((color shr 16) and 0xff),
+      float((color shr 8) and 0xff)]
+    for i in 0 .. 2: result[i] = rgb[i] / 255
+    if (d.flags and AV_PIX_FMT_FLAG_RGB) != 0: return
 
-proc burnOver*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) =
-  ## burn for a writable RGBA `frame` with transparency, such as a generator's
-  ## clear canvas, which the subtitles filter can't write alpha to: drawn on
-  ## black and on white, the two give each pixel's coverage and color, which
-  ## go over `frame` in place.
-  let (w, h) = (frame.width, frame.height)
-  var onBlack = b.burn(b.solid(w, h, 0), burn, secs)
-  var onWhite = b.burn(b.solid(w, h, 255), burn, secs)
-  defer:
-    av_frame_free(addr onBlack)
-    av_frame_free(addr onWhite)
-  for y in 0 ..< h.int:
-    template row(f: ptr AVFrame): ptr UncheckedArray[uint8] =
-      cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
-    let (dst, k, wt) = (row(frame), row(onBlack), row(onWhite))
-    for x in 0 ..< w.int:
-      let i = x * 4
-      # On white the text shows less of the background: what it covers.
-      var spread = 0
-      for c in 0 .. 2: spread += wt[i + c].int - k[i + c].int
-      let a = clamp(255 - spread div 3, 0, 255)
-      if a == 0: continue
-      let fa = a.float / 255
-      let da = dst[i + 3].float / 255
-      let oa = fa + da * (1 - fa)
-      for c in 0 .. 2:
-        let src = min(255.0, k[i + c].float / fa)
-        dst[i + c] = uint8(round((src * fa + dst[i + c].float * da * (1 - fa)) / oa))
-      dst[i + 3] = uint8(round(oa * 255))
+    # A script's YCbCr Matrix names the YUV its colors were picked against,
+    # as FFmpeg's subtitles filter takes it.
+    var (csp, range) = (frame.colorspace.int, frame.color_range.int)
+    case track.YCbCrMatrix
+    of YCBCR_NONE: discard
+    of YCBCR_SMPTE240M_TV, YCBCR_SMPTE240M_PC: csp = 7 # AVCOL_SPC_SMPTE240M
+    of YCBCR_FCC_TV, YCBCR_FCC_PC: csp = 4 # AVCOL_SPC_FCC
+    of YCBCR_BT709_TV, YCBCR_BT709_PC: csp = 1 # AVCOL_SPC_BT709
+    else: csp = 6 # AVCOL_SPC_SMPTE170M
+    case track.YCbCrMatrix
+    of YCBCR_NONE: discard
+    of YCBCR_BT601_PC, YCBCR_BT709_PC, YCBCR_SMPTE240M_PC, YCBCR_FCC_PC: range = 2
+    else: range = 1
+    if range == 0: # AVCOL_RANGE_UNSPECIFIED
+      range = (if startsWith($AVPixelFormat(frame.format), "yuvj"): 2 else: 1)
+    let luma = av_csp_luma_coeffs_from_avcsp(AVColorSpace(csp))
+    let (kr, kb) =
+      if luma == nil or luma.cr.den == 0: (0.299, 0.114)
+      else: (luma.cr.float, luma.cb.float)
+    let (r, g, b) = (result[0], result[1], result[2])
+    let y = kr * r + (1 - kr - kb) * g + kb * b
+    result = [y, (b - y) / (2 * (1 - kb)), (r - y) / (2 * (1 - kr))]
+    if range == 1: # AVCOL_RANGE_MPEG
+      result[0] = result[0] * 219 / 255 + 16 / 255
+      for i in 1 .. 2: result[i] = result[i] * 224 / 255 + 128 / 255
+    else:
+      for i in 1 .. 2: result[i] += 0.5
+
+  proc blend(frame: ptr AVFrame, img: ptr ASS_Image, track: ptr ASS_Track) =
+    ## Draws one of libass's images, a color through a coverage mask, over
+    ## `frame`: on transparency, "over" so the frame's alpha takes its coverage.
+    let opacity = 255 - int(img.color and 0xff)
+    let (x0, y0) = (max(img.dst_x.int, 0), max(img.dst_y.int, 0))
+    let x1 = min(int(img.dst_x + img.w), frame.width.int)
+    let y1 = min(int(img.dst_y + img.h), frame.height.int)
+    if opacity == 0 or x0 >= x1 or y0 >= y1: return
+    let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
+    let hasAlpha = (d.flags and AV_PIX_FMT_FLAG_ALPHA) != 0
+    let colors = d.nb_components.int - ord(hasAlpha)
+    let wide = d.comp[0].depth > 8
+    let target = colorIn(frame, d, track, img.color)
+
+    proc at(c: AVComponentDescriptor, x, y: int): pointer =
+      cast[pointer](cast[int](frame.data[c.plane]) + y * frame.linesize[c.plane].int +
+        x * c.step.int + c.offset.int)
+    proc get(c: AVComponentDescriptor, x, y: int): float =
+      let p = at(c, x, y)
+      let v = (if wide: cast[ptr uint16](p)[].int else: cast[ptr uint8](p)[].int)
+      v.float / float((1 shl (c.depth + c.shift)) - 1)
+    proc put(c: AVComponentDescriptor, x, y: int, v: float) =
+      let p = at(c, x, y)
+      let n = round(v * float((1 shl (c.depth + c.shift)) - 1))
+      if wide: cast[ptr uint16](p)[] = n.uint16 else: cast[ptr uint8](p)[] = n.uint8
+    proc coverage(cx, cy, sw, sh: int): float =
+      # A subsampled component's share of its block's mask.
+      var sum = 0
+      for py in max(cy shl sh, y0) ..< min((cy + 1) shl sh, y1):
+        let row = (py - img.dst_y) * img.stride - img.dst_x
+        for px in max(cx shl sw, x0) ..< min((cx + 1) shl sw, x1):
+          sum += img.bitmap[row + px].int
+      float(sum * opacity) / float((255 * 255) shl (sw + sh))
+
+    let alpha = d.comp[d.nb_components.int - 1]
+    # The colors first, each over the alpha as it was.
+    for i in 0 ..< colors:
+      let chroma = i > 0 and (d.flags and AV_PIX_FMT_FLAG_RGB) == 0
+      let (sw, sh) = (if chroma: (d.log2_chroma_w.int, d.log2_chroma_h.int) else: (0, 0))
+      let c = d.comp[i]
+      for cy in (y0 shr sh) .. ((y1 - 1) shr sh):
+        for cx in (x0 shr sw) .. ((x1 - 1) shr sw):
+          let a = coverage(cx, cy, sw, sh)
+          if a <= 0: continue
+          let da = (if hasAlpha: alpha.get(cx, cy) else: 1.0)
+          let oa = a + da * (1 - a)
+          c.put(cx, cy, (target[i] * a + c.get(cx, cy) * da * (1 - a)) / oa)
+    if hasAlpha:
+      for y in y0 ..< y1:
+        for x in x0 ..< x1:
+          let a = coverage(x, y, 0, 0)
+          if a > 0: alpha.put(x, y, a + alpha.get(x, y) * (1 - a))
+
+proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) =
+  ## Draws `burn`'s subtitles as they show `secs` into its layer or clip onto
+  ## `frame`, which must be writable and in a format `canBurn` takes.
+  when defined(libass):
+    let (track, images) = b.render(burn, frame.width, frame.height, secs)
+    var img = images
+    while img != nil:
+      blend(frame, img, track)
+      img = img.next
+  else:
+    error "burn and text need auto-editor built with libass"
+
+proc close*(b: var SubBurner) =
+  when defined(libass):
+    for t in b.tracks.values: ass_free_track(t)
+    b.tracks.clear()
+    for r in b.renderers.values: ass_renderer_done(r)
+    b.renderers.clear()
+    b.families.clear()
+    if b.lib != nil:
+      ass_library_done(b.lib)
+      b.lib = nil
 
 proc textBounds*(text: Action, w, h: cint): tuple[x, y, w, h: int] =
-  var b = SubBurner()
-  defer: b.close()
-  var f = av_frame_alloc()
-  if f == nil: error "Could not allocate frame"
-  defer: av_frame_free(addr f)
-  f.format = AV_PIX_FMT_RGBA.cint
-  f.width = w
-  f.height = h
-  if av_frame_get_buffer(f, 32) < 0: error "Could not allocate frame"
-  for y in 0 ..< h.int:
-    zeroMem(cast[pointer](cast[int](f.data[0]) + y * f.linesize[0].int), w.int * 4)
-  b.burnOver(f, text, 0)
-  var (x0, y0, x1, y1) = (w.int, h.int, -1, -1)
-  for y in 0 ..< h.int:
-    let row = cast[ptr UncheckedArray[uint8]](cast[int](f.data[0]) + y * f.linesize[0].int)
-    for x in 0 ..< w.int:
-      if row[x * 4 + 3] != 0:
-        (x0, y0, x1, y1) = (min(x0, x), min(y0, y), max(x1, x), max(y1, y))
-  if x1 >= 0: (x0, y0, x1 - x0 + 1, y1 - y0 + 1) else: (0, 0, 0, 0)
+  ## Where `text` draws on a `w` by `h` frame.
+  when defined(libass):
+    var b = SubBurner()
+    defer: b.close()
+    var (x0, y0, x1, y1) = (w.int, h.int, -1, -1)
+    var img = b.render(text, w, h, 0).images
+    while img != nil:
+      if (img.color and 0xff) != 0xff:
+        for y in max(img.dst_y.int, 0) ..< min(int(img.dst_y + img.h), h.int):
+          let row = (y - img.dst_y) * img.stride - img.dst_x
+          for x in max(img.dst_x.int, 0) ..< min(int(img.dst_x + img.w), w.int):
+            if img.bitmap[row + x] != 0:
+              (x0, y0, x1, y1) = (min(x0, x), min(y0, y), max(x1, x), max(y1, y))
+      img = img.next
+    if x1 >= 0: (x0, y0, x1 - x0 + 1, y1 - y0 + 1) else: (0, 0, 0, 0)
+  else:
+    error "text needs auto-editor built with libass"

@@ -1501,22 +1501,21 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           error "Could not make frame writable for confetti"
         drawConfetti(frame, effect, local, fps)
       of actBurn, actText:
-        # Timed from the start of the clip or generator layer it draws on.
-        if hasAlpha(AVPixelFormat(frame.format)):
-          # Drawn over a picture with transparency (a generator's clear
-          # canvas), in RGBA so the subtitles' own coverage is kept.
-          let conv = frame.reformat(AV_PIX_FMT_RGBA)
-          if conv != frame:
-            av_frame_free(addr frame)
-            frame = conv
-          # The pre-effects frame is cached by clone, so its buffer is shared.
-          if av_frame_make_writable(frame) < 0:
-            error "Could not make frame writable for burn"
-          burner.burnOver(frame, effect, local.float / fps)
-        else:
-          let burned = burner.burn(frame, effect, local.float / fps)
+        # Timed from the start of the clip or generator layer it draws on, and
+        # drawn in the frame's own format where burn can; otherwise a picture
+        # with transparency (a generator's clear canvas) goes to RGBA, keeping
+        # the subtitles' coverage.
+        let fmt = AVPixelFormat(frame.format)
+        let want = (if canBurn(fmt): fmt elif hasAlpha(fmt): AV_PIX_FMT_RGBA
+                    else: AV_PIX_FMT_YUV420P)
+        let conv = frame.reformat(want)
+        if conv != frame:
           av_frame_free(addr frame)
-          frame = burned
+          frame = conv
+        # The pre-effects frame is cached by clone, so its buffer is shared.
+        if av_frame_make_writable(frame) < 0:
+          error "Could not make frame writable for burn"
+        burner.burn(frame, effect, local.float / fps)
       of actConfine, actConfinePoly:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset

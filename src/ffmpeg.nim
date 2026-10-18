@@ -56,8 +56,13 @@ type
   AVColorTransferCharacteristic* = cint
   AVColorSpace* = cint
   AVPixelFormat* = distinct cint
+  AVComponentDescriptor* {.importc, header: "<libavutil/pixdesc.h>".} = object
+    plane*, step*, offset*, shift*, depth*: cint
   AVPixFmtDescriptor* {.importc, header: "<libavutil/pixdesc.h>".} = object
+    nb_components*: uint8
+    log2_chroma_w*, log2_chroma_h*: uint8
     flags*: uint64
+    comp*: array[4, AVComponentDescriptor]
 
 proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.importc,
     header: "<libavutil/pixdesc.h>".}
@@ -77,8 +82,9 @@ const AV_PIX_FMT_GRAY8* = AVPixelFormat(8)
 proc av_pix_fmt_desc_get*(pix_fmt: AVPixelFormat): ptr AVPixFmtDescriptor {.importc,
     header: "<libavutil/pixdesc.h>".}
 
-const AV_PIX_FMT_FLAG_RGB = 1'u64 shl 5
-const AV_PIX_FMT_FLAG_ALPHA = 1'u64 shl 7
+const AV_PIX_FMT_FLAG_PLANAR* = 1'u64 shl 4
+const AV_PIX_FMT_FLAG_RGB* = 1'u64 shl 5
+const AV_PIX_FMT_FLAG_ALPHA* = 1'u64 shl 7
 
 func isRgb*(pix_fmt: AVPixelFormat): bool =
   ## True for RGB pixel formats (rgb24, bgr0, gbrp, ...) as opposed to YUV and gray.
@@ -274,6 +280,9 @@ type
     max_b_frames*: cint
     profile*: cint
     strict_std_compliance*: cint
+    subtitle_header*: ptr uint8
+    subtitle_header_size*: cint
+    pkt_timebase*: AVRational
     # ... other fields omitted for brevity
 
 proc `==`*(a: AVSampleFormat, b: cint): bool = cint(ord(a)) == b
@@ -672,6 +681,7 @@ let
   ID_PCM_S16LE* {.importc: "AV_CODEC_ID_PCM_S16LE", header: "<libavcodec/codec_id.h>".}: AVCodecID
   ID_AAC* {.importc: "AV_CODEC_ID_AAC", header: "<libavcodec/codec_id.h>".}: AVCodecID
   ID_MOV_TEXT* {.importc: "AV_CODEC_ID_MOV_TEXT", header: "<libavcodec/codec_id.h>".}: AVCodecID
+  ID_ASS* {.importc: "AV_CODEC_ID_ASS", header: "<libavcodec/codec_id.h>".}: AVCodecID
 
 const
   AVFMT_NOFILE* = 0x0001
@@ -744,6 +754,12 @@ proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational,
     tb_dst: AVRational) {.importc, header: "<libavcodec/packet.h>".}
 proc av_rescale_q*(a: int64, bq, cq: AVRational): int64 {.importc,
     header: "<libavutil/mathematics.h>".}
+
+type AVLumaCoefficients* {.importc, header: "<libavutil/csp.h>".} = object
+  cr*, cg*, cb*: AVRational
+
+proc av_csp_luma_coeffs_from_avcsp*(csp: AVColorSpace): ptr AVLumaCoefficients {.
+    importc, header: "<libavutil/csp.h>".}
 
 # Filters
 type

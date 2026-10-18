@@ -4,7 +4,8 @@
  -
 
 ## Features
- -
+ - New `burn` action/generator: draws a subtitle file (.srt, .ass, or a file's text stream) over a section or on its own layer, e.g. `add:burn:talk.srt`, with overrides for font, size, colors, and alignment.
+ - New `text` action/generator: writes text over a section or on its own layer, e.g. `add:text:Chapter 1`, with the same overrides and an optional vertical layout.
 
 ## Performance
  -
