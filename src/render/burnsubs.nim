@@ -4,7 +4,7 @@
 ## for what the action overrides: font file, size, and colors. A frame goes
 ## through the filter stamped with its time in the layer or clip.
 
-import std/[hashes, math, os, strformat, strutils, tables, unicode]
+import std/[atomics, hashes, math, os, strformat, strutils, tables, unicode]
 import ../[action, av, ffmpeg, graph, log]
 import ../util/rational
 
@@ -22,8 +22,14 @@ type
     fonts: Table[string, tuple[dir, family: string]] # by font file
     scripts: string
     graphs: Table[string, SubGraph] # by the burn action
+    id: int
 
 var fallbackFont*: string
+var burners: Atomic[int]
+
+proc tag(b: var SubBurner): string =
+  if b.id == 0: b.id = burners.fetchAdd(1) + 1
+  &"{getCurrentProcessId()}-{b.id}"
 
 func playResY(header: string): float =
   ## The height an ASS script's coordinates (and font sizes) are in, as libass
@@ -110,7 +116,7 @@ proc fontDir(b: var SubBurner, font, name: string): tuple[dir, family: string] =
       error &"{name}: can't read the font {font}"
     let family = fontFamily(data)
     if family.len == 0: error &"{name}: {font} has no font family name"
-    let dir = getTempDir() / &"auto-editor-burn-{getCurrentProcessId()}-{hash(font).uint:x}"
+    let dir = getTempDir() / &"auto-editor-burn-{b.tag}-{hash(font).uint:x}"
     createDir(dir)
     writeFile(dir / extractFilename(font), data)
     b.fonts[font] = (dir, family)
@@ -164,7 +170,7 @@ func verticalEvents(text: string, cell, w, h: float, align: uint8): string =
 
 proc textScript(b: var SubBurner, text: Action, w, h: cint): string =
   if b.scripts.len == 0:
-    b.scripts = getTempDir() / &"auto-editor-text-{getCurrentProcessId()}"
+    b.scripts = getTempDir() / &"auto-editor-text-{b.tag}"
     createDir(b.scripts)
   result = b.scripts / &"{hash($text).uint:x}-{w}x{h}.ass"
   let size = h.float * 0.08
