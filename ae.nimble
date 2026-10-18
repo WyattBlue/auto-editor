@@ -273,27 +273,6 @@ let harfbuzz = Package(
     "-Ddocs=disabled", "-Dutilities=disabled", "-Dintrospection=disabled",
     "-Dbenchmark=disabled"],
 )
-let expat = Package(
-  name: "expat",
-  sourceUrl: "https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz",
-  sha256: "354552544b8f99012e5062f7d570ec77f14b412a3ff5c7d8d0dae62c0d217c30",
-  buildSystem: "cmake",
-  buildArguments: @["-DEXPAT_BUILD_TOOLS=OFF", "-DEXPAT_BUILD_EXAMPLES=OFF",
-    "-DEXPAT_BUILD_TESTS=OFF", "-DEXPAT_BUILD_DOCS=OFF", "-DEXPAT_SHARED_LIBS=OFF"],
-)
-let fontconfig = Package(
-  name: "fontconfig",
-  sourceUrl: "https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.16.2/fontconfig-2.16.2.tar.xz",
-  sha256: "165b8fd2a119864c87464b233986c4a1bc09efb09c65de1ca40cc1e85ffb77e2",
-  buildSystem: "meson",
-  # Statically linked, it reads the distro's own configuration and cache.
-  buildArguments: @["--auto-features=disabled", "-Dxml-backend=expat",
-    "-Dcache-build=disabled", "-Dtools=disabled", "-Dtests=disabled",
-    "-Ddoc=disabled", "-Dnls=disabled", "-Dbaseconfig-dir=/etc/fonts",
-    "-Dconfig-dir=/etc/fonts/conf.d", "-Dcache-dir=/var/cache/fontconfig",
-    "-Dtemplate-dir=/usr/share/fontconfig/conf.avail",
-    "-Dxml-dir=/usr/share/xml/fontconfig"],
-)
 let libass = Package(
   name: "libass",
   sourceUrl: "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz",
@@ -327,8 +306,6 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   result &= [lamer, opus, dav1d, x264, zlib]
   if enableLibass:
     result &= [freetype, fribidi, harfbuzz]
-    if kind == armv7 or (kind == native and defined(linux)):
-      result &= [expat, fontconfig]
     result.add libass
   if not disableVpx:
     result.add vpx
@@ -618,11 +595,11 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   if package.name == "libass":
     # Where libass finds the system's fonts.
     let isMac = defined(macosx) and kind == native
-    let isLinux = kind == armv7 or (kind == native and defined(linux))
     mesonArgs.add("-Dcoretext=" & (if isMac: "enabled" else: "disabled"))
     mesonArgs.add("-Ddirectwrite=" & (if kind in {winX64, winArm}: "enabled" else: "disabled"))
-    mesonArgs.add("-Dfontconfig=" & (if isLinux: "enabled" else: "disabled"))
-    if kind == wasm32 or kind == wasm64:
+    # Linux has none, so its fonts are only the ones given by path or attached.
+    mesonArgs.add("-Dfontconfig=disabled")
+    if kind notin {winX64, winArm} and not isMac:
       mesonArgs.add("-Drequire-system-font-provider=false")
     # Its x86 assembly (nasm) speeds up blending; elsewhere it's plain C.
     let x86 = kind == winX64 or (kind == native and hostCPU == "amd64")
@@ -648,15 +625,7 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   withDir mesonBuildDir:
     exec ("meson setup --reconfigure " & mesonArgs.join(" ") & " " & sourceDir)
     exec "ninja"
-    if package.name == "fontconfig":
-      # Its configuration installs to /etc, which belongs to the system: stage
-      # the install and keep only the library, headers and pkg-config file.
-      let stage = mesonBuildDir / "stage"
-      rmDir stage
-      exec &"DESTDIR=\"{stage}\" ninja install"
-      exec &"cp -R \"{stage}{buildPath}/.\" \"{buildPath}/\""
-    else:
-      exec "ninja install"
+    exec "ninja install"
 
 proc x265Build(buildPath: string, kind: CrossKind) =
   # Build x265 multiple times following the Homebrew approach:
@@ -1145,7 +1114,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, expat, fontconfig, libass]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libass]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

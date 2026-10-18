@@ -72,10 +72,10 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config nasm git gperf
+            sudo apt-get install -y build-essential pkg-config nasm git gperf fonts-dejavu-core
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config git gperf
+            sudo apt-get install -y build-essential pkg-config git gperf fonts-dejavu-core
           elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV

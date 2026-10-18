@@ -11,6 +11,7 @@ when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+import render/burnsubs
 import ./lib/escape
 when defined(emscripten):
   import ./av
@@ -429,7 +430,7 @@ const mainArgumentOptions = {
   coOutput, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
   coVideoSpeed, coExport, coFrameRate, coSampleRate, coResolution, coBackground,
   coYtDlpLocation, coOutputFormat, coYtDlpExtras, coProgress, coVcodec,
-  coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coAcodec,
+  coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coFont, coAcodec,
   coLayout, coAudioBitrate, coAudioNormalize, coKey, coWhen,
 }
 
@@ -548,6 +549,8 @@ judge making cuts.
     of coScale:
       video.scale = parseNum(key, $expecting)
       video.scaleSet = true
+    of coFont:
+      fallbackFont = key
     of coResolution:
       args.resolution = parseResolution(key, $expecting)
       args.resolutionSet = true

@@ -17,6 +17,7 @@ type SubBurner* = object
     renderers: Table[(cint, cint), ptr ASS_Renderer] # by frame size
     tracks: Table[string, ptr ASS_Track] # by the burn action
     families: Table[string, string] # by font file
+    attached: int
 
 var fallbackFont*: string
 
@@ -171,17 +172,6 @@ when defined(libass):
       ass_set_extract_fonts(b.lib, 1)
     b.lib
 
-  proc renderer(b: var SubBurner, w, h: cint): ptr ASS_Renderer =
-    # One for each size, since resizing a renderer empties its caches.
-    result = b.renderers.getOrDefault((w, h))
-    if result == nil:
-      result = ass_renderer_init(b.library)
-      if result == nil: error "Could not initialize libass's renderer"
-      ass_set_frame_size(result, w, h)
-      ass_set_storage_size(result, w, h)
-      ass_set_fonts(result, nil, nil, ASS_FONTPROVIDER_AUTODETECT, nil, 1)
-      b.renderers[(w, h)] = result
-
   proc family(b: var SubBurner, font, name: string): string =
     ## `font`'s family, which libass finds it by once it holds its data.
     if font notin b.families:
@@ -192,6 +182,19 @@ when defined(libass):
       ass_add_font(b.library, extractFilename(font).cstring, data.cstring, data.len.cint)
       b.families[font] = family
     b.families[font]
+
+  proc renderer(b: var SubBurner, w, h: cint): ptr ASS_Renderer =
+    # One for each size, since resizing a renderer empties its caches.
+    result = b.renderers.getOrDefault((w, h))
+    if result == nil:
+      result = ass_renderer_init(b.library)
+      if result == nil: error "Could not initialize libass's renderer"
+      ass_set_frame_size(result, w, h)
+      ass_set_storage_size(result, w, h)
+      let family = if fallbackFont.len > 0: b.family(fallbackFont, "--font") else: ""
+      ass_set_fonts(result, nil, (if family.len > 0: family.cstring else: nil),
+        ASS_FONTPROVIDER_AUTODETECT, nil, 1)
+      b.renderers[(w, h)] = result
 
   const fontMimes = ["font/ttf", "font/otf", "font/sfnt", "font/woff",
     "font/woff2", "application/font-sfnt", "application/font-woff",
@@ -226,6 +229,7 @@ when defined(libass):
       if name != nil:
         ass_add_font(b.library, name, cast[cstring](a.codecpar.extradata),
           a.codecpar.extradata_size)
+        inc b.attached
 
     let codec = avcodec_find_decoder(st.codecpar.codec_id)
     if codec == nil:
@@ -268,6 +272,7 @@ when defined(libass):
     let key = if burn.kind == actText: &"{burn} {w}x{h}" else: $burn
     result = b.tracks.getOrDefault(key)
     if result != nil: return
+    let attached = b.attached
     if burn.kind == actText:
       let script = textScript(burn, w, h)
       result = ass_read_memory(b.library, script.cstring, script.len.csize_t, nil)
@@ -276,10 +281,13 @@ when defined(libass):
       result = b.fileTrack(burn.burnFile)
     b.tracks[key] = result
 
+    let name = if burn.kind == actText: "text" else: "burn"
+    when not (defined(macosx) or defined(windows)):
+      if burn.burnFont.len == 0 and fallbackFont.len == 0 and b.attached == attached:
+        error &"{name}: no font to draw with, give one with font= or --font"
     var style: seq[string]
-    let font = if burn.burnFont.len > 0: burn.burnFont else: fallbackFont
-    if font.len > 0:
-      style.add "FontName=" & b.family(font, if burn.kind == actText: "text" else: "burn")
+    if burn.burnFont.len > 0:
+      style.add "FontName=" & b.family(burn.burnFont, name)
     if burn.burnSize > 0:
       # A percent of the frame, in the script's own coordinates.
       style.add &"Fontsize={burn.burnSize.float * result.playResY / 100:.2f}"
@@ -417,6 +425,7 @@ proc close*(b: var SubBurner) =
     for r in b.renderers.values: ass_renderer_done(r)
     b.renderers.clear()
     b.families.clear()
+    b.attached = 0
     if b.lib != nil:
       ass_library_done(b.lib)
       b.lib = nil
@@ -439,3 +448,12 @@ proc textBounds*(text: Action, w, h: cint): tuple[x, y, w, h: int] =
     if x1 >= 0: (x0, y0, x1 - x0 + 1, y1 - y0 + 1) else: (0, 0, 0, 0)
   else:
     error "text needs auto-editor built with libass"
+
+proc attachedFonts*(path: string): seq[string] =
+  when defined(libass):
+    var container = try: av.open(path) except IOError: return
+    defer: container.close()
+    let fmt = container.formatContext
+    for i in 0 ..< fmt.nb_streams.int:
+      let name = fontName(fmt.streams[i])
+      if name != nil: result.add $name

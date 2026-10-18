@@ -45,7 +45,7 @@ type CliOption* = enum
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
     coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coVcodec,
-    coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coNoSeek,
+    coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coFont, coNoSeek,
     coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
     coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
 
@@ -294,6 +294,8 @@ Examples:
     help: "Set the output pixel format (e.g. yuv420p, yuv420p10le)"),
   OptDef(names: "--scale", c: cVid, datum: coScale, metavar: "NUM",
     help: "Scale the output video's resolution by NUM factor"),
+  OptDef(names: "--font", c: cVid, datum: coFont, metavar: "PATH",
+    help: "Set the font file (.ttf, .otf, or .ttc) that text and burn draw with when they give none and the subtitles' own fonts can't be found"),
   OptDef(names: "--no-seek", c: cVid, kind: Flag, datum: coNoSeek,
     help: "Disable file seeking when rendering video. Helpful for debugging desync issues"),
   OptDef(names: "--no-partial-lossless", c: cVid, kind: Flag,
