@@ -18,6 +18,7 @@ type SubBurner* = object
     tracks: Table[string, ptr ASS_Track] # by the burn action
     families: Table[string, string] # by font file
     attached: int
+    own: Table[string, string]
 
 var fallbackFont*: string
 
@@ -267,9 +268,32 @@ when defined(libass):
           ass_process_chunk(result, line, line.len.cint, start, sub.end_display_time.clonglong)
         avsubtitle_free(addr sub)
 
-  proc track(b: var SubBurner, burn: Action, w, h: cint): ptr ASS_Track =
+  proc ownSubtitles(b: var SubBurner, media: string): string =
+    if media notin b.own:
+      var path = ""
+      try:
+        var container = av.open(media)
+        defer: container.close()
+        for s in container.subtitle:
+          let d = avcodec_descriptor_get(s.codecpar.codec_id)
+          if d != nil and (d.props and AV_CODEC_PROP_TEXT_SUB) != 0:
+            path = media
+            break
+      except IOError: discard
+      if path.len == 0:
+        for ext in ["srt", "ass"]:
+          if fileExists(media.changeFileExt(ext)):
+            path = media.changeFileExt(ext)
+            break
+      if path.len == 0: error &"burn: {media} has no subtitles"
+      b.own[media] = path
+    b.own[media]
+
+  proc track(b: var SubBurner, burn: Action, w, h: cint, media: string): ptr ASS_Track =
     # A text's script is written for the frame's size.
-    let key = if burn.kind == actText: &"{burn} {w}x{h}" else: $burn
+    let key = if burn.kind == actText: &"{burn} {w}x{h}"
+      elif burn.burnFile.len == 0: &"{burn} {media}"
+      else: $burn
     result = b.tracks.getOrDefault(key)
     if result != nil: return
     let attached = b.attached
@@ -278,7 +302,7 @@ when defined(libass):
       result = ass_read_memory(b.library, script.cstring, script.len.csize_t, nil)
       if result == nil: error "text: libass can't read its script"
     else:
-      result = b.fileTrack(burn.burnFile)
+      result = b.fileTrack(if burn.burnFile.len > 0: burn.burnFile else: b.ownSubtitles(media))
     b.tracks[key] = result
 
     let name = if burn.kind == actText: "text" else: "burn"
@@ -311,9 +335,9 @@ when defined(libass):
       # The library keeps them, and would give them to the next script it reads.
       ass_set_style_overrides(b.lib, nil)
 
-  proc render(b: var SubBurner, burn: Action, w, h: cint,
-      secs: float): tuple[track: ptr ASS_Track, images: ptr ASS_Image] =
-    result.track = b.track(burn, w, h)
+  proc render(b: var SubBurner, burn: Action, w, h: cint, secs: float,
+      media = ""): tuple[track: ptr ASS_Track, images: ptr ASS_Image] =
+    result.track = b.track(burn, w, h, media)
     result.images = ass_render_frame(b.renderer(w, h), result.track,
       clonglong(round(secs * 1000)), nil)
 
@@ -406,11 +430,12 @@ when defined(libass):
           let a = coverage(x, y, 0, 0)
           if a > 0: alpha.put(x, y, a + alpha.get(x, y) * (1 - a))
 
-proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float) =
+proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float,
+    media = "") =
   ## Draws `burn`'s subtitles as they show `secs` into its layer or clip onto
   ## `frame`, which must be writable and in a format `canBurn` takes.
   when defined(libass):
-    let (track, images) = b.render(burn, frame.width, frame.height, secs)
+    let (track, images) = b.render(burn, frame.width, frame.height, secs, media)
     var img = images
     while img != nil:
       blend(frame, img, track)
@@ -426,6 +451,7 @@ proc close*(b: var SubBurner) =
     b.renderers.clear()
     b.families.clear()
     b.attached = 0
+    b.own.clear()
     if b.lib != nil:
       ass_library_done(b.lib)
       b.lib = nil

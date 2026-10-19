@@ -274,8 +274,8 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
   ActionDef(name: "turn", flags: {afVideo}, argSpec: "deg",
     help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
   ActionDef(name: "burn", flags: {afVideo, afGenerator},
-    argSpec: "file[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
-    help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
+    argSpec: "[file][:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
+    help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
     argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical]",
     help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
@@ -665,9 +665,8 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
     else:
       (seen[cur], given[cur]) = (true, part)
   if kind == actText: given[0] = decodeString(given[0])
-  if given[0].len == 0:
-    raise newException(ActionParseError,
-      if kind == actText: "text needs something to say" else: "burn needs a subtitle file")
+  if kind == actText and given[0].len == 0:
+    raise newException(ActionParseError, "text needs something to say")
   if given[0].len > 4096 or given[1].len > 4096:
     raise newException(ActionParseError,
       if kind == actText: "text is too long" else: "burn path is too long")
@@ -1302,7 +1301,8 @@ when not defined(nimscript):
     of actTurn: &"turn:{act.tDeg}"
     of actBurn, actText:
       var s = if act.kind == actText: "text:" & escapeText(act.burnFile)
-              else: "burn:" & act.burnFile
+              elif act.burnFile.len > 0: "burn:" & act.burnFile
+              else: "burn"
       if act.burnFont.len > 0: s &= ":font=" & act.burnFont
       if act.burnSize > 0: s &= &":size={act.burnSize}"
       for (part, key) in [(bpColor, "color"), (bpOutline, "outline"), (bpBg, "bg")]:

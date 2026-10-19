@@ -13,6 +13,7 @@ type VideoFrame = object
   effects: Actions
   gen: bool      # source-less overlay (`add:confetti`): draw on a clear canvas
   local: int     # frame offset within the clip, for animated effects
+  srcSecs: float
   dur: int       # clip length in frames
   x: float32     # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
   y: float32
@@ -1193,7 +1194,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     av_frame_free(addr m)
 
   proc applyEffects(frame0: ptr AVFrame, effects: Actions, local, clipDur: int,
-      isOverlay = false): ptr AVFrame =
+      isOverlay = false, src: ptr string = nil, srcSecs = 0.0): ptr AVFrame =
     ## Apply one clip's effect chain to a frame, returning the (possibly new)
     ## frame. Shared by the single-layer path and per-clip compositing. `isOverlay`
     ## is true for higher composited layers, which want transparent (not bg) fill
@@ -1515,7 +1516,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # The pre-effects frame is cached by clone, so its buffer is shared.
         if av_frame_make_writable(frame) < 0:
           error "Could not make frame writable for burn"
-        burner.burn(frame, effect, local.float / fps)
+        if effect.kind == actBurn and effect.burnFile.len == 0:
+          if src == nil: error "burn: a layer without media has no subtitles of its own"
+          burner.burn(frame, effect, srcSecs, src[])
+        else:
+          burner.burn(frame, effect, local.float / fps)
       of actConfine, actConfinePoly:
         # Set/clear the region the following adjustment effects are masked to.
         confineActive = not effect.mReset
@@ -1892,6 +1897,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
               gen: obj.src == nil and layerIdx > 0,
               local: int(index - obj.start), dur: int(obj.dur),
+              srcSecs: float(timelinePos) * speed / tl.tb.float,
               x: ox, y: oy, scale: oscale, fit: not hasPos)
 
       # More than one active clip at this frame => composite layers (overlay /
@@ -1905,7 +1911,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg)
           av_frame_free(addr oldAcc)
         if acc != nil and acc.width > 0 and acc.height > 0:
-          acc = applyEffects(acc, objList[0].effects, objList[0].local, objList[0].dur)
+          acc = applyEffects(acc, objList[0].effects, objList[0].local, objList[0].dur,
+            src = objList[0].src, srcSecs = objList[0].srcSecs)
 
         for k in 1 ..< objList.len:
           let o = objList[k]
@@ -1917,7 +1924,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             if top != nil: av_frame_free(addr top)
             continue
           # Effects run at native size; overlayFrame scales (in full chroma).
-          top = applyEffects(top, o.effects, o.local, o.dur, isOverlay = true)
+          top = applyEffects(top, o.effects, o.local, o.dur, isOverlay = true,
+            src = o.src, srcSecs = o.srcSecs)
           # No explicit `pos`: fit the overlay to the canvas and center it, like
           # the base layer (scaleWithPad), but let the padding stay transparent
           # so only the image shows over the base.
@@ -2008,7 +2016,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
         frame = applyEffects(frame, objList[0].effects, objList[0].local,
-          objList[0].dur)
+          objList[0].dur, src = objList[0].src, srcSecs = objList[0].srcSecs)
 
       frame = finalizeFrame(frame, index)
 
