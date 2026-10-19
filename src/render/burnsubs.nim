@@ -11,14 +11,31 @@ when defined(libass):
   import ../[av, libass]
   import ../util/rational
 
-type SubBurner* = object
-  when defined(libass):
-    lib: ptr ASS_Library
-    renderers: Table[(cint, cint), ptr ASS_Renderer] # by frame size
-    tracks: Table[string, ptr ASS_Track] # by the burn action
-    families: Table[string, string] # by font file
-    attached: int
-    own: Table[string, string]
+type
+  Mask = object
+    ## An image's coverage summed over each block of a subsampling, times its
+    ## opacity, out of `full`.
+    sw, sh, w, full: int
+    cov: seq[int]
+
+  Drawn = object
+    ## An image from a renderer's last frame, and its masks.
+    w, h, stride, x, y: cint
+    color: uint32
+    bitmap: seq[uint8]
+    masks: seq[Mask]
+
+  SubBurner* = object
+    when defined(libass):
+      lib: ptr ASS_Library
+      renderers: Table[(cint, cint), ptr ASS_Renderer] # by frame size
+      # A subtitle shows for many frames, so its masks are kept while its
+      # images stay the same.
+      drawn: Table[pointer, seq[Drawn]]
+      tracks: Table[string, ptr ASS_Track] # by the burn action
+      families: Table[string, string] # by font file
+      attached: int
+      own: Table[string, string]
 
 var fallbackFont*: string
 
@@ -336,10 +353,13 @@ when defined(libass):
       ass_set_style_overrides(b.lib, nil)
 
   proc render(b: var SubBurner, burn: Action, w, h: cint, secs: float,
-      media = ""): tuple[track: ptr ASS_Track, images: ptr ASS_Image] =
+      media = ""): tuple[track: ptr ASS_Track, images: ptr ASS_Image,
+      drawn: ptr seq[Drawn], change: cint] =
     result.track = b.track(burn, w, h, media)
-    result.images = ass_render_frame(b.renderer(w, h), result.track,
-      clonglong(round(secs * 1000)), nil)
+    let r = b.renderer(w, h)
+    result.images = ass_render_frame(r, result.track,
+      clonglong(round(secs * 1000)), addr result.change)
+    result.drawn = addr b.drawn.mgetOrPut(r, @[])
 
   proc colorIn(frame: ptr AVFrame, d: ptr AVPixFmtDescriptor, track: ptr ASS_Track,
       color: uint32): array[3, float] =
@@ -377,7 +397,8 @@ when defined(libass):
     else:
       for i in 1 .. 2: result[i] += 0.5
 
-  proc blend(frame: ptr AVFrame, img: ptr ASS_Image, track: ptr ASS_Track) =
+  proc blend(frame: ptr AVFrame, img: ptr ASS_Image, track: ptr ASS_Track,
+      masks: var seq[Mask]) =
     ## Draws one of libass's images, a color through a coverage mask, over
     ## `frame`: on transparency, "over" so the frame's alpha takes its coverage.
     let opacity = 255 - int(img.color and 0xff)
@@ -394,52 +415,90 @@ when defined(libass):
     proc at(c: AVComponentDescriptor, x, y: int): pointer =
       cast[pointer](cast[int](frame.data[c.plane]) + y * frame.linesize[c.plane].int +
         x * c.step.int + c.offset.int)
-    proc get(c: AVComponentDescriptor, x, y: int): float =
-      let p = at(c, x, y)
-      let v = (if wide: cast[ptr uint16](p)[].int else: cast[ptr uint8](p)[].int)
-      v.float / float((1 shl (c.depth + c.shift)) - 1)
-    proc put(c: AVComponentDescriptor, x, y: int, v: float) =
-      let p = at(c, x, y)
-      let n = round(v * float((1 shl (c.depth + c.shift)) - 1))
+    proc load(p: pointer): int =
+      if wide: cast[ptr uint16](p)[].int else: cast[ptr uint8](p)[].int
+    proc store(p: pointer, n: int) =
       if wide: cast[ptr uint16](p)[] = n.uint16 else: cast[ptr uint8](p)[] = n.uint8
-    proc coverage(cx, cy, sw, sh: int): float =
-      # A subsampled component's share of its block's mask.
-      var sum = 0
-      for py in max(cy shl sh, y0) ..< min((cy + 1) shl sh, y1):
-        let row = (py - img.dst_y) * img.stride - img.dst_x
-        for px in max(cx shl sw, x0) ..< min((cx + 1) shl sw, x1):
-          sum += img.bitmap[row + px].int
-      float(sum * opacity) / float((255 * 255) shl (sw + sh))
+
+    proc mask(masks: var seq[Mask], sw, sh: int): ptr Mask =
+      # The chroma components share theirs.
+      for m in masks.mitems:
+        if (m.sw, m.sh) == (sw, sh): return addr m
+      let (cx0, cy0) = (x0 shr sw, y0 shr sh)
+      var m = Mask(sw: sw, sh: sh, w: ((x1 - 1) shr sw) - cx0 + 1,
+        full: (255 * 255) shl (sw + sh))
+      m.cov = newSeq[int](m.w * (((y1 - 1) shr sh) - cy0 + 1))
+      for y in y0 ..< y1:
+        let row = (y - img.dst_y) * img.stride - img.dst_x
+        let at = ((y shr sh) - cy0) * m.w - cx0
+        for x in x0 ..< x1:
+          m.cov[at + (x shr sw)] += img.bitmap[row + x].int
+      for v in m.cov.mitems: v *= opacity
+      masks.add m
+      addr masks[^1]
 
     let alpha = d.comp[d.nb_components.int - 1]
     # The colors first, each over the alpha as it was.
     for i in 0 ..< colors:
       let chroma = i > 0 and (d.flags and AV_PIX_FMT_FLAG_RGB) == 0
       let (sw, sh) = (if chroma: (d.log2_chroma_w.int, d.log2_chroma_h.int) else: (0, 0))
+      let m = masks.mask(sw, sh)
+      let full = m.full
       let c = d.comp[i]
+      let top = (1 shl (c.depth + c.shift)) - 1
+      let t = int(round(target[i] * top.float))
       for cy in (y0 shr sh) .. ((y1 - 1) shr sh):
+        let row = (cy - (y0 shr sh)) * m.w - (x0 shr sw)
         for cx in (x0 shr sw) .. ((x1 - 1) shr sw):
-          let a = coverage(cx, cy, sw, sh)
-          if a <= 0: continue
-          let da = (if hasAlpha: alpha.get(cx, cy) else: 1.0)
-          let oa = a + da * (1 - a)
-          c.put(cx, cy, (target[i] * a + c.get(cx, cy) * da * (1 - a)) / oa)
+          let a = m.cov[row + cx]
+          if a == 0: continue
+          let p = at(c, cx, cy)
+          let v = load(p)
+          if hasAlpha:
+            let a = a / full
+            let da = load(at(alpha, cx, cy)) / top
+            let oa = a + da * (1 - a)
+            store(p, int(round((target[i] * a + v / top * da * (1 - a)) / oa * top.float)))
+          else:
+            # Without alpha it's a mix toward the color, which needs no floats.
+            let m = (t - v) * a
+            store(p, v + (if m >= 0: (m + full div 2) div full else: -((full div 2 - m) div full)))
     if hasAlpha:
+      let m = masks.mask(0, 0)
+      let top = (1 shl (alpha.depth + alpha.shift)) - 1
       for y in y0 ..< y1:
+        let row = (y - y0) * m.w - x0
         for x in x0 ..< x1:
-          let a = coverage(x, y, 0, 0)
-          if a > 0: alpha.put(x, y, a + alpha.get(x, y) * (1 - a))
+          let a = m.cov[row + x]
+          if a > 0:
+            let p = at(alpha, x, y)
+            let a = a / m.full
+            store(p, int(round((a + load(p) / top * (1 - a)) * top.float)))
 
 proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float,
     media = "") =
   ## Draws `burn`'s subtitles as they show `secs` into its layer or clip onto
   ## `frame`, which must be writable and in a format `canBurn` takes.
   when defined(libass):
-    let (track, images) = b.render(burn, frame.width, frame.height, secs, media)
-    var img = images
+    let (track, images, drawn, change) =
+      b.render(burn, frame.width, frame.height, secs, media)
+    var (img, i) = (images, 0)
     while img != nil:
-      blend(frame, img, track)
-      img = img.next
+      if i == drawn[].len: drawn[].add Drawn()
+      let n = int(img.h * img.stride)
+      # libass makes some bitmaps, like a box's, anew each frame, so a change
+      # it reports can still leave an image the same.
+      template same(e: Drawn): bool =
+        (e.w, e.h, e.stride, e.x, e.y, e.color) ==
+          (img.w, img.h, img.stride, img.dst_x, img.dst_y, img.color) and
+          (n == 0 or equalMem(addr e.bitmap[0], img.bitmap, n))
+      if change != 0 and not same(drawn[][i]):
+        drawn[][i] = Drawn(w: img.w, h: img.h, stride: img.stride, x: img.dst_x,
+          y: img.dst_y, color: img.color, bitmap: newSeq[uint8](n))
+        if n > 0: copyMem(addr drawn[][i].bitmap[0], img.bitmap, n)
+      blend(frame, img, track, drawn[][i].masks)
+      (img, i) = (img.next, i + 1)
+    drawn[].setLen i
   else:
     error "burn and text need auto-editor built with libass"
 

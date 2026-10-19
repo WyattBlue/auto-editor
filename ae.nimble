@@ -601,9 +601,11 @@ proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
     mesonArgs.add("-Dfontconfig=disabled")
     if kind notin {winX64, winArm} and not isMac:
       mesonArgs.add("-Drequire-system-font-provider=false")
-    # Its x86 assembly (nasm) speeds up blending; elsewhere it's plain C.
-    let x86 = kind == winX64 or (kind == native and hostCPU == "amd64")
-    mesonArgs.add("-Dasm=" & (if x86: "enabled" else: "disabled"))
+    # Its x86 (nasm) and aarch64 assembly speed up rasterizing, blurring, and
+    # blending; elsewhere it's plain C.
+    let hasAsm = kind in {winX64, winArm} or
+      (kind == native and hostCPU in ["amd64", "arm64"])
+    mesonArgs.add("-Dasm=" & (if hasAsm: "enabled" else: "disabled"))
   if kind == wasm32 or kind == wasm64:
     if package.name == "dav1d":
       mesonArgs.add "-Denable_asm=false"
