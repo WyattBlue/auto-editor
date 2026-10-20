@@ -1,4 +1,4 @@
-import std/[atomics, sets, strformat, tables]
+import std/[atomics, sets, strformat, strutils, tables]
 from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt, floorMod, PI
 from std/algorithm import upperBound
 
@@ -820,12 +820,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
     srcs[src].decoder = decoderCtx
 
-    # An image source is a single still: known image codec, or a stream that
-    # reports exactly one frame (single-frame webp, png_pipe, etc.).
+    # An image source is a single still: an image codec read by an image
+    # demuxer, or a stream that reports exactly one frame. The demuxer check
+    # matters because these codecs also carry real video (MJPEG in avi/mov).
     let vstream = myCache.cns[src].video[0]
     let imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
-    srcs[src].isStill = vstream.codecpar.codec_id in imageCodecs or
-      vstream.nb_frames == 1
+    let demuxer = $myCache.cns[src].formatContext.iformat.name
+    srcs[src].isStill = vstream.nb_frames == 1 or
+      (vstream.codecpar.codec_id in imageCodecs and
+      (demuxer == "image2" or demuxer.endsWith("_pipe")))
 
   let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, video.scale)
   var fxGraph: Graph = nil
