@@ -11,6 +11,7 @@ type AudioResampler* = object
   frameSize: cint
   templateFormat: cint
   templateRate: cint
+  templateLayout: AVChannelLayout
   format: cint
   rate: cint
   isPassthrough: bool
@@ -32,8 +33,13 @@ func newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rat
   result.isPassthrough = false
 
 proc `=destroy`*(resampler: var AudioResampler) =
+  # A custom destroy hook skips field destruction, so release fields here.
   if resampler.graph != nil:
     avfilter_graph_free(addr resampler.graph)
+  `=destroy`(resampler.layout)
+  `=destroy`(resampler.templateLayout)
+
+proc `=copy`*(dest: var AudioResampler, src: AudioResampler) {.error.}
 
 proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFrame] =
   # We don't have any input, so don't bother even setting up
@@ -58,6 +64,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
     resampler.templateFormat = frame.format
     resampler.templateRate = frame.sample_rate
+    discard av_channel_layout_copy(addr resampler.templateLayout, addr frame.ch_layout)
 
     # Check if we can passthrough or if there is actually work to do
     if (frame.format == resampler.format and
@@ -114,7 +121,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     # Only validate critical properties that would break the filter graph
     if (frame.format != resampler.templateFormat or
         frame.sample_rate != resampler.templateRate or
-        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout[]) != 0):
+        av_channel_layout_compare(addr frame.ch_layout, addr resampler.templateLayout) != 0):
       error "Frame does not match resampler setup"
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
