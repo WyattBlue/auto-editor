@@ -361,8 +361,9 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
           discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
       elif strm.codecpar.codec_type == AVMEDIA_TYPE_VIDEO and
           (strm.disposition and AV_DISPOSITION_ATTACHED_PIC) != 0:
-        if avformat_query_codec(output.formatCtx.oformat, strm.codecpar.codec_id,
-            FF_COMPLIANCE_EXPERIMENTAL) == 0:
+        let supported = avformat_query_codec(output.formatCtx.oformat,
+          strm.codecpar.codec_id, FF_COMPLIANCE_EXPERIMENTAL)
+        if supported == 0 or (supported < 0 and output.formatCtx.oformat.name != "flac"):
           continue
         let outStrm = avformat_new_stream(output.formatCtx, nil)
         if outStrm == nil:
