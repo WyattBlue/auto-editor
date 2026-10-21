@@ -48,8 +48,6 @@ jobs:
             binary_name: auto-editor-linux-x86_64
           - os: ubuntu-24.04-arm
             binary_name: auto-editor-linux-aarch64
-          - os: macos-15-intel
-            binary_name: auto-editor-macos-x86_64
           - os: macos-latest
             binary_name: auto-editor-macos-arm64
     steps:
@@ -76,9 +74,6 @@ jobs:
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
             sudo apt update
             sudo apt-get install -y build-essential pkg-config git gperf fonts-dejavu-core
-          elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
-            brew install nasm
-            echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
