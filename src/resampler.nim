@@ -5,7 +5,7 @@ import util/rational
 
 type AudioResampler* = object
   graph*: ptr AVFilterGraph
-  layout: ref AVChannelLayout
+  layout: AVChannelLayout
   abuffer: ptr AVFilterContext
   abuffersink: ptr AVFilterContext
   frameSize: cint
@@ -21,10 +21,10 @@ func getFormatName(format: cint): string =
   let name = av_get_sample_fmt_name(format)
   (if name != nil: $name else: "none")
 
-func newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rate: cint,
+proc newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rate: cint,
     frameSize: cint = 0): AudioResampler =
   result.graph = nil
-  result.layout = layout
+  discard av_channel_layout_copy(addr result.layout, addr layout[])
   result.abuffer = nil
   result.abuffersink = nil
   result.frameSize = frameSize
@@ -58,7 +58,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if resampler.format == AV_SAMPLE_FMT_NONE:
       resampler.format = frame.format
     if resampler.layout.nb_channels == 0:
-      discard av_channel_layout_copy(addr resampler.layout[], addr frame.ch_layout)
+      discard av_channel_layout_copy(addr resampler.layout, addr frame.ch_layout)
     if resampler.rate == 0:
       resampler.rate = frame.sample_rate
 
@@ -70,7 +70,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if (frame.format == resampler.format and
         frame.sample_rate == resampler.rate and
         resampler.frameSize == 0 and
-        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout[]) == 0):
+        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout) == 0):
       resampler.isPassthrough = true
       let cloned = av_frame_clone(frame)
       if cloned == nil:
