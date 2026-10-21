@@ -8,7 +8,7 @@ import ./lib/editutil
 import ./util/[color, bar, fun, lang, rules, rational]
 
 import ./imports/[fcp7, json]
-import ./exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
+import ./exports/[drops, fcp7, fcp11, json, shotcut, kdenlive, otio]
 import ./render/[format, subtitle]
 
 proc freeActions*(args: mainArgs, tl: v3) =
@@ -672,6 +672,8 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   if tlV3.numberOfSrc > 1 and
       exportKind notin {exDefault, exClipSequence}:
     requireLicense(args, "export a timeline with multiple sources")
+
+  warnDrops(tlV3, exportKind)
 
   case exportKind:
   of exV1, exV2, exV3:
