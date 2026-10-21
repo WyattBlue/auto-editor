@@ -658,20 +658,16 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   let dir10bit = pkgDir / "x265_10bit"
   let dir8bit = pkgDir / "x265_8bit"
 
-  # For 10bit version, only x86_64 has assembly instructions available
   var highBitDepthArgs: seq[string] = @[
     "-DHIGH_BIT_DEPTH=1",
     "-DEXPORT_C_API=0",
     "-DENABLE_SHARED=0",
     "-DENABLE_CLI=0"
   ]
-  let isLinuxAarch64 = hostOS == "linux" and hostCPU == "arm64"
 
-  if hostCPU != "amd64" or kind == winArm or isWasm:
+  # 32-bit ARM has no 10-bit assembly, wasm has none at all
+  if kind == armv7 or isWasm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
-
-  if isLinuxAarch64:
-    highBitDepthArgs.add("-DENABLE_SVE2=0")
 
   var commonArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
@@ -688,7 +684,6 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   if kind == winArm:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
-    highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
   elif kind == winX64:
     let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
@@ -719,9 +714,6 @@ proc x265Build(buildPath: string, kind: CrossKind) =
     cmake8Cmd &= " -DENABLE_ASSEMBLY=0"
   for arg in commonArgs:
     cmake8Cmd &= " " & arg
-
-  if isLinuxAarch64:
-    cmake8Cmd &= " -DENABLE_SVE2=0"
 
   echo "RUN: ", cmake8Cmd
   exec cmake8Cmd
