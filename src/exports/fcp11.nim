@@ -85,15 +85,16 @@ func timecode(self: MediaInfo): string {.raises: [].} = # In SMPTE
       return v.timecode
   return "00:00:00:00"
 
-proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
+proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
+    resolve: bool, tl: v3) =
   func fraction(val: int64): string {.raises: [].} =
     if val == 0:
       return "0s"
     return &"{val * tl.tb.den}/{tl.tb.num}s"
 
   let verStr =
-    if version == "11": "1.11"
-    elif version == "10": "1.10"
+    if version == 11: "1.11"
+    elif version == 10: "1.10"
     else: error &"Unknown final cut pro version: {version}"
 
   let fcpxml = <>fcpxml(version = verStr)

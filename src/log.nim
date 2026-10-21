@@ -21,7 +21,7 @@ type
   ExportSpec* = object
     kind*: ExportKind
     name*: string
-    version*: string
+    version*: uint8
 
   PackedInt* = distinct int64
 
@@ -145,7 +145,7 @@ type mainArgs* = object
   labeledEdits*: seq[tuple[label: int, expr: EditExpr]]
   labeledWhens*: seq[tuple[label: int, action: Actions]]
   `export`*: ExportSpec = ExportSpec(
-    kind: exAuto, name: "Auto-Editor Media Group", version: "11")
+    kind: exAuto, name: "Auto-Editor Media Group", version: 11)
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
   setActionConcat*: bool # library-only: setAction frames run across the inputs end to end

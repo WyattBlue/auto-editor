@@ -41,7 +41,7 @@ func prefixEquals(s, expected: string, stop: int): bool {.raises: [].} =
 
 proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorError].} =
   result.name = "Auto-Editor Media Group"
-  result.version = "11"
+  result.version = 11
 
   let colonPos = exportStr.find(':')
   let kindEnd = if colonPos == -1: exportStr.len else: colonPos
@@ -111,7 +111,15 @@ proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorErro
 
     case paramName:
       of "name": result.name = value
-      of "version": result.version = value
+      of "version":
+        var n = 0
+        for c in value:
+          if c notin Digits or n > 25:
+            error &"Invalid version: {value}"
+          n = n * 10 + (ord(c) - ord('0'))
+        if value.len == 0 or n > 255:
+          error &"Invalid version: {value}"
+        result.version = n.uint8
       else: error &"Unknown parameter: {paramName}"
 
     if i < paramsStr.len and paramsStr[i] == ',':
@@ -638,7 +646,8 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   mi = built.mi
 
   var exportKind: ExportKind
-  var tlName, fcpVersion: string
+  var tlName: string
+  var fcpVersion: uint8
   let hasVideo = tlV3.v.len > 0 and not args.vn
   if args.`export`.kind == exAuto:
     (output, exportKind) = setOutput(args.output, exAuto, usePath, args.urlInput,
