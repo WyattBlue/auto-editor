@@ -68,6 +68,14 @@ auto-editor example.mp4 --export 'premiere:name="Your name here"'
 auto-editor example.mp4 --export 'premiere:name=""Your name here""'
 ```
 
+`final-cut-pro` and `resolve` also accept `version`, the FCPXML version to write: `11`
+(default) for FCPXML 1.11, or `10` for FCPXML 1.10, for an older editor that can't
+read 1.11.
+
+```bash
+auto-editor example.mp4 --export final-cut-pro:version=10
+```
+
 ## Split into clips without further editing
 
 To split at the cut points but make no other edits, set both actions to `nil`:

@@ -95,7 +95,7 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
   let verStr =
     if version == 11: "1.11"
     elif version == 10: "1.10"
-    else: error &"Unknown final cut pro version: {version}"
+    else: error &"Unknown FCPXML version: {version} (use 10 for 1.10 or 11 for 1.11)"
 
   let fcpxml = <>fcpxml(version = verStr)
   let resources = newElement("resources")
