@@ -278,6 +278,11 @@ proc parseEdit*(source: string, filename = "--edit"): EditExpr =
         else: error "Too many args"
       if m.stream < 0:
         error "subtitle: 'all' stream is not supported"
+      # Compile now so a bad pattern errors before analysis starts.
+      var flags = {reUtf8}
+      if m.ignoreCase: flags.incl reIgnoreCase
+      try: discard re(m.pattern, flags)
+      except ValueError: error &"regex: invalid pattern: {m.pattern}"
       return edit(m)
     of esWord:
       var m = wordMethod("")
