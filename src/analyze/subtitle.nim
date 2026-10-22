@@ -44,8 +44,9 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
         durFloat = float(packet.duration * subtitleStream.time_base)
         # A subtitle is active for any frame it overlaps, so snap outward:
         # floor the start, ceil the end. round() could clip a frame the
-        # subtitle actually touches.
-        start = floor(startFloat * tb).int
+        # subtitle actually touches. Edit lists and hand-written srt/ass can
+        # start a cue before 0.
+        start = max(0, floor(startFloat * tb).int)
         `end` = ceil((startFloat + durFloat) * tb).int
 
       var gotSubtitle: cint = 0
