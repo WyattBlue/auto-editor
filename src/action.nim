@@ -411,8 +411,13 @@ func easeName(e: Easing): string =
   of easeInOut: "inout"
 
 proc pFloat(s: string): float32 {.raises: [ActionParseError].} =
-  try: parseFloat(s).float32
-  except ValueError: raise newException(ActionParseError, &"Invalid float value: {s}")
+  # parseFloat accepts "nan" and "inf", which slip past `v < lo or v > hi`
+  # checks and are UB when converted to an int.
+  result =
+    try: parseFloat(s).float32
+    except ValueError: raise newException(ActionParseError, &"Invalid float value: {s}")
+  if classify(result) in {fcNan, fcInf, fcNegInf}:
+    raise newException(ActionParseError, &"Invalid float value: {s}")
 
 proc pInt(s: string, what = "integer value"): int {.raises: [ActionParseError].} =
   try: parseInt(s)
@@ -918,10 +923,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         raise newException(ActionParseError, "scale must be in (0.0, 100.0]")
     return Action(kind: actScale, tScaleW: w, tScaleH: h, tUniform: parts.len == 2)
   if parts[0] == "turn" and parts.len == 2:
-    let deg = pFloat(parts[1])
-    if classify(deg) in {fcNan, fcInf, fcNegInf}:
-      raise newException(ActionParseError, "turn takes an angle in degrees")
-    return Action(kind: actTurn, tDeg: deg)
+    return Action(kind: actTurn, tDeg: pFloat(parts[1]))
 
   # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
   # `rate` degrees/second.
@@ -1156,6 +1158,10 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     for v in s.kf:
       if v <= 0.0'f32:
         raise newException(ActionParseError, "pos scale must be greater than 0.0")
+    # x/y are rounded to an int, which is UB out of range.
+    for v in x.kf & y.kf:
+      if not (abs(v) < 2147483648.0'f32):
+        raise newException(ActionParseError, "pos x/y is out of range")
     result = Action(kind: actPos, pxKf: x.kf, pyKf: y.kf, pscaleKf: s.kf,
       pxKt: x.kt, pyKt: y.kt, pscaleKt: s.kt)
     result.parseEaseTail(parts, idx, val)
