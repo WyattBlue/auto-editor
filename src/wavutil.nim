@@ -212,8 +212,15 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
   if outputCtx == nil:
     error "Could not create output context"
 
+  # av_write_trailer crashes on a muxer whose header was never written.
+  var headerWritten = false
   defer:
-    outputCtx.close()
+    if headerWritten:
+      outputCtx.close()
+    else:
+      if outputCtx.pb != nil:
+        discard avio_closep(addr outputCtx.pb)
+      avformat_free_context(outputCtx)
 
   let (encoder, encoderCtx) =
     if codecName != "auto": initEncoder(codecName)
@@ -263,6 +270,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
 
   if avformat_write_header(outputCtx, nil) < 0:
     error "Error occurred when opening output file"
+  headerWritten = true
 
   var packet = av_packet_alloc()
   var frame = av_frame_alloc()
