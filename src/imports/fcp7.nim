@@ -230,6 +230,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
         elif rc.tag == "ntsc":
           ntsc = rc.innerText.strip() == "TRUE"
       tb = readTbNtsc(timebase, ntsc)
+      if not tb.isValid:
+        error "Invalid timebase"
     of "media":
       mediaNode = child
     else: discard
