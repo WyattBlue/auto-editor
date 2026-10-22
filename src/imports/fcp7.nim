@@ -1,4 +1,4 @@
-import std/[algorithm, strutils, streams, tables, uri, xmlparser, xmltree]
+import std/[algorithm, strformat, strutils, streams, tables, uri, xmlparser, xmltree]
 
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/[color, rational]
@@ -28,6 +28,13 @@ func readTbNtsc(tb: int, ntsc: bool): AVRational =
     # chart in Apple's FCP7 XML docs; see the link in exports/fcp7.nim.
     return tb.int64 * AVRational(num: 1000, den: 1001)
   return AVRational(num: tb.cint, den: 1)
+
+proc xmlInt(node: XmlNode, lo = low(int64), hi = high(int64)): int64 =
+  let s = node.innerText.strip()
+  result = try: parseBiggestInt(s)
+    except ValueError: error &"Invalid <{node.tag}> value: '{s}'"
+  if result < lo or result > hi:
+    error &"Invalid <{node.tag}> value: '{s}'"
 
 func num(s: string): (bool, float) =
   try: (true, parseFloat(s.strip()))
@@ -171,10 +178,11 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     for ci in trackChild:
       if ci.kind != xnElement: continue
       case ci.tag
-      of "start": startVal = parseInt(ci.innerText.strip())
-      of "end": endVal = parseInt(ci.innerText.strip())
-      of "in": inVal = parseInt(ci.innerText.strip())
-      of "out": outVal = parseInt(ci.innerText.strip())
+      # -1 marks a start or end inside a transition.
+      of "start": startVal = xmlInt(ci, lo = -1)
+      of "end": endVal = xmlInt(ci, lo = -1)
+      of "in": inVal = xmlInt(ci, lo = 0)
+      of "out": outVal = xmlInt(ci, lo = -1)
       of "file": fileNode = ci
       of "filter": filterNodes.add ci
       else: discard
@@ -183,6 +191,8 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     let srcPtr = resolveFile(fileNode, sources, interner)
     if srcPtr == nil: continue
 
+    if startVal != -1 and endVal != -1 and endVal <= startVal:
+      error "Invalid clipitem: <start> must come before <end>"
     let dur = endVal - startVal
     if outVal <= inVal: outVal = inVal + dur
     for fn in filterNodes:
@@ -226,12 +236,10 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
       for rc in child:
         if rc.kind != xnElement: continue
         if rc.tag == "timebase":
-          timebase = parseInt(rc.innerText.strip())
+          timebase = xmlInt(rc, 1, high(cint)).int
         elif rc.tag == "ntsc":
           ntsc = rc.innerText.strip() == "TRUE"
       tb = readTbNtsc(timebase, ntsc)
-      if not tb.isValid:
-        error "Invalid timebase"
     of "media":
       mediaNode = child
     else: discard
@@ -261,8 +269,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
               var h = 1080'i32
               for sc in fc:
                 if sc.kind != xnElement: continue
-                if sc.tag == "width": w = parseInt(sc.innerText.strip()).int32
-                elif sc.tag == "height": h = parseInt(sc.innerText.strip()).int32
+                if sc.tag == "width": w = xmlInt(sc, 1, high(int32)).int32
+                elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
               res = (w, h)
         of "track":
           let clips = parseTrack(vidChild, sources, effects, interner)
@@ -280,7 +288,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
               for sc in fc:
                 if sc.kind != xnElement: continue
                 if sc.tag == "samplerate":
-                  sr = parseInt(sc.innerText.strip()).cint
+                  sr = xmlInt(sc, 1, high(cint)).cint
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
