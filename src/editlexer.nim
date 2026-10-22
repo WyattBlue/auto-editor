@@ -25,6 +25,7 @@ type
     lexer*: Lexer
     currentToken: Token
     nextToken: Token
+    depth: int
 
   # AST node types
   ExprKind* = enum
@@ -174,6 +175,11 @@ proc expr(self: var Parser): Expr {.raises: [ValueError].}
 
 
 proc list(self: var Parser): Expr {.raises: [ValueError].} =
+  # Each nesting level recurses; unbounded input would overflow the stack.
+  if self.depth >= 256:
+    raise newException(ValueError, "Expression nested too deeply")
+  inc self.depth
+  defer: dec self.depth
   let startPos = self.currentToken.`from`
   self.eat()
 
