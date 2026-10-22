@@ -15,7 +15,7 @@ import render/burnsubs
 import ./lib/escape
 when defined(emscripten):
   import ./av
-import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
+import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre

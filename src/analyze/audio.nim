@@ -303,54 +303,6 @@ proc flushResampler(iter: AudioIterator) =
       error "Could not write flushed data to FIFO"
     av_frame_free(addr flushedFrame)
 
-iterator peaks*(processor: var AudioProcessor, container: InputContainer,
-    audioStream: ptr AVStream): tuple[startSample: int64, lo, hi: float32] =
-  var frame = av_frame_alloc()
-  if frame == nil:
-    error "Could not allocate frame"
-
-  defer:
-    av_frame_free(addr frame)
-    if processor.`iterator` != nil:
-      processor.`iterator`.cleanup()
-    avcodec_free_context(addr processor.codecCtx)
-
-  var firstSamplePos: int64 = 0
-  var bucketIdx: int64 = 0
-  var spb: int64 = 0
-
-  for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
-    if processor.`iterator` == nil:
-      processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        addr decodedFrame.ch_layout, processor.chunkDuration, processor.channel)
-      spb = round(processor.chunkDuration * float64(
-          decodedFrame.sample_rate)).int64
-      let tb = audioStream.time_base
-      let ts = bestPts(decodedFrame)
-      let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
-      firstSamplePos = (pts * int64(decodedFrame.sample_rate) * int64(
-          tb.num)) div int64(tb.den)
-
-    processor.`iterator`.writeFrame(decodedFrame)
-
-    while processor.`iterator`.hasChunk():
-      let (lo, hi) = processor.`iterator`.readPeaks()
-      yield (firstSamplePos + bucketIdx * spb, lo, hi)
-      bucketIdx += 1
-
-  if processor.`iterator` != nil:
-    processor.`iterator`.flushResampler()
-    while processor.`iterator`.hasChunk():
-      let (lo, hi) = processor.`iterator`.readPeaks()
-      yield (firstSamplePos + bucketIdx * spb, lo, hi)
-      bucketIdx += 1
-    # The tail may be shorter than a full chunk; hasChunk skips it, but it
-    # still covers the last timeline frame.
-    if av_audio_fifo_size(processor.`iterator`.fifo) > 0:
-      let (lo, hi) = processor.`iterator`.readPeaks()
-      yield (firstSamplePos + bucketIdx * spb, lo, hi)
-      bucketIdx += 1
-
 iterator channelPeaks*(processor: var AudioProcessor, container: InputContainer,
     audioStream: ptr AVStream, channels: seq[int]):
     tuple[startSample: int64, peaks: seq[tuple[lo, hi: float32]]] =
@@ -463,3 +415,49 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   if not noCache and decodeErrors == errorsBefore:
     writeCache(result, tb, path, "audio", cacheArgs)
+
+type WaveWindow* = object
+  ## Audio peaks for a stretch of one channel, one (lo, hi) pair per bucket.
+  sampleRate*: int
+  samplesPerBucket*: int
+  firstSample*: int64 ## sample index of peaks[0]
+  peaks*: seq[tuple[lo, hi: float32]]
+
+proc streamPeaks*(input: string, stream, samplesPerBucket: int,
+    startSample = 0'i64, lengthSamples = -1'i64): seq[WaveWindow] =
+  ## Peaks for every channel of audio `stream`, one window each in the
+  ## layout's order, from a single decode that seeks to `startSample`.
+  ## A negative `lengthSamples` runs to the end.
+  if samplesPerBucket < 1: error "samples-per-bucket must be positive"
+  var container = (try: av.open(input) except IOError as e: error e.msg)
+  defer: container.close()
+  if stream < 0 or stream >= container.audio.len:
+    error "Audio stream out of range: " & $stream
+  let audioStream = container.audio[stream]
+  let rate = audioStream.codecpar.sample_rate
+  if rate <= 0: error "Audio stream has invalid sample rate"
+  let n = audioStream.codecpar.ch_layout.nb_channels.int
+  var channels: seq[int]
+  for c in 0 ..< n: channels.add c
+  var processor = AudioProcessor(codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioStream.index,
+    chunkDuration: samplesPerBucket.float64 / rate.float64)
+  if startSample > 0:
+    let tb = audioStream.time_base
+    container.seek((startSample * int64(tb.den)) div (int64(rate) * int64(tb.num)),
+      stream = audioStream)
+    avcodec_flush_buffers(processor.codecCtx)
+  let endSample = if lengthSamples < 0: int64.high else: startSample + lengthSamples
+  for c in 0 ..< n:
+    result.add WaveWindow(sampleRate: rate, samplesPerBucket: samplesPerBucket,
+      firstSample: -1)
+  let bar = initBar(BarType.none) # for the cancel flag
+  for (bucketStart, peaks) in processor.channelPeaks(container, audioStream, channels):
+    bar.tick(0)
+    if bucketStart + samplesPerBucket <= startSample: continue
+    if bucketStart >= endSample: break
+    for c in 0 ..< min(n, peaks.len):
+      if result[c].firstSample < 0: result[c].firstSample = bucketStart
+      result[c].peaks.add peaks[c]
+  for w in result.mitems:
+    if w.firstSample < 0: w.firstSample = startSample

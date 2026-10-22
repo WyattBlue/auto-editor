@@ -38,8 +38,7 @@ type OptKind* = enum
 type CliOption* = enum
   coNone, coIsDebug, coSplitWords, coLanguage, coFormat, coOutput, coTranslate, coQueue,
     coPrompt, coThreads, coThreshold, coIsJson, coEncoders, coDecoders, coCodecs, coEdit,
-    coTimebase, coDisplay, coNoCache, coAsJson, coStream, coChannel, coSamplesPerBucket,
-    coStartSample, coLengthSamples, coShell, coWhenActive, coWhenInactive, coMargin,
+    coTimebase, coDisplay, coNoCache, coAsJson, coShell, coWhenActive, coWhenInactive, coMargin,
     coSmooth, coTransition, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
     coVideoSpeed, coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
@@ -155,23 +154,6 @@ const levelsOptions*: seq[OptDef] = @[
 const subdumpOptions*: seq[OptDef] = @[
   OptDef(names: "--json", kind: Flag, datum: coAsJson,
     help: "Print the subtitles as JSON"),
-]
-
-const waveformOptions*: seq[OptDef] = @[
-  OptDef(names: "--stream", datum: coStream, metavar: "NAT",
-    help: "Set which audio stream to analyze (default 0)"),
-  OptDef(names: "--channel", datum: coChannel, metavar: "NAME",
-    help: "Set one or more comma-separated audio channels to draw"),
-  OptDef(names: "--samples-per-bucket", datum: coSamplesPerBucket, metavar: "NAT",
-    help: "Number of audio samples per drawn bucket (default 256)"),
-  OptDef(names: "--start-sample", datum: coStartSample, metavar: "NAT",
-    help: "First audio sample to analyze from (default 0)"),
-  OptDef(names: "--length-samples", datum: coLengthSamples, metavar: "INT",
-    help: "Number of samples to analyze, -1 for all (default -1)"),
-  OptDef(names: "--display", datum: coDisplay, metavar: "FORMAT",
-    help: "Set the output format {float|d16} (default float)"),
-  OptDef(names: "--no-cache", kind: Flag, datum: coNoCache,
-    help: "Disable reading and writing cache files"),
 ]
 
 const completionOptions*: seq[OptDef] = @[
@@ -334,7 +316,7 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
 
 const cliOptions =
   whisperOptions & infoOptions & levelsOptions & subdumpOptions &
-    waveformOptions & completionOptions & mainOptions
+    completionOptions & mainOptions
 
 func `$`*(opt: CliOption): string {.raises: [].} =
   genCliOptionToString(cliOptions)
@@ -355,8 +337,6 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "levels", help: "Display loudness over time", opts: levelsOptions),
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out",
       opts: subdumpOptions),
-  CmdDef(name: "waveform", help: "Draw waveforms for library users. Unstable interface",
-      opts: waveformOptions, shellCompletion: false),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]",
       opts: whisperOptions),
 ] & (
