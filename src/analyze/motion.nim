@@ -238,10 +238,14 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
         processor.videoIndex].time_base).float64
     let index = round(frameTime * processor.tb.float64).int64
 
-    if totalPixels == 0:
-      totalPixels = filteredFrame.width * filteredFrame.height
-      prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
-      currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
+    let pixels = filteredFrame.width.int * filteredFrame.height.int
+    if pixels != totalPixels:
+      # The stream can change resolution mid-way; frames of different sizes
+      # aren't comparable, so start over as if this were the first frame.
+      totalPixels = pixels
+      prevFrame = cast[ptr UncheckedArray[uint8]](realloc(prevFrame, totalPixels))
+      currentFrame = cast[ptr UncheckedArray[uint8]](realloc(currentFrame, totalPixels))
+      firstTime = true
 
     # linesize includes alignment padding (e.g. width 400 -> stride 416), so
     # a flat copy of width*height bytes drifts rows; copy row by row.
