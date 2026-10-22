@@ -263,7 +263,8 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
   var start: int64 = 0
 
   for chunk in chunks:
-    if chunk[2] > 0.0 and chunk[2] < 99999.0:
+    # Check the float32 that gets stored: a tiny float64 underflows to 0.
+    if chunk[2].float32 > 0.0 and chunk[2].float32 < 99999.0:
       let (offset, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
       if dur == 0:
         continue

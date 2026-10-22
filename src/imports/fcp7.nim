@@ -118,9 +118,9 @@ proc readFilters(filterNode: XmlNode, acts: var seq[Action],
     case effectId
     of "timeremap":
       if "speed" in params:
-        let speed = params["speed"][0][1] / 100.0
+        let speed = float32(params["speed"][0][1] / 100.0)
         if speed > 0.0 and speed < 99999.0 and speed != 1.0:
-          acts.addFixed Action(kind: actSpeed, val: speed.float32)
+          acts.addFixed Action(kind: actSpeed, val: speed)
     of "opacity":
       let kf = kfSeq(params.getOrDefault("opacity"), srcIn, srcOut, 0.01, 0.0, 1.0)
       if kf.len > 0:
