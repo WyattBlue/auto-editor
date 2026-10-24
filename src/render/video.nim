@@ -230,7 +230,7 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: float,
       let frameNum = int(round(
         float(entry.timestamp) * float(tb.num) / float(tb.den) * fps))
 
-      # Be a bit conservative by adding video_deplay (the worst-case DTS/PTS gap), even
+      # Be a bit conservative by adding video_delay (the worst-case DTS/PTS gap), even
       # if some formats use PTS.
       result.frames.add(max(frameNum + reorderDelay, 0))
 

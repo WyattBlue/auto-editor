@@ -708,7 +708,7 @@ iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame,
       else:
         error "Error receiving packet from encoder"
 
-    yield packet # Nim requres iterator yield values
+    yield packet # Nim requires iterator yield values
 
 proc close*(outputCtx: ptr AVFormatContext) =
   let ret = av_write_trailer(outputCtx)

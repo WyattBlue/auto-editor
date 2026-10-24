@@ -34,7 +34,7 @@ yay -S auto-editor
 The auto-editor cli is no longer being published on pip. It is recommended to switch to a different installation method.
 
 ### Notice for 'Apt' Users
-The pkg versions available are very old. Either use the official binaries (recommened) or use [Homebrew for Linux](https://docs.brew.sh/Homebrew-on-Linux).
+The pkg versions available are very old. Either use the official binaries (recommended) or use [Homebrew for Linux](https://docs.brew.sh/Homebrew-on-Linux).
 
 ## Installing from Source (Unix-Like):
 Install `nim`, `nimble`, `cmake`, `meson`, `ninja`, then run:

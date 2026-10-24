@@ -296,7 +296,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
         if (*re == '-' && re[1] != ']') {
           re++; // skip '-'
           tok = token(re, &forward, utf8);
-          if (tok < 0) return -1; // not alow \d\D\s\S\w\W here
+          if (tok < 0) return -1; // not allow \d\D\s\S\w\W here
           re += forward;
         }
         EMIT(PC++, tok);

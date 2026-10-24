@@ -47,7 +47,7 @@ For example, edit out motionlessness in a video by setting `--edit motion`.
 # cut out sections where the total motion is less than 2%.
 auto-editor example.mp4 --edit motion:threshold=0.02
 
-# `--edit audio:threshold=0.04,stream=all` is used by defaut.
+# `--edit audio:threshold=0.04,stream=all` is used by default.
 auto-editor example.mp4
 
 # Different tracks can be set with different attribute.
