@@ -266,17 +266,18 @@ let fribidi = Package(
 )
 let harfbuzz = Package(
   name: "harfbuzz",
-  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/11.2.1/harfbuzz-11.2.1.tar.xz",
-  sha256: "093714c8548a285094685f0bdc999e202d666b59eeb3df2ff921ab68b8336a49",
+  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/15.0.0/harfbuzz-15.0.0.tar.xz",
+  sha256: "968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df",
   buildSystem: "meson",
   buildArguments: @["--auto-features=disabled", "-Dtests=disabled",
     "-Ddocs=disabled", "-Dutilities=disabled", "-Dintrospection=disabled",
-    "-Dbenchmark=disabled"],
+    "-Dbenchmark=disabled", "-Draster=disabled", "-Dvector=disabled",
+    "-Dgpu=disabled", "-Dsubset=disabled"],
 )
 let libass = Package(
   name: "libass",
-  sourceUrl: "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz",
-  sha256: "78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a",
+  sourceUrl: "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz",
+  sha256: "2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc",
   buildSystem: "meson",
   buildArguments: @["--auto-features=disabled", "-Dtest=disabled",
     "-Dcompare=disabled", "-Dprofile=disabled", "-Dfuzz=disabled",
