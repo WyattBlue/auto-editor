@@ -168,8 +168,8 @@ let libvpl = Package(
 )
 let bwlame = Package(
   name: "bwlame",
-  sourceUrl: "https://github.com/basswood-io/bwlame/archive/refs/tags/v4.0.0.tar.gz",
-  sha256: "e9399b2b92ea9c955c33c3998123a447bc5978a145f8efc2fd961c7cdbfcc0de",
+  sourceUrl: "https://github.com/basswood-io/bwlame/archive/refs/tags/v4.1.0.tar.gz",
+  sha256: "f07647a8db7cf511cb6a82e69483bc3c1ad87355995a74193801029c368cb45c",
   buildSystem: "make",
   ffFlag: "--enable-libmp3lame",
 )
@@ -331,7 +331,7 @@ func dirName(package: Package): string =
   if package.name == "whisper":
     return "whisper.cpp-1.9.5"
   if package.name == "bwlame":
-    return "bwlame-4.0.0"
+    return "bwlame-4.1.0"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
