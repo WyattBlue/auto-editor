@@ -179,6 +179,7 @@ const
   originMask = 0x03'u8
   originShift = 3
   shimmerFlag = 0x80'u8
+  yuvFlag = 0x80'u8
 static:
   assert ord(high(ConfettiScheme)) <= schemeMask.int, "scheme outgrew 3 bits"
   assert ord(high(ConfettiOrigin)) <= originMask.int, "origin outgrew 2 bits"
@@ -282,7 +283,7 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
-    help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`). Example: `drawbox:100:100:400:200:red`. As a generator it can take a file's place in `add:`, painting the box on its own overlay layer, e.g. `add:drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
+    help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`), or `yuv#YYUUVV` to write those 8-bit Y'CbCr values into a YUV picture as they are. Example: `drawbox:100:100:400:200:red`. As a generator it can take a file's place in `add:`, painting the box on its own overlay layer, e.g. `add:drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
   ActionDef(name: "pos", flags: {afVideo, afAnimatable}, argSpec: "x:y[:scale]",
     help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`. Animatable: each of `x`, `y`, and `scale` accepts a keyframe ramp `a..b..c` interpolated across the section, optionally eased with `:ease=`, e.g. `pos:0..600:300:1..0.5:ease=inout` slides the overlay across while shrinking it."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
@@ -290,9 +291,9 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
   ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
-    help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
+    help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green`, a hex value, or `yuv#YYUUVV`), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
   ActionDef(name: "chromakey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
-    help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green` or a hex value), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
+    help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green`, a hex value, or `yuv#YYUUVV`), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
   ActionDef(name: "choke", flags: {afVideo}, argSpec: "[n]", range: rng(1.0, 16.0),
     help: "Shrink (choke) the alpha matte left by a `colorkey`/`chromakey` inward by `n` pixels (default 1), cutting off the ring of key-color spill and ragged edge pixels around the subject. Must come after the key in the chain, e.g. `add:fg.mp4,chromakey:green,choke:2`. Only meaningful on overlay tracks (where keying produces alpha); a no-op on the base track. Implemented by eroding only the alpha plane via ffmpeg's `erosion` filter."),
   ActionDef(name: "aberration", flags: {afVideo}, argSpec: "[h[:v[:edge]]]", range: rng(-127.0, 127.0, each = true),
@@ -633,6 +634,8 @@ proc parseRgba(spec, what: string): uint32 {.raises: [ActionParseError].} =
     raise newException(ActionParseError, &"{what}: invalid color {spec}")
   let c = try: parseColor(spec)
     except ValueError as e: raise newException(ActionParseError, &"{what}: {e.msg}")
+  if c.yuv:
+    raise newException(ActionParseError, &"{what}: YUV colors aren't supported here")
   (c.red.uint32 shl 24) or (c.green.uint32 shl 16) or (c.blue.uint32 shl 8) or 0xff
 
 func rgbaStr*(c: uint32): string =
@@ -1557,9 +1560,9 @@ when not defined(nimscript):
           yield Action(kind: actSpin, sStart: st, sRate: rate)
           i += 7
         of actColorKey, actChromaKey:
-          var col: RGBColor
+          let col = RGBColor(red: base[i + 1], green: base[i + 2], blue: base[i + 3],
+            yuv: (base[i] and yuvFlag) != 0'u8)
           var sim, blend: Unorm16
-          copyMem(addr col, addr base[i + 1], sizeof(RGBColor))
           copyMem(addr sim, addr base[i + 4], sizeof(Unorm16))
           copyMem(addr blend, addr base[i + 6], sizeof(Unorm16))
           yield Action(kind: kind, color: col, similar: sim, blend: blend)
@@ -1673,7 +1676,8 @@ when not defined(nimscript):
           copyMem(addr y, addr base[i + 5], sizeof(int32))
           copyMem(addr w, addr base[i + 9], sizeof(int32))
           copyMem(addr h, addr base[i + 13], sizeof(int32))
-          let col = RGBColor(red: base[i + 17], green: base[i + 18], blue: base[i + 19])
+          let col = RGBColor(red: base[i + 17], green: base[i + 18], blue: base[i + 19],
+            yuv: (base[i] and yuvFlag) != 0'u8)
           yield Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h, dbColor: col)
           i += 20
         of actZoom, actBlur, actOpacity, actBrightness, actVolume:
@@ -1819,7 +1823,10 @@ when not defined(nimscript):
         base.writeAt(i, 3, a.sRate)
         i += 7
       of actColorKey, actChromaKey:
-        base.writeAt(i, 1, a.color)
+        if a.color.yuv: base[i] = base[i] or yuvFlag
+        base[i + 1] = a.color.red
+        base[i + 2] = a.color.green
+        base[i + 3] = a.color.blue
         base.writeAt(i, 4, a.similar)
         base.writeAt(i, 6, a.blend)
         i += 8
@@ -1909,7 +1916,10 @@ when not defined(nimscript):
         base.writeAt(i, 5, a.dbY)
         base.writeAt(i, 9, a.dbW)
         base.writeAt(i, 13, a.dbH)
-        base.writeAt(i, 17, a.dbColor)
+        if a.dbColor.yuv: base[i] = base[i] or yuvFlag
+        base[i + 17] = a.dbColor.red
+        base[i + 18] = a.dbColor.green
+        base[i + 19] = a.dbColor.blue
         i += 20
       of actZoom, actBlur, actOpacity, actBrightness, actVolume:
         if a.hasEase: base[i] = base[i] or easeFlag

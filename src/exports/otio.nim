@@ -484,7 +484,7 @@ proc otioWrite*(name, output: string, tl: v3) =
   if output != "-" and tl.bg != RGBColor(red: 0, green: 0, blue: 0):
     let (dir, nm, _) = splitFile(output)
     let pngPath = dir / (nm & "-bg.png")
-    writeSolidPng(pngPath, tl.res[0], tl.res[1], tl.bg)
+    writeSolidPng(pngPath, tl.res[0], tl.res[1], tl.bg.toRgb)
     videoTrackNum += 1
     children.add %*{
       "OTIO_SCHEMA": "Track.1",

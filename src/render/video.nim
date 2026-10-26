@@ -60,7 +60,7 @@ func scaleTurnOf(effects: Actions): tuple[w, h, deg: float32] =
     elif e.kind == actTurn: result.deg += e.tDeg
 
 func packRGB(c: RGBColor): uint32 =
-  uint32(c.red) shl 16 or uint32(c.green) shl 8 or uint32(c.blue)
+  uint32(c.yuv) shl 24 or uint32(c.red) shl 16 or uint32(c.green) shl 8 or uint32(c.blue)
 
 # Effects `confine` restricts to a region (adjustment effects only; geometry
 # effects like zoom/rotate/pos are intentionally left full-frame).
@@ -305,14 +305,31 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   return newFrame
 
-func toYuv(color: RGBColor): tuple[y, u, v: uint8] =
-  ## BT.601 RGB -> YUV, shared by every solid-color write into a planar frame.
+type YuvTag = tuple[space, range: cint]
+
+const untagged: YuvTag = (2.cint, 0.cint)
+
+func tagOf(frame: ptr AVFrame): YuvTag = (frame.colorspace, frame.color_range)
+
+func toYuv(color: RGBColor, tag: YuvTag): tuple[y, u, v: uint8] =
+  ## RGB -> YUV in `tag`'s matrix and range, shared by every solid-color write
+  ## into a planar frame.
+  if color.yuv:
+    return (color.red, color.green, color.blue)
+  let (kr, kb) = case tag.space
+    of 1: (0.2126, 0.0722)
+    of 9, 10: (0.2627, 0.0593)
+    else: (0.299, 0.114)
   let r = color.red.float
   let g = color.green.float
   let b = color.blue.float
-  (uint8(clamp(0.299 * r + 0.587 * g + 0.114 * b, 0.0, 255.0)),
-   uint8(clamp(-0.169 * r - 0.331 * g + 0.5 * b + 128, 0.0, 255.0)),
-   uint8(clamp(0.5 * r - 0.419 * g - 0.081 * b + 128, 0.0, 255.0)))
+  let y = kr * r + (1 - kr - kb) * g + kb * b
+  let cb = (b - y) / (2 * (1 - kb))
+  let cr = (r - y) / (2 * (1 - kr))
+  let (yScale, yOff, cScale) =
+    if tag.range == 2: (1.0, 0.0, 1.0) else: (219 / 255, 16.0, 224 / 255)
+  func code(v: float): uint8 = uint8(clamp(round(v), 0.0, 255.0))
+  (code(yOff + y * yScale), code(128 + cb * cScale), code(128 + cr * cScale))
 
 proc makeClear(width: cint, height: cint): ptr AVFrame =
   ## A transparent RGBA canvas: the starting picture for a generator layer
@@ -332,7 +349,30 @@ proc makeClear(width: cint, height: cint): ptr AVFrame =
       width.int * 4)
   return frame
 
-proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
+proc fillBox(frame: ptr AVFrame, x, y, w, h: int32, color: RGBColor) =
+  let (yv, uv, vv) = toYuv(color, frame.tagOf)
+  let x0 = clamp(x.int, 0, frame.width.int)
+  let y0 = clamp(y.int, 0, frame.height.int)
+  let x1 = clamp(x.int + w.int, 0, frame.width.int)
+  let y1 = clamp(y.int + h.int, 0, frame.height.int)
+  if x0 >= x1 or y0 >= y1:
+    return
+  for row in y0 ..< y1:
+    let p = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[0]) + row * frame.linesize[0].int)
+    for col in x0 ..< x1:
+      p[col] = yv
+  for row in (y0 div 2) .. ((y1 - 1) div 2):
+    let u = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[1]) + row * frame.linesize[1].int)
+    let v = cast[ptr UncheckedArray[uint8]](
+      cast[int](frame.data[2]) + row * frame.linesize[2].int)
+    for col in (x0 div 2) .. ((x1 - 1) div 2):
+      u[col] = uv
+      v[col] = vv
+
+proc makeSolid(width: cint, height: cint, color: RGBColor,
+    tag = untagged): ptr AVFrame =
   let frame: ptr AVFrame = av_frame_alloc()
   if frame == nil:
     return nil
@@ -340,6 +380,8 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   frame.format = AV_PIX_FMT_YUV420P.cint
   frame.width = width
   frame.height = height
+  frame.colorspace = tag.space
+  frame.color_range = tag.range
 
   if av_frame_get_buffer(frame, 32) < 0:
     error "Bad buffer"
@@ -347,7 +389,7 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   if av_frame_make_writable(frame) < 0:
     error "Can't make frame writable"
 
-  let (yValue, uValue, vValue) = toYuv(color)
+  let (yValue, uValue, vValue) = toYuv(color, tag)
 
   let yData: ptr uint8 = frame.data[0]
   let yLinesize: cint = frame.linesize[0]
@@ -497,7 +539,7 @@ proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
     else: 0.0'f32
 
   let rgba = AVPixelFormat(frame.format) == AV_PIX_FMT_RGBA
-  let (yv, uv, vv) = toYuv(color)
+  let (yv, uv, vv) = toYuv(color, frame.tagOf)
   var cov: array[2, Cov]
 
   # Paired luma rows, because both share one chroma row and it must only be
@@ -684,7 +726,7 @@ proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
     fillChip(frame, poly, color)
 
 proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
-    bg: RGBColor): ptr AVFrame =
+    bg: RGBColor, tag: YuvTag): ptr AVFrame =
   ## Scale src to fit within targetW x targetH preserving aspect ratio,
   ## centering with bg color padding. Returns a new YUV420P frame.
   ## Uses sws_scale_frame + manual pixel copy to avoid filter graph NEON
@@ -702,7 +744,7 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     scaledW = cint((srcW.int * targetH.int) div srcH.int) and not 1.cint
     if scaledW < 2: scaledW = 2
 
-  var output = makeSolid(targetW, targetH, bg)
+  var output = makeSolid(targetW, targetH, bg, tag)
   if output == nil:
     error "Could not create background frame in scaleWithPad"
   output.pts = src.pts
@@ -717,6 +759,8 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     av_frame_free(addr output)
     error "Could not allocate scaled frame"
   scaled.format = AV_PIX_FMT_YUV420P.cint
+  scaled.colorspace = tag.space
+  scaled.color_range = tag.range
   scaled.width = scaledW
   scaled.height = scaledH
   # Propagate interlaced flags so sws_frame_setup doesn't reject mismatched frames.
@@ -1006,7 +1050,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         copyMem(dst.data, sd.data, sd.size)
 
   let graphTb = av_inv_q(targetFps)
-  let bg = tl.bg.toString
+  let solidTag: YuvTag = (
+    (if encoderCtx.colorspace.int == 0: 2.cint else: encoderCtx.colorspace),
+    encoderCtx.color_range)
+  let bgRgb = tl.bg.toRgb(solidTag.space.int, solidTag.range.int == 2)
+  let bg = bgRgb.toString
+
+  func keyColor(effect: Action, frame: ptr AVFrame): string =
+    effect.color.toRgb(frame.colorspace.int, frame.color_range.int == 2).toString
 
   proc bufArgsOf(frame: ptr AVFrame): string =
     ## Buffer-source args for feeding `frame` into a graph; only built when a
@@ -1033,7 +1084,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   var framesSaved = 0
 
-  var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg)
+  var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg, solidTag)
   if nullFrame == nil:
     error "Could not allocate fallback video frame"
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
@@ -1049,9 +1100,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     var frame = frame0
     let w = frame.width
     let h = frame.height
-    let col = effect.color.toString
+    let col = keyColor(effect, frame)
     let isChroma = effect.kind == actChromaKey
-    var bgFrame = makeSolid(w, h, tl.bg)
+    var bgFrame = makeSolid(w, h, tl.bg, solidTag)
     frame.pts = 0
     bgFrame.pts = 0
     let g = newGraph()
@@ -1139,7 +1190,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   proc overBg(frame0: ptr AVFrame): ptr AVFrame =
     ## Flatten an alpha-shaped rgba frame over a solid `-bg` (base-track mask).
     var top = frame0
-    var bgFrame = makeSolid(top.width, top.height, tl.bg)
+    var bgFrame = makeSolid(top.width, top.height, tl.bg, solidTag)
     top.pts = 0
     bgFrame.pts = 0
     let g = newGraph()
@@ -1293,7 +1344,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if not isOverlay:
           # Base layer must stay canvas-sized: shrink the contained square back
           # to the original frame size, centered with bg padding.
-          let fitted = scaleWithPad(frame, w, h, tl.bg)
+          let fitted = scaleWithPad(frame, w, h, tl.bg, solidTag)
           if fitted != frame:
             av_frame_free(addr frame)
             frame = fitted
@@ -1381,9 +1432,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.linkNodes(@[bufferSrc, toRgba, lut, bufferSink]).configure()
         else:
           runFx(fxId(actOpacity, frame, f0 = o)):
-            let bgR = (1.0'f32 - o) * float32(tl.bg.red)
-            let bgG = (1.0'f32 - o) * float32(tl.bg.green)
-            let bgB = (1.0'f32 - o) * float32(tl.bg.blue)
+            let bgR = (1.0'f32 - o) * float32(bgRgb.red)
+            let bgG = (1.0'f32 - o) * float32(bgRgb.green)
+            let bgB = (1.0'f32 - o) * float32(bgRgb.blue)
             let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
             let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
             let lut = fxGraph.add("lutrgb",
@@ -1403,9 +1454,16 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSink = fxGraph.add("buffersink")
           fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
       of actDrawbox:
+        if effect.dbColor.yuv and AVPixelFormat(frame.format) in
+            [AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUVJ420P]:
+          if av_frame_make_writable(frame) < 0:
+            error "Can't make frame writable"
+          fillBox(frame, effect.dbX, effect.dbY, effect.dbW, effect.dbH, effect.dbColor)
+          continue
         runFx(fxId(actDrawbox, frame, i0 = effect.dbX, i1 = effect.dbY,
             i2 = effect.dbW, i3 = effect.dbH, col = packRGB(effect.dbColor))):
-          let col = effect.dbColor.toString
+          let col = effect.dbColor.toRgb(frame.colorspace.int,
+            frame.color_range.int == 2).toString
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("drawbox",
             # replace=1: on a generator/keyed layer the canvas alpha is 0, and
@@ -1422,7 +1480,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           continue
         runFx(fxId(effect.kind, frame, f0 = effect.similar, f1 = effect.blend,
             col = packRGB(effect.color))):
-          let col = effect.color.toString
+          let col = keyColor(effect, frame)
           var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
           if effect.kind == actChromaKey:
             # chromakey keys in YUV-with-alpha; convert in, then back to rgba so
@@ -1911,7 +1969,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         var (acc, baseDidDecode) = decodeClipFrame(objList[0])
         if baseDidDecode and (acc.width.int32, acc.height.int32) != tl.res:
           let oldAcc = acc
-          acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg)
+          acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg, solidTag)
           av_frame_free(addr oldAcc)
         if acc != nil and acc.width > 0 and acc.height > 0:
           acc = applyEffects(acc, objList[0].effects, objList[0].local, objList[0].dur,
@@ -1998,7 +2056,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # costs one sws_scale rather than one per decoded frame).
           if (frame.width.int32, frame.height.int32) != tl.res:
             let oldFrame = frame
-            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
+            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag)
             av_frame_free(addr oldFrame)
         else:
           # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or

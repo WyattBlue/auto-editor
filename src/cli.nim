@@ -225,7 +225,7 @@ Examples:
   OptDef(names: "-res, --resolution", c: cTl, datum: coResolution,
     metavar: "WIDTH,HEIGHT", help: "Set timeline width and height"),
   OptDef(names: "-b, -bg, --background", c: cTl, datum: coBackground, metavar: "COLOR",
-    help: "Set the background as a solid RGB color"),
+    help: "Set the background as a solid RGB color, or yuv#YYUUVV to fill YUV video with those 8-bit Y'CbCr values as they are"),
 
   OptDef(names: "--yt-dlp-location", c: cUrl, datum: coYtDlpLocation, metavar: "PATH",
     help: &"Set a custom path to {ytDlp}"),

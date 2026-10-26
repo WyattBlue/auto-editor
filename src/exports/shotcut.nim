@@ -130,7 +130,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   producer.attrs = {"id": "bg"}.toXmlAttributes()
   producer.addProp("length", global_out)
   producer.addProp("eof", "pause")
-  producer.addProp("resource", tl.bg.toString)
+  producer.addProp("resource", tl.bg.toRgb.toString)
   producer.addProp("mlt_service", "color")
   producer.addProp("mlt_image_format", "rgba")
   producer.addProp("aspect_ratio", "1")
