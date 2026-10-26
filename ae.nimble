@@ -166,10 +166,10 @@ let libvpl = Package(
   ],
   ffFlag: "--enable-libvpl",
 )
-let lamer = Package(
-  name: "lamer",
-  sourceUrl: "https://github.com/basswood-io/lamer/archive/refs/tags/v3.101.0.tar.gz",
-  sha256: "81839b16fdc401e20b73389d05f32a7656008f43bcb960feff290d6f08fc109e",
+let bwlame = Package(
+  name: "bwlame",
+  sourceUrl: "https://github.com/basswood-io/bwlame/archive/refs/tags/v3.101.0.tar.gz",
+  sha256: "506d8a6e855f59151a5407d848557f9ac10acad6ff61718c7b0b3441221bfe72",
   buildSystem: "make",
   ffFlag: "--enable-libmp3lame",
 )
@@ -304,7 +304,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add libvpl
   if enableWhisper:
     result.add whisper
-  result &= [lamer, opus, dav1d, x264, zlib]
+  result &= [bwlame, opus, dav1d, x264, zlib]
   if enableLibass:
     result &= [freetype, fribidi, harfbuzz]
     result.add libass
@@ -330,8 +330,8 @@ func dirName(package: Package): string =
     return "AMF-1.5.2"
   if package.name == "whisper":
     return "whisper.cpp-1.9.5"
-  if package.name == "lamer":
-    return "lamer-3.101.0"
+  if package.name == "bwlame":
+    return "bwlame-3.101.0"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -1109,7 +1109,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, lamer, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libass]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, bwlame, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libass]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:
