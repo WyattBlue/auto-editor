@@ -34,6 +34,7 @@
  - Subtitle cues starting before 0 no longer crash subtitle analysis.
  - Deeply nested `--edit` expressions report an error instead of overflowing the stack, and an invalid regex pattern reports an error instead of crashing.
  - Actions reject `nan` and `inf` values.
+ - A speed too small to store in v1 timelines or FCP7 XML time remaps reports an error instead of hanging.
  - FCP7 XML import rejects bad integer fields, a timebase of 0, and clips that end before they start.
 
 # Misc.
