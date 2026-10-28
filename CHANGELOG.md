@@ -19,6 +19,7 @@
 
 ## Performance
  - x265 uses its assembly on arm64 for 10-bit encoding.
+ - `zoom` scales only the part of the frame that stays visible and reuses its scaler, making 4K renders with zoom 1.4–1.9× faster.
 
 ## Fixes
  - WebP images, still and animated, can again be used as inputs. Required enabling FFmpeg's vp8 decoder.

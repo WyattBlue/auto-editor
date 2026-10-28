@@ -11,6 +11,18 @@ func isIsoBmff*(formatName: string): bool =
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
 
+proc cropView*(frame: ptr AVFrame, left, top, right, bottom: cint) =
+  ## Crop by moving `frame`'s data pointers; no pixels are copied. Offsets must
+  ## be multiples of the chroma subsampling so chroma stays lined up with luma.
+  frame.crop_left = csize_t(left)
+  frame.crop_top = csize_t(top)
+  frame.crop_right = csize_t(right)
+  frame.crop_bottom = csize_t(bottom)
+  # Without UNALIGNED, the left crop rounds down to keep the pointers aligned,
+  # leaving a wider frame than asked for.
+  if av_frame_apply_cropping(frame, AV_FRAME_CROP_UNALIGNED) < 0:
+    error "Failed to crop frame"
+
 proc supportedConfig[T](codec: ptr AVCodec,
     config: AVCodecConfig): ptr UncheckedArray[T] =
   var configPtr: pointer = nil

@@ -473,7 +473,7 @@ type
     decode_error_flags*: cint
     hw_frames_ctx: pointer
     opaque_ref: pointer
-    crop_top, crop_bottom, crop_left, crop_right: csize_t
+    crop_top*, crop_bottom*, crop_left*, crop_right*: csize_t
     private_ref: pointer
     ch_layout*: AVChannelLayout
     duration*: int64
@@ -535,6 +535,10 @@ proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_clone*(src: ptr AVFrame): ptr AVFrame {.importc,
     header: "<libavutil/frame.h>".}
+proc av_frame_apply_cropping*(frame: ptr AVFrame, flags: cint): cint {.importc,
+    header: "<libavutil/frame.h>".}
+
+const AV_FRAME_CROP_UNALIGNED* = 1.cint
 
 type
   AVTXContext* {.importc, header: "<libavutil/tx.h>", incompleteStruct.} = object

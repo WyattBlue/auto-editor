@@ -305,6 +305,18 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   return newFrame
 
+func zoomSpan(n, scaled, step: cint): tuple[start, len, scaledLen: cint, offset: float] =
+  ## Along one axis of length `n` zoomed to `scaled`: the `step`-aligned source
+  ## span covering the centered `n` output pixels, its length once scaled, and
+  ## where those pixels start in it. The span gets a margin so the scaler's
+  ## taps at the edges read real pixels.
+  let ratio = float(n) / float(scaled)
+  let ox = float(scaled - n) / 2
+  let first = max(0, cint(floor(ox * ratio)) - 2) div step * step
+  let last = min(n, (cint(ceil((ox + float(n)) * ratio)) + 2 + step - 1) div step * step)
+  let scaledLen = max(n, cint(round(float(last - first) / ratio)))
+  (first, last - first, scaledLen, ox - float(first) / ratio)
+
 type YuvTag = tuple[space, range: cint]
 
 const untagged: YuvTag = (2.cint, 0.cint)
@@ -1082,6 +1094,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       error "Failed to allocate reformat sws context"
     discard av_opt_set_int(reformatCtx, "threads", 0, 0)
 
+  # Allocated on the first zoom; swscale rebuilds it itself when the geometry
+  # changes, so a constant zoom pays the init cost once.
+  var zoomCtx: ptr SwsContext = nil
+
   var framesSaved = 0
 
   var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg, solidTag)
@@ -1354,21 +1370,48 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           continue
         let origW = frame.width
         let origH = frame.height
+        if zoomCtx == nil:
+          zoomCtx = sws_alloc_context()
+          if zoomCtx == nil:
+            error "Failed to allocate zoom sws context"
+          discard av_opt_set_int(zoomCtx, "threads", 0, 0)
+        if z > 1.0:
+          # Scale only the source region that stays visible instead of the whole
+          # frame, which at z=3 is 9x the pixels. The window is then placed
+          # where the full-frame scale would have put it, in output pixels, so
+          # an animated zoom doesn't step by whole source pixels.
+          let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
+          let hstep = 1.cint shl d.log2_chroma_w
+          let vstep = 1.cint shl d.log2_chroma_h
+          let sw = max(cint(float(origW) * z), 2)
+          let sh = max(cint(float(origH) * z), 2)
+          let x = zoomSpan(origW, sw, hstep)
+          let y = zoomSpan(origH, sh, vstep)
+          cropView(frame, x.start, y.start, origW - x.start - x.len,
+            origH - y.start - y.len)
+          let scaledFrame = frame.reformat(AVPixelFormat(frame.format),
+            x.scaledLen, y.scaledLen, zoomCtx)
+          if scaledFrame != frame:
+            av_frame_free(addr frame)
+            frame = scaledFrame
+          let cx = clamp(cint(round(x.offset / float(hstep))) * hstep, 0,
+            (x.scaledLen - origW) div hstep * hstep)
+          let cy = clamp(cint(round(y.offset / float(vstep))) * vstep, 0,
+            (y.scaledLen - origH) div vstep * vstep)
+          cropView(frame, cx, cy, x.scaledLen - origW - cx, y.scaledLen - origH - cy)
+          continue
         let scaledW = max(cint(float(origW) * z), 2)
         let scaledH = max(cint(float(origH) * z), 2)
-        let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
+        let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW,
+          scaledH, zoomCtx)
         if scaledFrame != frame:
           av_frame_free(addr frame)
           frame = scaledFrame
-        let zoomCrop = z > 1.0
-        runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32,
-            i2 = (if zoomCrop: 1'i32 else: 0'i32))):
+        runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32)):
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let mid =
-            if zoomCrop: fxGraph.add("crop", &"{origW}:{origH}")
-            else: fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+          let pad = fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
+          fxGraph.linkNodes(@[bufferSrc, pad, bufferSink]).configure()
       of actHflip, actVflip, actInvert, actErosion:
         runFx(fxId(effect.kind, frame)):
           let filterName = case effect.kind
@@ -2092,6 +2135,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if confineMatte != nil: av_frame_free(addr confineMatte)
     sws_free_context(addr scaleCtx)
     sws_free_context(addr reformatCtx)
+    sws_free_context(addr zoomCtx)
     av_frame_free(addr frame)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)

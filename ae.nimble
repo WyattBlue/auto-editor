@@ -1011,7 +1011,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts",
     "image_webp_pipe", "webp_anim"]
 
-  var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,crop,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
+  var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,drawbox,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
 
   let isCrossWasm = kind == wasm32 or kind == wasm64
   for package in packages:
