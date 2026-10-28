@@ -1382,6 +1382,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # frame, which at z=3 is 9x the pixels. The window is then placed
           # where the full-frame scale would have put it, in output pixels, so
           # an animated zoom doesn't step by whole source pixels.
+          if AVPixelFormat(frame.format).isBitstream:
+            # Cropping moves data pointers, which can't land mid-byte, so
+            # FFmpeg skips the left and top crop for 1-bit formats.
+            let gray = frame.reformat(AV_PIX_FMT_GRAY8)
+            av_frame_free(addr frame)
+            frame = gray
           let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
           let hstep = 1.cint shl d.log2_chroma_w
           let vstep = 1.cint shl d.log2_chroma_h

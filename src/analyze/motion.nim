@@ -145,10 +145,24 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
 
   let timeBase = processor.tb
 
-  let pixelFormat = processor.codecCtx.pix_fmt
+  # Cropping moves data pointers, which can't land mid-byte, so FFmpeg skips
+  # the left and top crop for 1-bit formats. Those frames go to gray first.
+  let toGray = crop.w > 0 and processor.codecCtx.pix_fmt.isBitstream
+  let pixelFormat = (if toGray: AV_PIX_FMT_GRAY8 else: processor.codecCtx.pix_fmt)
   let pixFmtName = $pixelFormat
   if pixFmtName == "":
     error &"Could not get pixel format name for format: {ord(pixelFormat)}"
+
+  var graySws: ptr SwsContext = nil
+  var grayFrame: ptr AVFrame = nil
+  if toGray:
+    graySws = sws_alloc_context()
+    grayFrame = av_frame_alloc()
+    if graySws == nil or grayFrame == nil:
+      error "Could not allocate gray conversion"
+  defer:
+    sws_free_context(addr graySws)
+    av_frame_free(addr grayFrame)
 
   let (filterGraph, bufferSrc, bufferSink) =
     if crop.w > 0:
@@ -158,6 +172,16 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
         processor.codecCtx.height, filter)
 
   template applyCrop() =
+    if toGray:
+      av_frame_unref(grayFrame)
+      grayFrame.format = AV_PIX_FMT_GRAY8.cint
+      grayFrame.width = frame.width
+      grayFrame.height = frame.height
+      if sws_scale_frame(graySws, grayFrame, frame) < 0:
+        error "Could not convert frame to gray"
+      grayFrame.pts = frame.pts
+      av_frame_unref(frame)
+      av_frame_move_ref(frame, grayFrame)
     if crop.w > 0:
       # Clamp to this frame: the stream can change resolution mid-way.
       let cw = min(crop.w, frame.width)
