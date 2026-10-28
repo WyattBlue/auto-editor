@@ -1191,7 +1191,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       let analysisSrc = analysisGraph.add("abuffer", bufferArgs)
       let analysisFilter = analysisGraph.add("loudnorm", firstPass)
       let analysisSink = analysisGraph.add("abuffersink")
-      analysisGraph.linkNodes(@[analysisSrc, analysisFilter, analysisSink]).configure()
+      analysisGraph.linkNodes(analysisSrc, analysisFilter, analysisSink).configure()
 
       fltpPts = 0
       block:
@@ -1237,8 +1237,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
       let aformat = loudnormGraph.add("aformat", &"sample_rates={sr}")
       let bufferSink = loudnormGraph.add("abuffersink")
-      loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat,
-          bufferSink]).configure()
+      loudnormGraph.linkNodes(bufferSrc, loudnormFilter, aformat,
+          bufferSink).configure()
 
       fltpPts = 0
       block:

@@ -238,21 +238,24 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
       dealloc(currentFrame)
 
   let filter = &"scale={width}:-1,format=gray,gblur=sigma={blur}"
-  var crop = (x: 0.cint, y: 0.cint, w: 0.cint, h: 0.cint)
-  if x != 0.0 or y != 0.0 or w != 1.0 or h != 1.0:
-    # Crop before scaling so the analyzed region gets the full `width` resolution.
-    let iw = processor.codecCtx.width
-    let ih = processor.codecCtx.height
-    let d = av_pix_fmt_desc_get(processor.codecCtx.pix_fmt)
-    let (hsub, vsub) = (if d == nil: (0, 0) else: (d.log2_chroma_w.int, d.log2_chroma_h.int))
-    let hmask = not ((1.cint shl hsub) - 1)
-    let vmask = not ((1.cint shl vsub) - 1)
-    let cw = max(1'i32, int32(round(iw.float32 * w)))
-    let ch = max(1'i32, int32(round(ih.float32 * h)))
-    let cx = clamp(int32(round(iw.float32 * x)), 0'i32, iw - cw)
-    let cy = clamp(int32(round(ih.float32 * y)), 0'i32, ih - ch)
-    # Snap to the chroma subsampling so chroma stays lined up with luma.
-    crop = (cx and hmask, cy and vmask, max(cw and hmask, 1), max(ch and vmask, 1))
+  let crop =
+    if x != 0.0 or y != 0.0 or w != 1.0 or h != 1.0:
+      # Crop before scaling so the analyzed region gets the full `width` resolution.
+      let iw = processor.codecCtx.width
+      let ih = processor.codecCtx.height
+      let d = av_pix_fmt_desc_get(processor.codecCtx.pix_fmt)
+      let (hsub, vsub) =
+        if d == nil: (0, 0) else: (d.log2_chroma_w.int, d.log2_chroma_h.int)
+      let hmask = not ((1.cint shl hsub) - 1)
+      let vmask = not ((1.cint shl vsub) - 1)
+      let cw = max(1'i32, int32(round(iw.float32 * w)))
+      let ch = max(1'i32, int32(round(ih.float32 * h)))
+      let cx = clamp(int32(round(iw.float32 * x)), 0'i32, iw - cw)
+      let cy = clamp(int32(round(ih.float32 * y)), 0'i32, ih - ch)
+      # Snap to the chroma subsampling so chroma stays lined up with luma.
+      (cx and hmask, cy and vmask, max(cw and hmask, 1), max(ch and vmask, 1))
+    else:
+      (0.cint, 0.cint, 0.cint, 0.cint)
   for filteredFrame in processor.videoPipeline(filter, crop):
     let frameTime = (filteredFrame.pts * processor.formatCtx.streams[
         processor.videoIndex].time_base).float64

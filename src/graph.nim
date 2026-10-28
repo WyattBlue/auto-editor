@@ -48,7 +48,7 @@ proc add*(graph: Graph, name: string, filterArgs: string = ""): ptr AVFilterCont
   graph.nodes.add(filterCtx)
   return filterCtx
 
-proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
+proc linkNodes*(graph: Graph, nodes: varargs[ptr AVFilterContext]): Graph =
   if graph.configured:
     error "Cannot link nodes after graph is configured"
   if nodes.len < 2:

@@ -1128,7 +1128,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let keyer = g.add((if isChroma: "chromakey" else: "colorkey"),
       &"{col}:{effect.similar}:{effect.blend}")
     let ov = g.add("overlay", "format=yuv420")
-    discard g.linkNodes(@[fgSrc, toAlpha, keyer])
+    discard g.linkNodes(fgSrc, toAlpha, keyer)
     g.link(bgSrc, ov, 0, 0) # background on the bottom pad
     g.link(keyer, ov, 0, 1) # keyed frame on top
     g.link(ov, g.add("buffersink"))
@@ -1152,7 +1152,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let geq = g.add("geq", &"lum={maskGray(effect)}")
     let toGray = g.add("format", "pix_fmts=gray8")
     let sink = g.add("buffersink")
-    g.linkNodes(@[src, geq, toGray, sink]).configure()
+    g.linkNodes(src, geq, toGray, sink).configure()
     g.push(black)
     result = g.pull()
     g.cleanup()
@@ -1188,7 +1188,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let am = g.add("alphamerge")
     let toRgba = g.add("format", "pix_fmts=rgba")
     let sink = g.add("buffersink")
-    discard g.linkNodes(@[fSrc, toGbrp])
+    discard g.linkNodes(fSrc, toGbrp)
     g.link(toGbrp, am, 0, 0)
     g.link(mSrc, am, 0, 1)
     g.link(am, toRgba)
@@ -1244,9 +1244,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let mm = g.add("maskedmerge")
     let toOrig = g.add("format", &"pix_fmts={$origFmt}")
     let sink = g.add("buffersink")
-    discard g.linkNodes(@[bSrc, bFmt])
-    discard g.linkNodes(@[oSrc, oFmt])
-    discard g.linkNodes(@[mSrc, mFmt])
+    discard g.linkNodes(bSrc, bFmt)
+    discard g.linkNodes(oSrc, oFmt)
+    discard g.linkNodes(mSrc, mFmt)
     g.link(bFmt, mm, 0, 0)
     g.link(oFmt, mm, 0, 1)
     g.link(mFmt, mm, 0, 2)
@@ -1375,6 +1375,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           if zoomCtx == nil:
             error "Failed to allocate zoom sws context"
           discard av_opt_set_int(zoomCtx, "threads", 0, 0)
+        let scaledW = max(cint(float(origW) * z), 2)
+        let scaledH = max(cint(float(origH) * z), 2)
         if z > 1.0:
           # Scale only the source region that stays visible instead of the whole
           # frame, which at z=3 is 9x the pixels. The window is then placed
@@ -1383,10 +1385,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
           let hstep = 1.cint shl d.log2_chroma_w
           let vstep = 1.cint shl d.log2_chroma_h
-          let sw = max(cint(float(origW) * z), 2)
-          let sh = max(cint(float(origH) * z), 2)
-          let x = zoomSpan(origW, sw, hstep)
-          let y = zoomSpan(origH, sh, vstep)
+          let x = zoomSpan(origW, scaledW, hstep)
+          let y = zoomSpan(origH, scaledH, vstep)
           cropView(frame, x.start, y.start, origW - x.start - x.len,
             origH - y.start - y.len)
           let scaledFrame = frame.reformat(AVPixelFormat(frame.format),
@@ -1399,19 +1399,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let cy = clamp(cint(round(y.offset / float(vstep))) * vstep, 0,
             (y.scaledLen - origH) div vstep * vstep)
           cropView(frame, cx, cy, x.scaledLen - origW - cx, y.scaledLen - origH - cy)
-          continue
-        let scaledW = max(cint(float(origW) * z), 2)
-        let scaledH = max(cint(float(origH) * z), 2)
-        let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW,
-          scaledH, zoomCtx)
-        if scaledFrame != frame:
-          av_frame_free(addr frame)
-          frame = scaledFrame
-        runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32)):
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let pad = fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, pad, bufferSink]).configure()
+        else:
+          let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW,
+            scaledH, zoomCtx)
+          if scaledFrame != frame:
+            av_frame_free(addr frame)
+            frame = scaledFrame
+          runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32)):
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let pad = fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, pad, bufferSink).configure()
       of actHflip, actVflip, actInvert, actErosion:
         runFx(fxId(effect.kind, frame)):
           let filterName = case effect.kind
@@ -1422,7 +1420,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add(filterName)
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actBlur:
         let sigma = sample(effect, effect.kf, effect.kt)
         if sigma <= 0.0:
@@ -1431,7 +1429,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("gblur", &"sigma={sigma}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actBrightness:
         let b = sample(effect, effect.kf, effect.kt)
         if b == 0.0'f32:
@@ -1444,7 +1442,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let lut = fxGraph.add("lutrgb", &"r={expr}:g={expr}:b={expr}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, toRgb, lut, toOrig, bufferSink).configure()
       of actLuv:
         if (effect.brighthue == luvBrighthueId and
             effect.contrast == luvContrastId and
@@ -1461,7 +1459,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let lut = fxGraph.add("lutyuv", &"y={expr.y}:u={expr.u}:v={expr.v}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, toYuv, lut, toOrig, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, toYuv, lut, toOrig, bufferSink).configure()
       of actOpacity:
         let o = sample(effect, effect.kf, effect.kt)
         if o >= 1.0'f32:
@@ -1472,7 +1470,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let toRgba = fxGraph.add("format", "pix_fmts=rgba")
             let lut = fxGraph.add("lutrgb", &"a=val*{o}")
             let bufferSink = fxGraph.add("buffersink")
-            fxGraph.linkNodes(@[bufferSrc, toRgba, lut, bufferSink]).configure()
+            fxGraph.linkNodes(bufferSrc, toRgba, lut, bufferSink).configure()
         else:
           runFx(fxId(actOpacity, frame, f0 = o)):
             let bgR = (1.0'f32 - o) * float32(bgRgb.red)
@@ -1485,7 +1483,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let toOrig = fxGraph.add("format",
                 &"pix_fmts={$AVPixelFormat(frame.format)}")
             let bufferSink = fxGraph.add("buffersink")
-            fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+            fxGraph.linkNodes(bufferSrc, toRgb, lut, toOrig, bufferSink).configure()
       of actLens:
         let k1 = effect.k1
         let k2 = effect.k2
@@ -1495,7 +1493,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actDrawbox:
         if effect.dbColor.yuv and AVPixelFormat(frame.format) in
             [AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUVJ420P]:
@@ -1514,7 +1512,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}" &
               &":color={col}:t=fill:replace=1")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actColorKey, actChromaKey:
         if not isOverlay:
           # Base layer: no lower track to reveal, so replace the keyed color with
@@ -1570,7 +1568,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             &":bh={effect.abBh}:bv={effect.abBv}:edge={edge}")
           let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, toRgba, shift, toOrig, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, toRgba, shift, toOrig, bufferSink).configure()
       of actMask, actMaskPoly:
         # Shape the alpha from a cached matte via alphamerge (cheap per frame).
         let matte = cachedMatte(maskMatte, maskMatteKey, frame, effect)
@@ -1590,7 +1588,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
           let filt = fxGraph.add("pixelize", &"width={w}:height={h}")
           let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actConfetti:
         # In the layer's own format so an overlay's alpha survives; fillRect only
         # writes yuv420p and rgba, so convert anything else first.
@@ -1775,7 +1773,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let bsrc = rotGraph.add("buffer", bufArgsOf(frame))
           let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
           let bsink = rotGraph.add("buffersink")
-          rotGraph.linkNodes(@[bsrc, filt, bsink]).configure()
+          rotGraph.linkNodes(bsrc, filt, bsink).configure()
           rotKey = rk
         rotGraph.push(frame)
         av_frame_free(addr frame)
