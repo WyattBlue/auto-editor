@@ -68,8 +68,9 @@ type
     hide: bool
 
 proc createBarString(config: BarConfig, progress: float, width: int): string =
-  let wholeWidth = int(progress * width.float)
-  let remainderWidth = (progress * width.float) mod 1.0
+  let filled = progress * width.float
+  let wholeWidth = int(filled)
+  let remainderWidth = filled - trunc(filled)
   let partWidth = int(remainderWidth * config.partWidth.float)
   let partChar = if partWidth < config.chars.len: config.chars[partWidth] else: ""
 
