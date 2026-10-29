@@ -1,11 +1,16 @@
 import std/[atomics, sets, strformat, strutils, tables]
-from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt, floorMod, PI
+from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt, PI
 from std/algorithm import upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
 import ./burnsubs
 import ../lib/dnorm16
+
+func mod360(deg: float32): float32 {.inline.} =
+  # Like `floorMod(deg, 360)`, but compiles to fdiv/floor/fma instead of a
+  # libm `fmodf` call. Not bit-exact for huge angles; fine for rotations.
+  deg - 360'f32 * floor(deg / 360'f32)
 
 type VideoFrame = object
   index: int
@@ -1321,7 +1326,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if isOverlay or placeDone: continue
         placeDone = true
         let (sx, sy, deg) = scaleTurnOf(effects)
-        if sx == 1.0'f32 and sy == 1.0'f32 and floorMod(deg, 360'f32) == 0: continue
+        if sx == 1.0'f32 and sy == 1.0'f32 and mod360(deg) == 0: continue
         let w = frame.width
         let h = frame.height
         let sw = max(2.cint, cint(round(w.float32 * sx))) and not 1.cint
@@ -2046,7 +2051,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
             oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
           let (tw, th, tDeg) = scaleTurnOf(o.effects)
-          if tw != 1.0'f32 or th != 1.0'f32 or floorMod(tDeg, 360'f32) != 0:
+          if tw != 1.0'f32 or th != 1.0'f32 or mod360(tDeg) != 0:
             # Keep the overlay's center where it was placed. Turned at the
             # size it's shown at, so it isn't enlarged afterwards.
             let cx = ox + top.width.float32 * oscale / 2
