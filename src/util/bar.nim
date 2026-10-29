@@ -62,7 +62,6 @@ type
     title: string
     total: float
     lastReport: float
-    stack: seq[tuple[title: string, lenTitle: int, total: float, begin: float]]
     progressThread: Thread[ThreadData]
     threadData: ThreadData
     hide: bool
@@ -193,7 +192,7 @@ proc initBar*(barType: BarType): Bar =
 
   let config = BarConfig(icon: icon, chars: chars, brackets: brackets,
     machine: machine, partWidth: partWidth, ampm: ampm)
-  result = Bar(hide: hide, config: config, stack: @[], cancel: cancelFlag)
+  result = Bar(hide: hide, config: config, cancel: cancelFlag)
   if not hide:
     when not defined(windows):
       termResized.store(false)
@@ -260,8 +259,6 @@ proc `end`*(bar: Bar) =
     when defined(windows):
       stderr.write("\x1b[?25h") # restore cursor
     stderr.flushFile()
-  if bar.stack.len > 0:
-    bar.stack.setLen(bar.stack.len - 1)
 
 proc destroy*(bar: Bar) =
   ## Stop the drawing thread; it reads `bar`, so this must come before `bar`
