@@ -453,7 +453,7 @@ func unpackRGB(v: uint32): RGBColor =
 func towardWhite(c: RGBColor, t: float32): RGBColor =
   ## Mix `c` toward white by `t` in [0, 1].
   let f = clamp(t, 0.0'f32, 1.0'f32)
-  func mix(v: uint8): uint8 =
+  template mix(v: uint8): uint8 =
     uint8(float32(v) + (255.0'f32 - float32(v)) * f)
   RGBColor(red: mix(c.red), green: mix(c.green), blue: mix(c.blue))
 
