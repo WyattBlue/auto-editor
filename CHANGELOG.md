@@ -7,7 +7,9 @@
  -
 
 ## Performance
- -
+ - A source that plays in two places at once, as across a dissolve or as a picture-in-picture or `loop` overlay of the same file, gets its own decoder for each instead of seeking back to a keyframe every frame. An edit with 1-second dissolves renders 2.5× faster, and a same-file overlay up to 40× faster.
+ - Rendering no longer slows down quadratically with the number of clips: 160,000 one-frame clips render in 1.6 seconds instead of 58.
+ - Importing FCP7 XML uses about 10% less memory.
 
 ## Fixes
  -
