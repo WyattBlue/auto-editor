@@ -196,23 +196,40 @@ func videoFrameToTimestamp*(frame: int, frameRate, streamTimebase: AVRational): 
   ## large timestamp error in long videos (e.g. 33 ms instead of 1001/30 ms).
   av_rescale_q(frame.int64, av_inv_q(frameRate), streamTimebase)
 
-type SrcState = ref object
-  kfFrames: seq[int]          # indexed keyframe frame numbers
-  observedKeyframes: seq[int] # keyframes seen while decoding (for backward seeks)
-  decoder: ptr AVCodecContext
-  still: ptr AVFrame          # memoized decoded still; nil until first decode
-  held: ptr AVFrame           # last decoded frame, held for forward reuse
-  frameRate: AVRational       # source frames/second, also used for seek timestamps
-  kfInterval: int             # average interval between indexed keyframes
-  frameIndex: int             # decoder's current source position; -1 = none yet
-  seekThreshold: int          # don't seek-ahead before this frame
-  seekFrame: int              # frame we seeked from, for the frames-saved debug
-  lastSeekTarget: int         # -1 = no seek performed yet
-  lastReqIndex: int           # last obj.index requested (held-frame reuse)
-  loopBase: int               # source frames consumed by completed loops
-  hasKfIndex: bool            # whether the demuxer provided a keyframe index
-  hasSeekFrame: bool          # whether seekFrame holds a pending marker
-  isStill: bool               # single-frame image source (logo/watermark)
+type
+  DecState = ref object
+    ## One decoder reading its own demuxer. A source gets another when a
+    ## timeline frame needs it at two places, as across a dissolve, so neither
+    ## place makes the other seek back to a keyframe every frame.
+    cn: InputContainer
+    ownsCn: bool                # opened for this decoder, not the media cache's
+    decoder: ptr AVCodecContext
+    held: ptr AVFrame           # last decoded frame, held for forward reuse
+    frameIndex: int             # current source position; -1 = none yet
+    seekThreshold: int          # don't seek-ahead before this frame
+    seekFrame: int              # frame we seeked from, for frames-saved debug
+    lastSeekTarget: int         # -1 = no seek performed yet
+    lastReqIndex: int           # last obj.index requested (held-frame reuse)
+    loopBase: int               # source frames consumed by completed loops
+    hasSeekFrame: bool          # whether seekFrame holds a pending marker
+    usedAt: int64               # timeline frame it last decoded for; -1 = never
+
+  SrcState = ref object
+    kfFrames: seq[int]          # indexed keyframe frame numbers
+    observedKeyframes: seq[int] # keyframes any decoder saw (for backward seeks)
+    decoders: seq[DecState]     # the first reads the media cache's container
+    still: ptr AVFrame          # memoized decoded still; nil until first decode
+    frameRate: AVRational       # source frames/second, also for seek timestamps
+    kfInterval: int             # average interval between indexed keyframes
+    hasKfIndex: bool            # whether the demuxer provided a keyframe index
+    isStill: bool               # single-frame image source (logo/watermark)
+
+const maxDecoders = 4 # per source; past this a busy decoder seeks instead
+
+proc newDecState(cn: InputContainer, decoder: ptr AVCodecContext,
+    ownsCn: bool): DecState =
+  DecState(cn: cn, ownsCn: ownsCn, decoder: decoder, frameIndex: -1,
+    seekThreshold: 10, lastSeekTarget: -1, lastReqIndex: -1, usedAt: -1)
 
 proc buildKeyframeIndex(stream: ptr AVStream, fps: float,
     defaultInterval: int): KeyframeIndex =
@@ -867,8 +884,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # Per-source state with mutable-decode defaults. Decoding always begins on a
     # keyframe, so frame 0 is always a valid seek point (observedKeyframes starts
     # at @[0]); decoder/isStill below fill in for sources that have a video stream.
-    srcs[src] = SrcState(frameIndex: -1, seekThreshold: 10,
-      observedKeyframes: @[0], lastSeekTarget: -1, lastReqIndex: -1, loopBase: 0)
+    srcs[src] = SrcState(observedKeyframes: @[0])
 
     # Audio-only sources (e.g. the .mp3 behind a synthesized video canvas) have
     # no video stream to decode.
@@ -879,7 +895,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
-    srcs[src].decoder = decoderCtx
+    srcs[src].decoders.add newDecState(myCache.cns[src], decoderCtx, false)
 
     # An image source is a single still: an image codec read by an image
     # demuxer, or a stream that reports exactly one frame. The demuxer check
@@ -1104,6 +1120,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var zoomCtx: ptr SwsContext = nil
 
   var framesSaved = 0
+  var frameNo = -1'i64 # the timeline frame being built
 
   var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg, solidTag)
   if nullFrame == nil:
@@ -1640,6 +1657,32 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         confineEffect = effect
     return frame
 
+  proc pickDecoder(ss: SrcState, src: ptr string, obj: VideoFrame): DecState =
+    ## The decoder that reaches `obj.index` with the least decoding among those
+    ## not yet used this timeline frame. When all are, opens another.
+    var bestCost = high(int)
+    for d in ss.decoders:
+      if d.usedAt == frameNo: continue
+      let pos = d.loopBase + d.frameIndex
+      let cost =
+        if d.held != nil and obj.index >= d.lastReqIndex and obj.index <= pos: 0
+        elif obj.index >= pos: obj.index - pos
+        else: high(int) div 2 # behind it: a backward seek
+      if cost < bestCost:
+        bestCost = cost
+        result = d
+    if result == nil:
+      if ss.decoders.len < maxDecoders:
+        let cn = (try: av.open(src[]) except IOError as e: error e.msg)
+        let decoder = initDecoder(cn.video[0].codecpar)
+        decoder.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+        result = newDecState(cn, decoder, true)
+        ss.decoders.add result
+        debug &"Decoder {ss.decoders.len} for {src[]}"
+      else:
+        result = ss.decoders[0]
+    result.usedAt = frameNo
+
   proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
     ## Decode one clip's frame at its native resolution (after any static
     ## rotation), maintaining per-source seek state. Still images decode once
@@ -1648,27 +1691,28 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return (makeClear(tl.res[0].cint, tl.res[1].cint), true)
     if obj.src == nil: # synthesized background base (audio-only `add`)
       return (av_frame_clone(nullFrame), true)
-    let st = srcs[obj.src]
-    if st.isStill:
-      if st.still == nil:
+    let ss = srcs[obj.src]
+    if ss.isStill:
+      if ss.still == nil:
         let imgStream = myCache.cns[obj.src].video[0]
         var scratch = av_frame_clone(nullFrame)
         var got: ptr AVFrame = nil
         for decodedFrame in myCache.cns[obj.src].flushDecode(imgStream.index.cint,
-            st.decoder, scratch):
+            ss.decoders[0].decoder, scratch):
           got = av_frame_clone(decodedFrame)
           break
         av_frame_free(addr scratch)
         if got == nil:
           got = av_frame_clone(nullFrame)
-        st.still = got
-      return (av_frame_clone(st.still), true)
+        ss.still = got
+      return (av_frame_clone(ss.still), true)
 
     let cacheKey = (obj.src, obj.index)
     if cacheKey in decodedCache:
       # Another layer at this same timeline frame already decoded this exact
       # source frame. Reuse it.
       return (av_frame_clone(decodedCache[cacheKey]), true)
+    let st = ss.pickDecoder(obj.src, obj)
 
     # `loop` makes the source restart when it runs out: requests past the source
     # end map back to its start. `loopBase` is the frames consumed by completed
@@ -1690,7 +1734,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return (av_frame_clone(st.held), true)
 
     var frame = av_frame_clone(nullFrame)
-    var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
+    var myStream: ptr AVStream = st.cn.video[0]
     var frameIndex = st.frameIndex
     var seekThreshold = st.seekThreshold
     var seekFrame = st.seekFrame
@@ -1702,14 +1746,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       # sparsely-cued containers can report just a single keyframe).
       # observedKeyframes is kept strictly ascending, so upperBound-1 is the
       # floor; frame 0 is always a valid seek point.
-      let idx = upperBound(st.observedKeyframes, target) - 1
-      let seekTarget = if idx >= 0: st.observedKeyframes[idx] else: 0
+      let idx = upperBound(ss.observedKeyframes, target) - 1
+      let seekTarget = if idx >= 0: ss.observedKeyframes[idx] else: 0
       if seekTarget < 0 or seekTarget > target:
-        let indexInfo = if st.hasKfIndex: &"{st.kfFrames.len} indexed" else: "no index"
+        let indexInfo = if ss.hasKfIndex: &"{ss.kfFrames.len} indexed" else: "no index"
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
-      myCache.cns[obj.src].seek(
-        videoFrameToTimestamp(seekTarget, st.frameRate, myStream.time_base),
+      st.cn.seek(
+        videoFrameToTimestamp(seekTarget, ss.frameRate, myStream.time_base),
         stream = myStream)
       avcodec_flush_buffers(st.decoder)
       st.lastSeekTarget = seekTarget
@@ -1717,28 +1761,28 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     var didDecode = false
     while frameIndex < target:
-      if target - frameIndex > st.kfInterval and frameIndex > seekThreshold:
+      if target - frameIndex > ss.kfInterval and frameIndex > seekThreshold:
         if st.lastSeekTarget != target:
-          seekThreshold = frameIndex + (st.kfInterval div 2)
+          seekThreshold = frameIndex + (ss.kfInterval div 2)
           seekFrame = frameIndex
           hasSeekFrame = true
           debug &"Seek: {frameIndex} -> {target}"
-          myCache.cns[obj.src].seek(
-            videoFrameToTimestamp(target, st.frameRate, myStream.time_base),
+          st.cn.seek(
+            videoFrameToTimestamp(target, ss.frameRate, myStream.time_base),
             stream = myStream)
           avcodec_flush_buffers(st.decoder)
           st.lastSeekTarget = target
 
       let decoder: ptr AVCodecContext = st.decoder
       var foundFrame = false
-      for decodedFrame in myCache.cns[obj.src].flushDecode(
+      for decodedFrame in st.cn.flushDecode(
           myStream.index.cint, decoder, frame):
         frame = decodedFrame
         frameIndex = int(round(
-          decodedFrame.time(myStream.time_base) * st.frameRate.float))
+          decodedFrame.time(myStream.time_base) * ss.frameRate.float))
         if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
-            frameIndex > st.observedKeyframes[^1]:
-          st.observedKeyframes.add frameIndex
+            frameIndex > ss.observedKeyframes[^1]:
+          ss.observedKeyframes.add frameIndex
         foundFrame = true
         break
 
@@ -1746,7 +1790,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if looping and frameIndex >= 0:
           loopBase += frameIndex + 1
           target = obj.index - loopBase
-          myCache.cns[obj.src].seek(0, stream = myStream)
+          st.cn.seek(0, stream = myStream)
           avcodec_flush_buffers(st.decoder)
           st.lastSeekTarget = -1
           frameIndex = -1
@@ -1962,6 +2006,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     for index in startIndex ..< tl.len:
       if stop != nil and stop[].load(): break
+      frameNo = index
       objList = @[]
       # The (src, index) decode cache is only valid within one timeline frame.
       for _, f in decodedCache:
@@ -2155,10 +2200,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       if s.still != nil:
         var sf = s.still
         av_frame_free(addr sf)
-      if s.held != nil:
-        var hf = s.held
-        av_frame_free(addr hf)
-      if s.decoder != nil:
-        var p = s.decoder
+      for d in s.decoders:
+        if d.held != nil:
+          var hf = d.held
+          av_frame_free(addr hf)
+        var p = d.decoder
         avcodec_free_context(addr p)
+        if d.ownsCn: d.cn.close()
     debug &"Total frames avoided decoding via seeks: {framesSaved}")
