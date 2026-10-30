@@ -255,11 +255,34 @@ proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
   result.res = mi.getRes()
   mutHelper(result, mi, clips)
 
+type EffectIndex* = object
+  ## Finds an action group already in a timeline's effects by hash, where a
+  ## linear search per clip is quadratic in the number of distinct groups.
+  seen: int
+  ids: Table[Actions, uint32]
+
+proc intern*(index: var EffectIndex, effects: var seq[Actions],
+    group: Actions): uint32 =
+  ## The position in `effects` of the first group equal to `group`, which is
+  ## then freed, or else of `group` itself, appended. Groups appended to
+  ## `effects` some other way are picked up on the next call.
+  while index.seen < effects.len:
+    discard index.ids.hasKeyOrPut(effects[index.seen], uint32(index.seen))
+    inc index.seen
+  index.ids.withValue(group, found):
+    group.free()
+    return found[]
+  result = uint32(effects.len)
+  effects.add group
+  index.ids[group] = result
+  index.seen = effects.len
+
 proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 {.raises: [AutoEditorError].} =
   var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
   var effects: seq[Actions] = @[]
+  var effectIndex: EffectIndex
   var start: int64 = 0
 
   for chunk in chunks:
@@ -275,15 +298,7 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
         else:
           try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
           except ActionParseError: error "Too many actions"
-      var effectIndex = effects.find(action)
-      if effectIndex == -1:
-        effects.add action
-        effectIndex = effects.len - 1
-      else:
-        action.free()
-      if effectIndex > int64(high(uint32)):
-        error "'Number of actions' limit for timeline reached."
-      let e = uint32(effectIndex)
+      let e = effectIndex.intern(effects, action)
       clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
       clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
       start += dur
@@ -484,8 +499,9 @@ proc validateTransitions*(tl: v3) {.raises: [].} =
 
 type RampKey = tuple[effectIdx: uint32, kind: ActionKind, fadeIn: bool, dur: int64]
 
-proc withRamp(tl: var v3, cache: var Table[RampKey, uint32], effectIdx: uint32,
-    kind: ActionKind, fadeIn: bool, dur: int64): uint32 =
+proc withRamp(tl: var v3, cache: var Table[RampKey, uint32],
+    index: var EffectIndex, effectIdx: uint32, kind: ActionKind, fadeIn: bool,
+    dur: int64): uint32 =
   let key = (effectIdx, kind, fadeIn, dur)
   if key in cache: return cache[key]
   var actions: seq[Action]
@@ -498,15 +514,7 @@ proc withRamp(tl: var v3, cache: var Table[RampKey, uint32], effectIdx: uint32,
       easeCurve: easeLinear, easeDurUnit: duFrames, easeDur: dur.float32)
     else: error "Internal error: unsupported transition ramp"
   actions.add ramp
-  let group = newActions(actions)
-  let found = tl.effects.find(group)
-  result =
-    if found >= 0:
-      group.free()
-      found.uint32
-    else:
-      tl.effects.add group
-      uint32(tl.effects.len - 1)
+  result = index.intern(tl.effects, newActions(actions))
   cache[key] = result
 
 proc bakeTransitions*(source: v3): v3 =
@@ -514,6 +522,7 @@ proc bakeTransitions*(source: v3): v3 =
   ## native renderer. Exporters continue to consume the unmodified timeline.
   result = source
   var rampCache: Table[RampKey, uint32]
+  var effectIndex: EffectIndex
 
   proc bakeTrack(tl: var v3, track: var seq[Clip], transitions: seq[Transition],
       isVideo: bool) =
@@ -562,9 +571,11 @@ proc bakeTransitions*(source: v3): v3 =
           part.offset = clip.offset + (lo - clip.start)
           part.dur = hi - lo
           if fadeIn:
-            part.effects = tl.withRamp(rampCache, part.effects, k, true, hi - lo)
+            part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
+              k, true, hi - lo)
           if fadeOut:
-            part.effects = tl.withRamp(rampCache, part.effects, k, false, hi - lo)
+            part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
+              k, false, hi - lo)
           outTrack.add part
 
       addPart(clip.start, fadeInEnd, fadeIn = fadeInEnd > clip.start,

@@ -152,15 +152,6 @@ proc resolveFile(fileNode: XmlNode, sources: var Table[string, ptr string],
       return p
   return nil
 
-proc getEffect(acts: seq[Action], effects: var seq[Actions]): uint32 =
-  let actionGroup = newActions(acts)
-  let idx = effects.find(actionGroup)
-  if idx == -1:
-    effects.add(actionGroup)
-    return uint32(effects.len - 1)
-  actionGroup.free()
-  return uint32(idx)
-
 proc readTransition(node: XmlNode): Transition =
   var startVal, endVal = -1'i64
   var alignment = taCenter
@@ -187,7 +178,8 @@ proc readTransition(node: XmlNode): Transition =
   Transition(kind: tkDissolve, at: startVal + before, dur: dur, alignment: alignment)
 
 proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
-    effects: var seq[Actions], interner: var StringInterner):
+    effects: var seq[Actions], effectIndex: var EffectIndex,
+    interner: var StringInterner):
     tuple[clips: seq[Clip], transitions: seq[Transition]] =
   var items: seq[XmlNode]
   for c in trackNode:
@@ -250,7 +242,7 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     let offset = (if inExt > 0: max(0'i64, outVal - outExt - dur) else: inVal)
     for fn in filterNodes:
       readFilters(fn, acts, inVal.float, outVal.float)
-    let e = getEffect(acts, effects)
+    let e = effectIndex.intern(effects, newActions(acts))
     result.clips.add Clip(src: srcPtr, start: startVal, dur: dur, offset: offset,
       effects: e, stream: 0)
 
@@ -296,6 +288,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   var res = (1920'i32, 1080'i32)
   var sources: Table[string, ptr string]
   var effects: seq[Actions] = @[]
+  var effectIndex: EffectIndex
   var vobjs: seq[seq[Clip]] = @[]
   var aobjs: seq[seq[Clip]] = @[]
   var vtrans, atrans: seq[seq[Transition]]
@@ -319,7 +312,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
                 elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
               res = (w, h)
         of "track":
-          let (clips, transitions) = parseTrack(vidChild, sources, effects, interner)
+          let (clips, transitions) = parseTrack(vidChild, sources, effects,
+            effectIndex, interner)
           if clips.len > 0:
             vobjs.add clips
             vtrans.add transitions
@@ -339,7 +333,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
-          let (clips, transitions) = parseTrack(audChild, sources, effects, interner)
+          let (clips, transitions) = parseTrack(audChild, sources, effects,
+            effectIndex, interner)
           if clips.len > 0:
             aobjs.add clips
             atrans.add transitions

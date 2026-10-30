@@ -292,6 +292,7 @@ proc applyAdds(tl: var v3, args: var mainArgs,
                   elif tl.a.len > 0: tl.a[0]
                   else: newSeq[Clip]())
 
+  var effectIndex: EffectIndex
   for i, spec in args.adds:
     let audioGen = isAudioGen(spec)
     if audioGen and spec.hasPos:
@@ -319,13 +320,7 @@ proc applyAdds(tl: var v3, args: var mainArgs,
         group = newActions(acts)
     except ActionParseError as e:
       error e.msg
-    var idx = tl.effects.find(group)
-    if idx == -1:
-      tl.effects.add group
-      idx = tl.effects.len - 1
-    else:
-      group.free()
-    let eIdx = uint32(idx)
+    let eIdx = effectIndex.intern(tl.effects, group)
     var track: seq[Clip]
     # A generator has no source timeline, so `offset` (and `follow-base` with it)
     # is meaningless for one: it renders from its position on the timeline.
@@ -370,15 +365,9 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
   var total = 0'i64
   for clip in base: total = max(total, clip.start + clip.dur)
 
-  proc group(tl: var v3, actions: seq[Action]): uint32 =
-    let g = newActions(actions)
-    let found = tl.effects.find(g)
-    if found >= 0:
-      g.free()
-      found.uint32
-    else:
-      tl.effects.add g
-      uint32(tl.effects.len - 1)
+  var effectIndex: EffectIndex
+  proc group(tl: var v3, index: var EffectIndex, actions: seq[Action]): uint32 =
+    index.intern(tl.effects, newActions(actions))
 
   for li in countdown(args.layers.high, 0):
     let spec = args.layers[li]
@@ -407,14 +396,14 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
           var acts: seq[Action]
           for x in tl.effects[clip.effects]: acts.add x
           acts.add own
-          groups[clip.effects] = tl.group(acts)
+          groups[clip.effects] = tl.group(effectIndex, acts)
         # Offsets are already in speed-scaled frames, so a trim of k output
         # frames moves the offset by k.
         track.add Clip(src: src, start: a, dur: b - a,
           offset: clip.offset + (a - clip.start), effects: groups[clip.effects])
     else:
       track.add Clip(src: src, start: first, dur: last - first, offset: first,
-        effects: tl.group(own))
+        effects: tl.group(effectIndex, own))
 
     let mi = initMediaInfo(spec.path)
     if mi.v.len > 0:

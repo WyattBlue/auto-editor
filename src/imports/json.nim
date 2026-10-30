@@ -7,8 +7,9 @@ proc parseActionOrErr(val: string): Action {.raises: [AutoEditorError].} =
   try: parseAction(val)
   except ActionParseError as e: error e.msg
 
-proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
-    Actions]): Clip {.raises: [AutoEditorError].} =
+proc parseClip(node: JsonNode, interner: var StringInterner,
+    effects: var seq[Actions], index: var EffectIndex): Clip
+    {.raises: [AutoEditorError].} =
   let srcNode = node{"src"}
   if srcNode != nil and srcNode.kind == JNull:
     result.src = nil # synthesized base clip: a render canvas with no media
@@ -48,13 +49,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[
       try: group = newActions(list)
       except ActionParseError: error "Too many actions"
 
-  let effectIndex = effects.find(group)
-  if effectIndex == -1:
-    effects.add(group)
-    result.effects = uint32(effects.len - 1)
-  else:
-    group.free()
-    result.effects = uint32(effectIndex)
+  result.effects = index.intern(effects, group)
 
 proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =
   if node{"kind"}.getStr("") != "dissolve":
@@ -122,6 +117,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
     error "Expected two elements in 'resolution' key"
 
   result.effects = @[]
+  var effectIndex: EffectIndex
 
   let vNode = jsonNode{"v"}
   if vNode != nil and vNode.kind == JArray:
@@ -132,7 +128,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
         error "'v' layers must be non-empty arrays"
       var track: seq[Clip]
       for videoNode in trackNode:
-        track.add(parseClip(videoNode, interner, result.effects))
+        track.add(parseClip(videoNode, interner, result.effects, effectIndex))
       result.v.add track
 
   # Parse audio tracks
@@ -143,7 +139,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
         error "'a' layers must be non-empty arrays"
       var track: seq[Clip]
       for audioNode in trackNode:
-        track.add(parseClip(audioNode, interner, result.effects))
+        track.add(parseClip(audioNode, interner, result.effects, effectIndex))
       result.a.add track
 
   let langsNode = jsonNode{"langs"}
@@ -188,6 +184,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
   # De-duplication moves entries, so remember where each file index landed;
   # clip references are remapped through indexMap below.
   var indexMap: seq[uint32]
+  var effectIndex: EffectIndex
   let effectsNode = jsonNode{"effects"}
   if effectsNode != nil and effectsNode.kind == JArray:
     for effectNode in effectsNode:
@@ -207,13 +204,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
       else:
         error "effects must be a list of lists"
 
-      var effectIndex = effects.find(group)
-      if effectIndex == -1:
-        effects.add(group)
-        effectIndex = effects.len - 1
-      else:
-        group.free()
-      indexMap.add uint32(effectIndex)
+      indexMap.add effectIndex.intern(effects, group)
 
   let clipsNode = jsonNode{"clips"}
   if clipsNode != nil and clipsNode.kind == JArray:

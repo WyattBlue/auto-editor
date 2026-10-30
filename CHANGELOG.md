@@ -22,6 +22,7 @@
  - `zoom` scales only the part of the frame that stays visible and reuses its scaler, making 4K renders with zoom 1.4–1.9× faster.
  - Exporting to Premiere, Resolve, Final Cut Pro, Shotcut, and Kdenlive uses far less memory and is up to 1.6× faster. A 50,000-clip timeline peaks at 0.6 GiB instead of 2.1 GiB for Premiere, and 0.2 GiB instead of 1.6 GiB for Shotcut.
  - Importing FCP7 XML streams the file and uses about a third of the memory: a 50,000-clip Premiere XML peaks at 0.7 GiB instead of 1.8 GiB.
+ - Loading a timeline where many clips have different actions no longer slows down quadratically: 50,000 clips, each with its own volume, load in 0.5 seconds instead of 12.
 
 ## Fixes
  - WebP images, still and animated, can again be used as inputs. Required enabling FFmpeg's vp8 decoder.

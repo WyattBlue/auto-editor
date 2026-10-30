@@ -1,4 +1,4 @@
-import std/[algorithm, math, sequtils, strformat, strutils, options]
+import std/[algorithm, hashes, math, sequtils, strformat, strutils, options]
 import ./util/[color, suggest]
 import ./lib/[dnorm16, escape]
 
@@ -1724,6 +1724,13 @@ when not defined(nimscript):
     for i in 0 ..< n:
       if pa[i] != pb[i]: return false
     true
+
+  func hash*(a: Actions): Hash =
+    ## Over the packed bytes, as `==` compares them.
+    let ia = int(a)
+    if ia <= 1: return hash(ia)
+    let p = cast[ptr UncheckedArray[uint8]](ia + sizeof(uint16))
+    hash(toOpenArray(p, 0, a.len - 1))
 
   proc newActions*(list: openArray[Action]): Actions =
     if list.len == 0: return aNil
