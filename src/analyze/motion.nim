@@ -164,6 +164,11 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
     sws_free_context(addr graySws)
     av_frame_free(addr grayFrame)
 
+  # Gray is the luma plane, but swscale converts YUV tagged with a color matrix
+  # to gray through RGB, since gray has none. Untagged, it reads luma directly
+  # at a fraction of the cost.
+  let untag = not pixelFormat.isRgb
+
   let (filterGraph, bufferSrc, bufferSink) =
     if crop.w > 0:
       createFilterGraph(timeBase, pixFmtName, crop.w, crop.h, filter)
@@ -171,7 +176,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
       createFilterGraph(timeBase, pixFmtName, processor.codecCtx.width,
         processor.codecCtx.height, filter)
 
-  template applyCrop() =
+  template prepareFrame() =
     if toGray:
       av_frame_unref(grayFrame)
       grayFrame.format = AV_PIX_FMT_GRAY8.cint
@@ -189,6 +194,8 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
       let cx = min(crop.x, frame.width - cw)
       let cy = min(crop.y, frame.height - ch)
       cropView(frame, cx, cy, frame.width - cw - cx, frame.height - ch - cy)
+    if untag:
+      frame.colorspace = AVColorSpace(2) # AVCOL_SPC_UNSPECIFIED
 
   defer:
     if filterGraph != nil:
@@ -215,7 +222,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
         if frame.pts == AV_NOPTS_VALUE:
           continue
 
-        applyCrop()
+        prepareFrame()
         if av_buffersrc_write_frame(bufferSrc, frame) < 0:
           error "Error adding frame to filter"
 
@@ -232,7 +239,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
     if frame.pts == AV_NOPTS_VALUE:
       continue
 
-    applyCrop()
+    prepareFrame()
     ret = av_buffersrc_write_frame(bufferSrc, frame)
     if ret >= 0:
       ret = av_buffersink_get_frame(bufferSink, filteredFrame)
