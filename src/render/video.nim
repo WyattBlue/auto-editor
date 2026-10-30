@@ -1,6 +1,6 @@
 import std/[atomics, sets, strformat, strutils, tables]
 from std/math import round, hypot, ceil, floor, exp, sin, cos, ln, sqrt, PI
-from std/algorithm import upperBound
+from std/algorithm import sort, upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
@@ -2003,6 +2003,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return f
     f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
 
+  # Each layer's clips by start, and those started but not yet ended, so a
+  # frame looks only at the clips under it instead of every clip in the layer.
+  var byStart = newSeq[seq[int]](tl.v.len)
+  for li, layer in tl.v:
+    for ci in 0 ..< layer.len: byStart[li].add ci
+    byStart[li].sort(proc(a, b: int): int = cmp(layer[a].start, layer[b].start))
+  var nextStart = newSeq[int](tl.v.len)
+  var started = newSeq[seq[int]](tl.v.len)
+
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     for index in startIndex ..< tl.len:
       if stop != nil and stop[].load(): break
@@ -2014,49 +2023,65 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr df)
       decodedCache.clear()
 
-      for layerIdx, layer in tl.v:
-        for obj in layer:
-          if index >= obj.start and index < (obj.start + obj.dur):
-            # Convert timeline position from target framerate to source framerate
-            let timelinePos = obj.offset + index - obj.start
-            let effectGroup = tl.effects[obj.effects]
-            var speed = 1.0
-            # Overlay placement comes from a `pos` action in the clip's effects
-            # (keeps Clip itself position-free); defaults to the canvas origin.
-            var ox, oy = 0.0'f32
-            var oscale = 1.0'f32
-            var hasPos = false
-            for effect in effectGroup:
-              if effect.kind == actSpeed:
-                speed *= effect.val
-              elif effect.kind == actPos:
-                hasPos = true
-                # Sample the placement ramps at this frame's progress, eased like
-                # the other animatable effects; static pos has 1-keyframe seqs.
-                # Kept as floats so overlayFrame can place at a sub-pixel offset.
-                let span = frameSpan(int(obj.dur), tl.tb.float)
-                let local = int(index - obj.start)
-                ox = effect.ramp(effect.pxKf, effect.pxKt, span).at(local)
-                oy = effect.ramp(effect.pyKf, effect.pyKt, span).at(local)
-                oscale = effect.ramp(effect.pscaleKf, effect.pscaleKt, span).at(local)
+      for layerIdx in 0 ..< tl.v.len:
+        # An alias: a loop variable here would copy the layer every frame, as
+        # the iterator keeps its locals in its closure.
+        template layer: untyped = tl.v[layerIdx]
+        while nextStart[layerIdx] < layer.len and
+            layer[byStart[layerIdx][nextStart[layerIdx]]].start <= index:
+          started[layerIdx].add byStart[layerIdx][nextStart[layerIdx]]
+          inc nextStart[layerIdx]
+        var live = 0
+        for k in 0 ..< started[layerIdx].len:
+          let ci = started[layerIdx][k]
+          if index < layer[ci].start + layer[ci].dur:
+            started[layerIdx][live] = ci
+            inc live
+        started[layerIdx].setLen(live)
+        # In layer order, as overlapping clips composite.
+        started[layerIdx].sort()
+        for ci in started[layerIdx]:
+          let obj = layer[ci]
+          # Convert timeline position from target framerate to source framerate
+          let timelinePos = obj.offset + index - obj.start
+          let effectGroup = tl.effects[obj.effects]
+          var speed = 1.0
+          # Overlay placement comes from a `pos` action in the clip's effects
+          # (keeps Clip itself position-free); defaults to the canvas origin.
+          var ox, oy = 0.0'f32
+          var oscale = 1.0'f32
+          var hasPos = false
+          for effect in effectGroup:
+            if effect.kind == actSpeed:
+              speed *= effect.val
+            elif effect.kind == actPos:
+              hasPos = true
+              # Sample the placement ramps at this frame's progress, eased like
+              # the other animatable effects; static pos has 1-keyframe seqs.
+              # Kept as floats so overlayFrame can place at a sub-pixel offset.
+              let span = frameSpan(int(obj.dur), tl.tb.float)
+              let local = int(index - obj.start)
+              ox = effect.ramp(effect.pxKf, effect.pxKt, span).at(local)
+              oy = effect.ramp(effect.pyKf, effect.pyKt, span).at(local)
+              oscale = effect.ramp(effect.pscaleKf, effect.pscaleKt, span).at(local)
 
-            # A synthesized background base (nil src) has no source frame.
-            let sourceFramePos =
-              if obj.src == nil: 0
+          # A synthesized background base (nil src) has no source frame.
+          let sourceFramePos =
+            if obj.src == nil: 0
+            else:
+              let rate = myCache.cns[obj.src].video[0].avg_frame_rate
+              # 0/0 (no declared frame rate) would make the index NaN; map 1:1.
+              if rate.isValid:
+                int(round(float(timelinePos) * rate.float / tl.tb.float))
               else:
-                let rate = myCache.cns[obj.src].video[0].avg_frame_rate
-                # 0/0 (no declared frame rate) would make the index NaN; map 1:1.
-                if rate.isValid:
-                  int(round(float(timelinePos) * rate.float / tl.tb.float))
-                else:
-                  int(timelinePos)
-            let i = int(round(float(sourceFramePos) * speed))
-            # nil src: the `-bg` canvas on the base track, a generator above it.
-            objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
-              gen: obj.src == nil and layerIdx > 0,
-              local: int(index - obj.start), dur: int(obj.dur),
-              srcSecs: float(timelinePos) * speed / tl.tb.float,
-              x: ox, y: oy, scale: oscale, fit: not hasPos)
+                int(timelinePos)
+          let i = int(round(float(sourceFramePos) * speed))
+          # nil src: the `-bg` canvas on the base track, a generator above it.
+          objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
+            gen: obj.src == nil and layerIdx > 0,
+            local: int(index - obj.start), dur: int(obj.dur),
+            srcSecs: float(timelinePos) * speed / tl.tb.float,
+            x: ox, y: oy, scale: oscale, fit: not hasPos)
 
       # More than one active clip at this frame => composite layers (overlay /
       # picture-in-picture / image overlays). objList is in track order, so
