@@ -155,14 +155,15 @@ proc resolveFile(fileNode: XmlNode, files: var Table[string, FileInfo],
   if result.src != nil:
     files[fileId] = result
 
-func streamOf(file: FileInfo, trackIndex: int64): int16 =
-  ## The audio stream holding the file's 1-based channel `trackIndex`. Premiere
-  ## points both sides of a stereo pair at its first channel.
+func streamOf(file: FileInfo, trackIndex: int64): tuple[stream: int16, firstChannel: bool] =
+  ## The audio stream holding the file's 1-based channel `trackIndex`, and
+  ## whether it is that stream's first channel. Premiere points both sides of
+  ## a stereo pair at its first channel.
   var first = 1'i64
   for i, n in file.channels:
-    if trackIndex < first + n: return int16(i)
+    if trackIndex < first + n: return (int16(i), trackIndex == first)
     first += n
-  0
+  (0'i16, true)
 
 proc readTransition(node: XmlNode): Transition =
   var startVal, endVal = -1'i64
@@ -192,7 +193,10 @@ proc readTransition(node: XmlNode): Transition =
 proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     effects: var seq[Actions], effectIndex: var EffectIndex,
     interner: var StringInterner, audio: bool, dropped: var CountTable[string]):
-    tuple[clips: seq[Clip], transitions: seq[Transition]] =
+    tuple[clips: seq[Clip], transitions: seq[Transition], laterChannels: bool] =
+  ## `laterChannels` is set when every audio clip names a channel past the
+  ## first of its stream, as on the per-channel tracks resolve-fcp7 writes.
+  result.laterChannels = audio
   var items: seq[XmlNode]
   for c in trackNode:
     if c.kind != xnElement: continue
@@ -270,7 +274,11 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     for fn in filterNodes:
       readFilters(fn, acts, inVal.float, outVal.float)
     let e = effectIndex.intern(effects, newActions(acts))
-    let stream = (if audio: file.streamOf(trackIndex) else: 0'i16)
+    var stream = 0'i16
+    if audio:
+      let (s, firstChannel) = file.streamOf(trackIndex)
+      stream = s
+      if firstChannel: result.laterChannels = false
     result.clips.add Clip(src: file.src, start: startVal, dur: dur,
       offset: offset, effects: e, stream: stream)
 
@@ -341,7 +349,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
                 elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
               res = (w, h)
         of "track":
-          let (clips, transitions) = parseTrack(vidChild, files, effects,
+          let (clips, transitions, _) = parseTrack(vidChild, files, effects,
             effectIndex, interner, audio = false, dropped)
           if clips.len > 0:
             vobjs.add clips
@@ -362,9 +370,11 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
-          let (clips, transitions) = parseTrack(audChild, files, effects,
-            effectIndex, interner, audio = true, dropped)
-          if clips.len > 0:
+          let (clips, transitions, laterChannels) = parseTrack(audChild, files,
+            effects, effectIndex, interner, audio = true, dropped)
+          # Clips play whole streams, which the stream's first-channel track
+          # already holds.
+          if clips.len > 0 and not laterChannels:
             aobjs.add clips
             atrans.add transitions
         else: discard

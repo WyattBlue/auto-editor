@@ -228,6 +228,9 @@ proc makeFiledef(files: var FileDefs, clipitem: XmlNode, mi: MediaInfo,
 proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
     ntsc: string): XmlNode
 
+func channelsOf(mi: MediaInfo, stream: int16): int =
+  if stream >= 0 and stream.int < mi.a.len: max(1, mi.a[stream].channels.int) else: 1
+
 proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
     ptrToMi: Table[ptr string, MediaInfo],
     timebase: int64, ntsc: string) =
@@ -235,78 +238,86 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
   # them, making <link> refs ambiguous); audio continues after the video ids.
   var nextId = (if tl.v.len > 0: tl.v[0].len else: 0)
   for t, alayer in tl.a.pairs:
-    let track = newElement("track")
     let transitions = (if t < tl.at.len: tl.at[t] else: @[])
     let transitionLinks = transitionPlan(alayer, transitions)
-    for j, aclip in alayer.pairs:
-      if aclip.src == nil:
-        continue
-      if transitionLinks[j].incoming >= 0:
-        let transition = transitions[transitionLinks[j].incoming]
-        if transition.alignment == taStart:
-          track.add dissolveItem(transition, "audio", timebase, ntsc)
-      let mi = ptrToMi[aclip.src]
+    # Resolve imports every audio clipitem as mono, reading trackindex as a
+    # channel of the file's first audio stream, so each channel gets its own
+    # track. setStreamTo0 has already made every clip's stream the first.
+    var subTracks = 1
+    for aclip in alayer:
+      if aclip.src != nil:
+        subTracks = max(subTracks, ptrToMi[aclip.src].channelsOf(aclip.stream))
+    for sub in 0 ..< subTracks:
+      let track = newElement("track")
+      for j, aclip in alayer.pairs:
+        if aclip.src == nil:
+          continue
+        let mi = ptrToMi[aclip.src]
+        if sub >= mi.channelsOf(aclip.stream):
+          continue
+        if transitionLinks[j].incoming >= 0:
+          let transition = transitions[transitionLinks[j].incoming]
+          if transition.alignment == taStart:
+            track.add dissolveItem(transition, "audio", timebase, ntsc)
 
-      var startVal = $aclip.start
-      var endVal = $(aclip.start + aclip.dur)
-      var inFrame = aclip.offset
-      var outFrame = aclip.offset + aclip.dur
-      if transitionLinks[j].incoming >= 0:
-        let transition = transitions[transitionLinks[j].incoming]
-        if transition.alignment == taCenter:
-          startVal = "-1"
-          inFrame = max(0'i64, inFrame - transition.dur div 2)
-        elif transition.alignment == taStart:
-          startVal = "-1"
-      if transitionLinks[j].outgoing >= 0:
-        let transition = transitions[transitionLinks[j].outgoing]
-        if transition.alignment == taCenter:
-          endVal = "-1"
-          outFrame += transition.dur - transition.dur div 2
-        elif transition.alignment == taEnd:
-          endVal = "-1"
-      let inVal = $inFrame
-      let outVal = $outFrame
+        var startVal = $aclip.start
+        var endVal = $(aclip.start + aclip.dur)
+        var inFrame = aclip.offset
+        var outFrame = aclip.offset + aclip.dur
+        if transitionLinks[j].incoming >= 0:
+          let transition = transitions[transitionLinks[j].incoming]
+          if transition.alignment == taCenter:
+            startVal = "-1"
+            inFrame = max(0'i64, inFrame - transition.dur div 2)
+          elif transition.alignment == taStart:
+            startVal = "-1"
+        if transitionLinks[j].outgoing >= 0:
+          let transition = transitions[transitionLinks[j].outgoing]
+          if transition.alignment == taCenter:
+            endVal = "-1"
+            outFrame += transition.dur - transition.dur div 2
+          elif transition.alignment == taEnd:
+            endVal = "-1"
+        let inVal = $inFrame
+        let outVal = $outFrame
 
-      nextId += 1
-      let clipItemNum = nextId
+        nextId += 1
+        let clipItemNum = nextId
 
-      let clipitem = newElement("clipitem")
-      clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
-      clipitem.add elem("name", agSplitFile(mi.path).name)
-      clipitem.add elem("start", startVal)
-      clipitem.add elem("end", endVal)
-      clipitem.add elem("enabled", "TRUE")
-      clipitem.add elem("in", inVal)
-      clipitem.add elem("out", outVal)
+        let clipitem = newElement("clipitem")
+        clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
+        clipitem.add elem("name", agSplitFile(mi.path).name)
+        clipitem.add elem("start", startVal)
+        clipitem.add elem("end", endVal)
+        clipitem.add elem("enabled", "TRUE")
+        clipitem.add elem("in", inVal)
+        clipitem.add elem("out", outVal)
 
-      files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
+        files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
-      let sourcetrack = newElement("sourcetrack")
-      sourcetrack.add elem("mediatype", "audio")
-      # The clip's stream within its own file: after setStreamTo0 every
-      # track points at a single-stream wav, not the t-th stream of one file.
-      sourcetrack.add elem("trackindex", $(aclip.stream + 1))
-      clipitem.add sourcetrack
+        let sourcetrack = newElement("sourcetrack")
+        sourcetrack.add elem("mediatype", "audio")
+        sourcetrack.add elem("trackindex", $(sub + 1))
+        clipitem.add sourcetrack
 
-      if mi.v.len > 0:
-        let link1 = newElement("link")
-        link1.add elem("linkclipref", &"clipitem-{j + 1}")
-        link1.add elem("mediatype", "video")
-        clipitem.add link1
-        let link2 = newElement("link")
-        link2.add elem("linkclipref", &"clipitem-{clipItemNum}")
-        clipitem.add link2
+        if mi.v.len > 0:
+          let link1 = newElement("link")
+          link1.add elem("linkclipref", &"clipitem-{j + 1}")
+          link1.add elem("mediatype", "video")
+          clipitem.add link1
+          let link2 = newElement("link")
+          link2.add elem("linkclipref", &"clipitem-{clipItemNum}")
+          clipitem.add link2
 
-      for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
-          aclip.dur, tl.tb.float64):
-        clipitem.add f
+        for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
+            aclip.dur, tl.tb.float64):
+          clipitem.add f
 
-      track.add clipitem
-      if transitionLinks[j].outgoing >= 0:
-        track.add dissolveItem(transitions[transitionLinks[j].outgoing],
-          "audio", timebase, ntsc)
-    audio.add track
+        track.add clipitem
+        if transitionLinks[j].outgoing >= 0:
+          track.add dissolveItem(transitions[transitionLinks[j].outgoing],
+            "audio", timebase, ntsc)
+      audio.add track
 
 type AudioTrackInfo = object
   layerIdx: int         # Index into tl.a
