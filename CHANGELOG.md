@@ -20,7 +20,8 @@
 ## Performance
  - x265 uses its assembly on arm64 for 10-bit encoding.
  - `zoom` scales only the part of the frame that stays visible and reuses its scaler, making 4K renders with zoom 1.4–1.9× faster.
- - Exporting to Premiere, Resolve, Final Cut Pro, Shotcut, and Kdenlive uses far less memory and is up to 2× faster. A 50,000-clip timeline peaks at 0.6 GiB instead of 2.1 GiB for Premiere, and 0.2 GiB instead of 1.6 GiB for Shotcut.
+ - Exporting to Premiere, Resolve, Final Cut Pro, Shotcut, and Kdenlive uses far less memory and is up to 1.6× faster. A 50,000-clip timeline peaks at 0.6 GiB instead of 2.1 GiB for Premiere, and 0.2 GiB instead of 1.6 GiB for Shotcut.
+ - Importing FCP7 XML streams the file and uses about a third of the memory: a 50,000-clip Premiere XML peaks at 0.7 GiB instead of 1.8 GiB.
 
 ## Fixes
  - WebP images, still and animated, can again be used as inputs. Required enabling FFmpeg's vp8 decoder.
@@ -39,6 +40,8 @@
  - A speed too small to store in v1 timelines or FCP7 XML time remaps reports an error instead of hanging.
  - FCP7 XML import rejects bad integer fields, a timebase of 0, and clips that end before they start.
  - Exporting to Premiere, Resolve (FCP7 XML), Shotcut, or Kdenlive with an output path that can't be written reports an error instead of crashing.
+ - FCP7 XML import reads text in CDATA sections, such as a `<pathurl>`, instead of dropping it.
+ - Importing an FCP7 XML file that doesn't exist reports an error instead of crashing.
 
 # Misc.
  - Can be now be used as a Nim library, without going through command-line strings.
