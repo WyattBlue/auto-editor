@@ -231,30 +231,59 @@ proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
 func channelsOf(mi: MediaInfo, stream: int16): int =
   if stream >= 0 and stream.int < mi.a.len: max(1, mi.a[stream].channels.int) else: 1
 
-proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
-    ptrToMi: Table[ptr string, MediaInfo],
-    timebase: int64, ntsc: string) =
+type ResolveAudioIds = seq[seq[seq[int]]] # [layer][channel][clip] -> clipitem id; 0 if none
+
+proc planResolveAudio(tl: v3, ptrToMi: Table[ptr string, MediaInfo]): ResolveAudioIds =
+  ## Resolve imports every audio clipitem as mono, reading trackindex as a
+  ## channel of the file's first audio stream, so each channel gets its own
+  ## track. setStreamTo0 has already made every clip's stream the first.
   # Ids must be unique across every audio track (a per-track j would repeat
   # them, making <link> refs ambiguous); audio continues after the video ids.
   var nextId = (if tl.v.len > 0: tl.v[0].len else: 0)
+  for alayer in tl.a:
+    var channels = 1
+    for aclip in alayer:
+      if aclip.src != nil:
+        channels = max(channels, ptrToMi[aclip.src].channelsOf(aclip.stream))
+    var layer = newSeq[seq[int]](channels)
+    for sub in 0 ..< channels:
+      layer[sub] = newSeq[int](alayer.len)
+      for j, aclip in alayer:
+        if aclip.src != nil and sub < ptrToMi[aclip.src].channelsOf(aclip.stream):
+          nextId += 1
+          layer[sub][j] = nextId
+    result.add layer
+
+proc addResolveLinks(clipitem: XmlNode, tl: v3, audioIds: ResolveAudioIds, j: int) =
+  ## Link the video clip and every audio channel at position `j` together, so
+  ## they move as one.
+  var members: seq[(int, string)]
+  if tl.v.len > 0 and j < tl.v[0].len and tl.v[0][j].src != nil:
+    members.add (j + 1, "video")
+  for layer in audioIds:
+    for ids in layer:
+      if j < ids.len and ids[j] != 0:
+        members.add (ids[j], "audio")
+  if members.len < 2:
+    return
+  for (id, mediaType) in members:
+    let link = newElement("link")
+    link.add elem("linkclipref", &"clipitem-{id}")
+    link.add elem("mediatype", mediaType)
+    clipitem.add link
+
+proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
+    ptrToMi: Table[ptr string, MediaInfo], audioIds: ResolveAudioIds,
+    timebase: int64, ntsc: string) =
   for t, alayer in tl.a.pairs:
     let transitions = (if t < tl.at.len: tl.at[t] else: @[])
     let transitionLinks = transitionPlan(alayer, transitions)
-    # Resolve imports every audio clipitem as mono, reading trackindex as a
-    # channel of the file's first audio stream, so each channel gets its own
-    # track. setStreamTo0 has already made every clip's stream the first.
-    var subTracks = 1
-    for aclip in alayer:
-      if aclip.src != nil:
-        subTracks = max(subTracks, ptrToMi[aclip.src].channelsOf(aclip.stream))
-    for sub in 0 ..< subTracks:
+    for sub, ids in audioIds[t]:
       let track = newElement("track")
       for j, aclip in alayer.pairs:
-        if aclip.src == nil:
+        if ids[j] == 0:
           continue
         let mi = ptrToMi[aclip.src]
-        if sub >= mi.channelsOf(aclip.stream):
-          continue
         if transitionLinks[j].incoming >= 0:
           let transition = transitions[transitionLinks[j].incoming]
           if transition.alignment == taStart:
@@ -281,11 +310,8 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
         let inVal = $inFrame
         let outVal = $outFrame
 
-        nextId += 1
-        let clipItemNum = nextId
-
         let clipitem = newElement("clipitem")
-        clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
+        clipitem.attrs = {"id": &"clipitem-{ids[j]}"}.toXmlAttributes
         clipitem.add elem("name", agSplitFile(mi.path).name)
         clipitem.add elem("start", startVal)
         clipitem.add elem("end", endVal)
@@ -300,14 +326,7 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
         sourcetrack.add elem("trackindex", $(sub + 1))
         clipitem.add sourcetrack
 
-        if mi.v.len > 0:
-          let link1 = newElement("link")
-          link1.add elem("linkclipref", &"clipitem-{j + 1}")
-          link1.add elem("mediatype", "video")
-          clipitem.add link1
-          let link2 = newElement("link")
-          link2.add elem("linkclipref", &"clipitem-{clipItemNum}")
-          clipitem.add link2
+        clipitem.addResolveLinks(tl, audioIds, j)
 
         for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
             aclip.dur, tl.tb.float64):
@@ -509,6 +528,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     nextVideoId += tl.v[k].len
   let firstAudioId = (if hasVideo: nextVideoId else: 1)
   let audioPlan = if resolve: @[] else: planPremiereAudio(tl, ptrToMi, firstAudioId)
+  let resolveAudio = if resolve: planResolveAudio(tl, ptrToMi) else: @[]
 
   let xmeml = <>xmeml(version = "5")
   let sequence = (if resolve: <>sequence() else: <>sequence(explodedTracks = "true"))
@@ -604,12 +624,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
           clipitem.add f
 
         if resolve:
-          let link1 = newElement("link")
-          link1.add elem("linkclipref", thisClipid)
-          clipitem.add link1
-          let link2 = newElement("link")
-          link2.add elem("linkclipref", &"clipitem-{tl.v[0].len + j + 1}")
-          clipitem.add link2
+          clipitem.addResolveLinks(tl, resolveAudio, j)
         elif vIdx == 0:
           # Base track: link the clip to itself and to its aligned audio clips so
           # they move together. Overlay tracks (v[1..]) carry no audio, so they
@@ -641,7 +656,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   # Audio definitions and clips
   let audio = newElement("audio")
   if resolve:
-    resolveWriteAudio(audio, files, tl, ptrToMi, timebase, ntsc)
+    resolveWriteAudio(audio, files, tl, ptrToMi, resolveAudio, timebase, ntsc)
   else:
     premiereWriteAudio(audio, files, tl, ptrToMi, audioPlan, timebase, ntsc)
 
