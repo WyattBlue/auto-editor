@@ -89,13 +89,18 @@ auto-editor example.mp4 -w:0 nil -w:1 nil --export premiere
 auto-editor reads timeline/XML files as inputs and renders them like any media:
 
 ```bash
-auto-editor myFcp7File.xml -o render.mp4    # render an fcp7 xml (experimental)
+auto-editor myFcp7File.xml -o render.mp4    # render a Premiere/Resolve fcp7 xml
+auto-editor project.fcpxmld -o render.mp4   # render a Final Cut Pro export
 auto-editor timeline.v3 -o render.mp4       # render an auto-editor timeline file
 ```
 
-Importers: auto-editor timeline files (`.v1`, `.v2`, `.v3`) and FCP7 XML
-(experimental). The input format is detected by extension. PRs for more importers
-are welcome.
+Importers: auto-editor timeline files (`.v1`, `.v2`, `.v3`), FCP7 XML (Premiere Pro,
+DaVinci Resolve), and FCPXML (`.fcpxml` files and the `.fcpxmld` bundles Final Cut Pro
+exports). The input format is detected by extension.
+
+FCPXML import reads the primary storyline, connected clips (lanes above become video
+layers; lanes below contribute audio only), transitions, constant speed, and volume.
+Compound, synchronized, and multicam clips are left out with a warning.
 
 ## Timeline format notes
 

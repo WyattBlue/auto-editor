@@ -1,6 +1,6 @@
 import std/[algorithm, sequtils, strformat, strutils, tables]
 
-import ../[action, av, ffmpeg, log, timeline]
+import ../[action, ffmpeg, log, timeline]
 import ../util/[color, fun, rational, xml]
 
 # Tags common in FCP7 XML, so the parsed tree can share their strings.
@@ -76,7 +76,8 @@ func onGrid(pts: seq[(float, float)], srcIn, span: float): bool =
 func kfSeq(pts: seq[(float, float)], srcIn, srcOut, scale, lo, hi: float):
     seq[float32] =
   if pts.len == 0: return
-  if pts.len == 1:
+  # Premiere keyframes even an untouched opacity, as a run of equal values.
+  if pts.allIt(it[1] == pts[0][1]):
     if pts[0][1] * scale == 1.0: return
     return @[clamp(pts[0][1] * scale, lo, hi).float32]
 
@@ -129,19 +130,39 @@ proc readFilters(filterNode: XmlNode, acts: var seq[Action],
         acts.addFixed Action(kind: actVolume, kf: kf)
     else: discard
 
-proc resolveFile(fileNode: XmlNode, sources: var Table[string, ptr string],
-                 interner: var StringInterner): ptr string =
+type FileInfo = object
+  src: ptr string
+  channels: seq[int] # each audio stream's channel count, in stream order
+
+proc resolveFile(fileNode: XmlNode, files: var Table[string, FileInfo],
+    interner: var StringInterner): FileInfo =
+  ## A file is described once; later clips refer to it by id alone.
   let fileId = fileNode.attr("id")
-  if fileId in sources:
-    return sources[fileId]
+  if fileId in files:
+    return files[fileId]
   for fc in fileNode:
     if fc.kind != xnElement: continue
     if fc.tag == "pathurl":
-      let filePath = uriToPath(fc.innerText.strip())
-      let p = interner.intern(filePath)
-      sources[fileId] = p
-      return p
-  return nil
+      result.src = interner.intern(uriToPath(fc.innerText.strip()))
+    elif fc.tag == "media":
+      for m in fc:
+        if m.kind != xnElement or m.tag != "audio": continue
+        var channels = 2
+        for a in m:
+          if a.kind == xnElement and a.tag == "channelcount":
+            channels = int(xmlInt(a, 1, 64))
+        result.channels.add channels
+  if result.src != nil:
+    files[fileId] = result
+
+func streamOf(file: FileInfo, trackIndex: int64): int16 =
+  ## The audio stream holding the file's 1-based channel `trackIndex`. Premiere
+  ## points both sides of a stereo pair at its first channel.
+  var first = 1'i64
+  for i, n in file.channels:
+    if trackIndex < first + n: return int16(i)
+    first += n
+  0
 
 proc readTransition(node: XmlNode): Transition =
   var startVal, endVal = -1'i64
@@ -168,14 +189,17 @@ proc readTransition(node: XmlNode): Transition =
   # Every transition is read as a dissolve, the only kind the timeline has.
   Transition(kind: tkDissolve, at: startVal + before, dur: dur, alignment: alignment)
 
-proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
+proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     effects: var seq[Actions], effectIndex: var EffectIndex,
-    interner: var StringInterner):
+    interner: var StringInterner, audio: bool, dropped: var CountTable[string]):
     tuple[clips: seq[Clip], transitions: seq[Transition]] =
   var items: seq[XmlNode]
   for c in trackNode:
-    if c.kind == xnElement and c.tag in ["clipitem", "transitionitem"]:
+    if c.kind != xnElement: continue
+    if c.tag in ["clipitem", "transitionitem"]:
       items.add c
+    elif c.tag == "generatoritem": # titles, color mattes, bars and tone
+      dropped.inc "generated clip"
   var parsed = newSeq[Transition](items.len)
   for k, node in items:
     if node.tag == "transitionitem":
@@ -190,6 +214,9 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     var inVal = 0i64
     var outVal = -1i64
     var fileNode: XmlNode = nil
+    var nested = false
+    var enabled = true
+    var trackIndex = 1'i64
     var acts: seq[Action]
     var filterNodes: seq[XmlNode]
 
@@ -202,12 +229,21 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
       of "in": inVal = xmlInt(ci, lo = 0)
       of "out": outVal = xmlInt(ci, lo = -1)
       of "file": fileNode = ci
+      of "sequence": nested = true
+      of "enabled": enabled = ci.innerText.strip() != "FALSE"
       of "filter": filterNodes.add ci
+      of "sourcetrack":
+        for st in ci:
+          if st.kind == xnElement and st.tag == "trackindex":
+            trackIndex = xmlInt(st, 1, high(int32))
       else: discard
 
-    if fileNode == nil: continue
-    let srcPtr = resolveFile(fileNode, sources, interner)
-    if srcPtr == nil: continue
+    if not enabled: continue
+    if fileNode == nil:
+      if nested: dropped.inc "nested sequence"
+      continue
+    let file = resolveFile(fileNode, files, interner)
+    if file.src == nil: continue
 
     # An edge inside a transition is the transition's edit point. A centered
     # transition also extends the clip's media by its half on that side.
@@ -234,8 +270,9 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
     for fn in filterNodes:
       readFilters(fn, acts, inVal.float, outVal.float)
     let e = effectIndex.intern(effects, newActions(acts))
-    result.clips.add Clip(src: srcPtr, start: startVal, dur: dur, offset: offset,
-      effects: e, stream: 0)
+    let stream = (if audio: file.streamOf(trackIndex) else: 0'i16)
+    result.clips.add Clip(src: file.src, start: startVal, dur: dur,
+      offset: offset, effects: e, stream: stream)
 
 proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   let root = parseXmlFile(path, fcp7Tags)
@@ -277,7 +314,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
 
   var sr: cint = 48000
   var res = (1920'i32, 1080'i32)
-  var sources: Table[string, ptr string]
+  var files: Table[string, FileInfo]
+  var dropped: CountTable[string]
   var effects: seq[Actions] = @[]
   var effectIndex: EffectIndex
   var vobjs: seq[seq[Clip]] = @[]
@@ -303,8 +341,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
                 elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
               res = (w, h)
         of "track":
-          let (clips, transitions) = parseTrack(vidChild, sources, effects,
-            effectIndex, interner)
+          let (clips, transitions) = parseTrack(vidChild, files, effects,
+            effectIndex, interner, audio = false, dropped)
           if clips.len > 0:
             vobjs.add clips
             vtrans.add transitions
@@ -324,8 +362,8 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
-          let (clips, transitions) = parseTrack(audChild, sources, effects,
-            effectIndex, interner)
+          let (clips, transitions) = parseTrack(audChild, files, effects,
+            effectIndex, interner, audio = true, dropped)
           if clips.len > 0:
             aobjs.add clips
             atrans.add transitions
@@ -340,6 +378,22 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
     result.validateTransitions()
   result.templateFile = result.firstSource
   result.updateNumberOfSrc()
-  result.layout = initLayout("stereo")
+  # The layout of the first audio clip's stream, as rendering its source would.
+  var channels = 2
+  if aobjs.len > 0 and aobjs[0].len > 0:
+    let first = aobjs[0][0]
+    for file in files.values:
+      if file.src == first.src and first.stream < file.channels.len:
+        channels = file.channels[first.stream]
+        break
+  result.layout = (ref AVChannelLayout)()
+  av_channel_layout_default(addr result.layout[], channels.cint)
   while result.langs.len < result.v.len + result.a.len:
     result.langs.add ['u', 'n', 'd', '\0']
+
+  if dropped.len > 0:
+    var parts: seq[string]
+    for what, count in dropped:
+      parts.add (if count == 1: &"1 {what}" else: &"{count} {what}s")
+    parts.sort()
+    warning "Left out of the import: " & parts.join(", ")
