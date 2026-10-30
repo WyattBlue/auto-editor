@@ -1,4 +1,5 @@
 import std/[base64, os, strutils, strformat]
+from std/uri import decodeUrl
 from std/math import gcd, `mod`, round, trunc, pow
 
 import ../log
@@ -155,6 +156,26 @@ func pathToUri*(path: AbsPath): string {.raises: [].} =
     else:
       result.add '%'
       result.add toHex(ord(c), 2)
+
+func uriToPath*(uri: string): string {.raises: [].} =
+  ## The path a file:// URL names, decoded; other strings unchanged.
+  var path = uri
+  if path.startsWith("file://localhost/"):
+    # Windows-style: file://localhost/C:/... -> C:/...
+    if path.len > 18 and path[18] == ':':
+      path = path[17..^1]
+    else:
+      path = path[16..^1]
+  elif path.startsWith("file://"):
+    # Windows-style: file:///C:/... -> C:/...
+    if path.len > 9 and path[9] == ':':
+      path = path[8..^1]
+    else:
+      # Unix-style: file:///path -> /path
+      path = path[7..^1]
+  else:
+    return uri
+  return decodeUrl(path, decodePlus = false)
 
 const
   commonAspectRatios = [

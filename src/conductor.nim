@@ -7,7 +7,7 @@ import ./[av, action, edit, ffmpeg, license, log, media, stats, timeline]
 import ./lib/editutil
 import ./util/[color, bar, fun, lang, rules, rational]
 
-import ./imports/[fcp7, json]
+import ./imports/[fcp7, fcp11, json]
 import ./exports/[drops, fcp7, fcp11, json, shotcut, kdenlive, otio]
 import ./render/[format, subtitle]
 
@@ -447,6 +447,11 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       tlV3 = fcp7ReadXml(input, interner)
       tlV3.applyArgs(args, audio)
       usePath = input
+    elif inputExt in [".fcpxml", ".fcpxmld"]:
+      tlV3 = fcp11ReadXml(input, interner)
+      tlV3.applyArgs(args, audio)
+      # A bundle names its output as the .fcpxml it holds.
+      usePath = input.changeFileExt(".fcpxml")
     else:
       usePath = input
       var tb = AVRational(num: 30, den: 1)

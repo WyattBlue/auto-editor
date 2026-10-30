@@ -1,7 +1,7 @@
-import std/[algorithm, sequtils, strformat, strutils, tables, uri]
+import std/[algorithm, sequtils, strformat, strutils, tables]
 
 import ../[action, av, ffmpeg, log, timeline]
-import ../util/[color, rational, xml]
+import ../util/[color, fun, rational, xml]
 
 # Tags common in FCP7 XML, so the parsed tree can share their strings.
 const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",
@@ -12,25 +12,6 @@ const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",
   "valuemax", "keyframe", "when", "rate", "timebase", "ntsc", "duration",
   "pathurl", "masterclipid", "pproTicksIn", "pproTicksOut", "alphatype",
   "pixelaspectratio", "anamorphic", "logginginfo", "colorinfo", "comments"]
-
-func uriToPath(uri: string): string =
-  var path = uri
-  if path.startsWith("file://localhost/"):
-    # Windows-style: file://localhost/C:/... -> C:/...
-    if path.len > 18 and path[18] == ':':
-      path = path[17..^1]
-    else:
-      path = path[16..^1]
-  elif path.startsWith("file://"):
-    # Windows-style: file:///C:/... -> C:/...
-    if path.len > 9 and path[9] == ':':
-      path = path[8..^1]
-    else:
-      # Unix-style: file:///path -> /path
-      path = path[7..^1]
-  else:
-    return uri
-  return decodeUrl(path, decodePlus = false)
 
 func readTbNtsc(tb: int, ntsc: bool): AVRational =
   if ntsc:
