@@ -50,6 +50,48 @@ func appliesTo(kind: ActionKind, video: bool): bool {.raises: [].} =
 func plural(n: int, noun: string): string {.raises: [].} =
   if n == 1: "1 " & noun else: $n & " " & noun & "s"
 
+type DropScan = object
+  baseSrcs: seq[ptr string]
+  videoBase: bool
+  actions: seq[string]
+  droppedV, droppedA, generated: int
+
+func onlyBaseSrcs(s: DropScan, layer: seq[Clip]): bool {.raises: [].} =
+  for clip in layer:
+    if clip.src != nil and clip.src notin s.baseSrcs:
+      return false
+  true
+
+func carried(s: DropScan, layer: seq[Clip], i: int, rule: LayerRule,
+    isBase: bool): bool {.raises: [].} =
+  if isBase: return true
+  case rule
+  of lrAll: true
+  of lrBase: false
+  of lrSameSource: s.onlyBaseSrcs(layer)
+  of lrFirst: i == 0 and s.onlyBaseSrcs(layer)
+
+proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
+    rule: LayerRule, supported: set[ActionKind]) {.raises: [].} =
+  for i, layer in layers:
+    if layer.len == 0: continue
+    let isBase = (if video: i == 0 else: i == 0 and not s.videoBase)
+    # Generator layers (add:text, add:tone) have no file for an editor to
+    # reference. A video base without files is different: it's the canvas
+    # an audio-only timeline gets for its overlays, not content.
+    if not (video and i == 0) and layer.allIt(it.src == nil):
+      inc s.generated
+      continue
+    if not s.carried(layer, i, rule, isBase):
+      if video: inc s.droppedV else: inc s.droppedA
+      continue
+    for clip in layer:
+      if clip.src == nil: continue
+      for act in tl.effects[clip.effects]:
+        if act.kind notin supported and act.kind.appliesTo(video):
+          let name = ($act).split({':', ','})[0]
+          if name notin s.actions: s.actions.add name
+
 proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   ## What exporting `tl` as `kind` leaves out: action names, then counts of
   ## video, audio, generated and subtitle tracks. Empty when nothing is lost.
@@ -58,55 +100,18 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   let sup = support(kind)
   let videoBase = tl.v.len > 0 and tl.v[0].len > 0
 
-  var baseSrcs: seq[ptr string]
+  var s = DropScan(videoBase: videoBase)
   for clip in (if videoBase: tl.v[0] elif tl.a.len > 0: tl.a[0] else: @[]):
-    if clip.src != nil and clip.src notin baseSrcs:
-      baseSrcs.add clip.src
+    if clip.src != nil and clip.src notin s.baseSrcs:
+      s.baseSrcs.add clip.src
 
-  func onlyBaseSrcs(layer: seq[Clip]): bool =
-    for clip in layer:
-      if clip.src != nil and clip.src notin baseSrcs:
-        return false
-    true
+  s.scan(tl, tl.v, true, sup.v, sup.actions)
+  s.scan(tl, tl.a, false, sup.a, sup.actions)
 
-  proc carried(layer: seq[Clip], i: int, rule: LayerRule, isBase: bool): bool =
-    if isBase: return true
-    case rule
-    of lrAll: true
-    of lrBase: false
-    of lrSameSource: layer.onlyBaseSrcs
-    of lrFirst: i == 0 and layer.onlyBaseSrcs
-
-  var actions: seq[string]
-  var droppedV, droppedA, generated = 0
-
-  proc scan(layers: seq[seq[Clip]], video: bool, rule: LayerRule) =
-    for i, layer in layers:
-      if layer.len == 0: continue
-      let isBase = (if video: i == 0 else: i == 0 and not videoBase)
-      # Generator layers (add:text, add:tone) have no file for an editor to
-      # reference. A video base without files is different: it's the canvas
-      # an audio-only timeline gets for its overlays, not content.
-      if not (video and i == 0) and layer.allIt(it.src == nil):
-        inc generated
-        continue
-      if not carried(layer, i, rule, isBase):
-        if video: inc droppedV else: inc droppedA
-        continue
-      for clip in layer:
-        if clip.src == nil: continue
-        for act in tl.effects[clip.effects]:
-          if act.kind notin sup.actions and act.kind.appliesTo(video):
-            let name = ($act).split({':', ','})[0]
-            if name notin actions: actions.add name
-
-  scan(tl.v, true, sup.v)
-  scan(tl.a, false, sup.a)
-
-  result = actions
-  if droppedV > 0: result.add plural(droppedV, "video track")
-  if droppedA > 0: result.add plural(droppedA, "audio track")
-  if generated > 0: result.add plural(generated, "generated track")
+  result = s.actions
+  if s.droppedV > 0: result.add plural(s.droppedV, "video track")
+  if s.droppedA > 0: result.add plural(s.droppedA, "audio track")
+  if s.generated > 0: result.add plural(s.generated, "generated track")
   var subs = 0
   for layer in tl.s:
     if layer.len > 0: inc subs

@@ -204,11 +204,31 @@ proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
 
   filedef.add mediadef
 
+type FileDefs = object
+  urls, ids: Table[MediaInfo, string]
+  written: HashSet[string] # urls that already have a full <file> definition
+  resolve: bool
+
+proc makeFiledef(files: var FileDefs, clipitem: XmlNode, mi: MediaInfo,
+    tl: v3, timebase: int64, ntsc: string) =
+  let pathurl = files.urls[mi]
+  let filedef = <>file(id = files.ids[mi])
+  if pathurl notin files.written:
+    let durationStr =
+      if files.resolve: ""                  # Resolve wants it blank
+      # Premiere holds a still for the length given; blank, it ignores the
+      # clip's in/out and falls back to a ~12h default.
+      elif mi.isStill: $tl.len
+      else: ""                              # Premiere reads media length
+    mediaDef(filedef, pathurl, mi, tl, timebase, ntsc, durationStr)
+    files.written.incl(pathurl)
+  clipitem.add filedef
+
 proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
     ntsc: string): XmlNode
 
-proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo],
+proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
+    ptrToMi: Table[ptr string, MediaInfo],
     timebase: int64, ntsc: string) =
   # Ids must be unique across every audio track (a per-track j would repeat
   # them, making <link> refs ambiguous); audio continues after the video ids.
@@ -259,7 +279,7 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       clipitem.add elem("in", inVal)
       clipitem.add elem("out", outVal)
 
-      makeFiledef(clipitem, mi)
+      files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
       let sourcetrack = newElement("sourcetrack")
       sourcetrack.add elem("mediatype", "audio")
@@ -322,8 +342,8 @@ proc planPremiereAudio(tl: v3, ptrToMi: Table[ptr string, MediaInfo],
       nextId += alayer.len
     channelOffset += channels
 
-proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo],
+proc premiereWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
+    ptrToMi: Table[ptr string, MediaInfo],
     audioPlan: seq[AudioTrackInfo], timebase: int64, ntsc: string) =
   audio.add elem("numOutputChannels", "2")
   let aformat = newElement("format")
@@ -394,7 +414,7 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       clipitem.add elem("in", inVal)
       clipitem.add elem("out", outVal)
 
-      makeFiledef(clipitem, src)
+      files.makeFiledef(clipitem, src, tl, timebase, ntsc)
 
       let sourcetrack = newElement("sourcetrack")
       sourcetrack.add elem("mediatype", "audio")
@@ -454,33 +474,17 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   let (width, height) = tl.res
   let (timebase, ntsc) = setTbNtsc(tl.tb)
 
-  var miToUrl = initTable[MediaInfo, string]()
-  var miToId = initTable[MediaInfo, string]()
+  var files = FileDefs(resolve: resolve)
   var ptrToMi = initTable[ptr string, MediaInfo]()       # Cache ptr -> MediaInfo lookup
-  var fileDefs = initHashSet[string]() # Contains urls
 
   var idCounter = 0
   for ptrSrc in tl.uniqueSources:
     idCounter += 1
     let src = ptrSrc[]
     let mi = initMediaInfo(src)
-    miToUrl[mi] = handlePath(src)
-    miToId[mi] = &"file-{idCounter}"
+    files.urls[mi] = handlePath(src)
+    files.ids[mi] = &"file-{idCounter}"
     ptrToMi[ptrSrc] = mi
-
-  proc makeFiledef(clipitem: XmlNode, mi: MediaInfo) =
-    let pathurl = miToUrl[mi]
-    let filedef = <>file(id = miToId[mi])
-    if pathurl notin fileDefs:
-      let durationStr =
-        if resolve: ""                        # Resolve wants it blank
-        # Premiere holds a still for the length given; blank, it ignores the
-        # clip's in/out and falls back to a ~12h default.
-        elif mi.isStill: $tl.len
-        else: ""                              # Premiere reads media length
-      mediaDef(filedef, pathurl, mi, tl, timebase, ntsc, durationStr)
-      fileDefs.incl(pathurl)
-    clipitem.add filedef
 
   let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
 
@@ -578,7 +582,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         clipitem.add elem("in", inVal)
         clipitem.add elem("out", outVal)
 
-        makeFiledef(clipitem, mi)
+        files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
         clipitem.add elem("compositemode", "normal")
 
@@ -625,9 +629,9 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   # Audio definitions and clips
   let audio = newElement("audio")
   if resolve:
-    resolveWriteAudio(audio, makeFiledef, tl, ptrToMi, timebase, ntsc)
+    resolveWriteAudio(audio, files, tl, ptrToMi, timebase, ntsc)
   else:
-    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi, audioPlan, timebase, ntsc)
+    premiereWriteAudio(audio, files, tl, ptrToMi, audioPlan, timebase, ntsc)
 
   media.add audio
   sequence.add media

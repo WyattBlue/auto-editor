@@ -44,32 +44,35 @@ func assColor(c: uint32): string =
   let (r, g, b, a) = (c shr 24, (c shr 16) and 0xff, (c shr 8) and 0xff, c and 0xff)
   "&H" & toHex(int(((255 - a) shl 24) or (b shl 16) or (g shl 8) or r), 8)
 
+proc u16(data: string, at: int): int =
+  if at < 0 or at + 2 > data.len: raise newException(ValueError, "truncated font")
+  (data[at].ord shl 8) or data[at + 1].ord
+
+proc u32(data: string, at: int): int = (data.u16(at) shl 16) or data.u16(at + 2)
+
 proc fontFamily*(data: string): string =
   ## The family name in a TrueType/OpenType font's `name` table (the first
   ## face of a collection), as libass matches fonts by; "" if it has none.
-  proc u16(at: int): int =
-    if at < 0 or at + 2 > data.len: raise newException(ValueError, "truncated font")
-    (data[at].ord shl 8) or data[at + 1].ord
-  proc u32(at: int): int = (u16(at) shl 16) or u16(at + 2)
   try:
-    let face = if data.startsWith("ttcf"): u32(12) else: 0
+    let face = if data.startsWith("ttcf"): data.u32(12) else: 0
     var table = -1
-    for i in 0 ..< u16(face + 4):
+    for i in 0 ..< data.u16(face + 4):
       let rec = face + 12 + 16 * i
-      if rec + 4 <= data.len and data[rec ..< rec + 4] == "name": table = u32(rec + 8)
+      if rec + 4 <= data.len and data[rec ..< rec + 4] == "name":
+        table = data.u32(rec + 8)
     if table < 0: return ""
-    let strings = table + u16(table + 4)
+    let strings = table + data.u16(table + 4)
     # The family (name 1), in a Unicode encoding before Mac Roman.
     var best = (rank: 99, text: "")
-    for i in 0 ..< u16(table + 2):
+    for i in 0 ..< data.u16(table + 2):
       let rec = table + 6 + 12 * i
-      if u16(rec + 6) != 1: continue
-      let rank = case u16(rec)
+      if data.u16(rec + 6) != 1: continue
+      let rank = case data.u16(rec)
         of 3: 0
         of 0: 1
         of 1: 2
         else: 99
-      let (len, at) = (u16(rec + 8), strings + u16(rec + 10))
+      let (len, at) = (data.u16(rec + 8), strings + data.u16(rec + 10))
       if rank >= best.rank or at + len > data.len: continue
       var text = ""
       if rank == 2:
@@ -77,7 +80,7 @@ proc fontFamily*(data: string): string =
       else:
         var k = at
         while k + 1 < at + len:
-          text.add Rune(u16(k)).toUTF8
+          text.add Rune(data.u16(k)).toUTF8
           k += 2
       best = (rank, text)
     best.text
