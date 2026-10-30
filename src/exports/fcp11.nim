@@ -85,13 +85,67 @@ func timecode(self: MediaInfo): string {.raises: [].} = # In SMPTE
       return v.timecode
   return "00:00:00:00"
 
+func fraction(val: int64, tb: AVRational): string {.raises: [].} =
+  if val == 0:
+    return "0s"
+  return &"{val * tb.den}/{tb.num}s"
+
+proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
+    ptrToIdx: Table[ptr string, int], projName: string, srcDur: int,
+    clip: Clip) =
+  let i = ptrToIdx.getOrDefault(clip.src)
+  let startPoint = parseSMPTE(sources[i].timecode, tl.tb)
+
+  let asset = newElement("asset-clip")
+  asset.attrs = {
+    "name": projName,
+    "ref": "r" & $(i * 2 + 2),
+    "offset": fraction(clip.start, tl.tb),
+    "duration": fraction(clip.dur, tl.tb),
+    "start": fraction(clip.offset + startPoint, tl.tb),
+    "tcFormat": "NDF"
+  }.toXmlAttributes
+
+  spine.add(asset)
+
+  let effectGroup = tl.effects[clip.effects]
+  for effect in effectGroup:
+    if effect.kind == actSpeed:
+      # See the "Time Maps" section.
+      # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
+
+      let timemap = newElement("timeMap")
+      let timept1 = newElement("timept")
+      timept1.attrs = {"time": "0s", "value": "0s",
+          "interp": "smooth2"}.toXmlAttributes
+      timemap.add(timept1)
+
+      let timept2 = newElement("timept")
+      timept2.attrs = {
+        "time": fraction(int(srcDur.float / effect.val), tl.tb),
+        "value": fraction(srcDur, tl.tb),
+        "interp": "smooth2"
+      }.toXmlAttributes
+      timemap.add(timept2)
+
+      asset.add(timemap)
+      break
+
+proc addTransition(spine: XmlNode, tl: v3, dissolveId: string,
+    t: Transition) {.raises: [].} =
+  # A spine transition overlaps the edit point; the neighboring clips keep
+  # their trimmed extents and the editor pulls handle media from the source.
+  let tr = newElement("transition")
+  tr.attrs = {"name": "Cross Dissolve", "offset": fraction(t.spanStart, tl.tb),
+    "duration": fraction(t.dur, tl.tb)}.toXmlAttributes
+  if tl.v.len > 0:
+    let fv = newElement("filter-video")
+    fv.attrs = {"ref": dissolveId, "name": "Cross Dissolve"}.toXmlAttributes
+    tr.add fv
+  spine.add tr
+
 proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
     resolve: bool, tl: v3) =
-  func fraction(val: int64): string {.raises: [].} =
-    if val == 0:
-      return "0s"
-    return &"{val * tl.tb.den}/{tl.tb.num}s"
-
   let verStr =
     if version == 11: "1.11"
     elif version == 10: "1.10"
@@ -125,7 +179,7 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
     let width = $tl.res[0]
     let height = $tl.res[1]
     resources.add(<>format(id = id, name = makeName(mi, tl.tb),
-        frameDuration = fraction(1), width = width, height = height,
+        frameDuration = fraction(1, tl.tb), width = width, height = height,
         colorSpace = getColorspace(mi)))
 
     let id2 = "r" & $(i * 2 + 2)
@@ -135,9 +189,9 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
 
     let startPoint = parseSMPTE(mi.timecode, tl.tb)
     let r2 = <>asset(id = id2, name = agSplitFile(mi.path).name,
-        start = fraction(startPoint), hasVideo = hasVideo, format = id,
+        start = fraction(startPoint, tl.tb), hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
-        audioChannels = audioChannels, duration = fraction(assetDur))
+        audioChannels = audioChannels, duration = fraction(assetDur, tl.tb))
 
     let mediaRep = newElement("media-rep")
     mediaRep.attrs = {
@@ -181,62 +235,11 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
   lib.add evt
   fcpxml.add lib
 
-  proc makeClip(clip: Clip) =
-    let i = ptrToIdx.getOrDefault(clip.src)
-    let startPoint = parseSMPTE(sources[i].timecode, tl.tb)
-
-    let asset = newElement("asset-clip")
-    asset.attrs = {
-      "name": projName,
-      "ref": "r" & $(i * 2 + 2),
-      "offset": fraction(clip.start),
-      "duration": fraction(clip.dur),
-      "start": fraction(clip.offset + startPoint),
-      "tcFormat": "NDF"
-    }.toXmlAttributes
-
-    spine.add(asset)
-
-    let effectGroup = tl.effects[clip.effects]
-    for effect in effectGroup:
-      if effect.kind == actSpeed:
-        # See the "Time Maps" section.
-        # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
-
-        let timemap = newElement("timeMap")
-        let timept1 = newElement("timept")
-        timept1.attrs = {"time": "0s", "value": "0s",
-            "interp": "smooth2"}.toXmlAttributes
-        timemap.add(timept1)
-
-        let timept2 = newElement("timept")
-        timept2.attrs = {
-          "time": fraction(int(srcDur.float / effect.val)),
-          "value": fraction(srcDur),
-          "interp": "smooth2"
-        }.toXmlAttributes
-        timemap.add(timept2)
-
-        asset.add(timemap)
-        break
-
-  proc addTransition(t: Transition) {.raises: [].} =
-    # A spine transition overlaps the edit point; the neighboring clips keep
-    # their trimmed extents and the editor pulls handle media from the source.
-    let tr = newElement("transition")
-    tr.attrs = {"name": "Cross Dissolve", "offset": fraction(t.spanStart),
-      "duration": fraction(t.dur)}.toXmlAttributes
-    if tl.v.len > 0:
-      let fv = newElement("filter-video")
-      fv.attrs = {"ref": dissolveId, "name": "Cross Dissolve"}.toXmlAttributes
-      tr.add fv
-    spine.add tr
-
   if resolve:
     for i in countdown(tl.a.len - 1, 1):
       for clip in tl.a[i]:
         if clip.src != nil:
-          makeClip(clip)
+          spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
 
   let plan = transitionPlan(clips, transitions)
   for i, clip in clips:
@@ -245,10 +248,10 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
       # clip's outgoing one.
       if plan[i].incoming >= 0 and
           transitions[plan[i].incoming].alignment == taStart:
-        addTransition(transitions[plan[i].incoming])
-      makeClip(clip)
+        spine.addTransition(tl, dissolveId, transitions[plan[i].incoming])
+      spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
       if plan[i].outgoing >= 0:
-        addTransition(transitions[plan[i].outgoing])
+        spine.addTransition(tl, dissolveId, transitions[plan[i].outgoing])
 
   if output == "-":
     echo $fcpxml
