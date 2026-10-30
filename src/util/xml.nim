@@ -4,7 +4,7 @@
 ## what it holds. Output matches xmltree's `$` except that attributes keep
 ## insertion order.
 
-import std/[parsexml, streams]
+import std/[parsexml, streams, tables]
 import std/macros except error
 import ../log
 
@@ -202,10 +202,17 @@ proc writeXml*(root: XmlNode, output: string) {.raises: [AutoEditorError].} =
 # As in std/xmlparser: deeper documents could exhaust the stack.
 const xmlMaxDepth = 256
 
-type XmlTooDeep = object of CatchableError
+type
+  XmlTooDeep = object of CatchableError
 
-proc parseElement(x: var XmlParser, errors: var seq[string], depth: int):
-    XmlNode {.raises: [IOError, OSError, ValueError, XmlTooDeep].}
+  XmlReader = object
+    x: XmlParser
+    errors: seq[string]
+    tags: seq[string] # literals: a copy shares their storage
+    tagIds: Table[string, int]
+
+proc parseElement(r: var XmlReader, depth: int): XmlNode
+    {.raises: [IOError, OSError, ValueError, XmlTooDeep].}
 
 proc addText(parent: XmlNode, text: string) =
   # Adjacent runs share one node: innerText reads the same, with fewer nodes.
@@ -214,94 +221,100 @@ proc addText(parent: XmlNode, text: string) =
   else:
     parent.children.add newText(text)
 
-proc parseChildren(x: var XmlParser, n: XmlNode, errors: var seq[string],
-    depth: int) {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
+proc parseChildren(r: var XmlReader, n: XmlNode, depth: int)
+    {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
   if depth > xmlMaxDepth:
     raise newException(XmlTooDeep, "")
   while true:
-    case x.kind
+    case r.x.kind
     of xmlElementEnd:
-      if x.elementName == n.str:
-        x.next()
+      if r.x.elementName == n.str:
+        r.x.next()
       else:
-        errors.add errorMsg(x, "</" & n.str & "> expected")
+        r.errors.add errorMsg(r.x, "</" & n.str & "> expected")
       return
     of xmlEof:
-      errors.add errorMsg(x, "</" & n.str & "> expected")
+      r.errors.add errorMsg(r.x, "</" & n.str & "> expected")
       return
     of xmlCharData, xmlWhitespace, xmlCData:
-      n.addText x.charData
-      x.next()
+      n.addText r.x.charData
+      r.x.next()
     of xmlEntity:
       # As in std/xmltree's innerText, an unknown entity reads as its name.
-      n.addText x.entityName
-      x.next()
+      n.addText r.x.entityName
+      r.x.next()
     of xmlComment, xmlPI, xmlSpecial:
-      x.next()
+      r.x.next()
     of xmlError:
-      errors.add errorMsg(x)
-      x.next()
+      r.errors.add errorMsg(r.x)
+      r.x.next()
     of xmlElementStart, xmlElementOpen:
-      n.children.add parseElement(x, errors, depth)
+      n.children.add r.parseElement(depth)
     of xmlAttribute, xmlElementClose:
-      errors.add errorMsg(x, "<some_tag> expected")
-      x.next()
+      r.errors.add errorMsg(r.x, "<some_tag> expected")
+      r.x.next()
 
-proc parseElement(x: var XmlParser, errors: var seq[string], depth: int):
-    XmlNode {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
-  result = newElement(x.elementName)
-  if x.kind == xmlElementOpen:
-    x.next()
+proc parseElement(r: var XmlReader, depth: int): XmlNode
+    {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
+  let id = r.tagIds.getOrDefault(r.x.elementName, -1)
+  result = newElement(if id >= 0: r.tags[id] else: r.x.elementName)
+  if r.x.kind == xmlElementOpen:
+    r.x.next()
     while true:
-      case x.kind
+      case r.x.kind
       of xmlAttribute:
-        result.attrs.add (x.attrKey, x.attrValue)
-        x.next()
+        result.attrs.add (r.x.attrKey, r.x.attrValue)
+        r.x.next()
       of xmlElementClose:
-        x.next()
+        r.x.next()
         break
       of xmlError:
-        errors.add errorMsg(x)
-        x.next()
+        r.errors.add errorMsg(r.x)
+        r.x.next()
         break
       else:
-        errors.add errorMsg(x, "'>' expected")
-        x.next()
+        r.errors.add errorMsg(r.x, "'>' expected")
+        r.x.next()
         break
   else:
-    x.next()
-  x.parseChildren(result, errors, depth + 1)
+    r.x.next()
+  r.parseChildren(result, depth + 1)
 
-proc parseXmlFile*(path: string): XmlNode {.raises: [AutoEditorError].} =
+proc parseXmlFile*(path: string, knownTags: openArray[string] = []): XmlNode
+    {.raises: [AutoEditorError].} =
   ## Reads the XML file at `path`, streaming it rather than loading it whole.
   ## CDATA reads as text; comments and processing instructions are left out.
+  ## Elements named in `knownTags`, a const list, share its strings instead
+  ## of each holding a copy of its name.
   var s: FileStream
   try:
     s = openFileStream(path)
   except IOError:
     error "Cannot read: " & path
-  var x: XmlParser
-  var errors: seq[string]
+  var r: XmlReader
+  for i, tag in knownTags:
+    r.tags.add tag
+    r.tagIds[tag] = i
   try:
-    x.open(s, path)
+    r.x.open(s, path)
     while true:
-      x.next()
-      case x.kind
+      r.x.next()
+      case r.x.kind
       of xmlElementOpen, xmlElementStart:
         try:
-          result = x.parseElement(errors, 0)
+          result = r.parseElement(0)
         except XmlTooDeep:
-          errors.add errorMsg(x, "elements nested deeper than " & $xmlMaxDepth &
-            " levels")
+          r.errors.add errorMsg(r.x, "elements nested deeper than " &
+            $xmlMaxDepth & " levels")
         break
       of xmlWhitespace, xmlSpecial, xmlPI: discard
       of xmlError:
-        errors.add errorMsg(x)
+        r.errors.add errorMsg(r.x)
       else:
-        errors.add errorMsg(x, "<some_tag> expected")
+        r.errors.add errorMsg(r.x, "<some_tag> expected")
         break
-    x.close()
+    r.x.close()
   except IOError, OSError, ValueError:
     error "Cannot read: " & path
-  if errors.len > 0:
-    error "Failed to parse XML: " & errors[0]
+  if r.errors.len > 0:
+    error "Failed to parse XML: " & r.errors[0]

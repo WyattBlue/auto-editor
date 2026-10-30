@@ -3,6 +3,16 @@ import std/[algorithm, sequtils, strformat, strutils, tables, uri]
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/[color, rational, xml]
 
+# Tags common in FCP7 XML, so the parsed tree can share their strings.
+const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",
+  "clipitem", "transitionitem", "file", "name", "start", "end", "in", "out",
+  "enabled", "mediatype", "trackindex", "link", "linkclipref", "clipindex",
+  "sourcetrack", "labels", "label2", "compositemode", "filter", "effect",
+  "effectid", "effecttype", "parameter", "parameterid", "value", "valuemin",
+  "valuemax", "keyframe", "when", "rate", "timebase", "ntsc", "duration",
+  "pathurl", "masterclipid", "pproTicksIn", "pproTicksOut", "alphatype",
+  "pixelaspectratio", "anamorphic", "logginginfo", "colorinfo", "comments"]
+
 func uriToPath(uri: string): string =
   var path = uri
   if path.startsWith("file://localhost/"):
@@ -247,7 +257,7 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
       effects: e, stream: 0)
 
 proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
-  let root = parseXmlFile(path)
+  let root = parseXmlFile(path, fcp7Tags)
   if root == nil or root.tag != "xmeml":
     let tag = if root == nil: "nil" else: root.tag
     error "Expected 'xmeml' root tag, got '" & tag & "'"
