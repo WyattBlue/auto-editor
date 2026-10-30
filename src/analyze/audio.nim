@@ -243,29 +243,6 @@ proc readChunk(iter: AudioIterator): Unorm16 =
 
   return toUnorm16(float32(maxAbs) / 32767.0'f32)
 
-proc readPeaks(iter: AudioIterator): tuple[lo, hi: float32] =
-  let sizeWithError = iter.exactSize + iter.accumulatedError
-  let currentSize = min(round(sizeWithError).int, iter.maxBufferSize)
-  iter.accumulatedError = sizeWithError - float64(currentSize)
-
-  let samples = cast[ptr UncheckedArray[int16]](iter.readBuffer)
-  let samplesRead = av_audio_fifo_read(
-    iter.fifo, cast[pointer](addr iter.readBuffer), currentSize.cint
-  )
-  let totalSamples = samplesRead * iter.channelCount
-
-  var minV: int32 = 0
-  var maxV: int32 = 0
-  let start = (if iter.selectedChannel < 0: 0 else: iter.selectedChannel)
-  let step = (if iter.selectedChannel < 0: 1 else: iter.channelCount)
-  var i = start
-  while i < totalSamples:
-    let v = int32(samples[i])
-    if v < minV: minV = v
-    if v > maxV: maxV = v
-    i += step
-  return (float32(minV) / 32768.0'f32, float32(maxV) / 32768.0'f32)
-
 proc readChannelPeaks(iter: AudioIterator,
     channels: openArray[int]): seq[tuple[lo, hi: float32]] =
   ## Read one bucket once and calculate peaks for every requested channel.
