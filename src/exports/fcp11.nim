@@ -1,4 +1,5 @@
-import std/[strformat, strutils, tables, xmltree]
+import std/[strformat, strutils, tables]
+import ./xml
 from std/math import round
 
 import ../[action, ffmpeg, log, media, timeline]
@@ -253,13 +254,6 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
       if plan[i].outgoing >= 0:
         spine.addTransition(tl, dissolveId, transitions[plan[i].outgoing])
 
-  if output == "-":
-    echo $fcpxml
-  else:
-    let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $fcpxml
-    try:
-      writeFile(output, xmlStr)
-    except IOError, OSError:
-      error &"Cannot write to: {output}"
+  writeXml(fcpxml, output)
 
 {.pop.}

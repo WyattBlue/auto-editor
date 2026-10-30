@@ -1,4 +1,5 @@
-import std/[strformat, strutils, xmltree]
+import std/[strformat, strutils]
+import ./xml
 from std/math import log10, round
 
 import ../action

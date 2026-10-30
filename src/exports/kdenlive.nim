@@ -1,5 +1,5 @@
-import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
-import ./mlt
+import std/[json, os, tables, strformat, sysrand, strutils]
+import ./[mlt, xml]
 import ../[action, media, timeline]
 import ../util/[color, fun]
 
@@ -772,8 +772,4 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   mlt.add(tractor)
 
-  if output == "-":
-    echo $mlt
-  else:
-    let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $mlt
-    writeFile(output, xmlStr)
+  writeXml(mlt, output)

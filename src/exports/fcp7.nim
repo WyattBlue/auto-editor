@@ -1,4 +1,5 @@
-import std/[os, sets, strformat, tables, xmltree]
+import std/[os, sets, strformat, tables]
+import ./xml
 from std/math import ceil, round
 when defined(windows):
   import std/strutils
@@ -637,8 +638,4 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   sequence.add media
   xmeml.add sequence
 
-  if output == "-":
-    echo $xmeml
-  else:
-    let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $xmeml
-    writeFile(output, xmlStr)
+  writeXml(xmeml, output)

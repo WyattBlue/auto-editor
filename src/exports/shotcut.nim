@@ -1,6 +1,6 @@
-import std/[strformat, strutils, xmltree]
+import std/[strformat, strutils]
 
-import ./mlt
+import ./[mlt, xml]
 import ../[action, ffmpeg, timeline]
 import ../util/[color, fun, rational]
 
@@ -378,8 +378,4 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
   mlt.add(tractor)
 
-  if output == "-":
-    echo $mlt
-  else:
-    let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $mlt
-    writeFile(output, xmlStr)
+  writeXml(mlt, output)
