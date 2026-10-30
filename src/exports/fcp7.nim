@@ -1,5 +1,5 @@
 import std/[os, sets, strformat, tables]
-import ./xml
+import ../util/xml
 from std/math import ceil, round
 when defined(windows):
   import std/strutils

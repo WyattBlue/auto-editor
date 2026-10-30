@@ -1,7 +1,7 @@
-import std/[algorithm, sequtils, strformat, strutils, streams, tables, uri, xmlparser, xmltree]
+import std/[algorithm, sequtils, strformat, strutils, tables, uri]
 
 import ../[action, av, ffmpeg, log, timeline]
-import ../util/[color, rational]
+import ../util/[color, rational, xml]
 
 func uriToPath(uri: string): string =
   var path = uri
@@ -255,15 +255,7 @@ proc parseTrack(trackNode: XmlNode, sources: var Table[string, ptr string],
       effects: e, stream: 0)
 
 proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
-  let xmlContent = readFile(path)
-  let stream = newStringStream(xmlContent)
-  var parseErrors: seq[string] = @[]
-  let root = parseXml(stream, path, parseErrors)
-  stream.close()
-
-  if parseErrors.len > 0:
-    error "Failed to parse XML: " & parseErrors[0]
-
+  let root = parseXmlFile(path)
   if root == nil or root.tag != "xmeml":
     let tag = if root == nil: "nil" else: root.tag
     error "Expected 'xmeml' root tag, got '" & tag & "'"

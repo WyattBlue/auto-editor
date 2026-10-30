@@ -1,5 +1,5 @@
 import std/[strformat, strutils]
-import ./xml
+import ../util/xml
 from std/math import log10, round
 
 import ../action

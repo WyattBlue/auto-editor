@@ -1,5 +1,5 @@
 import std/[strformat, strutils, tables]
-import ./xml
+import ../util/xml
 from std/math import round
 
 import ../[action, ffmpeg, log, media, timeline]

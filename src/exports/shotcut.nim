@@ -1,6 +1,7 @@
 import std/[strformat, strutils]
 
-import ./[mlt, xml]
+import ./mlt
+import ../util/xml
 import ../[action, ffmpeg, timeline]
 import ../util/[color, fun, rational]
 

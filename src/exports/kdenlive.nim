@@ -1,5 +1,6 @@
 import std/[json, os, tables, strformat, sysrand, strutils]
-import ./[mlt, xml]
+import ./mlt
+import ../util/xml
 import ../[action, media, timeline]
 import ../util/[color, fun]
 
