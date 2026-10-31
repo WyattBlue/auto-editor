@@ -99,8 +99,11 @@ DaVinci Resolve), and FCPXML (`.fcpxml` files and the `.fcpxmld` bundles Final C
 exports). The input format is detected by extension.
 
 FCPXML import reads the primary storyline, connected clips (lanes above become video
-layers; lanes below contribute audio only), transitions, constant speed, and volume.
-Compound, synchronized, and multicam clips are left out with a warning.
+layers; lanes below contribute audio only), transitions, speed (including ramps), and
+volume. Compound, synchronized, and multicam clips are left out with a warning.
+
+Which transitions each export and import carries is covered by the
+**auto-editor-transitions** skill.
 
 ## Timeline format notes
 

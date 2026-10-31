@@ -136,4 +136,5 @@ auto-editor video.mp4 -w:0 speed:6,volume:0.4         # fast, quiet silent secti
 With `:mic`, press Ctrl-C to finish capture; actions are applied afterward.
 
 Full reference: <https://auto-editor.com/ref/actions.md>. For plain cutting / pace /
-edit methods, see the **auto-editor** skill.
+edit methods, see the **auto-editor** skill. For transitions between sections
+(dissolves, wipes, crossfades), see the **auto-editor-transitions** skill.

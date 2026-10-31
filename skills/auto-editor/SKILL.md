@@ -139,6 +139,7 @@ Larger-than-expected files are usually a too-high auto bitrate — set `-b:v` or
 ## Going further
 
 - Creative effects (speed/zoom/overlays/animations) → **auto-editor-effects** skill
+- Transitions at the cuts (dissolves, Premiere Pro's transitions, crossfades) → **auto-editor-transitions** skill
 - Export to Premiere/Resolve/Final Cut, clip-sequence, or `.v1/.v2/.v3` timelines → **auto-editor-export** skill
 - Transcribe audio and cut by spoken words → **auto-editor-transcribe** skill
 - Full option list: `auto-editor --help` or <https://auto-editor.com/ref/options.md>
