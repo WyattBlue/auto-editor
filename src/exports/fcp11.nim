@@ -1,7 +1,6 @@
 import std/[strformat, strutils, tables]
 from std/math import ceil, round
 import ../util/xml
-from std/math import round
 
 import ../[ffmpeg, log, media, timeline]
 import ../util/[fun, rational]
@@ -123,7 +122,7 @@ proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
   let map = initSpeedMap(effectGroup)
   if map.mean != 1.0 or map.ramp:
     let timemap = newElement("timeMap")
-    proc point(time: int64, value: float64, interp: string) =
+    proc point(time: int64, value: float64, interp: string) {.raises: [].} =
       let p = newElement("timept")
       p.attrs = {"time": fraction(time, tl.tb), "value": mediaFraction(value, tl.tb),
         "interp": interp}.toXmlAttributes

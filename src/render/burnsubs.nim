@@ -361,7 +361,9 @@ when defined(libass):
       else: $burn
     result = b.tracks.getOrDefault(key)
     if result != nil: return
-    let attached = b.attached
+    # Elsewhere the system finds a font when none is given.
+    when not (defined(macosx) or defined(windows)):
+      let attached = b.attached
     if burn.kind == actText:
       let script = textScript(burn, w, h)
       result = ass_read_memory(b.library, script.cstring, script.len.csize_t, nil)

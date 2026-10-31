@@ -145,8 +145,8 @@ template eachPixel(res: var Img, w, h: int, body: untyped) =
   eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
     for y {.inject.} in y0 ..< y1:
       for x {.inject.} in 0 ..< w:
-        let u {.inject.} = (x.float32 + 0.5'f32) / w.float32
-        let v {.inject.} = (y.float32 + 0.5'f32) / h.float32
+        let u {.inject, used.} = (x.float32 + 0.5'f32) / w.float32
+        let v {.inject, used.} = (y.float32 + 0.5'f32) / h.float32
         var c {.inject.}: C
         body
         dst[].put(x, y, c))

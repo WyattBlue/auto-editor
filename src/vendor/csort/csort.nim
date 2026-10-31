@@ -1,13 +1,14 @@
 # Batcher's odd-even mergesort with SIMD, handles arbitrary lengths.
 
 # Instruction set tags. The sorting network takes one as a parameter, so a
-# single build can hold a version per instruction set.
+# single build can hold a version per instruction set; each build uses only
+# its own CPU's.
 type
-  NoSimd = object
-  Neon = object
-  Sse42 = object
-  Avx2 = object
-  Wasm128 = object
+  NoSimd {.used.} = object
+  Neon {.used.} = object
+  Sse42 {.used.} = object
+  Avx2 {.used.} = object
+  Wasm128 {.used.} = object
 
 template lanes32(_: typedesc[NoSimd]): int = 0
 template lanes64(_: typedesc[NoSimd]): int = 0
