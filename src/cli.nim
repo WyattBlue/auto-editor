@@ -181,9 +181,11 @@ Examples:
   --smooth 0.2s,0.1s  # Set mincut to 0.2 seconds, minclip to 0.1 seconds.
   --smooth 0  # Turn off smoothing"""),
   OptDef(names: "--transition", c: cEdit, datum: coTransition,
-    metavar: "dissolve:DURATION[:MIN-CUT]", help: """
-Add linked video/audio cross-dissolves at cuts and fades at the timeline ends.
-Skip cuts whose removed source interval is shorter than MIN-CUT (default 1sec)."""),
+    metavar: "KIND:DURATION[:MIN-CUT]", help: """
+Add linked video/audio transitions at cuts and at the timeline ends. KIND is
+dissolve, a Premiere Pro transition like push or clock-wipe, or an audio
+crossfade (constant-power, exponential-fade). Skip cuts whose removed source
+interval is shorter than MIN-CUT (default 1sec)."""),
   OptDef(names: "-o, --output", c: cEdit, datum: coOutput,
     metavar: "FILE", help: "Set the name/path of the new output file"),
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: coCutOut,

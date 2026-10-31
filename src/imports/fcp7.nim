@@ -1,4 +1,5 @@
 import std/[algorithm, sequtils, strformat, strutils, tables]
+from std/math import round
 
 import ../[action, ffmpeg, log, timeline]
 import ../util/[color, fun, rational, xml]
@@ -165,14 +166,21 @@ func streamOf(file: FileInfo, trackIndex: int64): tuple[stream: int16, firstChan
     first += n
   (0'i16, true)
 
-proc readTransition(node: XmlNode): Transition =
+proc readTransition(node: XmlNode, audio: bool): Transition =
   var startVal, endVal = -1'i64
   var alignment = taCenter
+  var kind = tkDissolve
   for c in node:
     if c.kind != xnElement: continue
     case c.tag
     of "start": startVal = xmlInt(c, lo = 0)
     of "end": endVal = xmlInt(c, lo = 0)
+    of "effect":
+      # An unknown transition plays as a dissolve.
+      for f in c:
+        if f.kind == xnElement and f.tag in ["effectid", "name"] and
+            kindFromName(f.innerText.strip(), not audio, kind):
+          break
     of "alignment":
       alignment = case c.innerText.strip()
         of "start", "start-black": taStart
@@ -187,37 +195,68 @@ proc readTransition(node: XmlNode): Transition =
     of taStart: 0'i64
     of taCenter: dur div 2
     of taEnd: dur
-  # Every transition is read as a dissolve, the only kind the timeline has.
-  Transition(kind: tkDissolve, at: startVal + before, dur: dur, alignment: alignment)
+  Transition(kind: kind, at: startVal + before, dur: dur, alignment: alignment)
+
+proc generatorColor(effect: XmlNode): (bool, RGBColor) =
+  ## The color a Slug or Color generator fills the frame with. Titles, bars
+  ## and the rest have no such color.
+  var name, id: string
+  var color = RGBColor(red: 0, green: 0, blue: 0)
+  for c in effect:
+    if c.kind != xnElement: continue
+    case c.tag
+    of "name": name = c.innerText.strip().toLowerAscii()
+    of "effectid": id = c.innerText.strip().toLowerAscii()
+    of "parameter":
+      var isFill = false
+      var value: XmlNode = nil
+      for pc in c:
+        if pc.kind != xnElement: continue
+        if pc.tag == "parameterid": isFill = pc.innerText.strip() == "fillcolor"
+        elif pc.tag == "value": value = pc
+      if isFill and value != nil:
+        for ch in value:
+          if ch.kind != xnElement or ch.tag notin ["red", "green", "blue"]: continue
+          let v = uint8(xmlInt(ch, 0, 255))
+          case ch.tag
+          of "red": color.red = v
+          of "green": color.green = v
+          else: color.blue = v
+    else: discard
+  if id == "slug" or name in ["slug", "black video"]: return (true, color)
+  if id == "color" or name in ["color", "color matte", "colour matte"]:
+    return (true, color)
+  (false, color)
 
 proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     effects: var seq[Actions], effectIndex: var EffectIndex,
-    interner: var StringInterner, audio: bool, dropped: var CountTable[string]):
+    interner: var StringInterner, audio: bool, res: (int32, int32),
+    tb: AVRational, dropped: var CountTable[string]):
     tuple[clips: seq[Clip], transitions: seq[Transition], laterChannels: bool] =
   ## `laterChannels` is set when every audio clip names a channel past the
   ## first of its stream, as on the per-channel tracks resolve-fcp7 writes.
   result.laterChannels = audio
   var items: seq[XmlNode]
   for c in trackNode:
-    if c.kind != xnElement: continue
-    if c.tag in ["clipitem", "transitionitem"]:
+    if c.kind == xnElement and
+        c.tag in ["clipitem", "generatoritem", "transitionitem"]:
       items.add c
-    elif c.tag == "generatoritem": # titles, color mattes, bars and tone
-      dropped.inc "generated clip"
   var parsed = newSeq[Transition](items.len)
   for k, node in items:
     if node.tag == "transitionitem":
-      parsed[k] = readTransition(node)
+      parsed[k] = readTransition(node, audio)
       result.transitions.add parsed[k]
 
   for k, trackChild in items:
-    if trackChild.tag != "clipitem": continue
+    if trackChild.tag == "transitionitem": continue
+    let generator = trackChild.tag == "generatoritem"
 
     var startVal = 0i64
     var endVal = 0i64
     var inVal = 0i64
     var outVal = -1i64
-    var fileNode: XmlNode = nil
+    var ticksIn = -1'i64
+    var fileNode, effectNode: XmlNode = nil
     var nested = false
     var enabled = true
     var trackIndex = 1'i64
@@ -232,7 +271,9 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       of "end": endVal = xmlInt(ci, lo = -1)
       of "in": inVal = xmlInt(ci, lo = 0)
       of "out": outVal = xmlInt(ci, lo = -1)
+      of "pproTicksIn": ticksIn = xmlInt(ci, lo = 0)
       of "file": fileNode = ci
+      of "effect": effectNode = ci
       of "sequence": nested = true
       of "enabled": enabled = ci.innerText.strip() != "FALSE"
       of "filter": filterNodes.add ci
@@ -243,11 +284,20 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       else: discard
 
     if not enabled: continue
-    if fileNode == nil:
+    var fill: RGBColor
+    var file: FileInfo
+    if generator:
+      var known = false
+      if effectNode != nil: (known, fill) = generatorColor(effectNode)
+      if not known or audio:
+        dropped.inc "generated clip"
+        continue
+    elif fileNode == nil:
       if nested: dropped.inc "nested sequence"
       continue
-    let file = resolveFile(fileNode, files, interner)
-    if file.src == nil: continue
+    else:
+      file = resolveFile(fileNode, files, interner)
+      if file.src == nil: continue
 
     # An edge inside a transition is the transition's edit point. A centered
     # transition also extends the clip's media by its half on that side.
@@ -267,12 +317,27 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     if endVal <= startVal:
       error "Invalid clipitem: <start> must come before <end>"
     let dur = endVal - startVal
+    if generator:
+      # A source-less clip paints its effects on the canvas.
+      let box = Action(kind: actDrawbox, dbX: 0, dbY: 0, dbW: res[0], dbH: res[1],
+        dbColor: fill)
+      result.clips.add Clip(src: nil, start: startVal, dur: dur,
+        effects: effectIndex.intern(effects, newActions(@[box])))
+      continue
     if outVal <= inVal: outVal = inVal + dur + inExt + outExt
-    # <in> is clamped at 0 when the handle runs past the media start, so take
-    # the offset from <out> instead.
-    let offset = (if inExt > 0: max(0'i64, outVal - outExt - dur) else: inVal)
     for fn in filterNodes:
       readFilters(fn, acts, inVal.float, outVal.float)
+    var speed = 1.0
+    for a in acts:
+      if a.kind == actSpeed: speed *= a.val
+    # <in> is clamped at 0 when the handle runs past the media start, so take
+    # the offset from <out> instead. Premiere's ticks give the source time
+    # exactly, where <in> is rounded to a frame after the speed change.
+    let offset =
+      if inExt > 0: max(0'i64, outVal - outExt - dur)
+      elif ticksIn >= 0:
+        int64(round(ticksIn.float * tb.float / pproTicksPerSecond.float / speed))
+      else: inVal
     let e = effectIndex.intern(effects, newActions(acts))
     var stream = 0'i16
     if audio:
@@ -350,7 +415,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
               res = (w, h)
         of "track":
           let (clips, transitions, _) = parseTrack(vidChild, files, effects,
-            effectIndex, interner, audio = false, dropped)
+            effectIndex, interner, audio = false, res, tb, dropped)
           if clips.len > 0:
             vobjs.add clips
             vtrans.add transitions
@@ -371,7 +436,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
           let (clips, transitions, laterChannels) = parseTrack(audChild, files,
-            effects, effectIndex, interner, audio = true, dropped)
+            effects, effectIndex, interner, audio = true, res, tb, dropped)
           # Clips play whole streams, which the stream's first-channel track
           # already holds.
           if clips.len > 0 and not laterChannels:

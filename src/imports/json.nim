@@ -52,9 +52,9 @@ proc parseClip(node: JsonNode, interner: var StringInterner,
   result.effects = index.intern(effects, group)
 
 proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =
-  if node{"kind"}.getStr("") != "dissolve":
-    error "Unsupported transition kind"
-  result.kind = tkDissolve
+  let kind = node{"kind"}.getStr("")
+  if not parseTransitionKind(kind, result.kind):
+    error &"Unsupported transition kind: '{kind}'"
   result.at = node{"at"}.getBiggestInt(-1)
   result.dur = node{"dur"}.getBiggestInt(-1)
   if result.at < 0 or result.dur <= 0:

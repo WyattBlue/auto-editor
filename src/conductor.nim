@@ -560,7 +560,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       applyLayers(tlV3, args, interner)
       tlV3.applyArgs(args, audio)
       if args.transition.getNumber > 0:
-        tlV3.addDissolveTransitions(
+        tlV3.addTransitions(args.transitionKind,
           toTb(args.transition, tlV3.tb.float).int64,
           toTb(args.transitionMinCut, tlV3.tb.float).int64)
       elif args.placedTransitions.len > 0:

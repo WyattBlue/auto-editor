@@ -1,7 +1,7 @@
 import std/[algorithm, options, os, sets, strformat, tables]
-from std/math import round, ceil
+from std/math import round, ceil, exp, sin, PI
 
-import ./[action, av, ffmpeg, media, log, wavutil]
+import ./[action, av, ffmpeg, media, log, transitions, wavutil]
 import ./util/[color, fun, lang, rational]
 import ./lib/cliputil
 
@@ -29,9 +29,9 @@ type Clip* = object
   stream*: int16
   effects*: uint32 # Reference to global effects in Timeline.
 
+export transitions
+
 type
-  TransitionKind* = enum
-    tkDissolve
   TransitionAlignment* = enum
     taStart, taCenter, taEnd
   Transition* = object
@@ -42,6 +42,12 @@ type
   TransitionLink* = object
     incoming*: int32 = -1
     outgoing*: int32 = -1
+  TransitionWindow* = object
+    ## A baked video transition: the frames from `start` for `dur` on its
+    ## track blend the clips there by `kind`.
+    start*, dur*: int64
+    kind*: TransitionKind
+    alignment*: TransitionAlignment
 
 type v3* = object
   layout*: ref AVChannelLayout
@@ -59,6 +65,7 @@ type v3* = object
   templateFile*: ptr string
   vt*: seq[seq[Transition]]
   at*: seq[seq[Transition]]
+  windows*: seq[seq[TransitionWindow]] # per video track, set by bakeTransitions
 
 func len*(self: v3): int64 {.raises: [].} =
   result = 0
@@ -346,14 +353,16 @@ func transitionPlan*(clips: seq[Clip], transitions: seq[Transition]):
         transitions[outCursor].alignment != taStart:
       result[i].outgoing = outCursor.int32
 
-proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
-  ## Add portable start/center/end aligned dissolves to primary A/V tracks.
-  ## Centered transitions are shortened symmetrically so they cannot overlap a
-  ## neighboring transition or consume an entire visible clip.
+proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
+    minCut: int64 = 0) =
+  ## Add start/center/end aligned transitions to primary A/V tracks: `kind` on
+  ## the tracks it belongs to, a dissolve on the others. Centered transitions
+  ## are shortened symmetrically so they cannot overlap a neighboring transition
+  ## or consume an entire visible clip.
   if requested <= 0: return
   let timelineEffects = tl.effects
 
-  proc build(clips: seq[Clip]): seq[Transition] =
+  proc build(clips: seq[Clip], kind: TransitionKind): seq[Transition] =
     if clips.len == 0: return
     var speeds = newSeq[float64](clips.len)
     for i, clip in clips:
@@ -380,7 +389,7 @@ proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
       if left.src != nil and right.src == left.src:
         half = min(half, int64(cutDur.float64 / max(leftSpeed, rightSpeed)))
       if half > 0:
-        centers.add Transition(kind: tkDissolve, at: right.start,
+        centers.add Transition(kind: kind, at: right.start,
           dur: half * 2, alignment: taCenter)
 
     var firstDur = min(requested, clips[0].dur)
@@ -388,7 +397,7 @@ proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
       firstDur = min(firstDur,
         centers[0].at - centers[0].dur div 2 - clips[0].start)
     if firstDur > 0:
-      result.add Transition(kind: tkDissolve, at: clips[0].start,
+      result.add Transition(kind: kind, at: clips[0].start,
         dur: firstDur, alignment: taStart)
     result.add centers
     let last = clips[^1]
@@ -397,13 +406,15 @@ proc addDissolveTransitions*(tl: var v3, requested: int64, minCut: int64 = 0) =
       let c = centers[^1]
       lastDur = min(lastDur, last.start + last.dur - (c.at + c.dur - c.dur div 2))
     if lastDur > 0:
-      result.add Transition(kind: tkDissolve, at: last.start + last.dur,
+      result.add Transition(kind: kind, at: last.start + last.dur,
         dur: lastDur, alignment: taEnd)
 
+  let videoKind = (if kind in videoKinds: kind else: tkDissolve)
+  let audioKind = (if kind in audioKinds: kind else: tkDissolve)
   tl.vt.setLen(tl.v.len)
-  if tl.v.len > 0: tl.vt[0] = build(tl.v[0])
+  if tl.v.len > 0: tl.vt[0] = build(tl.v[0], videoKind)
   tl.at.setLen(tl.a.len)
-  for i in 0 ..< tl.a.len: tl.at[i] = build(tl.a[i])
+  for i in 0 ..< tl.a.len: tl.at[i] = build(tl.a[i], audioKind)
   tl.validateTransitions()
 
 func spanStart*(t: Transition): int64 =
@@ -443,7 +454,9 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
           best = i
       if best < 0: continue
       let c = clips[best]
-      var t = Transition(kind: tkDissolve, alignment: align, dur: p.dur)
+      let fits = p.kind in (if video: videoKinds else: audioKinds)
+      var t = Transition(kind: (if fits: p.kind else: tkDissolve),
+        alignment: align, dur: p.dur)
       case align
       of taStart:
         t.at = c.start
@@ -465,7 +478,8 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
   for i in 0 ..< tl.a.len: tl.at[i] = place(tl.a[i], false)
 
 proc validateTransitions*(tl: v3) {.raises: [].} =
-  proc validateTrack(clips: seq[Clip], transitions: seq[Transition]) =
+  proc validateTrack(clips: seq[Clip], transitions: seq[Transition], audio: bool) =
+    let kinds = (if audio: audioKinds else: videoKinds)
     var priorEnd = low(int64)
     var priorAt = low(int64)
     var leftCursor, rightCursor = 0
@@ -474,6 +488,9 @@ proc validateTransitions*(tl: v3) {.raises: [].} =
       let spanEnd = spanStart + t.dur
       if t.dur <= 0 or spanStart < priorEnd or t.at < priorAt:
         error "Transitions must have positive, non-overlapping ranges"
+      if t.kind notin kinds:
+        let track = (if audio: "an audio" else: "a video")
+        error &"'{t.kind}' is not {track} transition"
       while leftCursor < clips.len and
           clips[leftCursor].start + clips[leftCursor].dur < t.at:
         inc leftCursor
@@ -494,19 +511,34 @@ proc validateTransitions*(tl: v3) {.raises: [].} =
       priorAt = t.at
   if tl.vt.len notin [0, tl.v.len] or tl.at.len notin [0, tl.a.len]:
     error "Transition track count must match media track count"
-  for i in 0 ..< tl.vt.len: validateTrack(tl.v[i], tl.vt[i])
-  for i in 0 ..< tl.at.len: validateTrack(tl.a[i], tl.at[i])
+  for i in 0 ..< tl.vt.len: validateTrack(tl.v[i], tl.vt[i], false)
+  for i in 0 ..< tl.at.len: validateTrack(tl.a[i], tl.at[i], true)
 
-type RampKey = tuple[effectIdx: uint32, kind: ActionKind, fadeIn: bool, dur: int64]
+type RampKey = tuple[effectIdx: uint32, kind: ActionKind, curve: TransitionKind,
+  fadeIn: bool, dur: int64]
+
+func fadeCurve(curve: TransitionKind, fadeIn: bool): seq[float32] =
+  ## Gain across a fade, sampled finely enough that joining the samples
+  ## linearly stays within half a percent of the curve.
+  const n = 16
+  case curve
+  of tkConstantPower:
+    for i in 0 .. n: result.add float32(sin(i / n * PI / 2))
+  of tkExponentialFade:
+    const k = 3.0
+    for i in 0 .. n: result.add float32((exp(k * i.float / n) - 1) / (exp(k) - 1))
+  else:
+    result = @[0.0'f32, 1.0'f32]
+  if not fadeIn: result.reverse()
 
 proc withRamp(tl: var v3, cache: var Table[RampKey, uint32],
-    index: var EffectIndex, effectIdx: uint32, kind: ActionKind, fadeIn: bool,
-    dur: int64): uint32 =
-  let key = (effectIdx, kind, fadeIn, dur)
+    index: var EffectIndex, effectIdx: uint32, kind: ActionKind,
+    curve: TransitionKind, fadeIn: bool, dur: int64): uint32 =
+  let key = (effectIdx, kind, curve, fadeIn, dur)
   if key in cache: return cache[key]
   var actions: seq[Action]
   for a in tl.effects[effectIdx]: actions.add a
-  let values = if fadeIn: @[0.0'f32, 1.0'f32] else: @[1.0'f32, 0.0'f32]
+  let values = fadeCurve(curve, fadeIn)
   let ramp = case kind
     of actOpacity: Action(kind: actOpacity, kf: values, hasEase: true,
       easeCurve: easeLinear, easeDurUnit: duFrames, easeDur: dur.float32)
@@ -518,15 +550,21 @@ proc withRamp(tl: var v3, cache: var Table[RampKey, uint32],
   cache[key] = result
 
 proc bakeTransitions*(source: v3): v3 =
-  ## Lower edit-point transitions to clip overlaps and linear ramps for the
-  ## native renderer. Exporters continue to consume the unmodified timeline.
+  ## Lower edit-point transitions for the native renderer to clip overlaps:
+  ## dissolves and audio crossfades as gain ramps, other video transitions as
+  ## `windows` the renderer blends. Exporters continue to consume the
+  ## unmodified timeline.
   result = source
   var rampCache: Table[RampKey, uint32]
   var effectIndex: EffectIndex
 
   proc bakeTrack(tl: var v3, track: var seq[Clip], transitions: seq[Transition],
-      isVideo: bool) =
+      isVideo: bool, windows: var seq[TransitionWindow]) =
     if track.len == 0 or transitions.len == 0: return
+    for t in transitions:
+      if isVideo and t.kind != tkDissolve:
+        windows.add TransitionWindow(start: t.spanStart, dur: t.dur,
+          kind: t.kind, alignment: t.alignment)
     let plan = transitionPlan(track, transitions)
     let k = (if isVideo: actOpacity else: actVolume)
     let partsPerClip = (if isVideo: 2 else: 3)
@@ -536,6 +574,7 @@ proc bakeTransitions*(source: v3): v3 =
       var fadeInEnd = clip.start
       var fadeOutStart = 0'i64
       var hasFadeOut = false
+      var inCurve, outCurve = tkDissolve
 
       if plan[i].incoming >= 0:
         let t = transitions[plan[i].incoming]
@@ -543,17 +582,24 @@ proc bakeTransitions*(source: v3): v3 =
         clip.start -= before
         clip.offset = max(0'i64, clip.offset - before)
         clip.dur += before
-        fadeInEnd = clip.start + t.dur
+        # A window blends the clip in by itself.
+        if not isVideo or t.kind == tkDissolve:
+          fadeInEnd = clip.start + t.dur
+          inCurve = t.kind
+        else:
+          fadeInEnd = clip.start
 
       if plan[i].outgoing >= 0:
         let t = transitions[plan[i].outgoing]
+        let ramped = not isVideo or t.kind == tkDissolve
+        outCurve = t.kind
         if t.alignment == taCenter:
           let after = t.dur - t.dur div 2
           clip.dur += after
           if not isVideo:
             fadeOutStart = t.at - t.dur div 2
             hasFadeOut = true
-        else:
+        elif ramped:
           fadeOutStart = t.at - t.dur
           hasFadeOut = true
 
@@ -572,10 +618,10 @@ proc bakeTransitions*(source: v3): v3 =
           part.dur = hi - lo
           if fadeIn:
             part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
-              k, true, hi - lo)
+              k, inCurve, true, hi - lo)
           if fadeOut:
             part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
-              k, false, hi - lo)
+              k, outCurve, false, hi - lo)
           outTrack.add part
 
       addPart(clip.start, fadeInEnd, fadeIn = fadeInEnd > clip.start,
@@ -585,10 +631,14 @@ proc bakeTransitions*(source: v3): v3 =
         fadeOut = fadeOutStart < clipEnd)
     track = outTrack
 
+  result.windows = newSeq[seq[TransitionWindow]](result.v.len)
   for i in 0 ..< result.v.len:
-    if i < result.vt.len: result.bakeTrack(result.v[i], result.vt[i], true)
+    if i < result.vt.len:
+      result.bakeTrack(result.v[i], result.vt[i], true, result.windows[i])
+  var noWindows: seq[TransitionWindow]
   for i in 0 ..< result.a.len:
-    if i < result.at.len: result.bakeTrack(result.a[i], result.at[i], false)
+    if i < result.at.len:
+      result.bakeTrack(result.a[i], result.at[i], false, noWindows)
   result.vt.setLen(0)
   result.at.setLen(0)
 

@@ -2,8 +2,8 @@ import std/[envvars, options, os, strformat, tables, times]
 when not defined(emscripten):
   import std/strutils
 
-import ./[action, cli, editexpr]
-export editexpr
+import ./[action, cli, editexpr, transitions]
+export editexpr, transitions
 import ./util/[color, rational, term]
 
 type
@@ -109,12 +109,14 @@ type AddSpec* = object
                      # layer (not the base), as a comma-separated atf-8 string
 
 type PlacedTransition* = object
-  ## A dissolve an editor placed on a linear edit, in output frames; the
+  ## A transition an editor placed on a linear edit, in output frames; the
   ## alignment is 0 start, 1 center, 2 end at `at`. Video goes on the first
-  ## video track, audio on every audio track.
+  ## video track, audio on every audio track. A kind that doesn't belong on
+  ## its track is placed as a dissolve.
   at*, dur*: int64
   align*: int
   video*: bool
+  kind*: TransitionKind
 
 type VideoSettings* = object
   codec*: string = "auto"
@@ -151,7 +153,8 @@ type mainArgs* = object
   setActionConcat*: bool # library-only: setAction frames run across the inputs end to end
   adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
   layers*: seq[LayerSpec]                         # library-only overlays
-  transition*: PackedInt = pack(false, 0) # 0 disables; otherwise dissolve duration
+  transition*: PackedInt = pack(false, 0) # 0 disables; otherwise its duration
+  transitionKind*: TransitionKind
   transitionMinCut*: PackedInt = pack(true, 1000) # 1 second
   placedTransitions*: seq[PlacedTransition] # library-only: chosen in an editor
 

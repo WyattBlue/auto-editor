@@ -4,7 +4,7 @@ from std/algorithm import sort, upperBound
 
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
-import ./burnsubs
+import ./[burnsubs, transition]
 import ../lib/dnorm16
 
 func mod360(deg: float32): float32 {.inline.} =
@@ -24,6 +24,9 @@ type VideoFrame = object
   y: float32
   scale: float32 # overlay size multiplier; 1.0 for the base layer
   fit: bool      # no explicit `pos`: fit-and-center to the canvas like the base
+  layer: int
+  win: int = -1  # the layer's transition window it is in, if any
+  incoming: bool # in its window, the clip coming in rather than going out
 
 # Identity of a configured effect filter graph: everything that determines the
 # graph's topology and arguments, as a flat value so the per-frame reuse check
@@ -326,6 +329,54 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     error "Failed to scale frame"
 
   return newFrame
+
+proc toImg(frame: ptr AVFrame): Img =
+  let rgb = frame.reformat(AV_PIX_FMT_RGB24)
+  result = Img(w: rgb.width.int, h: rgb.height.int)
+  result.px = newSeq[uint8](result.w * result.h * 3)
+  for y in 0 ..< result.h:
+    copyMem(addr result.px[y * result.w * 3],
+      cast[pointer](cast[int](rgb.data[0]) + y * rgb.linesize[0].int), result.w * 3)
+  if rgb != frame:
+    var f = rgb
+    av_frame_free(addr f)
+
+proc fromImg(im: Img, like: ptr AVFrame): ptr AVFrame =
+  ## `im` in the format and color tags of `like`, so the round trip through
+  ## RGB uses the same matrix both ways.
+  var rgb = av_frame_alloc()
+  if rgb == nil: error "Could not allocate a transition frame"
+  rgb.format = AV_PIX_FMT_RGB24.cint
+  rgb.width = im.w.cint
+  rgb.height = im.h.cint
+  rgb.color_primaries = like.color_primaries
+  rgb.color_trc = like.color_trc
+  if av_frame_get_buffer(rgb, 32) < 0: error "Could not allocate a transition frame"
+  for y in 0 ..< im.h:
+    copyMem(cast[pointer](cast[int](rgb.data[0]) + y * rgb.linesize[0].int),
+      unsafeAddr im.px[y * im.w * 3], im.w * 3)
+  if AVPixelFormat(like.format).isRgb:
+    rgb.colorspace = like.colorspace
+    rgb.color_range = like.color_range
+  else:
+    rgb.colorspace = 0 # AVCOL_SPC_RGB
+  result = av_frame_alloc()
+  if result == nil: error "Could not allocate a transition frame"
+  result.format = like.format
+  result.width = like.width
+  result.height = like.height
+  result.colorspace = like.colorspace
+  result.color_range = like.color_range
+  result.color_primaries = like.color_primaries
+  result.color_trc = like.color_trc
+  if av_frame_get_buffer(result, 32) < 0: error "Could not allocate a transition frame"
+  var ctx = sws_alloc_context()
+  if ctx == nil: error "Failed to allocate sws context"
+  discard av_opt_set_int(ctx, "threads", 0, 0)
+  let ret = sws_scale_frame(ctx, result, rgb)
+  sws_free_context(addr ctx)
+  av_frame_free(addr rgb)
+  if ret < 0: error "Failed to convert a transition frame"
 
 func zoomSpan(n, scaled, step: cint): tuple[start, len, scaledLen: cint, offset: float] =
   ## Along one axis of length `n` zoomed to `scaled`: the `step`-aligned source
@@ -2003,6 +2054,55 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return f
     f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
 
+  proc baseFrame(o: VideoFrame): ptr AVFrame =
+    ## The bottom layer's picture: fit to the canvas over the background.
+    var (acc, didDecode) = decodeClipFrame(o)
+    if didDecode and (acc.width.int32, acc.height.int32) != tl.res:
+      let oldAcc = acc
+      acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg, solidTag)
+      av_frame_free(addr oldAcc)
+    if acc != nil and acc.width > 0 and acc.height > 0:
+      acc = applyEffects(acc, o.effects, o.local, o.dur, src = o.src,
+        srcSecs = o.srcSecs)
+    acc
+
+  proc overlayObj(acc: ptr AVFrame, o: VideoFrame): ptr AVFrame =
+    ## `o` composited over `acc` as a new frame, or nil when `o` has no frame
+    ## for this position (its source ended, or hasn't started), so the base
+    ## shows through rather than an opaque bg-filled fallback.
+    var (top, topDidDecode) = decodeClipFrame(o)
+    if not topDidDecode or top == nil or top.width <= 0 or top.height <= 0:
+      if top != nil: av_frame_free(addr top)
+      return nil
+    # Effects run at native size; overlayFrame scales (in full chroma).
+    top = applyEffects(top, o.effects, o.local, o.dur, isOverlay = true,
+      src = o.src, srcSecs = o.srcSecs)
+    # No explicit `pos`: fit the overlay to the canvas and center it, like
+    # the base layer (scaleWithPad), but let the padding stay transparent
+    # so only the image shows over the base.
+    var ox = o.x
+    var oy = o.y
+    var oscale = o.scale
+    if o.fit:
+      oscale = min(acc.width.float32 / top.width.float32,
+                   acc.height.float32 / top.height.float32)
+      ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
+      oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
+    let (tw, th, tDeg) = scaleTurnOf(o.effects)
+    if tw != 1.0'f32 or th != 1.0'f32 or mod360(tDeg) != 0:
+      # Keep the overlay's center where it was placed. Turned at the
+      # size it's shown at, so it isn't enlarged afterwards.
+      let cx = ox + top.width.float32 * oscale / 2
+      let cy = oy + top.height.float32 * oscale / 2
+      let turned = transformOverlay(top, tw * oscale, th * oscale, tDeg)
+      av_frame_free(addr top)
+      top = turned
+      oscale = 1
+      ox = cx - top.width.float32 / 2
+      oy = cy - top.height.float32 / 2
+    result = overlayFrame(acc, top, ox, oy, oscale)
+    av_frame_free(addr top)
+
   # Each layer's clips by start, and those started but not yet ended, so a
   # frame looks only at the clips under it instead of every clip in the layer.
   var byStart = newSeq[seq[int]](tl.v.len)
@@ -2011,6 +2111,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     byStart[li].sort(proc(a, b: int): int = cmp(layer[a].start, layer[b].start))
   var nextStart = newSeq[int](tl.v.len)
   var started = newSeq[seq[int]](tl.v.len)
+  # Each layer's first transition window not yet over.
+  var nextWindow = newSeq[int](tl.v.len)
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     for index in startIndex ..< tl.len:
@@ -2040,6 +2142,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         started[layerIdx].setLen(live)
         # In layer order, as overlapping clips composite.
         started[layerIdx].sort()
+        var win = -1
+        if layerIdx < tl.windows.len:
+          template windows: untyped = tl.windows[layerIdx]
+          if nextWindow[layerIdx] > 0 and
+              windows[nextWindow[layerIdx] - 1].start > index:
+            nextWindow[layerIdx] = 0 # a preview went back
+          while nextWindow[layerIdx] < windows.len and
+              windows[nextWindow[layerIdx]].start +
+              windows[nextWindow[layerIdx]].dur <= index:
+            inc nextWindow[layerIdx]
+          let wi = nextWindow[layerIdx]
+          if wi < windows.len and windows[wi].start <= index:
+            win = wi
+        let firstInLayer = objList.len
         for ci in started[layerIdx]:
           let obj = layer[ci]
           # Convert timeline position from target framerate to source framerate
@@ -2081,61 +2197,82 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             gen: obj.src == nil and layerIdx > 0,
             local: int(index - obj.start), dur: int(obj.dur),
             srcSecs: float(timelinePos) * speed / tl.tb.float,
-            x: ox, y: oy, scale: oscale, fit: not hasPos)
+            x: ox, y: oy, scale: oscale, fit: not hasPos, layer: layerIdx)
+        if win >= 0:
+          # A centered window holds the clip going out, then the one coming in.
+          let alignment = tl.windows[layerIdx][win].alignment
+          for k in firstInLayer ..< objList.len:
+            objList[k].win = win
+            objList[k].incoming = case alignment
+              of taStart: true
+              of taEnd: false
+              of taCenter:
+                if objList.len - firstInLayer == 1:
+                  layer[started[layerIdx][0]].start >= tl.windows[layerIdx][win].start
+                else:
+                  k > firstInLayer
 
-      # More than one active clip at this frame => composite layers (overlay /
-      # picture-in-picture / image overlays). objList is in track order, so
-      # objList[0] is the bottom (base) layer and later entries paint on top.
-      if objList.len > 1:
+      # More than one active clip at this frame, or one in a transition =>
+      # composite layers (overlay / picture-in-picture / image overlays).
+      # objList is in track order, so objList[0] is the bottom (base) layer and
+      # later entries paint on top.
+      var inWindow = false
+      for o in objList:
+        if o.win >= 0: inWindow = true
+      if objList.len > 1 or inWindow:
         av_frame_free(addr frame)
-        var (acc, baseDidDecode) = decodeClipFrame(objList[0])
-        if baseDidDecode and (acc.width.int32, acc.height.int32) != tl.res:
-          let oldAcc = acc
-          acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg, solidTag)
-          av_frame_free(addr oldAcc)
-        if acc != nil and acc.width > 0 and acc.height > 0:
-          acc = applyEffects(acc, objList[0].effects, objList[0].local, objList[0].dur,
-            src = objList[0].src, srcSecs = objList[0].srcSecs)
-
-        for k in 1 ..< objList.len:
+        var acc: ptr AVFrame = nil
+        var k = 0
+        while k < objList.len:
           let o = objList[k]
-          var (top, topDidDecode) = decodeClipFrame(o)
-          # The overlay has no frame for this timeline position (its source ended,
-          # or hasn't started): leave the base untouched so it shows through,
-          # rather than compositing an opaque bg-filled fallback over it.
-          if not topDidDecode or top == nil or top.width <= 0 or top.height <= 0:
-            if top != nil: av_frame_free(addr top)
+          if o.win < 0:
+            if acc == nil:
+              acc = baseFrame(o)
+            else:
+              let newAcc = overlayObj(acc, o)
+              if newAcc != nil:
+                av_frame_free(addr acc)
+                acc = newAcc
+            inc k
             continue
-          # Effects run at native size; overlayFrame scales (in full chroma).
-          top = applyEffects(top, o.effects, o.local, o.dur, isOverlay = true,
-            src = o.src, srcSecs = o.srcSecs)
-          # No explicit `pos`: fit the overlay to the canvas and center it, like
-          # the base layer (scaleWithPad), but let the padding stay transparent
-          # so only the image shows over the base.
-          var ox = o.x
-          var oy = o.y
-          var oscale = o.scale
-          if o.fit:
-            oscale = min(acc.width.float32 / top.width.float32,
-                         acc.height.float32 / top.height.float32)
-            ox = float32((acc.width - int(top.width.float32 * oscale)) div 2)
-            oy = float32((acc.height - int(top.height.float32 * oscale)) div 2)
-          let (tw, th, tDeg) = scaleTurnOf(o.effects)
-          if tw != 1.0'f32 or th != 1.0'f32 or mod360(tDeg) != 0:
-            # Keep the overlay's center where it was placed. Turned at the
-            # size it's shown at, so it isn't enlarged afterwards.
-            let cx = ox + top.width.float32 * oscale / 2
-            let cy = oy + top.height.float32 * oscale / 2
-            let turned = transformOverlay(top, tw * oscale, th * oscale, tDeg)
-            av_frame_free(addr top)
-            top = turned
-            oscale = 1
-            ox = cx - top.width.float32 / 2
-            oy = cy - top.height.float32 / 2
-          let newAcc = overlayFrame(acc, top, ox, oy, oscale)
-          av_frame_free(addr acc)
-          av_frame_free(addr top)
-          acc = newAcc
+
+          # A transition: the picture with the clip going out, blended into
+          # the one with the clip coming in, both over what's below.
+          var j = k
+          while j < objList.len and objList[j].layer == o.layer and
+              objList[j].win == o.win:
+            inc j
+          let isBase = acc == nil
+          let below =
+            if isBase: makeSolid(tl.res[0], tl.res[1], tl.bg, solidTag) else: acc
+          var fromF, toF: ptr AVFrame = nil
+          for m in k ..< j:
+            var f =
+              if isBase: baseFrame(objList[m])
+              else: overlayObj(below, objList[m])
+            if f == nil: f = av_frame_clone(below)
+            if objList[m].incoming:
+              if toF != nil: av_frame_free(addr toF)
+              toF = f
+            else:
+              if fromF != nil: av_frame_free(addr fromF)
+              fromF = f
+          if fromF == nil: fromF = av_frame_clone(below)
+          if toF == nil: toF = av_frame_clone(below)
+          let w = tl.windows[o.layer][o.win]
+          let local = index - w.start
+          let p = float32((local.float + 0.5) / w.dur.float)
+          let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
+          let dip: tuple[r, g, b: float32] = (tl.bg.red.float32, tl.bg.green.float32,
+            tl.bg.blue.float32)
+          let img = render(w.kind, fromF.toImg, toF.toImg, below.toImg, p,
+            local.int, seed, dip)
+          acc = img.fromImg(fromF)
+          av_frame_free(addr fromF)
+          av_frame_free(addr toF)
+          var b = below
+          av_frame_free(addr b)
+          k = j
 
         let scaledAcc = scaleProxyFrame(acc)
         if scaledAcc != acc:

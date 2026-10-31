@@ -35,7 +35,7 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
     var arr = newJArray()
     for t in track:
       arr.add %*{
-        "kind": "dissolve",
+        "kind": $t.kind,
         "at": t.at,
         "dur": t.dur,
         "alignment": (case t.alignment

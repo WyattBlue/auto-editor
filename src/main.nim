@@ -98,17 +98,17 @@ proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
     error "Invalid number: 'start'"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
-proc parseTransition(val: string): (PackedInt, PackedInt) =
-  result[1] = pack(true, 1000) # default minimum cut: one second
+proc parseTransition(val: string): (TransitionKind, PackedInt, PackedInt) =
+  result[2] = pack(true, 1000) # default minimum cut: one second
   let parts = val.split(':')
-  if parts.len notin [2, 3] or parts[0] != "dissolve":
-    error "--transition expects dissolve:DURATION[:MIN-CUT]"
-  result[0] = parseTimeSimple(parts[1])
-  if result[0].getNumber <= 0:
+  if parts.len notin [2, 3] or not parseTransitionKind(parts[0], result[0]):
+    error "--transition expects KIND:DURATION[:MIN-CUT]"
+  result[1] = parseTimeSimple(parts[1])
+  if result[1].getNumber <= 0:
     error "--transition duration must be greater than zero"
   if parts.len == 3:
-    result[1] = parseTimeSimple(parts[2])
-    if result[1].getNumber < 0:
+    result[2] = parseTimeSimple(parts[2])
+    if result[2].getNumber < 0:
       error "--transition minimum cut duration cannot be negative"
 
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
@@ -600,7 +600,8 @@ judge making cuts.
     of coSmooth:
       args.smooth = parseTwoLengths(key, $expecting)
     of coTransition:
-      (args.transition, args.transitionMinCut) = parseTransition(key)
+      (args.transitionKind, args.transition, args.transitionMinCut) =
+        parseTransition(key)
     of coKey:
       args.licenseKey = key
     else:

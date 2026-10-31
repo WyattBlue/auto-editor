@@ -135,6 +135,22 @@ func audioLevelsFilter(act: Action, inFrame, outFrame, dur: int64,
   result = newElement("filter")
   result.add effect
 
+proc addTicks(clipitem: XmlNode, effects: Actions, inFrame, outFrame: int64,
+    tb: AVRational, video: bool) =
+  ## Premiere's source times for <in> and <out>, which count frames after the
+  ## speed change while the ticks count before it. Premiere keeps video on
+  ## whole source frames, the ones the render shows, and audio exact.
+  var speed = 1.0
+  for a in effects:
+    if a.kind == actSpeed:
+      speed = a.val
+      break
+  let perFrame = pproTicksPerSecond.float * tb.den.float / tb.num.float
+  for (tag, frame) in [("pproTicksIn", inFrame), ("pproTicksOut", outFrame)]:
+    let source = frame.float * speed
+    let ticks = (if video: round(source) else: source) * perFrame
+    clipitem.add elem(tag, $int64(round(ticks)))
+
 func clipFilters(effects: Actions, isVideo: bool, inFrame, outFrame, dur: int64,
     fps: float): seq[XmlNode] =
   var seen: set[ActionKind]
@@ -318,6 +334,7 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
         clipitem.add elem("enabled", "TRUE")
         clipitem.add elem("in", inVal)
         clipitem.add elem("out", outVal)
+        clipitem.addTicks(tl.effects[aclip.effects], inFrame, outFrame, tl.tb, false)
 
         files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
@@ -444,6 +461,7 @@ proc premiereWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
       clipitem.add elem("end", endVal)
       clipitem.add elem("in", inVal)
       clipitem.add elem("out", outVal)
+      clipitem.addTicks(tl.effects[aclip.effects], inFrame, outFrame, tl.tb, false)
 
       files.makeFiledef(clipitem, src, tl, timebase, ntsc)
 
@@ -491,7 +509,11 @@ proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
     of taCenter: "center"
     of taEnd: "end-black")
   let effect = newElement("effect")
-  let effectName = if mediaType == "video": "Cross Dissolve" else: "Cross Fade (0dB)"
+  # FCP7 XML can't name the other kinds; editors read them as a dissolve.
+  let effectName =
+    if mediaType == "video": "Cross Dissolve"
+    elif t.kind == tkConstantPower: "Cross Fade (+3dB)"
+    else: "Cross Fade (0dB)"
   effect.add elem("name", effectName)
   effect.add elem("effectid", effectName)
   effect.add elem("effecttype", "transition")
@@ -613,6 +635,8 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         clipitem.add elem("end", endVal)
         clipitem.add elem("in", inVal)
         clipitem.add elem("out", outVal)
+        if still: clipitem.addTicks(tl.effects[clip.effects], 0, clip.dur, tl.tb, true)
+        else: clipitem.addTicks(tl.effects[clip.effects], inFrame, outFrame, tl.tb, true)
 
         files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 

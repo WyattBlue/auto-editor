@@ -29,6 +29,7 @@ type
   StoryItem = object # the primary storyline in order, for placing transitions
     kind: StoryKind
     start, stop: int64 # timeline frames; a transition's span
+    transition: TransitionKind
 
   Reader = object
     tb: AVRational
@@ -291,7 +292,14 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
       r.readConnected(n, start)
     of "transition":
       let stop = n.attrSeconds("offset") + n.attrSeconds("duration") - tcStart
-      story.add StoryItem(kind: skTransition, start: start, stop: r.frames(stop))
+      var kind = tkDissolve
+      if not kindFromName(n.attr("name"), true, kind):
+        for f in n:
+          if f.kind == xnElement and f.tag == "filter-video" and
+              kindFromName(f.attr("name"), true, kind):
+            break
+      story.add StoryItem(kind: skTransition, start: start, stop: r.frames(stop),
+        transition: kind)
     else:
       r.dropped.inc uiName(n.tag)
 
@@ -311,7 +319,7 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
       if not hasPrev or item.start == at: taStart
       elif not hasNext or item.stop == at: taEnd
       else: taCenter
-    transitions.add Transition(kind: tkDissolve, at: at, dur: dur,
+    transitions.add Transition(kind: item.transition, at: at, dur: dur,
       alignment: alignment)
 
   result.tb = r.tb
@@ -353,8 +361,10 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
       result.vt = newSeq[seq[Transition]](result.v.len)
       result.vt[0] = transitions
     if audio.len > 0:
+      # A storyline transition crossfades the audio.
       result.at = newSeq[seq[Transition]](result.a.len)
       result.at[0] = transitions
+      for t in result.at[0].mitems: t.kind = tkDissolve
     result.validateTransitions()
 
   result.effects = r.effects
