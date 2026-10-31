@@ -834,6 +834,9 @@ proc avfilter_graph_parse_ptr*(graph: ptr AVFilterGraph, filters: cstring,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_config*(graphctx: ptr AVFilterGraph,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_send_command*(graph: ptr AVFilterGraph, target, cmd,
+    arg: cstring, res: cstring, res_len: cint, flags: cint): cint {.importc,
+    header: "<libavfilter/avfilter.h>".}
 proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint, dst: ptr AVFilterContext,
     dstpad: cuint): cint {.importc, header: "<libavfilter/avfilter.h>".}
 proc avfilter_get_by_name*(name: cstring): ptr AVFilter {.importc,

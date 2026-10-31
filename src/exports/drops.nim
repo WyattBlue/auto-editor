@@ -15,6 +15,7 @@ type
   Support = object
     actions: set[ActionKind]
     v, a: LayerRule
+    ramps: bool # speed ramps, which the others play at their mean speed
 
 const mltActions = {actSpeed, actVolume, actDeesser, actInvert, actHflip,
   actVflip, actErosion, actBlur, actBrightness, actLuv, actLens, actDrawbox,
@@ -26,8 +27,9 @@ func support(kind: ExportKind): Support {.raises: [].} =
     Support(actions: {actSpeed, actOpacity, actVolume}, v: lrAll, a: lrAll)
   of exResolveFcp7:
     Support(actions: {actSpeed, actOpacity, actVolume}, v: lrBase, a: lrAll)
-  of exFinalCutPro: Support(actions: {actSpeed}, v: lrBase, a: lrSameSource)
-  of exResolve: Support(actions: {actSpeed}, v: lrBase, a: lrAll)
+  of exFinalCutPro:
+    Support(actions: {actSpeed}, v: lrBase, a: lrSameSource, ramps: true)
+  of exResolve: Support(actions: {actSpeed}, v: lrBase, a: lrAll, ramps: true)
   of exShotcut: Support(actions: mltActions, v: lrBase, a: lrFirst)
   of exKdenlive: Support(actions: mltActions, v: lrSameSource, a: lrSameSource)
   of exPremiereOtio:
@@ -72,7 +74,7 @@ func carried(s: DropScan, layer: seq[Clip], i: int, rule: LayerRule,
   of lrFirst: i == 0 and s.onlyBaseSrcs(layer)
 
 proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
-    rule: LayerRule, supported: set[ActionKind]) {.raises: [].} =
+    rule: LayerRule, supported: set[ActionKind], ramps: bool) {.raises: [].} =
   for i, layer in layers:
     if layer.len == 0: continue
     let isBase = (if video: i == 0 else: i == 0 and not s.videoBase)
@@ -91,6 +93,9 @@ proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
         if act.kind notin supported and act.kind.appliesTo(video):
           let name = ($act).split({':', ','})[0]
           if name notin s.actions: s.actions.add name
+        elif act.kind == actSpeed and act.sKf.len > 0 and not ramps:
+          const name = "speed ramp (as its mean speed)"
+          if name notin s.actions: s.actions.add name
 
 proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   ## What exporting `tl` as `kind` leaves out: action names, then counts of
@@ -105,8 +110,8 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
     if clip.src != nil and clip.src notin s.baseSrcs:
       s.baseSrcs.add clip.src
 
-  s.scan(tl, tl.v, true, sup.v, sup.actions)
-  s.scan(tl, tl.a, false, sup.a, sup.actions)
+  s.scan(tl, tl.v, true, sup.v, sup.actions, sup.ramps)
+  s.scan(tl, tl.a, false, sup.a, sup.actions, sup.ramps)
 
   result = s.actions
   if s.droppedV > 0: result.add plural(s.droppedV, "video track")

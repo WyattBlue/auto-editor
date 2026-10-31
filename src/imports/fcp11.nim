@@ -6,6 +6,7 @@ import std/[algorithm, math, os, strformat, strutils, tables]
 
 import ../[action, av, log, timeline]
 import ../util/[color, fun, rational, xml]
+import ../lib/speedmap
 
 # Tags common in FCPXML, so the parsed tree can share their strings.
 const fcp11Tags = ["fcpxml", "resources", "format", "asset", "media-rep",
@@ -70,21 +71,31 @@ proc attrSeconds(n: XmlNode, name: string, default = 0.0): float64 =
 func frames(r: Reader, secs: float64): int64 =
   int64(round(secs * r.tb.num.float64 / r.tb.den.float64))
 
-proc clipEffects(r: var Reader, n: XmlNode): uint32 =
+proc speedOf(r: var Reader, timeMap: XmlNode, inSecs: float64, dur: int64,
+    offset: var int64): Action =
+  ## The speed a time map plays the clip at from its in point for `dur`
+  ## frames. A ramp sets `offset` from where in the media the clip begins.
+  var points: seq[(float64, float64)]
+  for p in timeMap:
+    if p.kind == xnElement and p.tag == "timept":
+      points.add (p.attrSeconds("time"), p.attrSeconds("value"))
+  let secs = dur.float64 * r.tb.den.float64 / r.tb.num.float64
+  let (speed, mediaIn, ok) = speedFromMap(points, inSecs, secs)
+  if not ok:
+    r.dropped.inc "speed ramp"
+    return Action(kind: actSpeed, val: 1)
+  if speed.sKf.len > 0: offset = r.frames(mediaIn / speed.val)
+  speed
+
+proc clipEffects(r: var Reader, n: XmlNode, inSecs: float64, dur: int64,
+    offset: var int64): uint32 =
   var acts: seq[Action]
   for c in n:
     if c.kind != xnElement: continue
     case c.tag
     of "timeMap":
-      # A constant speed: the last point's media time over its clip time.
-      var last: XmlNode = nil
-      for p in c:
-        if p.kind == xnElement and p.tag == "timept": last = p
-      if last != nil:
-        let time = last.attrSeconds("time")
-        let value = last.attrSeconds("value")
-        if time > 0 and value > 0 and abs(value / time - 1.0) > 1e-6:
-          acts.add Action(kind: actSpeed, val: float32(value / time))
+      let speed = r.speedOf(c, inSecs, dur, offset)
+      if speed.val != 1.0 or speed.sKf.len > 0: acts.add speed
     of "adjust-volume":
       let amount = c.attr("amount")
       if amount.endsWith("dB"):
@@ -142,11 +153,12 @@ proc place(r: var Reader, n: XmlNode, start: int64): (bool, Placed) =
     r.frames(n.attrSeconds("offset"))
   if dur <= 0 or not (asset.hasVideo or asset.hasAudio):
     return
-  let offset = r.frames(mediaSecs) - r.frames(asset.start)
+  var offset = r.frames(mediaSecs) - r.frames(asset.start)
+  let effects = r.clipEffects(n, mediaSecs, dur, offset)
   if offset < 0:
     error &"{n.tag} starts before its media"
   let clip = Clip(src: asset.src, start: start, dur: dur, offset: offset,
-    effects: r.clipEffects(n), stream: 0)
+    effects: effects, stream: 0)
   (true, Placed(clip: clip, video: asset.hasVideo, audio: asset.hasAudio))
 
 proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =

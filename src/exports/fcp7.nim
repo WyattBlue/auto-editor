@@ -6,6 +6,7 @@ when defined(windows):
 
 import ../[action, ffmpeg, media, timeline]
 import ../util/[fun, rational]
+import ../lib/speedmap
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -51,14 +52,36 @@ func param(id, name, value: string, min = "", max = ""): XmlNode =
   p.add elem("value", value)
   return p
 
-func speedup(speed: float): XmlNode =
+func mediaFrame(map: SpeedMap, clip: Clip, frame: int64): float64 =
+  ## The source frame at `frame` in the clip's speed-scaled frames, which
+  ## <in> and <out> count.
+  if not map.ramp: return frame.float64 * map.mean
+  map.mean * (clip.offset.float64 + clip.dur.float64 *
+    map.mediaAt(float64(frame - clip.offset) / clip.dur.float64))
+
+proc speedup(map: SpeedMap, clip: Clip, inFrame, outFrame: int64): XmlNode =
   let fil = newElement("filter")
   let effect = newElement("effect")
   effect.add elem("name", "Time Remap")
   effect.add elem("effectid", "timeremap")
-  effect.add param("variablespeed", "variablespeed", "0", "0", "1")
-  effect.add param("speed", "speed", $speed, "-100000", "100000")
+  effect.add param("variablespeed", "variablespeed", (if map.ramp: "1" else: "0"),
+    "0", "1")
+  effect.add param("speed", "speed", $(map.mean * 100), "-100000", "100000")
   effect.add param("frameblending", "frameblending", "FALSE")
+  if map.ramp:
+    # A ramp's source frame at each frame from <in> to <out>, which the
+    # editor joins with straight lines.
+    let graph = param("graphdict", "graphdict", "0")
+    let step = max(1'i64, (outFrame - inFrame) div 32)
+    var frame = inFrame
+    while true:
+      let kf = newElement("keyframe")
+      kf.add elem("when", $frame)
+      kf.add elem("value", $round(map.mediaFrame(clip, frame), 3))
+      graph.add kf
+      if frame >= outFrame: break
+      frame = min(frame + step, outFrame)
+    effect.add graph
   fil.add effect
 
   return fil
@@ -135,31 +158,27 @@ func audioLevelsFilter(act: Action, inFrame, outFrame, dur: int64,
   result = newElement("filter")
   result.add effect
 
-proc addTicks(clipitem: XmlNode, effects: Actions, inFrame, outFrame: int64,
-    tb: AVRational, video: bool) =
+proc addTicks(clipitem: XmlNode, effects: Actions, clip: Clip,
+    inFrame, outFrame: int64, tb: AVRational, video: bool) =
   ## Premiere's source times for <in> and <out>, which count frames after the
   ## speed change while the ticks count before it. Premiere keeps video on
   ## whole source frames, the ones the render shows, and audio exact.
-  var speed = 1.0
-  for a in effects:
-    if a.kind == actSpeed:
-      speed = a.val
-      break
+  let map = initSpeedMap(effects)
   let perFrame = pproTicksPerSecond.float * tb.den.float / tb.num.float
   for (tag, frame) in [("pproTicksIn", inFrame), ("pproTicksOut", outFrame)]:
-    let source = frame.float * speed
+    let source = map.mediaFrame(clip, frame)
     let ticks = (if video: round(source) else: source) * perFrame
     clipitem.add elem(tag, $int64(round(ticks)))
 
-func clipFilters(effects: Actions, isVideo: bool, inFrame, outFrame, dur: int64,
-    fps: float): seq[XmlNode] =
+proc clipFilters(effects: Actions, clip: Clip, isVideo: bool, inFrame, outFrame,
+    dur: int64, fps: float): seq[XmlNode] =
   var seen: set[ActionKind]
   for a in effects:
     if a.kind in seen: continue
     seen.incl a.kind
     case a.kind
     of actSpeed:
-      result.add speedup(a.val * 100)
+      result.add speedup(initSpeedMap(effects), clip, inFrame, outFrame)
     of actOpacity:
       if isVideo:
         result.add opacityFilter(a, inFrame, outFrame, dur, fps)
@@ -334,7 +353,7 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
         clipitem.add elem("enabled", "TRUE")
         clipitem.add elem("in", inVal)
         clipitem.add elem("out", outVal)
-        clipitem.addTicks(tl.effects[aclip.effects], inFrame, outFrame, tl.tb, false)
+        clipitem.addTicks(tl.effects[aclip.effects], aclip, inFrame, outFrame, tl.tb, false)
 
         files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
@@ -345,8 +364,8 @@ proc resolveWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
 
         clipitem.addResolveLinks(tl, audioIds, j)
 
-        for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
-            aclip.dur, tl.tb.float64):
+        for f in clipFilters(tl.effects[aclip.effects], aclip, false, inFrame,
+            outFrame, aclip.dur, tl.tb.float64):
           clipitem.add f
 
         track.add clipitem
@@ -461,7 +480,7 @@ proc premiereWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
       clipitem.add elem("end", endVal)
       clipitem.add elem("in", inVal)
       clipitem.add elem("out", outVal)
-      clipitem.addTicks(tl.effects[aclip.effects], inFrame, outFrame, tl.tb, false)
+      clipitem.addTicks(tl.effects[aclip.effects], aclip, inFrame, outFrame, tl.tb, false)
 
       files.makeFiledef(clipitem, src, tl, timebase, ntsc)
 
@@ -474,8 +493,8 @@ proc premiereWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
       labels.add elem("label2", "Iris")
       clipitem.add labels
 
-      for f in clipFilters(tl.effects[aclip.effects], false, inFrame, outFrame,
-          aclip.dur, tl.tb.float64):
+      for f in clipFilters(tl.effects[aclip.effects], aclip, false, inFrame,
+          outFrame, aclip.dur, tl.tb.float64):
         clipitem.add f
 
       track.add clipitem
@@ -635,14 +654,14 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         clipitem.add elem("end", endVal)
         clipitem.add elem("in", inVal)
         clipitem.add elem("out", outVal)
-        if still: clipitem.addTicks(tl.effects[clip.effects], 0, clip.dur, tl.tb, true)
-        else: clipitem.addTicks(tl.effects[clip.effects], inFrame, outFrame, tl.tb, true)
+        if still: clipitem.addTicks(tl.effects[clip.effects], clip, 0, clip.dur, tl.tb, true)
+        else: clipitem.addTicks(tl.effects[clip.effects], clip, inFrame, outFrame, tl.tb, true)
 
         files.makeFiledef(clipitem, mi, tl, timebase, ntsc)
 
         clipitem.add elem("compositemode", "normal")
 
-        for f in clipFilters(tl.effects[clip.effects], true,
+        for f in clipFilters(tl.effects[clip.effects], clip, true,
             (if still: 0'i64 else: inFrame), (if still: clip.dur else: outFrame),
             clip.dur, tl.tb.float64):
           clipitem.add f

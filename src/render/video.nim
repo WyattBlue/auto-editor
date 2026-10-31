@@ -5,7 +5,7 @@ from std/algorithm import sort, upperBound
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
 import ./[burnsubs, transition]
-import ../lib/dnorm16
+import ../lib/[dnorm16, speedmap]
 
 func mod360(deg: float32): float32 {.inline.} =
   # Like `floorMod(deg, 360)`, but compiles to fdiv/floor/fma instead of a
@@ -2113,6 +2113,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var started = newSeq[seq[int]](tl.v.len)
   # Each layer's first transition window not yet over.
   var nextWindow = newSeq[int](tl.v.len)
+  var speedMaps: Table[uint32, SpeedMap]
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     for index in startIndex ..< tl.len:
@@ -2158,9 +2159,16 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let firstInLayer = objList.len
         for ci in started[layerIdx]:
           let obj = layer[ci]
-          # Convert timeline position from target framerate to source framerate
-          let timelinePos = obj.offset + index - obj.start
           let effectGroup = tl.effects[obj.effects]
+          if obj.effects notin speedMaps:
+            speedMaps[obj.effects] = initSpeedMap(effectGroup)
+          # The position in speed-scaled frames; a ramp moves through the
+          # clip's span unevenly.
+          let timelinePos =
+            if speedMaps[obj.effects].ramp:
+              obj.offset.float + obj.dur.float * speedMaps[obj.effects].mediaAt(
+                float(index - obj.start) / obj.dur.float)
+            else: float(obj.offset + index - obj.start)
           var speed = 1.0
           # Overlay placement comes from a `pos` action in the clip's effects
           # (keeps Clip itself position-free); defaults to the canvas origin.
@@ -2188,15 +2196,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               let rate = myCache.cns[obj.src].video[0].avg_frame_rate
               # 0/0 (no declared frame rate) would make the index NaN; map 1:1.
               if rate.isValid:
-                int(round(float(timelinePos) * rate.float / tl.tb.float))
+                int(round(timelinePos * rate.float / tl.tb.float))
               else:
-                int(timelinePos)
+                int(round(timelinePos))
           let i = int(round(float(sourceFramePos) * speed))
           # nil src: the `-bg` canvas on the base track, a generator above it.
           objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
             gen: obj.src == nil and layerIdx > 0,
             local: int(index - obj.start), dur: int(obj.dur),
-            srcSecs: float(timelinePos) * speed / tl.tb.float,
+            srcSecs: timelinePos * speed / tl.tb.float,
             x: ox, y: oy, scale: oscale, fit: not hasPos, layer: layerIdx)
         if win >= 0:
           # A centered window holds the clip going out, then the one coming in.

@@ -363,8 +363,10 @@ func atempoChain(speed: float): seq[string] =
     result.add &"atempo={rem}"
 
 proc createFilterGraph(effects: openArray[Action], sr: cint,
-    layout: ref AVChannelLayout):
+    layout: ref AVChannelLayout, rampStages = 0):
   (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
+  ## `rampStages` atempo filters named atempo@ramp0... end the chain, for a
+  ## caller to change their tempo as a ramp goes.
 
   let filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   if filterGraph == nil:
@@ -412,6 +414,8 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
   if speedFx.len > 0:
     let i = max(at, 0)
     filters = filters[0 ..< i] & speedFx & filters[i ..< filters.len]
+  for j in 0 ..< rampStages:
+    filters.add &"atempo@ramp{j}=tempo=1"
 
   # Pin the chain's output to s16p. Some filters (e.g. deesser) emit dblp, which
   # the frame-readback in processAudioClip can't convert, yielding silence.
@@ -469,16 +473,28 @@ proc applyVolume(data: var seq[int16], act: Action, channels: int, sr: cint,
       let idx = i * channels + ch
       data[idx] = clamp16(int32(round(data[idx].float32 * gain)))
 
+const rampBlock = 1024 # input samples between tempo changes in a ramp
+
 proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
-    layout: ref AVChannelLayout): seq[int16] =
+    layout: ref AVChannelLayout, rampTempo: seq[float64] = @[]): seq[int16] =
   ## Push interleaved s16 samples through an ffmpeg filter chain built from
   ## `acts`, returning the interleaved result at the same sample rate.
+  ## `rampTempo`, when given, is a tempo for each block of `rampBlock` input
+  ## samples, which the chain's last stretch follows.
   let channels = layout.nb_channels
   var processedData = data
 
   block:
     let samples = data.len div channels
-    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(acts, sourceSr, layout)
+    # atempo behaves over a limited factor range, so a ramp is spread across
+    # enough stages that each stays within one.
+    var stages = 0
+    if rampTempo.len > 0:
+      stages = 1
+      for t in rampTempo:
+        while pow(t, 1 / stages) > 6.0 or pow(t, 1 / stages) < 0.5: inc stages
+    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(acts, sourceSr,
+      layout, stages)
     defer: avfilter_graph_free(addr filterGraph)
 
     # Create audio frame with input data
@@ -512,23 +528,49 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
       for frame in outputFrames:
         av_frame_free(addr frame)
 
-    if av_buffersrc_write_frame(bufferSrc, inputFrame) < 0:
-      error "Error adding frame to audio filter"
+    proc collect() =
+      while true:
+        var outputFrame = av_frame_alloc()
+        if outputFrame == nil:
+          error "Could not allocate output audio frame"
+        let ret = av_buffersink_get_frame(bufferSink, outputFrame)
+        if ret < 0:
+          av_frame_free(addr outputFrame)
+          break
+        outputFrames.add(outputFrame)
+
+    if stages == 0:
+      if av_buffersrc_write_frame(bufferSrc, inputFrame) < 0:
+        error "Error adding frame to audio filter"
+    else:
+      # Block by block, each at its tempo, so the stretch follows the ramp.
+      for b, tempo in rampTempo:
+        let lo = b * rampBlock
+        let n = min(rampBlock, samples - lo)
+        if n <= 0: break
+        let arg = $pow(tempo, 1 / stages)
+        for j in 0 ..< stages:
+          discard avfilter_graph_send_command(filterGraph, cstring(&"atempo@ramp{j}"),
+            "tempo", cstring(arg), nil, 0, 0)
+        var blk = av_frame_alloc()
+        blk.nb_samples = n.cint
+        blk.format = AV_SAMPLE_FMT_S16P.cint
+        discard av_channel_layout_copy(addr blk.ch_layout, addr layout[])
+        blk.sample_rate = sourceSr
+        blk.pts = lo.int64
+        if av_frame_get_buffer(blk, 0) < 0:
+          error "Could not allocate input audio frame buffer"
+        for ch in 0 ..< channels:
+          copyMem(blk.data[ch], addr cast[ptr UncheckedArray[int16]](
+            inputFrame.data[ch])[lo], n * sizeof(int16))
+        let ret = av_buffersrc_write_frame(bufferSrc, blk)
+        av_frame_free(addr blk)
+        if ret < 0:
+          error "Error adding frame to audio filter"
+        collect()
     if av_buffersrc_write_frame(bufferSrc, nil) < 0:
       error "Error flushing audio filter"
-
-    # Collect output frames
-    while true:
-      var outputFrame = av_frame_alloc()
-      if outputFrame == nil:
-        error "Could not allocate output audio frame"
-
-      let ret = av_buffersink_get_frame(bufferSink, outputFrame)
-      if ret < 0:
-        av_frame_free(addr outputFrame)
-        break
-
-      outputFrames.add(outputFrame)
+    collect()
 
     # Convert output frames back to interleaved seq[int16]
     if outputFrames.len == 0:
@@ -602,24 +644,79 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
   # deesser sees the signal).
   var processedData = data
   let channels = layout.nb_channels
+  let effects = ef[clip.effects]
+
+  # A ramp moves through the media unevenly. A varispeed ramp resamples it
+  # here, its pitch following; a speed ramp's stretch follows it in the
+  # filter chain. `uOf` says how far through the media each sample is.
+  var hasRamp, hasVariRamp: bool
+  for a in effects:
+    if a.kind == actSpeed and a.sKf.len > 0:
+      hasRamp = true
+      if a.varispeed: hasVariRamp = true
+  var uOf: seq[float32]
+  if hasVariRamp:
+    var rates = newSeq[float64](speedSteps + 1)
+    for i in 0 .. speedSteps:
+      rates[i] = 1.0
+      for a in effects:
+        if a.kind == actSpeed and a.varispeed and a.sKf.len > 0:
+          rates[i] *= a.speedAt(i / speedSteps)
+    let frames = processedData.len div channels
+    var warped: seq[int16]
+    var pos = 0.0
+    while pos < frames.float64 - 1:
+      let u = pos / frames.float64
+      uOf.add float32(u)
+      let i0 = int(pos)
+      let f = pos - i0.float64
+      for ch in 0 ..< channels:
+        let a = processedData[i0 * channels + ch].float64
+        let b = processedData[(i0 + 1) * channels + ch].float64
+        warped.add int16(round(a + (b - a) * f))
+      let r = u * speedSteps
+      let k = min(int(r), speedSteps - 1)
+      pos += rates[k] + (rates[k + 1] - rates[k]) * (r - k.float64)
+    processedData = warped
+  var rampTempo: seq[float64]
+  if hasRamp and effects.anyIt(it.kind == actSpeed and not it.varispeed and
+      it.sKf.len > 0):
+    let frames = processedData.len div channels
+    var b = 0
+    while b * rampBlock < frames:
+      let mid = min(frames - 1, b * rampBlock + rampBlock div 2)
+      let u = (if uOf.len > 0: uOf[mid].float64 else: mid / frames)
+      var tempo = 1.0
+      for a in effects:
+        if a.kind == actSpeed and not a.varispeed and a.sKf.len > 0:
+          tempo *= a.speedAt(u)
+      rampTempo.add tempo
+      inc b
+
   var pending: seq[Action]
-  for effect in ef[clip.effects]:
+  template runPending() =
+    if pending.len > 0:
+      processedData = runFilterChain(processedData, pending, sourceSr, layout,
+        rampTempo)
+      rampTempo.setLen(0)
+      pending.setLen(0)
+  for effect in effects:
     case effect.kind
-    of actSpeed, actDeesser, actPitch:
+    of actSpeed:
+      # A ramp is done above or by the chain's ramp stages.
+      if effect.sKf.len == 0: pending.add effect
+    of actDeesser, actPitch:
       pending.add effect
     of actVolume:
-      if pending.len > 0:
-        processedData = runFilterChain(processedData, pending, sourceSr, layout)
-        pending.setLen(0)
+      runPending()
       applyVolume(processedData, effect, channels.int, sourceSr, fps)
     of actConvolve:
-      if pending.len > 0:
-        processedData = runFilterChain(processedData, pending, sourceSr, layout)
-        pending.setLen(0)
+      runPending()
       applyConvolve(processedData, effect.irPath, channels.int, sourceSr)
     else: discard
-  if pending.len > 0:
-    processedData = runFilterChain(processedData, pending, sourceSr, layout)
+  if rampTempo.len > 0 and pending.len == 0:
+    pending.add Action(kind: actSpeed, val: 1)
+  runPending()
 
   # Now resample from source to target sample rate
   if sourceSr == targetSr:

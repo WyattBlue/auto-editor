@@ -3,7 +3,7 @@ from std/math import round, ceil, exp, sin, PI
 
 import ./[action, av, ffmpeg, media, log, transitions, wavutil]
 import ./util/[color, fun, lang, rational]
-import ./lib/cliputil
+import ./lib/[cliputil, speedmap]
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -417,6 +417,38 @@ proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
   for i in 0 ..< tl.a.len: tl.at[i] = build(tl.a[i], audioKind)
   tl.validateTransitions()
 
+proc sliceClip*(tl: var v3, index: var EffectIndex, clip: Clip, lo, hi: int64): Clip =
+  ## The part of `clip` from timeline frame `lo` to `hi`, which may reach past
+  ## its ends. A speed ramp is cut down to the media that part covers.
+  result = clip
+  result.start = lo
+  result.dur = hi - lo
+  let map = initSpeedMap(tl.effects[clip.effects])
+  if not map.ramp:
+    result.offset = clip.offset + (lo - clip.start)
+    return
+  if lo == clip.start and hi == clip.start + clip.dur:
+    return
+  let u0 = map.mediaAt(float(lo - clip.start) / clip.dur.float)
+  let u1 = map.mediaAt(float(hi - clip.start) / clip.dur.float)
+  # Sampled finely enough that joining the samples linearly follows any
+  # easing closely.
+  const n = 32
+  var actions: seq[Action]
+  var mean = 1.0
+  for a in tl.effects[clip.effects]:
+    var b = a
+    if a.kind == actSpeed and a.sKf.len > 0:
+      b = Action(kind: actSpeed, varispeed: a.varispeed)
+      for j in 0 .. n:
+        b.sKf.add float32(a.speedAt(u0 + (u1 - u0) * j.float64 / n))
+      b.val = float32(b.meanSpeed)
+    if b.kind == actSpeed: mean *= b.val
+    actions.add b
+  let media = map.mean * (clip.offset.float + clip.dur.float * u0)
+  result.offset = int64(round(media / mean))
+  result.effects = index.intern(tl.effects, newActions(actions))
+
 func spanStart*(t: Transition): int64 =
   ## First timeline frame of the transition's span.
   t.at - (case t.alignment
@@ -613,9 +645,12 @@ proc bakeTransitions*(source: v3): v3 =
       template addPart(lo, hi: int64, fadeIn, fadeOut: bool) =
         if hi > lo:
           var part = clip
-          part.start = lo
-          part.offset = clip.offset + (lo - clip.start)
-          part.dur = hi - lo
+          if initSpeedMap(tl.effects[original.effects]).ramp:
+            part = tl.sliceClip(effectIndex, original, lo, hi)
+          else:
+            part.start = lo
+            part.offset = clip.offset + (lo - clip.start)
+            part.dur = hi - lo
           if fadeIn:
             part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
               k, inCurve, true, hi - lo)

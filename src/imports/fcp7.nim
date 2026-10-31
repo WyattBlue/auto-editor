@@ -3,6 +3,7 @@ from std/math import round
 
 import ../[action, ffmpeg, log, timeline]
 import ../util/[color, fun, rational, xml]
+import ../lib/speedmap
 
 # Tags common in FCP7 XML, so the parsed tree can share their strings.
 const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",
@@ -29,6 +30,9 @@ proc xmlInt(node: XmlNode, lo = low(int64), hi = high(int64)): int64 =
     error &"Invalid <{node.tag}> value: '{s}'"
 
 func num(s: string): (bool, float) =
+  case s.strip()
+  of "TRUE": return (true, 1.0)
+  of "FALSE": return (true, 0.0)
   try: (true, parseFloat(s.strip()))
   except ValueError: (false, 0.0)
 
@@ -94,7 +98,13 @@ func kfSeq(pts: seq[(float, float)], srcIn, srcOut, scale, lo, hi: float):
     let time = srcIn + float(i) / float(n - 1) * span
     result.add clamp(ordered.lerpAt(time) * scale, lo, hi).float32
 
-proc readFilters(filterNode: XmlNode, acts: var seq[Action],
+type Remap = object
+  ## A clip's Time Remap: its speed, and what v3 can't play of it.
+  speed: float = 1.0
+  ramp, reverse, freeze: bool
+  graph: seq[(float64, float64)] # source frames at <in>/<out> frames
+
+proc readFilters(filterNode: XmlNode, acts: var seq[Action], remap: var Remap,
     srcIn, srcOut: float) =
   for c in filterNode:
     if c.kind == xnElement and c.tag == "enabled" and
@@ -117,10 +127,30 @@ proc readFilters(filterNode: XmlNode, acts: var seq[Action],
 
     case effectId
     of "timeremap":
-      if "speed" in params:
-        let speed = float32(params["speed"][0][1] / 100.0)
-        if speed > 0.0 and speed < 99999.0 and speed != 1.0:
-          acts.addFixed Action(kind: actSpeed, val: speed)
+      let speeds = params.getOrDefault("speed")
+      if speeds.len > 0:
+        let speed = speeds[0][1] / 100.0
+        remap.speed = abs(speed)
+        remap.freeze = speed == 0.0
+        remap.reverse = speed < 0.0
+        remap.ramp = speeds.anyIt(it[1] != speeds[0][1])
+      for v in params.getOrDefault("variablespeed"):
+        if v[1] != 0.0: remap.ramp = true
+      for v in params.getOrDefault("reverse"):
+        if v[1] != 0.0: remap.reverse = true
+      for p in effectTag:
+        if p.kind != xnElement or p.tag != "parameter": continue
+        let (id, _) = readParam(p)
+        if id != "graphdict": continue
+        for kf in p:
+          if kf.kind != xnElement or kf.tag != "keyframe": continue
+          var timeOk, valOk = false
+          var time, value = 0.0
+          for kc in kf:
+            if kc.kind != xnElement: continue
+            if kc.tag == "when": (timeOk, time) = num(kc.innerText)
+            elif kc.tag == "value": (valOk, value) = num(kc.innerText)
+          if timeOk and valOk: remap.graph.add (time, value)
     of "opacity":
       let kf = kfSeq(params.getOrDefault("opacity"), srcIn, srcOut, 0.01, 0.0, 1.0)
       if kf.len > 0:
@@ -255,7 +285,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     var endVal = 0i64
     var inVal = 0i64
     var outVal = -1i64
-    var ticksIn = -1'i64
+    var ticksIn, ticksOut = -1'i64
     var fileNode, effectNode: XmlNode = nil
     var nested = false
     var enabled = true
@@ -272,6 +302,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       of "in": inVal = xmlInt(ci, lo = 0)
       of "out": outVal = xmlInt(ci, lo = -1)
       of "pproTicksIn": ticksIn = xmlInt(ci, lo = 0)
+      of "pproTicksOut": ticksOut = xmlInt(ci, lo = 0)
       of "file": fileNode = ci
       of "effect": effectNode = ci
       of "sequence": nested = true
@@ -325,18 +356,44 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
         effects: effectIndex.intern(effects, newActions(@[box])))
       continue
     if outVal <= inVal: outVal = inVal + dur + inExt + outExt
+    var remap = Remap()
     for fn in filterNodes:
-      readFilters(fn, acts, inVal.float, outVal.float)
-    var speed = 1.0
-    for a in acts:
-      if a.kind == actSpeed: speed *= a.val
+      readFilters(fn, acts, remap, inVal.float, outVal.float)
+    let ticksPerFrame = pproTicksPerSecond.float / tb.float
+    var speed = remap.speed
+    if remap.freeze:
+      dropped.inc "freeze frame"
+      speed = 1.0
+    if remap.reverse: dropped.inc "reversed clip"
+    var rampOffset = -1'i64
+    if remap.ramp and not remap.reverse and remap.graph.len >= 2:
+      # The time remap graph gives the source frame at each frame of the
+      # clip, which a ramp follows.
+      let (s, mediaIn, ok) = speedFromMap(remap.graph, float(inVal + inExt),
+        dur.float)
+      if ok and s.sKf.len > 0:
+        acts.addFixed s
+        rampOffset = int64(round(mediaIn / s.val))
+      elif ok:
+        speed = s.val
+      remap.ramp = not ok
+    if remap.ramp:
+      # Played at its average speed, which keeps the clip's length and the
+      # media it covers. Premiere's ticks give the media exactly; without
+      # them only the first keyframe's speed is known.
+      dropped.inc "speed ramp"
+      if ticksOut > ticksIn and ticksIn >= 0:
+        speed = (ticksOut - ticksIn).float / ticksPerFrame /
+          float(dur + inExt + outExt)
+    if rampOffset < 0 and speed > 0.0 and speed < 99999.0 and speed != 1.0:
+      acts.addFixed Action(kind: actSpeed, val: speed.float32)
     # <in> is clamped at 0 when the handle runs past the media start, so take
     # the offset from <out> instead. Premiere's ticks give the source time
     # exactly, where <in> is rounded to a frame after the speed change.
     let offset =
-      if inExt > 0: max(0'i64, outVal - outExt - dur)
-      elif ticksIn >= 0:
-        int64(round(ticksIn.float * tb.float / pproTicksPerSecond.float / speed))
+      if rampOffset >= 0: rampOffset
+      elif inExt > 0: max(0'i64, outVal - outExt - dur)
+      elif ticksIn >= 0: int64(round(ticksIn.float / ticksPerFrame / speed))
       else: inVal
     let e = effectIndex.intern(effects, newActions(acts))
     var stream = 0'i16

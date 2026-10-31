@@ -88,8 +88,10 @@ type
     of actLens:
       k1*, k2*: Snorm16
     of actSpeed:
-      val*: float32
+      val*: float32          # the speed, or a ramp's mean speed over its media
       varispeed*: bool
+      sKf*: seq[float32]     # a ramp's keyframes across its media; empty if constant
+      sKt*: seq[KfTime]      # their times (auto or percent), or empty: evenly
     of actZoom, actBlur, actOpacity, actBrightness, actVolume:
       kf*: seq[float32]      # keyframes in native units; len >= 1
       kt*: seq[KfTime]       # each keyframe's time, or empty: spread evenly
@@ -217,9 +219,9 @@ const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "cut", flags: {afAudio, afVideo},
     help: "Remove the section completely from the output."),
   ActionDef(name: "speed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
-    help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed."),
+    help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed. A ramp like `speed:1..4` or `speed:1@0%..6@50%..1` spreads its keyframes across the section's source, eased with `:ease=curve`."),
   ActionDef(name: "varispeed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.2, 100.0),
-    help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher."),
+    help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Ramps like `speed`'s, e.g. `varispeed:1..4`."),
   ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
     help: """
 Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
@@ -504,6 +506,50 @@ func sampleKf*(kf: seq[float32], p: float32): float32 =
   let x = clamp(p, 0.0'f32, 1.0'f32) * float32(kf.len - 1)
   let seg = min(int(x), kf.len - 2)
   kf[seg] + (kf[seg + 1] - kf[seg]) * (x - float32(seg))
+
+func speedAt*(a: Action, u: float64): float64 =
+  ## A speed action's speed `u` (0 to 1) of the way through its media.
+  if a.sKf.len == 0: return a.val
+  let u = clamp(u, 0.0, 1.0)
+  if a.sKt.len == 0:
+    return sampleKf(a.sKf, applyEase(a.easeCurve, u.float32))
+  # Timed: auto keyframes sit evenly between their timed neighbors, and each
+  # step between two keyframes is eased on its own.
+  var at = newSeq[float64](a.sKf.len)
+  var known = newSeq[bool](a.sKf.len)
+  for i, t in a.sKt:
+    if t.unit == kuPercent:
+      at[i] = t.at / 100
+      known[i] = true
+  if not known[0]: (at[0], known[0]) = (0.0, true)
+  if not known[^1]: (at[^1], known[^1]) = (1.0, true)
+  var i = 1
+  while i < at.len:
+    if not known[i]:
+      var j = i
+      while not known[j]: inc j
+      for k in i ..< j:
+        at[k] = at[i - 1] + (at[j] - at[i - 1]) * float64(k - i + 1) / float64(j - i + 1)
+      i = j
+    inc i
+  for k in 1 ..< at.len: at[k] = max(at[k], at[k - 1])
+  if u <= at[0]: return a.sKf[0]
+  for k in 1 ..< at.len:
+    if u < at[k]:
+      let t = float32((u - at[k - 1]) / (at[k] - at[k - 1]))
+      return a.sKf[k - 1] + (a.sKf[k] - a.sKf[k - 1]) * applyEase(a.easeCurve, t)
+  a.sKf[^1]
+
+const speedSteps* = 512 ## samples across a ramp's media for its mean and map
+
+func meanSpeed*(a: Action): float64 =
+  ## The speed that covers a ramp's media in the same time: the harmonic mean
+  ## across it.
+  if a.sKf.len == 0: return a.val
+  var inv = 0.0
+  for i in 0 ..< speedSteps:
+    inv += 1 / a.speedAt((i.float64 + 0.5) / speedSteps)
+  speedSteps / inv
 
 type
   AnimSpan* = object
@@ -1200,6 +1246,32 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     result.checkTimedEase()
     return result
 
+  if parts[0] in ["speed", "varispeed"] and parts.len >= 2 and
+      (".." in parts[1] or '@' in parts[1] or parts.len > 2):
+    # A ramp across the section's media: speed:1..8, speed:1@0%..4@50%..1
+    let (kf, kt) = parseRamp(parts[1])
+    let hi = (if parts[0] == "varispeed": 100.0'f32 else: 99999.0'f32)
+    let lo = (if parts[0] == "varispeed": 0.2'f32 else: 0.0'f32)
+    for v in kf:
+      if not (v > lo and v < hi) and not (parts[0] == "varispeed" and v == lo):
+        raise newException(ActionParseError, &"{parts[0]} must be in range ({lo}, {hi})")
+    for t in kt:
+      if t.unit notin {kuAuto, kuPercent}:
+        raise newException(ActionParseError,
+          &"{parts[0]} keyframes are placed by percent of the section's media")
+    result = Action(kind: actSpeed, varispeed: parts[0] == "varispeed", sKf: kf,
+      sKt: kt)
+    result.parseEaseTail(parts, 2, val)
+    if result.easeDurUnit != duClip:
+      raise newException(ActionParseError, &"{parts[0]} ramps ease across the whole section")
+    if kf.len == 1 and not result.hasEase:
+      result.sKf.setLen(0)
+      result.sKt.setLen(0)
+      result.val = kf[0]
+    else:
+      result.val = float32(result.meanSpeed)
+    return result
+
   if parts.len == 2:
     let effectType = parts[0]
     let effectVal = pFloat(parts[1])
@@ -1290,7 +1362,12 @@ when not defined(nimscript):
     of actLoop: "loop"
     of actErosion: "erosion"
     of actSpeed:
-      if act.varispeed: &"varispeed:{act.val}" else: &"speed:{act.val}"
+      let name = (if act.varispeed: "varispeed" else: "speed")
+      if act.sKf.len == 0: &"{name}:{act.val}"
+      else:
+        var parts: seq[string]
+        for v in act.sKf: parts.add $v
+        &"{name}:{rampStr(parts, act.sKt)}{easeSuffix(act)}"
     of actVolume: &"volume:{kfStr(act)}{easeSuffix(act)}"
     of actDeesser: &"deesser:{act.intensity}:{act.maxd}:{act.freq}"
     of actPitch: &"pitch:{act.pCents.float32 / 100.0'f32}"
@@ -1427,7 +1504,11 @@ when not defined(nimscript):
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
     of actRotate, actPitch, actTone: 3
-    of actLens, actSpeed: 5
+    of actLens: 5
+    of actSpeed:
+      if a.sKf.len == 0: 5
+      else: 5 + 1 + (if a.hasEase: 1 else: 0) + 1 + timeBytes(a.sKf.len, a.sKt) +
+        a.sKf.len * 4
     of actDeesser, actSpin: 7
     of actColorKey, actChromaKey, actAberration: 8
     of actScale: 10
@@ -1509,9 +1590,25 @@ when not defined(nimscript):
         of actSpeed:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
-          yield Action(kind: actSpeed, val: v,
+          var act = Action(kind: actSpeed, val: v,
             varispeed: (base[i] and varispeedFlag) != 0'u8)
-          i += 5
+          var pos = i + 5
+          # A ramp stores its mean negated, then its easing and keyframes.
+          if v < 0:
+            act.val = -v
+            act.hasEase = base[pos] != 0'u8
+            pos += 1
+            if act.hasEase:
+              act.easeCurve = Easing(base[pos].int)
+              pos += 1
+            let (count, timed) = unpackCount(base, pos)
+            act.sKf = newSeq[float32](count)
+            for c in 0 ..< count:
+              copyMem(addr act.sKf[c], addr base[pos], sizeof(float32))
+              pos += 4
+            if timed: act.sKt = unpackTimes(base, pos, count)
+          yield act
+          i = pos
         of actDeesser:
           var iu, mu, fu: Unorm16
           copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
@@ -1742,6 +1839,7 @@ when not defined(nimscript):
         of actPos: max(a.pxKf.len, max(a.pyKf.len, a.pscaleKf.len))
         of actPixelate: max(a.pixWKf.len, a.pixHKf.len)
         of actZoom, actBlur, actOpacity, actBrightness, actVolume: a.kf.len
+        of actSpeed: a.sKf.len
         else: 0
       if maxKf > 255:
         raise newException(ActionParseError, "Too many keyframes (max 255)")
@@ -1753,6 +1851,7 @@ when not defined(nimscript):
           (a.pixHKt.len in [0, a.pixHKf.len])
         of actZoom, actBlur, actOpacity, actBrightness, actVolume:
           a.kt.len in [0, a.kf.len]
+        of actSpeed: a.sKt.len in [0, a.sKf.len]
         else: true
       if not paired:
         raise newException(ActionParseError, "Keyframe times don't match the keyframes")
@@ -1793,8 +1892,24 @@ when not defined(nimscript):
         i += 5
       of actSpeed:
         if a.varispeed: base[i] = base[i] or varispeedFlag
-        base.writeAt(i, 1, a.val)
-        i += 5
+        if a.sKf.len == 0:
+          base.writeAt(i, 1, a.val)
+          i += 5
+        else:
+          base.writeAt(i, 1, -a.val)
+          var pos = i + 5
+          base[pos] = (if a.hasEase: 1'u8 else: 0'u8)
+          pos += 1
+          if a.hasEase:
+            base[pos] = uint8(ord(a.easeCurve))
+            pos += 1
+          packCount(base, pos, a.sKf.len, a.sKt)
+          for v in a.sKf:
+            var vv = v
+            copyMem(addr base[pos], addr vv, sizeof(float32))
+            pos += 4
+          packTimes(base, pos, a.sKt)
+          i = pos
       of actDeesser:
         base.writeAt(i, 1, a.intensity)
         base.writeAt(i, 3, a.maxd)

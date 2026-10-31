@@ -392,15 +392,18 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
         let a = max(clip.start, first)
         let b = min(clip.start + clip.dur, last)
         if b <= a: continue
-        if clip.effects notin groups:
+        # Offsets are in speed-scaled frames, so a trim of k output frames
+        # moves the offset by k; a speed ramp is cut down with the clip.
+        var part = tl.sliceClip(effectIndex, clip, a, b)
+        if part.effects notin groups:
           var acts: seq[Action]
-          for x in tl.effects[clip.effects]: acts.add x
+          for x in tl.effects[part.effects]: acts.add x
           acts.add own
-          groups[clip.effects] = tl.group(effectIndex, acts)
-        # Offsets are already in speed-scaled frames, so a trim of k output
-        # frames moves the offset by k.
-        track.add Clip(src: src, start: a, dur: b - a,
-          offset: clip.offset + (a - clip.start), effects: groups[clip.effects])
+          groups[part.effects] = tl.group(effectIndex, acts)
+        part.src = src
+        part.stream = 0
+        part.effects = groups[part.effects]
+        track.add part
     else:
       track.add Clip(src: src, start: first, dur: last - first, offset: first,
         effects: tl.group(effectIndex, own))

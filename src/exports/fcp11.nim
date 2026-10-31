@@ -1,9 +1,11 @@
 import std/[strformat, strutils, tables]
+from std/math import ceil, round
 import ../util/xml
 from std/math import round
 
-import ../[action, ffmpeg, log, media, timeline]
+import ../[ffmpeg, log, media, timeline]
 import ../util/[fun, rational]
+import ../lib/speedmap
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.
@@ -91,6 +93,11 @@ func fraction(val: int64, tb: AVRational): string {.raises: [].} =
     return "0s"
   return &"{val * tb.den}/{tb.num}s"
 
+func mediaFraction(frames: float64, tb: AVRational): string {.raises: [].} =
+  ## A media time between frames, to a thousandth of one.
+  let n = int64(round(frames * 1000))
+  if n == 0: "0s" else: &"{n * tb.den}/{tb.num * 1000}s"
+
 proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
     ptrToIdx: Table[ptr string, int], projName: string, srcDur: int,
     clip: Clip) =
@@ -109,28 +116,37 @@ proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
 
   spine.add(asset)
 
+  # See the "Time Maps" section. Points map the clip's own time, which its
+  # start is in, to its media's, across the whole asset.
+  # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
   let effectGroup = tl.effects[clip.effects]
-  for effect in effectGroup:
-    if effect.kind == actSpeed:
-      # See the "Time Maps" section.
-      # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
-
-      let timemap = newElement("timeMap")
-      let timept1 = newElement("timept")
-      timept1.attrs = {"time": "0s", "value": "0s",
-          "interp": "smooth2"}.toXmlAttributes
-      timemap.add(timept1)
-
-      let timept2 = newElement("timept")
-      timept2.attrs = {
-        "time": fraction(int(srcDur.float / effect.val), tl.tb),
-        "value": fraction(srcDur, tl.tb),
-        "interp": "smooth2"
-      }.toXmlAttributes
-      timemap.add(timept2)
-
-      asset.add(timemap)
-      break
+  let map = initSpeedMap(effectGroup)
+  if map.mean != 1.0 or map.ramp:
+    let timemap = newElement("timeMap")
+    proc point(time: int64, value: float64, interp: string) =
+      let p = newElement("timept")
+      p.attrs = {"time": fraction(time, tl.tb), "value": mediaFraction(value, tl.tb),
+        "interp": interp}.toXmlAttributes
+      timemap.add p
+    point(0, 0.0, "smooth2")
+    if not map.ramp:
+      point(int64(srcDur.float / map.mean), srcDur.float, "smooth2")
+    else:
+      # Straight lines between frames along the ramp follow it closely;
+      # before and after the clip the media plays at its end speeds.
+      if clip.offset > 0: point(clip.offset, map.mean * clip.offset.float, "linear")
+      let n = min(clip.dur, 32)
+      var value = 0.0
+      for j in 1 .. n:
+        let local = clip.dur * j div n
+        value = map.mean * (clip.offset.float + clip.dur.float *
+          map.mediaAt(local.float / clip.dur.float))
+        point(clip.offset + local, value, "linear")
+      let last = effectGroup.speedOf(1.0)
+      if srcDur.float > value:
+        point(clip.offset + clip.dur + int64(ceil((srcDur.float - value) / last)),
+          srcDur.float, "linear")
+    asset.add timemap
 
 proc addTransition(spine: XmlNode, tl: v3, dissolveId: string,
     t: Transition) {.raises: [].} =

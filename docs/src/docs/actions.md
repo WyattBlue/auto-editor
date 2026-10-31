@@ -96,6 +96,32 @@ auto-editor video.mp4 -w:0 varispeed:2
 auto-editor video.mp4 -w:1 varispeed:0.5
 ```
 
+### Speed ramps
+
+`speed` and `varispeed` can also ramp, with the same `..` keyframes as the
+[animated effects](#keyframes). The keyframes are spread across the section's
+*source*: `speed:1..4` starts at normal speed and reaches 4x at the section's
+last source frame, so the ramp stays on the same footage however the section
+is trimmed. A keyframe can be placed with `@percent` of the source, and the
+ramp eased with `:ease=curve` (always across the whole section):
+
+```sh
+# Ease silent sections from normal speed up to 8x
+auto-editor video.mp4 -w:0 speed:1..8:ease=in
+
+# Speed through the middle of each section and back
+auto-editor video.mp4 -w:0 speed:1@0%..6@50%..1@100%
+
+# Tape spinning up: the pitch rises with the speed
+auto-editor video.mp4 -w:0 varispeed:1..4
+```
+
+The section takes as long as its source does at each speed along the way:
+`speed:1..4` over 10 seconds of source plays for about 4.6 seconds. Final Cut
+Pro and DaVinci Resolve (FCPXML) keep the ramp, as do auto-editor's own
+timelines; Premiere, Shotcut and Kdenlive play the section at the ramp's mean
+speed, which keeps its length and footage.
+
 ### pitch
 
 Shift the pitch of the section in semitones, leaving its speed and duration alone.
