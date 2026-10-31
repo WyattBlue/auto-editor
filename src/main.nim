@@ -16,7 +16,7 @@ import ./lib/escape
 when defined(emscripten):
   import ./av
 import cmds/[info, desc, cache, levels, subdump, whisper]
-import util/[color, fun, term, rational]
+import util/[color, fun, term, rational, suggest]
 
 import vendor/tinyre/tinyre
 
@@ -101,8 +101,12 @@ proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
 proc parseTransition(val: string): (TransitionKind, PackedInt, PackedInt) =
   result[2] = pack(true, 1000) # default minimum cut: one second
   let parts = val.split(':')
-  if parts.len notin [2, 3] or not parseTransitionKind(parts[0], result[0]):
+  if parts.len notin [2, 3]:
     error "--transition expects KIND:DURATION[:MIN-CUT]"
+  if not parseTransitionKind(parts[0], result[0]):
+    var ids = @["constant-gain"]
+    for info in transitionInfo: ids.add info.id
+    error &"Unknown transition kind: '{parts[0]}'{didYouMean(parts[0], ids)}"
   result[1] = parseTimeSimple(parts[1])
   if result[1].getNumber <= 0:
     error "--transition duration must be greater than zero"
