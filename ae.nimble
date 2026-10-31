@@ -274,6 +274,11 @@ let harfbuzz = Package(
     "-Dbenchmark=disabled", "-Draster=disabled", "-Dvector=disabled",
     "-Dgpu=disabled", "-Dsubset=disabled"],
 )
+let libunibreak = Package(
+  name: "libunibreak",
+  sourceUrl: "https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-8.0.tar.gz",
+  sha256: "9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4",
+)
 let libass = Package(
   name: "libass",
   sourceUrl: "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz",
@@ -281,7 +286,7 @@ let libass = Package(
   buildSystem: "meson",
   buildArguments: @["--auto-features=disabled", "-Dtest=disabled",
     "-Dcompare=disabled", "-Dprofile=disabled", "-Dfuzz=disabled",
-    "-Dcheckasm=disabled", "-Dlibunibreak=disabled"],
+    "-Dcheckasm=disabled", "-Dlibunibreak=enabled"],
 )
 let ffmpeg = Package(
   name: "ffmpeg",
@@ -306,7 +311,7 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add whisper
   result &= [bwlame, opus, dav1d, x264, zlib]
   if enableLibass:
-    result &= [freetype, fribidi, harfbuzz]
+    result &= [freetype, fribidi, harfbuzz, libunibreak]
     result.add libass
   if not disableVpx:
     result.add vpx
@@ -1109,7 +1114,7 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, bwlame, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libass]
+  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, bwlame, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libunibreak, libass]
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

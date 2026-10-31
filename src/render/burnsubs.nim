@@ -10,6 +10,7 @@ when defined(libass):
   import std/[math, os, tables]
   import ../[av, libass]
   import ../util/rational
+  proc c_strdup(s: cstring): cstring {.importc: "strdup", header: "<string.h>".}
 
 type
   Mask = object
@@ -94,6 +95,39 @@ func assText(text: string): string =
     of '\\': result.add "\\\u2060"
     of '{', '}': result.add "\\" & c
     else: result.add c
+
+func tagLang*(tag: string): string =
+  ## The ISO 639-1 code libass's line breaking knows for a stream's language
+  ## tag, which containers store as ISO 639-2; "" for other languages.
+  case tag
+  of "en", "eng": "en"
+  of "de", "ger", "deu": "de"
+  of "es", "spa": "es"
+  of "fr", "fre", "fra": "fr"
+  of "ru", "rus": "ru"
+  of "ja", "jpn": "ja"
+  of "ko", "kor": "ko"
+  of "zh", "chi", "zho": "zh"
+  else: ""
+
+type Script = enum kana, hangul, han
+
+func scripts(text: string): set[Script] =
+  for r in text.runes:
+    let c = r.int32
+    if c in 0x3040'i32 .. 0x30FF'i32: result.incl kana
+    elif c in 0xAC00'i32 .. 0xD7AF'i32 or c in 0x1100'i32 .. 0x11FF'i32 or
+        c in 0x3130'i32 .. 0x318F'i32: result.incl hangul
+    elif c in 0x4E00'i32 .. 0x9FFF'i32 or c in 0x3400'i32 .. 0x4DBF'i32: result.incl han
+
+func scriptLang(seen: set[Script]): string =
+  # Japanese nearly always has kana and Korean hangul, so Han alone is Chinese.
+  if kana in seen: "ja" elif hangul in seen: "ko" elif han in seen: "zh" else: ""
+
+func textLang*(text: string): string =
+  ## The ISO 639-1 code a text's writing system implies, for untagged
+  ## subtitles: "ja", "ko", or "zh", else "".
+  scriptLang(scripts(text))
 
 func vertAlignParts(align: uint8): tuple[h, v: string] =
   if align notin 1'u8 .. 9'u8:
@@ -274,6 +308,7 @@ when defined(libass):
       ass_process_codec_private(result, cast[cstring](dec.subtitle_header),
         dec.subtitle_header_size)
     let packet = container.packet
+    var seen: set[Script]
     while av_read_frame(fmt, packet) >= 0:
       defer: av_packet_unref(packet)
       if packet.stream_index != st.index: continue
@@ -285,8 +320,18 @@ when defined(libass):
         for i in 0 ..< sub.num_rects.int:
           let line = sub.rects[i].ass
           if line == nil: break
+          seen = seen + scripts($line)
           ass_process_chunk(result, line, line.len.cint, start, sub.end_display_time.clonglong)
         avsubtitle_free(addr sub)
+
+    # The language steers the Unicode line breaking: in Chinese, Japanese, and
+    # Korean, characters ambiguous between scripts break like ideographs. The
+    # stream's tag names it; an .srt has none, so its writing system stands in.
+    if st.codecpar.codec_id != ID_ASS and result.Language == nil:
+      let tag = av_dict_get(st.metadata, "language", nil, 0)
+      var lang = (if tag == nil: "" else: tagLang($tag.value))
+      if lang.len == 0: lang = scriptLang(seen)
+      if lang.len > 0: result.Language = c_strdup(lang.cstring)
 
   proc ownSubtitles(b: var SubBurner, media: string): string =
     if media notin b.own:

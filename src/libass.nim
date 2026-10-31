@@ -6,6 +6,7 @@ type
   ASS_Track* {.importc, header: "<ass/ass.h>".} = object
     PlayResX*, PlayResY*: cint
     YCbCrMatrix*: cint
+    Language*: cstring  ## ISO 639-1; libass frees it with free()
   ASS_Image* {.importc, header: "<ass/ass.h>".} = object
     w*, h*, stride*: cint
     bitmap*: ptr UncheckedArray[uint8] ## coverage, 255 for full

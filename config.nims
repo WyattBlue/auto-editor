@@ -128,7 +128,7 @@ if not defined(dynamic):
   if enableLibass:
     # libass, for burn and text, and what it uses, after what uses them.
     switch("define", "libass")
-    switch("passL", "-lass -lharfbuzz -lfribidi -lfreetype")
+    switch("passL", "-lass -lharfbuzz -lfribidi -lfreetype -lunibreak")
     when defined(macosx):
       # Core Text finds the system's fonts; iconv is macOS's own.
       switch("passL", "-liconv -framework ApplicationServices")
