@@ -7,7 +7,7 @@
 ## default settings.
 
 import std/[cpuinfo, typedthreads]
-from std/math import PI, arcsin, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt
+from std/math import PI, arcsin, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt, tan
 
 import ../transitions
 
@@ -1246,16 +1246,50 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       c = (if cover > 0: cc else: under.get(x, y))
 
   of tkCubeSpin:
-    # The outgoing picture squeezes to the left as the incoming one grows
-    # from the right, like the faces of a turning cube.
-    let edge = (1 - p) * fw
+    # A cube as wide and deep as the frame turns a quarter turn about its
+    # vertical axis, carrying the outgoing picture on its front face away to
+    # the left and bringing the incoming one in on its right face. The camera
+    # has After Effects' default 50 mm view and sees the front face fill the
+    # frame at rest; each pixel shows the nearest face its ray meets.
+    let cam = fw / 2 / tan(19.8'f32 * PI.float32 / 180)
+    let phi = p * PI.float32 / 2
+    let (sn, cs) = (sin(phi), cos(phi))
+    # (x, z) turned about the cube's center, which is half a frame deep.
+    template turn(x, z: float32): (float32, float32) =
+      (x * cs + z * sn, -x * sn + z * cs)
+    # Each face: its center, the direction its picture runs across, and its
+    # outward normal, all as turned.
+    let (ax, az) = turn(0'f32, -fw / 2)
+    let (aux, auz) = turn(1'f32, 0'f32)
+    let (anx, anz) = turn(0'f32, -1'f32)
+    let (bx, bz) = turn(fw / 2, 0'f32)
+    let (bux, buz) = turn(0'f32, 1'f32)
+    let (bnx, bnz) = turn(1'f32, 0'f32)
     result.eachPixel(w, h):
-      let xx = x.float32 + 0.5'f32
-      let yy = y.float32 + 0.5'f32
-      if xx < edge:
-        c = a.sample(xx / max(1 - p, 1e-3), yy) * (1 - 0.4'f32 * p)
-      else:
-        c = b.sample((xx - edge) / max(p, 1e-3), yy) * (0.6'f32 + 0.4'f32 * p)
+      # The ray from the camera through this pixel on the plane z = 0, with the
+      # cube's center at z = fw / 2.
+      let dx = x.float32 + 0.5'f32 - fw / 2
+      let dy = y.float32 + 0.5'f32 - fh / 2
+      let dz = cam
+      var bestT = Inf.float32
+      c = under.get(x, y)
+      for face in 0 .. 1:
+        let (px, pz, ux, uz, nx, nz) =
+          if face == 0: (ax, az + fw / 2, aux, auz, anx, anz)
+          else: (bx, bz + fw / 2, bux, buz, bnx, bnz)
+        let facing = dx * nx + dz * nz
+        if facing >= 0: continue # seen from behind
+        # Where the ray, from (0, 0, -cam), meets the face's plane.
+        let t = (px * nx + (pz + cam) * nz) / facing
+        if t <= 0 or t >= bestT: continue
+        let hx = dx * t - px
+        let hz = dz * t - cam - pz
+        let fu = hx * ux + hz * uz
+        let fv = dy * t
+        if abs(fu) > fw / 2 or abs(fv) > fh / 2: continue
+        bestT = t
+        let src = (if face == 0: a.unsafeAddr else: b.unsafeAddr)
+        c = src[].sample(fu + fw / 2, fv + fh / 2)
 
   of tkConstantPower, tkExponentialFade:
     result = mixImg(a, b, p)
