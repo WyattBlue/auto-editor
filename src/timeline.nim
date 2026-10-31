@@ -546,8 +546,8 @@ proc validateTransitions*(tl: v3) {.raises: [].} =
   for i in 0 ..< tl.vt.len: validateTrack(tl.v[i], tl.vt[i], false)
   for i in 0 ..< tl.at.len: validateTrack(tl.a[i], tl.at[i], true)
 
-type RampKey = tuple[effectIdx: uint32, kind: ActionKind, curve: TransitionKind,
-  fadeIn: bool, dur: int64]
+type RampKey = tuple[effectIdx: uint32, curve: TransitionKind, fadeIn: bool,
+  dur: int64]
 
 func fadeCurve(curve: TransitionKind, fadeIn: bool): seq[float32] =
   ## Gain across a fade, sampled finely enough that joining the samples
@@ -564,28 +564,21 @@ func fadeCurve(curve: TransitionKind, fadeIn: bool): seq[float32] =
   if not fadeIn: result.reverse()
 
 proc withRamp(tl: var v3, cache: var Table[RampKey, uint32],
-    index: var EffectIndex, effectIdx: uint32, kind: ActionKind,
-    curve: TransitionKind, fadeIn: bool, dur: int64): uint32 =
-  let key = (effectIdx, kind, curve, fadeIn, dur)
+    index: var EffectIndex, effectIdx: uint32, curve: TransitionKind,
+    fadeIn: bool, dur: int64): uint32 =
+  let key = (effectIdx, curve, fadeIn, dur)
   if key in cache: return cache[key]
   var actions: seq[Action]
   for a in tl.effects[effectIdx]: actions.add a
-  let values = fadeCurve(curve, fadeIn)
-  let ramp = case kind
-    of actOpacity: Action(kind: actOpacity, kf: values, hasEase: true,
-      easeCurve: easeLinear, easeDurUnit: duFrames, easeDur: dur.float32)
-    of actVolume: Action(kind: actVolume, kf: values, hasEase: true,
-      easeCurve: easeLinear, easeDurUnit: duFrames, easeDur: dur.float32)
-    else: error "Internal error: unsupported transition ramp"
-  actions.add ramp
+  actions.add Action(kind: actVolume, kf: fadeCurve(curve, fadeIn), hasEase: true,
+    easeCurve: easeLinear, easeDurUnit: duFrames, easeDur: dur.float32)
   result = index.intern(tl.effects, newActions(actions))
   cache[key] = result
 
 proc bakeTransitions*(source: v3): v3 =
   ## Lower edit-point transitions for the native renderer to clip overlaps:
-  ## dissolves and audio crossfades as gain ramps, other video transitions as
-  ## `windows` the renderer blends. Exporters continue to consume the
-  ## unmodified timeline.
+  ## audio crossfades as gain ramps, video transitions as `windows` the
+  ## renderer blends. Exporters continue to consume the unmodified timeline.
   result = source
   var rampCache: Table[RampKey, uint32]
   var effectIndex: EffectIndex
@@ -594,12 +587,11 @@ proc bakeTransitions*(source: v3): v3 =
       isVideo: bool, windows: var seq[TransitionWindow]) =
     if track.len == 0 or transitions.len == 0: return
     for t in transitions:
-      if isVideo and t.kind != tkDissolve:
+      if isVideo:
         windows.add TransitionWindow(start: t.spanStart, dur: t.dur,
           kind: t.kind, alignment: t.alignment)
     let plan = transitionPlan(track, transitions)
-    let k = (if isVideo: actOpacity else: actVolume)
-    let partsPerClip = (if isVideo: 2 else: 3)
+    let partsPerClip = (if isVideo: 1 else: 3)
     var outTrack = newSeqOfCap[Clip](track.len * partsPerClip + 2)
     for i, original in track:
       var clip = original
@@ -615,15 +607,14 @@ proc bakeTransitions*(source: v3): v3 =
         clip.offset = max(0'i64, clip.offset - before)
         clip.dur += before
         # A window blends the clip in by itself.
-        if not isVideo or t.kind == tkDissolve:
+        if isVideo:
+          fadeInEnd = clip.start
+        else:
           fadeInEnd = clip.start + t.dur
           inCurve = t.kind
-        else:
-          fadeInEnd = clip.start
 
       if plan[i].outgoing >= 0:
         let t = transitions[plan[i].outgoing]
-        let ramped = not isVideo or t.kind == tkDissolve
         outCurve = t.kind
         if t.alignment == taCenter:
           let after = t.dur - t.dur div 2
@@ -631,7 +622,7 @@ proc bakeTransitions*(source: v3): v3 =
           if not isVideo:
             fadeOutStart = t.at - t.dur div 2
             hasFadeOut = true
-        elif ramped:
+        elif not isVideo:
           fadeOutStart = t.at - t.dur
           hasFadeOut = true
 
@@ -653,10 +644,10 @@ proc bakeTransitions*(source: v3): v3 =
             part.dur = hi - lo
           if fadeIn:
             part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
-              k, inCurve, true, hi - lo)
+              inCurve, true, hi - lo)
           if fadeOut:
             part.effects = tl.withRamp(rampCache, effectIndex, part.effects,
-              k, outCurve, false, hi - lo)
+              outCurve, false, hi - lo)
           outTrack.add part
 
       addPart(clip.start, fadeInEnd, fadeIn = fadeInEnd > clip.start,
