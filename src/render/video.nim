@@ -2199,7 +2199,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 int(round(timelinePos * rate.float / tl.tb.float))
               else:
                 int(round(timelinePos))
-          let i = int(round(float(sourceFramePos) * speed))
+          var i = int(round(float(sourceFramePos) * speed))
+          if speedMaps[obj.effects].ramp and obj.src != nil:
+            # Rounding near a slow end can step past the clip's media.
+            let rate = myCache.cns[obj.src].video[0].avg_frame_rate
+            let fps = (if rate.isValid: rate.float / tl.tb.float else: 1.0)
+            let last = int(ceil(float(obj.offset + obj.dur) * speed * fps - 1e-3)) - 1
+            i = min(i, max(last, 0))
           # nil src: the `-bg` canvas on the base track, a generator above it.
           objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
             gen: obj.src == nil and layerIdx > 0,

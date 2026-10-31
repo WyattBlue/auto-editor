@@ -95,7 +95,11 @@ func speedFromMap*(points: seq[(float64, float64)], inTime, len: float64):
   for k in 0 .. n:
     let slope = (if k == 0: slopes[0] elif k == n: slopes[^1]
                  else: (slopes[k - 1] + slopes[k]) / 2)
-    result.speed.sKf.add float32(round(slope, 3))
+    result.speed.sKf.add float32(slope)
     result.speed.sKt.add KfTime(at: float32(round((media[k] - media[0]) / span * 100, 2)),
       unit: kuPercent)
-  result.speed.val = float32(result.speed.meanSpeed)
+  # Speeds between the samples are a guess, so scale them to cover exactly
+  # the map's media in the clip's time.
+  let scale = span / len / result.speed.meanSpeed
+  for v in result.speed.sKf.mitems: v = float32(round(v * scale, 3))
+  result.speed.val = float32(span / len)
