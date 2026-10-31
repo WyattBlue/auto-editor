@@ -322,6 +322,105 @@ func leakColor(u, v, p: float32, warm: bool, seed: uint32): C =
     else: rgb.b = ch
   rgb * clamp01(blot * 1.8'f32)
 
+# Kaleidoscope's motion every 0.02 of progress, measured from Premiere's
+# render at its defaults: the lattice's turn in degrees and its zoom, the
+# picture's turn in degrees, the outgoing and incoming sides' zoom, and the
+# incoming side's lattice offset. The two sides share the rest.
+const kaleidoCurve: array[51, array[7, float32]] = [
+  [-90, 0.085, 0, 1, 1, -0.534, -1.066],
+  [-90, 0.101, 0, 1.05, 1, -0.534, -1.066],
+  [-90.1, 0.125, 0, 1.2, 1, -0.534, -1.066],
+  [-90, 0.168, 0.1, 1.41, 1, -0.534, -1.066],
+  [-90, 0.227, 0, 1.63, 1, -0.534, -1.066],
+  [-90, 0.305, 0.1, 1.84, 1, -0.534, -1.066],
+  [-89.6, 0.398, 0.7, 2.02, 1, -0.534, -1.066],
+  [-88.1, 0.509, 2.9, 2.17, 1, -0.534, -1.066],
+  [-85.7, 0.634, 6.6, 2.29, 1, -0.534, -1.066],
+  [-82.3, 0.774, 11.8, 2.39, 1, -0.534, -1.066],
+  [-77.9, 0.927, 18.7, 2.47, 1, -0.534, -1.066],
+  [-72.6, 1.091, 26.8, 2.53, 1, -0.534, -1.066],
+  [-66.4, 1.264, 36.4, 2.58, 1, -0.534, -1.066],
+  [-59.5, 1.443, 47.2, 2.62, 1, -0.534, -1.066],
+  [-51.7, 1.626, 59.2, 2.64, 1, -0.534, -1.066],
+  [-43.4, 1.809, 71.9, 2.64, 1, -0.534, -1.066],
+  [-34.5, 1.99, 85.4, 2.64, 1, -0.534, -1.066],
+  [-25.2, 2.164, 99.8, 2.64, 1, -0.534, -1.066],
+  [-15.6, 2.314, 115.9, 2.64, 1, -0.534, -1.066],
+  [-6, 2.463, 132, 2.64, 1.19, -0.534, -1.066],
+  [3.6, 2.613, 148.1, 2.64, 1.38, -0.534, -1.066],
+  [12.9, 2.723, 161.4, 2.64, 1.8, -0.533, -1.059],
+  [22, 2.814, 173.1, 2.64, 1.92, -0.528, -1.049],
+  [30.6, 2.881, 187.1, 2.64, 2.16, -0.519, -1.041],
+  [38.6, 2.918, 204.5, 2.64, 2.41, -0.518, -1.038],
+  [46, 2.93, 220.2, 2.64, 2.39, -0.516, -0.958],
+  [52.7, 2.909, 234.6, 2.64, 2.46, -0.481, -0.952],
+  [58.7, 2.864, 249.1, 2.64, 2.52, -0.476, -0.946],
+  [63.9, 2.789, 262, 2.64, 2.56, -0.474, -0.941],
+  [68.4, 2.694, 274.3, 2.64, 2.59, -0.47, -0.936],
+  [72.3, 2.574, 285.3, 2.64, 2.64, -0.467, -0.931],
+  [75.6, 2.435, 296.4, 2.64, 2.66, -0.463, -0.927],
+  [78.3, 2.28, 305.4, 2.64, 2.69, -0.461, -0.923],
+  [80.6, 2.113, 314.6, 2.64, 2.69, -0.458, -0.92],
+  [82.4, 1.938, 321.6, 2.64, 2.69, -0.457, -0.918],
+  [84, 1.755, 329, 2.64, 2.67, -0.456, -0.916],
+  [85.3, 1.573, 335.1, 2.64, 2.64, -0.456, -0.915],
+  [86.4, 1.389, 340.6, 2.64, 2.61, -0.455, -0.914],
+  [87.3, 1.211, 345.3, 2.64, 2.57, -0.455, -0.914],
+  [88.1, 1.041, 349.2, 2.64, 2.52, -0.455, -0.915],
+  [88.7, 0.88, 352.7, 2.64, 2.45, -0.454, -0.915],
+  [89.2, 0.731, 355.4, 2.64, 2.36, -0.454, -0.915],
+  [89.6, 0.596, 357.5, 2.64, 2.26, -0.454, -0.915],
+  [89.8, 0.475, 359.1, 2.64, 2.13, -0.453, -0.916],
+  [90, 0.369, 359.8, 2.64, 1.97, -0.453, -0.916],
+  [90, 0.28, 360, 2.64, 1.78, -0.453, -0.916],
+  [90, 0.208, 360, 2.64, 1.57, -0.453, -0.916],
+  [90, 0.153, 360, 2.64, 1.34, -0.453, -0.916],
+  [89.8, 0.116, 360, 2.64, 1.14, -0.453, -0.916],
+  [90, 0.101, 360, 2.64, 1.02, -0.453, -0.916],
+  [90, 0.097, 360, 2.64, 1, -0.453, -0.916],
+]
+const kaleidoOffsetA = (-0.5459'f32, -1.084'f32)
+
+type
+  KaleidoSide = object
+    mx, my: float32 # lattice offset
+    f0x, f0y, r0: float32 # where the frame's center folds to
+    cs, sn, scale: float32 # the picture's turn and zoom
+  KaleidoInstant = object
+    cs, sn, zoom: float32 # the lattice's turn and zoom
+    wipe, feather: float32
+    side: array[2, KaleidoSide]
+
+func kaleidoAt(p: float32): array[7, float32] =
+  let t = clamp01(p) * 50
+  let i = min(int(t), 49)
+  let f = t - i.float32
+  for k in 0 ..< 7:
+    result[k] = kaleidoCurve[i][k] + (kaleidoCurve[i + 1][k] - kaleidoCurve[i][k]) * f
+
+func kaleidoFold(ux, uy: float32): (float32, float32, float32) =
+  ## Where (`ux`, `uy`) lands in the first of sixteen mirrored pieces about
+  ## the center of its cell, with its distance from that center. Cells are
+  ## one unit across and mirror their neighbors.
+  func edge(v: float32): float32 =
+    let m = v + 0.5'f32 - floor((v + 0.5'f32) / 2) * 2
+    0.5'f32 - abs(1 - m)
+  # The pieces' mirrors stand every 22.5 degrees, so reflecting across the
+  # axes, the diagonal and then 22.5 degrees lands in the first.
+  var (x, y) = (abs(edge(ux)), abs(edge(uy)))
+  if y > x: swap(x, y)
+  const nx = -0.38268343'f32 # normal to the 22.5 degree mirror
+  const ny = 0.9238795'f32
+  let d = x * nx + y * ny
+  if d > 0:
+    x -= 2 * d * nx
+    y -= 2 * d * ny
+  (x, y, sqrt(x * x + y * y))
+
+func mirrored(v, n: float32): float32 {.inline.} =
+  let m = v - floor(v / (2 * n)) * 2 * n
+  n - abs(n - m)
+
 proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     frames: int, seed: uint32, color: C = black): Img =
   ## `frame` counts frames into the transition, of its `frames`, for flicker
@@ -611,23 +710,57 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       c = mix(b.get(x, y), a.get(x, y), k) * (1 - 0.6'f32 * edge) + (grain, grain, grain)
 
   of tkKaleidoscope:
-    let k = bell(p)
-    let mixed = mixImg(a, b, mid)
-    let src = mixed.unsafeAddr
-    let segs = 6
-    let seg = 2 * PI.float32 / segs.float32
-    let rot = p * PI.float32
+    # Cells of sixteen mirrored pieces tile the frame, mirroring their
+    # neighbors; they shrink to a third of the height and grow back while the
+    # lattice and the picture turn. Each side keeps its own picture turn and
+    # zoom, and the incoming one wipes in as a ring from the cells' middle.
+    # Premiere blurs the motion, so this averages instants across 0.4 of a
+    # frame, more of them on a taller frame, where the motion spans more
+    # pixels and fewer would show as steps.
+    if p <= 0: return a
+    let n = clamp(h div 135, 4, 8)
+    let shutter = 0.4'f32 / max(frames, 1).float32
+    var instants = newSeq[KaleidoInstant](n)
+    for j in 0 ..< n:
+      let q = clamp01(p + ((j.float32 + 0.5'f32) / n.float32 - 0.5'f32) * shutter)
+      let k = kaleidoAt(q)
+      let turn = k[0] * PI.float32 / 180
+      let wipe = 0.5'f32 * pow(clamp01((q - 0.28'f32) / 0.16'f32), 2.2'f32)
+      instants[j] = KaleidoInstant(cs: cos(turn), sn: sin(turn), zoom: k[1],
+        wipe: wipe, feather: 0.05'f32 + 0.3'f32 * wipe)
+      for i in 0 .. 1:
+        let (mx, my) = (if i == 0: kaleidoOffsetA else: (k[5], k[6]))
+        let (f0x, f0y, r0) = kaleidoFold(mx, my)
+        let phi = (k[2] - 180 * i.float32) * PI.float32 / 180 - turn
+        instants[j].side[i] = KaleidoSide(mx: mx, my: my, f0x: f0x, f0y: f0y,
+          r0: r0, cs: cos(phi), sn: sin(phi), scale: k[3 + i] / k[1] * fh)
+    let pics = [a.unsafeAddr, b.unsafeAddr]
     result.eachPixel(w, h):
-      let dx = (u - 0.5'f32) * fw / fh
-      let dy = v - 0.5'f32
-      let r = sqrt(dx * dx + dy * dy)
-      var ang = arctan2(dy, dx) + rot
-      ang = ang - floor(ang / seg) * seg
-      ang = abs(ang - seg / 2)
-      let zoom = 1 - 0.5'f32 * k
-      let kx = (0.5'f32 + cos(ang) * r * zoom * fh / fw) * fw
-      let ky = (0.5'f32 + sin(ang) * r * zoom) * fh
-      c = mix(src[].get(x, y), src[].sample(kx, ky, true), smooth(0, 0.6, k))
+      let qx = (x.float32 + 0.5'f32 - fw / 2) / fh
+      let qy = (y.float32 + 0.5'f32 - fh / 2) / fh
+      for inst in instants:
+        let rx = (inst.cs * qx - inst.sn * qy) * inst.zoom
+        let ry = (inst.sn * qx + inst.cs * qy) * inst.zoom
+        var picked: array[2, C]
+        var t = 0'f32
+        for i in 0 .. 1:
+          let sd = inst.side[i]
+          let (fx, fy, r) = kaleidoFold(rx + sd.mx, ry + sd.my)
+          if i == 0:
+            # The wipe follows the outgoing side's cells.
+            t = (if inst.wipe >= 0.5'f32: 1'f32
+              elif inst.wipe <= 0: 0'f32
+              else: smooth(inst.wipe + inst.feather, inst.wipe - inst.feather,
+                abs(r - sd.r0)))
+            if t >= 1: continue
+          elif t <= 0: continue
+          let dx = fx - sd.f0x
+          let dy = sd.f0y - fy
+          let sx = (sd.cs * dx - sd.sn * dy) * sd.scale + fw / 2
+          let sy = (sd.sn * dx + sd.cs * dy) * sd.scale + fh / 2
+          picked[i] = pics[i][].sample(mirrored(sx, fw), mirrored(sy, fh))
+        c = c + mix(picked[0], picked[1], t)
+      c = c * (1 / n.float32)
 
   of tkLiquidDistortion, tkWave:
     let amp = bell(p) * (if kind == tkWave: 0.04'f32 else: 0.08'f32)
