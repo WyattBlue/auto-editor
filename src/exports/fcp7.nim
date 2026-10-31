@@ -530,16 +530,40 @@ proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
   let effect = newElement("effect")
   # FCP7 XML can't name the other kinds; editors read them as a dissolve.
   let effectName =
-    if mediaType == "video": "Cross Dissolve"
-    elif t.kind == tkConstantPower: "Cross Fade (+3dB)"
-    else: "Cross Fade (0dB)"
+    if mediaType != "video":
+      (if t.kind == tkConstantPower: "Cross Fade (+3dB)" else: "Cross Fade (0dB)")
+    else:
+      case t.kind
+      of tkDipToBlack, tkDipToWhite, tkDipToBlackLegacy, tkDipToWhiteLegacy:
+        "Dip to Color Dissolve"
+      of tkWipe: "Edge Wipe"
+      else: "Cross Dissolve"
   effect.add elem("name", effectName)
   effect.add elem("effectid", effectName)
   effect.add elem("effecttype", "transition")
   effect.add elem("mediatype", mediaType)
+  if effectName == "Edge Wipe":
+    effect.add elem("wipecode", "2")
+    effect.add elem("wipeaccuracy", "100")
   effect.add elem("startratio", "0")
   effect.add elem("endratio", "1")
   effect.add elem("reverse", "FALSE")
+  case effectName
+  of "Dip to Color Dissolve":
+    let white = t.kind in {tkDipToWhite, tkDipToWhiteLegacy}
+    let c = (if white: "255" else: "0")
+    let p = <>parameter(authoringApp = "PremierePro")
+    p.add elem("parameterid", "dipcolor")
+    p.add elem("name", "Color")
+    let value = newElement("value")
+    value.add elem("alpha", "255")
+    for ch in ["red", "green", "blue"]: value.add elem(ch, c)
+    p.add value
+    effect.add p
+  of "Edge Wipe":
+    # Wipe's default: from the left.
+    effect.add param("directionofwipe", "Angle", "90", "-360", "360")
+  else: discard
   result.add effect
 
 proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =

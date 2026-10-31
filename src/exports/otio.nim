@@ -471,7 +471,8 @@ proc transitionNode(rate: float, t: Transition, video: bool): JsonNode =
       if t.kind == tkDissolve: ("Constant Gain", "Constant Gain")
       else: (transitionInfo[t.kind].name, transitionInfo[t.kind].matchName)
     result["name"] = %name
-    result["transition_type"] = %"Custom_Transition"
+    if t.kind != tkCrossDissolveLegacy:
+      result["transition_type"] = %"Custom_Transition"
     result["metadata"] = %*{"PremierePro_OTIO": {"MatchName": matchName}}
 
 proc otioWrite*(name, output: string, tl: v3) =

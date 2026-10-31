@@ -33,10 +33,10 @@ shortened or skipped when a clip is too short to support it.
 
 ## Kinds
 
-Every kind of transition Premiere Pro has (outside its Legacy folder) is
-available under its Premiere name, lowercased with dashes. They play at
-Premiere's default settings; `dip-to-color` dips to the timeline's background
-color (`-bg`).
+Every kind of transition Premiere Pro has is available under its Premiere
+name, lowercased with dashes; those in its Legacy folder that share a name with
+a newer one end in `-legacy`. They play at Premiere's default settings;
+`dip-to-color` dips to the timeline's background color (`-bg`).
 
 | Group | Kinds |
 |---|---|
@@ -50,6 +50,7 @@ color (`-bg`).
 | Transformers | `3d-spin`, `3d-spinback`, `frame`, `louver`, `mirror`, `page-peel`, `slice`, `wave` |
 | Wipe | `clock-wipe`, `linear-wipe`, `neon-wipe`, `panel-wipe`, `plateau-wipe`, `radial-wipe`, `soft-wipe`, `star-wipe`, `stretch-wipe` |
 | Immersive Video | `vr-chroma-leaks`, `vr-gradient-wipe`, `vr-iris-wipe`, `vr-light-leaks`, `vr-light-rays`, `vr-mobius-zoom`, `vr-random-blocks`, `vr-spherical-blur` |
+| Legacy | `additive-dissolve-legacy`, `barn-doors`, `center-split`, `clock-wipe-legacy`, `cross-dissolve-legacy`, `cross-zoom-legacy`, `dip-to-black-legacy`, `dip-to-white-legacy`, `film-dissolve-legacy`, `inset`, `iris-box`, `iris-cross`, `iris-diamond`, `iris-round`, `non-additive-dissolve`, `push-legacy`, `radial-wipe-legacy`, `slide-legacy`, `split-legacy`, `whip-legacy`, `wipe` |
 
 ```sh
 auto-editor video.mp4 --transition push:0.5sec
@@ -76,15 +77,16 @@ The native render and every editor export carry transitions:
 | default (rendered media) | Rendered directly |
 | `v3` | Stored in the `transitions` key |
 | `premiere-otio` | Every kind, as Premiere's own transitions |
-| `premiere`, `resolve-fcp7` (FCP7 XML) | Cross Dissolve, and Cross Fade (0dB) or (+3dB) |
+| `premiere`, `resolve-fcp7` (FCP7 XML) | Cross Dissolve, Dip to Color Dissolve, Edge Wipe, and Cross Fade (0dB) or (+3dB) |
 | `final-cut-pro`, `resolve` (FCPXML) | Cross Dissolve spine transitions |
 | `shotcut` | Same-track transitions (luma + mix), fade filters at the ends |
 | `kdenlive` | Same-track mixes, fade filters at the ends |
 
-FCP7 XML, FCPXML, Shotcut and Kdenlive have no way to name Premiere's
+FCP7 XML, FCPXML, Shotcut and Kdenlive have no way to name most of Premiere's
 transitions, so those exports dissolve where the timeline has another kind.
-Premiere reads FCP7 XML transitions as a dissolve too; to bring the kinds into
-Premiere, export with `premiere-otio`. Importing FCP7 XML or FCPXML reads the
+From FCP7 XML, Premiere brings in the dips (as its legacy Dip to Black or
+White) and `wipe`, and reads everything else as a dissolve; to bring every
+kind into Premiere, export with `premiere-otio`. Importing FCP7 XML or FCPXML reads the
 kinds those formats can name, like Additive Dissolve or Cross Fade (+3dB).
 
 ## Where transitions are dropped

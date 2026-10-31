@@ -32,6 +32,12 @@ type
     # Wipe
     tkClockWipe, tkLinearWipe, tkNeonWipe, tkPanelWipe, tkPlateauWipe,
     tkRadialWipe, tkSoftWipe, tkStarWipe, tkStretchWipe,
+    # Legacy
+    tkAdditiveDissolveLegacy, tkBarnDoors, tkCenterSplit, tkClockWipeLegacy,
+    tkCrossDissolveLegacy, tkCrossZoomLegacy, tkDipToBlackLegacy,
+    tkDipToWhiteLegacy, tkFilmDissolveLegacy, tkInset, tkIrisBox, tkIrisCross,
+    tkIrisDiamond, tkIrisRound, tkNonAdditiveDissolve, tkPushLegacy,
+    tkRadialWipeLegacy, tkSlideLegacy, tkSplitLegacy, tkWhipLegacy, tkWipe,
     # Audio crossfades
     tkConstantPower, tkExponentialFade
 
@@ -142,6 +148,34 @@ const transitionInfo*: array[TransitionKind, TransitionInfo] = [
   tkSoftWipe: ti("soft-wipe", "Soft Wipe", "AE.AE_Impact_Wipe"),
   tkStarWipe: ti("star-wipe", "Star Wipe", "AE.AE_Impact_Star_Wipe"),
   tkStretchWipe: ti("stretch-wipe", "Stretch Wipe", "AE.AE_Impact_Stretch_Wipe"),
+  tkAdditiveDissolveLegacy: ti("additive-dissolve-legacy",
+    "Additive Dissolve (Legacy)", "ADBE Additive Dissolve"),
+  tkBarnDoors: ti("barn-doors", "Barn Doors", "AE.ADBE Barn Doors"),
+  tkCenterSplit: ti("center-split", "Center Split", "AE.ADBE Center Split"),
+  tkClockWipeLegacy: ti("clock-wipe-legacy", "Clock Wipe (Legacy)", "AE.ADBE Clock Wipe"),
+  tkCrossDissolveLegacy: ti("cross-dissolve-legacy", "Cross Dissolve (Legacy)",
+    "AE.ADBE Cross Dissolve New"),
+  tkCrossZoomLegacy: ti("cross-zoom-legacy", "Cross Zoom (Legacy)", "ADBE Cross Zoom"),
+  tkDipToBlackLegacy: ti("dip-to-black-legacy", "Dip to Black (Legacy)",
+    "AE.ADBE Dip To Black"),
+  tkDipToWhiteLegacy: ti("dip-to-white-legacy", "Dip to White (Legacy)",
+    "AE.ADBE Dip To White"),
+  tkFilmDissolveLegacy: ti("film-dissolve-legacy", "Film Dissolve (Legacy)",
+    "ADBE Film Dissolve"),
+  tkInset: ti("inset", "Inset", "AE.ADBE Inset"),
+  tkIrisBox: ti("iris-box", "Iris Box", "ADBE Iris Square"),
+  tkIrisCross: ti("iris-cross", "Iris Cross", "ADBE Iris Cross"),
+  tkIrisDiamond: ti("iris-diamond", "Iris Diamond", "ADBE Iris Diamond"),
+  tkIrisRound: ti("iris-round", "Iris Round", "ADBE Iris Round"),
+  tkNonAdditiveDissolve: ti("non-additive-dissolve", "Non-Additive Dissolve",
+    "AE.ADBE Non-Additive Dissolve"),
+  tkPushLegacy: ti("push-legacy", "Push (Legacy)", "ADBE Push"),
+  tkRadialWipeLegacy: ti("radial-wipe-legacy", "Radial Wipe (Legacy)",
+    "AE.ADBE Radial Wipe"),
+  tkSlideLegacy: ti("slide-legacy", "Slide (Legacy)", "ADBE Slide"),
+  tkSplitLegacy: ti("split-legacy", "Split (Legacy)", "AE.ADBE Split"),
+  tkWhipLegacy: ti("whip-legacy", "Whip (Legacy)", "AE.ADBE Whip"),
+  tkWipe: ti("wipe", "Wipe", "ADBE Wipe"),
   tkConstantPower: ti("constant-power", "Constant Power", "Custom Fade"),
   tkExponentialFade: ti("exponential-fade", "Exponential Fade", "Exponential Fade"),
 ]
@@ -160,12 +194,16 @@ func parseTransitionKind*(id: string, kind: var TransitionKind): bool =
   false
 
 func kindFromMatchName*(matchName: string, kind: var TransitionKind): bool =
-  ## Premiere's legacy Cross Dissolve and Constant Gain are dissolves too.
-  if matchName in ["AE.ADBE Cross Dissolve New", "Constant Gain"]:
+  ## Premiere's Constant Gain is a dissolve too.
+  if matchName == "Constant Gain":
     kind = tkDissolve
     return true
+  # Premiere writes some with an "AE." in front and some without, and the
+  # same transition both ways in different files.
+  func bare(s: string): string =
+    if s.len > 3 and s[0 .. 2] == "AE.": s[3 .. ^1] else: s
   for k in TransitionKind:
-    if transitionInfo[k].matchName == matchName:
+    if bare(transitionInfo[k].matchName) == bare(matchName):
       kind = k
       return true
   false
@@ -182,11 +220,15 @@ func kindFromName*(name: string, video: bool, kind: var TransitionKind): bool =
   if video:
     case n
     of "crossdissolve": kind = tkDissolve
-    of "diptocolordissolve", "fadetocolor": kind = tkDipToBlack
+    of "diptocolordissolve", "fadetocolor": kind = tkDipToBlackLegacy
     of "additivedissolve": kind = tkAdditiveDissolve
     of "clock", "clockwipe": kind = tkClockWipe
-    of "edgewipe", "wipe": kind = tkLinearWipe
-    of "ovaliris", "circle": kind = tkRadialWipe
+    of "edgewipe", "wipe": kind = tkWipe
+    of "ovaliris", "circle": kind = tkIrisRound
+    of "rectangleiris": kind = tkIrisBox
+    of "diamondiris": kind = tkIrisDiamond
+    of "crossiris": kind = tkIrisCross
+    of "insetwipe": kind = tkInset
     of "star", "stariris": kind = tkStarWipe
     of "pushslide": kind = tkPush
     of "splitslide", "centersplitslide": kind = tkSplit

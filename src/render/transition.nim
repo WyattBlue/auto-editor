@@ -333,13 +333,13 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
   let mid = smooth(0.42, 0.58, p)
 
   case kind
-  of tkDissolve:
+  of tkDissolve, tkCrossDissolveLegacy:
     result = mixImg(a, b, p)
 
   of tkMorphCut:
     result = mixImg(a, b, smooth(0, 1, p))
 
-  of tkAdditiveDissolve:
+  of tkAdditiveDissolve, tkAdditiveDissolveLegacy:
     let ka = min(1'f32, 2 * (1 - p))
     let kb = min(1'f32, 2 * p)
     result.eachPixel(w, h):
@@ -371,7 +371,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
     result.eachPixel(w, h):
       c = mix(src.get(x, y), dip, k)
 
-  of tkFilmDissolve:
+  of tkFilmDissolve, tkFilmDissolveLegacy:
     var toLin: array[256, float32]
     for i in 0 .. 255: toLin[i] = pow(i.float32 / 255, 2.2'f32)
     result = newImg(w, h)
@@ -1064,6 +1064,106 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
         let su = min(u, edge + band)
         c = (if u > edge + band: a.get(x, y) else: a.sample(clamp(su, 0, 1) * fw,
           y.float32 + 0.5'f32))
+
+  # The legacy transitions move at a constant rate, without easing, and
+  # their wipes have hard edges.
+  of tkDipToBlackLegacy, tkDipToWhiteLegacy:
+    let dip = (if kind == tkDipToBlackLegacy: black else: white)
+    let first = p < 0.5
+    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let k = (if first: 2 * p else: 2 - 2 * p)
+    result.eachPixel(w, h):
+      c = mix(src[].get(x, y), dip, k)
+
+  of tkNonAdditiveDissolve:
+    # Whichever picture is brighter at a pixel shows there.
+    let ka = min(1'f32, 2 * (1 - p))
+    let kb = min(1'f32, 2 * p)
+    result.eachPixel(w, h):
+      let ca = a.get(x, y) * ka
+      let cb = b.get(x, y) * kb
+      c = (if luma(ca) >= luma(cb): ca else: cb)
+
+  of tkClockWipeLegacy, tkRadialWipeLegacy:
+    # A hand sweeping clockwise from twelve about the center, or a quarter
+    # turn from the top about the top left corner.
+    let corner = kind == tkRadialWipeLegacy
+    result.eachPixel(w, h):
+      let dx = (if corner: u else: u - 0.5'f32) * fw / fh
+      let dy = (if corner: v else: v - 0.5'f32)
+      var ang = arctan2(dx, -dy) / (2 * PI.float32)
+      if ang < 0: ang += 1
+      if corner: ang = clamp01((ang - 0.25'f32) * 4)
+      c = (if ang < p: b.get(x, y) else: a.get(x, y))
+
+  of tkIrisBox, tkIrisCross, tkIrisDiamond, tkIrisRound, tkBarnDoors, tkInset,
+      tkWipe:
+    # The incoming picture opens as a shape: points whose distance by the
+    # shape's measure is under the threshold show it.
+    let asp = fw / fh
+    proc dist(u, v: float32): float32 =
+      let dx = abs(u - 0.5'f32) * asp
+      let dy = abs(v - 0.5'f32)
+      case kind
+      of tkIrisBox: max(dx, dy)
+      of tkIrisDiamond: dx + dy
+      of tkIrisRound: sqrt(dx * dx + dy * dy)
+      of tkIrisCross:
+        const k = 0.3'f32
+        min(max(dx / k, dy), max(dx, dy / k))
+      of tkBarnDoors: dx
+      of tkInset: max(u * asp, v)
+      else: u # tkWipe, from the left
+    let far = max(dist(0, 0), max(dist(1, 0), max(dist(0, 1), dist(1, 1))))
+    let thr = p * far
+    result.eachPixel(w, h):
+      c = (if dist(u, v) < thr: b.get(x, y) else: a.get(x, y))
+
+  of tkCenterSplit:
+    # The outgoing picture's quarters slide out to its corners.
+    let ox = p * fw / 2
+    let oy = p * fh / 2
+    result.eachPixel(w, h):
+      let xx = x.float32 + 0.5'f32
+      let yy = y.float32 + 0.5'f32
+      let sx = (if xx < fw / 2: xx + ox else: xx - ox)
+      let sy = (if yy < fh / 2: yy + oy else: yy - oy)
+      let inside = (xx < fw / 2) == (sx < fw / 2) and (yy < fh / 2) == (sy < fh / 2)
+      c = (if inside: a.sample(sx, sy) else: b.get(x, y))
+
+  of tkSplitLegacy:
+    # The outgoing picture's halves slide out to the sides.
+    let off = p * fw / 2
+    result.eachPixel(w, h):
+      let xx = x.float32 + 0.5'f32
+      let sx = (if xx < fw / 2: xx + off else: xx - off)
+      let inside = (xx < fw / 2) == (sx < fw / 2)
+      c = (if inside: a.sample(sx, y.float32 + 0.5'f32) else: b.get(x, y))
+
+  of tkPushLegacy, tkWhipLegacy, tkSlideLegacy:
+    # From the west: the incoming picture enters from the left, pushing the
+    # outgoing one out, or sliding over it.
+    let t = (if kind == tkWhipLegacy: easeInOut(p) else: p)
+    let shift = t * fw
+    let r = (if kind == tkWhipLegacy: bell(p) * fw / 24 else: 0'f32)
+    let am = a.motion(r * 2, 0)
+    let bm = b.motion(r * 2, 0)
+    result.eachPixel(w, h):
+      let xx = x.float32 + 0.5'f32
+      let yy = y.float32 + 0.5'f32
+      if xx < shift: c = bm.sample(xx - shift + fw, yy)
+      elif kind == tkSlideLegacy: c = a.get(x, y)
+      else: c = am.sample(xx - shift, yy)
+
+  of tkCrossZoomLegacy:
+    # Zooms into the outgoing picture, then out of the incoming one.
+    let z = 1 + 3 * (1 - abs(2 * p - 1))
+    let src = (if p < 0.5: a.unsafeAddr else: b.unsafeAddr)
+    var zoomed: Img
+    zoomed.eachPixel(w, h):
+      c = src[].sample((x.float32 + 0.5'f32 - fw / 2) / z + fw / 2,
+        (y.float32 + 0.5'f32 - fh / 2) / z + fh / 2)
+    result = zoomed.blur((z - 1) * fw / 320)
 
   of tkConstantPower, tkExponentialFade:
     result = mixImg(a, b, p)

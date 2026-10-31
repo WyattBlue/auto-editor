@@ -211,6 +211,20 @@ proc readTransition(node: XmlNode, audio: bool): Transition =
         if f.kind == xnElement and f.tag in ["effectid", "name"] and
             kindFromName(f.innerText.strip(), not audio, kind):
           break
+      if kind == tkDipToBlackLegacy:
+        # A light dip color dips to white.
+        var total, count = 0
+        for f in c:
+          if f.kind != xnElement or f.tag != "parameter": continue
+          for v in f:
+            if v.kind != xnElement or v.tag != "value": continue
+            for ch in v:
+              if ch.kind == xnElement and ch.tag in ["red", "green", "blue"]:
+                let (ok, n) = num(ch.innerText)
+                if ok:
+                  total += int(n)
+                  inc count
+        if count > 0 and total div count > 127: kind = tkDipToWhiteLegacy
     of "alignment":
       alignment = case c.innerText.strip()
         of "start", "start-black": taStart
