@@ -36,7 +36,10 @@ shortened or skipped when a clip is too short to support it.
 Every kind of transition Premiere Pro has is available under its Premiere
 name, lowercased with dashes; those in its Legacy folder that share a name with
 a newer one end in `-legacy`. They play at Premiere's default settings;
-`dip-to-color` dips to the timeline's background color (`-bg`).
+`dip-to-color` dips to the timeline's background color (`-bg`). The Obsolete
+ones are those Premiere no longer lists; of them, it only still reads
+`page-turn` and `page-peel-obsolete`, so `premiere-otio` gives it the others
+as a dissolve.
 
 | Group | Kinds |
 |---|---|
@@ -51,6 +54,7 @@ a newer one end in `-legacy`. They play at Premiere's default settings;
 | Wipe | `clock-wipe`, `linear-wipe`, `neon-wipe`, `panel-wipe`, `plateau-wipe`, `radial-wipe`, `soft-wipe`, `star-wipe`, `stretch-wipe` |
 | Immersive Video | `vr-chroma-leaks`, `vr-gradient-wipe`, `vr-iris-wipe`, `vr-light-leaks`, `vr-light-rays`, `vr-mobius-zoom`, `vr-random-blocks`, `vr-spherical-blur` |
 | Legacy | `additive-dissolve-legacy`, `barn-doors`, `center-split`, `clock-wipe-legacy`, `cross-dissolve-legacy`, `cross-zoom-legacy`, `dip-to-black-legacy`, `dip-to-white-legacy`, `film-dissolve-legacy`, `inset`, `iris-box`, `iris-cross`, `iris-diamond`, `iris-round`, `non-additive-dissolve`, `push-legacy`, `radial-wipe-legacy`, `slide-legacy`, `split-legacy`, `whip-legacy`, `wipe` |
+| Obsolete | `band-slide`, `checker-wipe`, `cube-spin`, `flip-over`, `gradient-wipe`, `page-peel-obsolete`, `page-turn`, `venetian-blinds` |
 
 ```sh
 auto-editor video.mp4 --transition push:0.5sec

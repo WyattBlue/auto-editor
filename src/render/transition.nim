@@ -7,7 +7,7 @@
 ## default settings.
 
 import std/[cpuinfo, typedthreads]
-from std/math import PI, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt
+from std/math import PI, arcsin, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt
 
 import ../transitions
 
@@ -322,10 +322,11 @@ func leakColor(u, v, p: float32, warm: bool, seed: uint32): C =
     else: rgb.b = ch
   rgb * clamp01(blot * 1.8'f32)
 
-proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
-    seed: uint32, color: C = black): Img =
-  ## `frame` counts frames into the transition, for flicker that changes
-  ## every frame. `color` is the dip color.
+proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
+    frames: int, seed: uint32, color: C = black): Img =
+  ## `frame` counts frames into the transition, of its `frames`, for flicker
+  ## that changes every frame and blur that spans one. `color` is the dip
+  ## color.
   let (w, h) = (a.w, a.h)
   let (fw, fh) = (w.float32, h.float32)
   let e = easeInOut(p)
@@ -496,9 +497,12 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
       else: c = under.get(x, y)
 
   of tkTravelMotion, tkPush, tkWhip:
+    # Push eases as a smoothstep, with motion blur over about half a frame's
+    # travel.
     let speed = (if kind == tkWhip: bell(p) * fw * 0.6'f32
+                 elif kind == tkPush: 6 * p * (1 - p) * fw / frames.float32 * 0.5'f32
                  else: bell(p) * fw * 0.25'f32)
-    let shift = -e * fw
+    let shift = -(if kind == tkPush: smooth(0, 1, p) else: e) * fw
     let dip = (if kind == tkTravelMotion: 1 - 0.12'f32 * bell(p) else: 1'f32)
     let am = a.motion(speed, 0)
     let bm = b.motion(speed, 0)
@@ -964,10 +968,41 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
         c = mix(a.get(x, y), b.sample(ref1 * fw, y.float32 + 0.5'f32), fade * bell(p))
 
   of tkPagePeel:
-    # The page lifts from the bottom right corner and folds back over itself.
+    # The bottom left corner lifts and rolls up toward the top right, the
+    # fold turning as it goes; the roll shows the incoming picture on its
+    # back.
+    let theta = (60 - 70 * p) * PI.float32 / 180
+    let nx = cos(theta)
+    let ny = -sin(theta)
+    let r = fh * 0.14'f32
+    var far = 0'f32
+    for (cx, cy) in [(0'f32, 0'f32), (fw, 0'f32), (fw, fh), (0'f32, fh)]:
+      far = max(far, cx * nx + (cy - fh) * ny)
+    let d = smooth(0, 1, p) * (far + r) - r
+    result.eachPixel(w, h):
+      let qx = x.float32 + 0.5'f32
+      let qy = y.float32 + 0.5'f32
+      let t = qx * nx + (qy - fh) * ny
+      let s = t - d
+      if s < 0:
+        # Shadowed where the roll is near.
+        c = b.get(x, y) * (1 - 0.35'f32 * exp(s / (r * 0.6'f32)))
+      elif s < r:
+        # Back to where this part of the page lay before it rolled.
+        let arc = r * (PI.float32 - arcsin(s / r))
+        let back = t - (d - arc)
+        let shade = 0.6'f32 + 0.4'f32 * sqrt(max(0'f32, 1 - (s / r) * (s / r)))
+        c = b.sample(qx - back * nx, qy - back * ny) * shade
+      else:
+        c = a.get(x, y)
+
+  of tkPagePeelObsolete, tkPageTurn:
+    # The page lifts from the bottom right corner and folds back over itself:
+    # a peel shows a pale back, a turn the picture through the page.
     let nx = 1 / sqrt(2'f32)
     let diag = sqrt(fw * fw + fh * fh)
-    let reach = e * diag * 1.15'f32
+    let reach = p * diag * 1.15'f32
+    let back = (if kind == tkPageTurn: 0'f32 else: 0.55'f32)
     let ox = fw - nx * reach
     let oy = fh - nx * reach
     result.eachPixel(w, h):
@@ -980,7 +1015,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
         let rx = qx - 2 * s * nx
         let ry = qy - 2 * s * nx
         if a.inside(rx, ry) and -s < reach / 2:
-          c = mix(a.sample(rx, ry), white, 0.55'f32) * (0.75'f32 + 0.25'f32 *
+          c = mix(a.sample(rx, ry), white, back) * (0.75'f32 + 0.25'f32 *
             clamp01(-s / (fh * 0.1'f32)))
         else:
           c = a.get(x, y)
@@ -998,14 +1033,16 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
       c = (if yy >= 0 and yy < fh: am.sample(x.float32 + 0.5'f32, yy) else: b.get(x, y))
 
   of tkClockWipe:
+    # The hand moves as a smoothstep, its edge feathered over about ten
+    # degrees either side.
+    const soft = 10'f32 / 360
+    let hand = smooth(0, 1, p) * (1 + 2 * soft) - soft
     result.eachPixel(w, h):
       let dx = (u - 0.5'f32) * fw / fh
       let dy = v - 0.5'f32
       var ang = arctan2(dx, -dy) / (2 * PI.float32)
       if ang < 0: ang += 1
-      let r = sqrt(dx * dx + dy * dy)
-      let soft = 0.004'f32 / max(r, 0.01'f32)
-      c = mix(a.get(x, y), b.get(x, y), 1 - smooth(e - soft, e + soft, ang))
+      c = mix(a.get(x, y), b.get(x, y), 1 - smooth(hand - soft, hand + soft, ang))
 
   of tkLinearWipe, tkSoftWipe, tkNeonWipe:
     let soft = (if kind == tkSoftWipe: 0.25'f32 else: 0.01'f32)
@@ -1164,6 +1201,61 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame: int,
       c = src[].sample((x.float32 + 0.5'f32 - fw / 2) / z + fw / 2,
         (y.float32 + 0.5'f32 - fh / 2) / z + fh / 2)
     result = zoomed.blur((z - 1) * fw / 320)
+
+  of tkBandSlide:
+    # Bands of the incoming picture slide in from alternate sides.
+    const n = 6
+    let off = (1 - p) * fw
+    result.eachPixel(w, h):
+      let band = min(n - 1, int(v * n))
+      let xx = x.float32 + 0.5'f32 + (if band mod 2 == 0: off else: -off)
+      c = (if xx >= 0 and xx < fw: b.sample(xx, y.float32 + 0.5'f32)
+           else: a.get(x, y))
+
+  of tkCheckerWipe:
+    # Each square of a checkerboard wipes across, every other one half a
+    # step behind.
+    const n = 8
+    result.eachPixel(w, h):
+      let cell = int(u * n) + int(v * n)
+      let t = clamp01(p * 2 - (if cell mod 2 == 0: 0'f32 else: 0.5'f32))
+      c = (if fract(u * n) < t: b.get(x, y) else: a.get(x, y))
+
+  of tkVenetianBlinds:
+    const n = 10
+    result.eachPixel(w, h):
+      c = (if fract(v * n) < p: b.get(x, y) else: a.get(x, y))
+
+  of tkGradientWipe:
+    # A soft-edged wipe along a diagonal gradient.
+    const soft = 0.12'f32
+    result.eachPixel(w, h):
+      let g = clamp01(u * 0.7'f32 + v * 0.3'f32)
+      c = mix(a.get(x, y), b.get(x, y), clamp01((p * (1 + soft) - g) / soft))
+
+  of tkFlipOver:
+    # The picture turns over about its middle, showing the incoming one on
+    # its back.
+    let angle = PI.float32 * p
+    let first = angle < PI / 2
+    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let ang = (if first: angle else: angle - PI.float32)
+    result.eachPixel(w, h):
+      let (cc, cover) = src[].turned(x.float32 + 0.5'f32, y.float32 + 0.5'f32,
+        ang, false)
+      c = (if cover > 0: cc else: under.get(x, y))
+
+  of tkCubeSpin:
+    # The outgoing picture squeezes to the left as the incoming one grows
+    # from the right, like the faces of a turning cube.
+    let edge = (1 - p) * fw
+    result.eachPixel(w, h):
+      let xx = x.float32 + 0.5'f32
+      let yy = y.float32 + 0.5'f32
+      if xx < edge:
+        c = a.sample(xx / max(1 - p, 1e-3), yy) * (1 - 0.4'f32 * p)
+      else:
+        c = b.sample((xx - edge) / max(p, 1e-3), yy) * (0.6'f32 + 0.4'f32 * p)
 
   of tkConstantPower, tkExponentialFade:
     result = mixImg(a, b, p)

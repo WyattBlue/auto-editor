@@ -2275,12 +2275,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           if toF == nil: toF = av_frame_clone(below)
           let w = tl.windows[o.layer][o.win]
           let local = index - w.start
-          let p = float32((local.float + 0.5) / w.dur.float)
+          # As Premiere: the first frame is all the outgoing picture.
+          let p = float32(local.float / w.dur.float)
           let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
           let dip: tuple[r, g, b: float32] = (tl.bg.red.float32, tl.bg.green.float32,
             tl.bg.blue.float32)
           let img = render(w.kind, fromF.toImg, toF.toImg, below.toImg, p,
-            local.int, seed, dip)
+            local.int, w.dur.int, seed, dip)
           acc = img.fromImg(fromF)
           av_frame_free(addr fromF)
           av_frame_free(addr toF)

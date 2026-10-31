@@ -466,7 +466,9 @@ proc transitionNode(rate: float, t: Transition, video: bool): JsonNode =
     "in_offset": rationalTime(rate, inOffset.float),
     "out_offset": rationalTime(rate, (t.dur - inOffset).float)
   }
-  if t.kind != tkDissolve or not video:
+  # Premiere drops a transition whose match name it doesn't know, leaving a
+  # cut, so those it no longer reads go as a dissolve.
+  if (t.kind != tkDissolve and transitionInfo[t.kind].matchName != "") or not video:
     let (name, matchName) =
       if t.kind == tkDissolve: ("Constant Gain", "Constant Gain")
       else: (transitionInfo[t.kind].name, transitionInfo[t.kind].matchName)

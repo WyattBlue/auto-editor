@@ -38,13 +38,17 @@ type
     tkDipToWhiteLegacy, tkFilmDissolveLegacy, tkInset, tkIrisBox, tkIrisCross,
     tkIrisDiamond, tkIrisRound, tkNonAdditiveDissolve, tkPushLegacy,
     tkRadialWipeLegacy, tkSlideLegacy, tkSplitLegacy, tkWhipLegacy, tkWipe,
+    # Obsolete: no longer in Premiere's Effects panel
+    tkBandSlide, tkCheckerWipe, tkCubeSpin, tkFlipOver, tkGradientWipe,
+    tkPagePeelObsolete, tkPageTurn, tkVenetianBlinds,
     # Audio crossfades
     tkConstantPower, tkExponentialFade
 
   TransitionInfo* = object
     id*: string        # the name in v3 files and on the command line
     name*: string      # Premiere's name
-    matchName*: string # Premiere's internal name, as its OTIO files carry it
+    matchName*: string # Premiere's internal name, as its OTIO files carry it;
+                       # empty for those Premiere no longer reads
 
 const audioKinds* = {tkDissolve, tkConstantPower, tkExponentialFade}
 const videoKinds* = {low(TransitionKind) .. high(TransitionKind)} -
@@ -176,6 +180,15 @@ const transitionInfo*: array[TransitionKind, TransitionInfo] = [
   tkSplitLegacy: ti("split-legacy", "Split (Legacy)", "AE.ADBE Split"),
   tkWhipLegacy: ti("whip-legacy", "Whip (Legacy)", "AE.ADBE Whip"),
   tkWipe: ti("wipe", "Wipe", "ADBE Wipe"),
+  tkBandSlide: ti("band-slide", "Band Slide", ""),
+  tkCheckerWipe: ti("checker-wipe", "Checker Wipe", ""),
+  tkCubeSpin: ti("cube-spin", "Cube Spin", ""),
+  tkFlipOver: ti("flip-over", "Flip Over", ""),
+  tkGradientWipe: ti("gradient-wipe", "Gradient Wipe", ""),
+  tkPagePeelObsolete: ti("page-peel-obsolete", "Page Peel (Obsolete)",
+    "AE.ADBE Page Peel"),
+  tkPageTurn: ti("page-turn", "Page Turn", "ADBE Page Turn"),
+  tkVenetianBlinds: ti("venetian-blinds", "Venetian Blinds", ""),
   tkConstantPower: ti("constant-power", "Constant Power", "Custom Fade"),
   tkExponentialFade: ti("exponential-fade", "Exponential Fade", "Exponential Fade"),
 ]
@@ -202,6 +215,7 @@ func kindFromMatchName*(matchName: string, kind: var TransitionKind): bool =
   # same transition both ways in different files.
   func bare(s: string): string =
     if s.len > 3 and s[0 .. 2] == "AE.": s[3 .. ^1] else: s
+  if matchName == "": return false
   for k in TransitionKind:
     if bare(transitionInfo[k].matchName) == bare(matchName):
       kind = k
@@ -234,7 +248,8 @@ func kindFromName*(name: string, video: bool, kind: var TransitionKind): bool =
     of "splitslide", "centersplitslide": kind = tkSplit
     of "pagecurl": kind = tkPagePeel
     of "crossstretch": kind = tkStretch
-    of "venetianblindwipe": kind = tkLouver
+    of "venetianblindwipe", "venetianblinds": kind = tkVenetianBlinds
+    of "checkerwipe", "checkerboardwipe": kind = tkCheckerWipe
     of "smoothcut": kind = tkMorphCut
     else:
       for k in videoKinds:
