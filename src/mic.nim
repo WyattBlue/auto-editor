@@ -1,5 +1,6 @@
-import std/[os, strformat]
+import std/[os, strformat, typedthreads]
 import ./[av, ffmpeg, log]
+import ./util/rational
 
 when defined(macosx):
 
@@ -194,9 +195,182 @@ proc openMic*(): MicInput =
 proc close*(input: var MicInput) =
   avformat_close_input(addr input.formatContext)
 
+# Gap detection: the device stamps packets from its own clock, so a pts jump
+# larger than the audio a packet carries means buffers were lost in between.
+# A microphone can't resend, so the hole is filled with silence to keep the
+# stream at wall-clock length.
+type GapFiller* = object
+  timeBase: AVRational
+  sampleRate: cint
+  bytesPerFrame: int # 0 = not PCM, packet durations unknown, no detection
+  nextPts: int64 # where the next packet should start; AV_NOPTS_VALUE at first
+  firstPts: int64 # capture start, to say where in the recording a gap is
+  pending: ptr AVPacket # the real packet, held back while silence goes first
+  missing: int64 # samples of silence still owed before `pending`
+
+proc initGapFiller*(timeBase: AVRational, sampleRate: cint,
+    bytesPerFrame: int): GapFiller =
+  GapFiller(timeBase: timeBase, sampleRate: sampleRate,
+    bytesPerFrame: bytesPerFrame, nextPts: AV_NOPTS_VALUE,
+    firstPts: AV_NOPTS_VALUE)
+
+proc initGapFiller*(stream: ptr AVStream): GapFiller =
+  let par = stream.codecpar
+  let bits = av_get_bits_per_sample(par.codec_id)
+  var bytesPerFrame = 0
+  if bits > 0 and par.ch_layout.nb_channels > 0 and par.sample_rate > 0:
+    bytesPerFrame = (bits div 8) * par.ch_layout.nb_channels
+  initGapFiller(stream.time_base, par.sample_rate, bytesPerFrame)
+
+proc hasPending*(g: GapFiller): bool = g.pending != nil
+
+proc feed*(g: var GapFiller, src: ptr AVPacket) =
+  ## Take ownership of the next captured packet; `emit` hands it back, after
+  ## any silence it is owed.
+  assert g.pending == nil
+  g.pending = src
+  g.missing = 0
+  if g.bytesPerFrame == 0 or src.pts == AV_NOPTS_VALUE:
+    return
+  if g.firstPts == AV_NOPTS_VALUE:
+    g.firstPts = src.pts
+  if g.nextPts == AV_NOPTS_VALUE:
+    return
+  let sampleTb = AVRational(num: 1, den: g.sampleRate)
+  let missing = av_rescale_q(src.pts - g.nextPts, g.timeBase, sampleTb)
+  # Below 5ms is clock jitter (alsa stamps from a filtered wall clock), and
+  # the smallest device buffer is larger than that.
+  if missing >= g.sampleRate div 200:
+    g.missing = missing
+    let at = av_rescale_q(g.nextPts - g.firstPts, g.timeBase,
+      AVRational(num: 1, den: 1000))
+    warning &"Microphone dropped {missing * 1000 div g.sampleRate} ms of audio " &
+      &"at {at div 1000}.{at mod 1000:03} s"
+
+proc emit*(g: var GapFiller, pkt: ptr AVPacket) =
+  ## Move the next packet into `pkt`: up to 1s of silence while any is owed
+  ## (a laptop waking from sleep owes hours; keep allocations bounded), else
+  ## the fed packet itself.
+  assert g.pending != nil
+  let sampleTb = AVRational(num: 1, den: g.sampleRate)
+  if g.missing > 0:
+    let samples = min(g.missing, g.sampleRate.int64)
+    if av_new_packet(pkt, cint(samples * g.bytesPerFrame)) < 0:
+      error "out of memory"
+    zeroMem(pkt.data, pkt.size)
+    pkt.pts = g.nextPts
+    pkt.dts = g.nextPts
+    pkt.duration = av_rescale_q(samples, sampleTb, g.timeBase)
+    pkt.stream_index = g.pending.stream_index
+    pkt.flags = AV_PKT_FLAG_KEY
+    g.nextPts += pkt.duration
+    g.missing -= samples
+    return
+  if g.bytesPerFrame > 0 and g.pending.pts != AV_NOPTS_VALUE:
+    # Resync to the device clock, so sub-threshold jitter never accumulates.
+    g.nextPts = g.pending.pts + av_rescale_q(g.pending.size div g.bytesPerFrame,
+      sampleTb, g.timeBase)
+  av_packet_move_ref(pkt, g.pending)
+  av_packet_free(addr g.pending)
+
+proc close*(g: var GapFiller) =
+  if g.pending != nil:
+    av_packet_free(addr g.pending)
+
+# The capture devices hold little: dshow drops once its rtbufsize fills and
+# alsa overruns, so a consumer stall longer than that silently loses audio
+# (avfoundation queues on its own, see patches/ffmpeg.patch). So a thread does
+# nothing but av_read_frame into an unbounded queue; decoding, gating, muxing
+# and the whisper model load all happen behind that queue, where a stall only
+# adds latency. A microphone can't retransmit, so buffering is the only option.
+type
+  MicReaderArgs = object
+    fmtCtx: ptr AVFormatContext
+    streamIndex: cint
+    stop: ptr bool # the caller's Ctrl-C flag
+    quit: bool # set by close()
+    packets: Channel[ptr AVPacket]
+    err: cint # why reading ended; 0 = asked to stop
+
+  MicReader* = ref object
+    args: MicReaderArgs
+    thread: Thread[ptr MicReaderArgs]
+    gaps: GapFiller
+    finished: bool # the end sentinel has been received
+    closed: bool
+
+proc readerLoop(a: ptr MicReaderArgs) {.thread.} =
+  var pkt = av_packet_alloc()
+  while pkt != nil and not (a.stop[] or a.quit):
+    let ret = av_read_frame(a.fmtCtx, pkt)
+    if ret == AVERROR_EAGAIN:
+      # avfoundation never blocks; it just says nothing is ready yet.
+      sleep(2)
+      continue
+    if ret < 0:
+      if not (a.stop[] or a.quit):
+        a.err = ret
+      break
+    if pkt.stream_index != a.streamIndex:
+      av_packet_unref(pkt)
+      continue
+    a.packets.send(pkt) # the consumer frees it
+    pkt = av_packet_alloc()
+  if pkt == nil:
+    a.err = AVERROR(ENOMEM)
+  else:
+    av_packet_free(addr pkt)
+  a.packets.send(nil) # end sentinel
+
+proc newMicReader*(input: MicInput, stop: ptr bool): MicReader =
+  ## Start capturing from `input` right away; packets queue up until `next` is
+  ## called. Reading ends when `stop[]` is set, `close` is called, or the
+  ## device fails.
+  result = MicReader(gaps: initGapFiller(input.audioStream))
+  result.args = MicReaderArgs(fmtCtx: input.formatContext,
+    streamIndex: input.audioStream.index, stop: stop)
+  result.args.packets.open()
+  createThread(result.thread, readerLoop, addr result.args)
+
+proc next*(r: MicReader, pkt: ptr AVPacket): cint =
+  ## Move the next captured packet into `pkt`. Returns 0, or a negative AVERROR
+  ## once capture has ended: AVERROR_EOF when it was stopped on request, the
+  ## device's error otherwise. Everything captured before the end is still
+  ## delivered first, with silence filling any hole the device left.
+  if r.finished:
+    return AVERROR_EOF
+  if not r.gaps.hasPending:
+    let src = r.args.packets.recv()
+    if src == nil:
+      r.finished = true
+      return (if r.args.err != 0: r.args.err else: AVERROR_EOF)
+    r.gaps.feed(src)
+  r.gaps.emit(pkt)
+  return 0
+
+proc close*(r: MicReader) =
+  ## Stop reading and join the thread. Must happen before the format context
+  ## is closed. Queued packets that were never consumed are freed.
+  if r.closed:
+    return
+  r.closed = true
+  r.args.quit = true
+  joinThread(r.thread)
+  r.gaps.close()
+  while true:
+    let (ok, p) = r.args.packets.tryRecv()
+    if not ok: break
+    if p != nil:
+      var pkt = p
+      av_packet_free(addr pkt)
+  r.args.packets.close()
+  r.finished = true
+
 proc recordMic*(outputPath: string, shouldStop: ptr bool) =
   var input = openMic()
   defer: input.close()
+  let reader = newMicReader(input, shouldStop)
+  defer: reader.close()
 
   var output = av.openWrite(outputPath)
   let outputStream = output.addStreamFromTemplate(input.audioStream)
@@ -212,26 +386,22 @@ proc recordMic*(outputPath: string, shouldStop: ptr bool) =
   var firstTs = AV_NOPTS_VALUE
   var packetsWritten = 0
   stderr.writeLine(&"Listening on \"{input.name}\"... (press Ctrl-C to stop)")
-  while not shouldStop[]:
-    let ret = av_read_frame(input.formatContext, packet)
-    if ret == AVERROR_EAGAIN:
-      sleep(5)
-      continue
+  while true:
+    let ret = reader.next(packet)
+    if ret == AVERROR_EOF:
+      break
     if ret < 0:
-      if shouldStop[]:
-        break
       error &"Could not read microphone: {av_err2str(ret)}"
-    if packet.stream_index == input.audioStream.index:
-      let ts = if packet.dts != AV_NOPTS_VALUE: packet.dts else: packet.pts
-      if firstTs == AV_NOPTS_VALUE and ts != AV_NOPTS_VALUE:
-        firstTs = ts
-      if firstTs != AV_NOPTS_VALUE:
-        if packet.pts != AV_NOPTS_VALUE: packet.pts -= firstTs
-        if packet.dts != AV_NOPTS_VALUE: packet.dts -= firstTs
-      packet.stream_index = 0
-      packet.time_base = input.audioStream.time_base
-      output.mux(packet[])
-      inc packetsWritten
+    let ts = if packet.dts != AV_NOPTS_VALUE: packet.dts else: packet.pts
+    if firstTs == AV_NOPTS_VALUE and ts != AV_NOPTS_VALUE:
+      firstTs = ts
+    if firstTs != AV_NOPTS_VALUE:
+      if packet.pts != AV_NOPTS_VALUE: packet.pts -= firstTs
+      if packet.dts != AV_NOPTS_VALUE: packet.dts -= firstTs
+    packet.stream_index = 0
+    packet.time_base = input.audioStream.time_base
+    output.mux(packet[])
+    inc packetsWritten
     av_packet_unref(packet)
 
   stderr.writeLine("")

@@ -108,6 +108,10 @@ proc main*(cArgs: seq[string]) =
   var fmtCtx: ptr AVFormatContext
   var audioStream: ptr AVStream
   var input: InputContainer
+  var readPacket: PacketSource
+  when defined(macosx) or defined(windows) or
+      (defined(linux) and not defined(emscripten)):
+    var reader: MicReader
 
   if isMic:
     when defined(macosx) or defined(windows) or
@@ -115,6 +119,10 @@ proc main*(cArgs: seq[string]) =
       var micInput = openMic()
       fmtCtx = micInput.formatContext
       audioStream = micInput.audioStream
+      # Capture buffers from here on, so speech during the (seconds-long) model
+      # load below is kept, not dropped by the device.
+      reader = newMicReader(micInput, addr ctrlcStop)
+      readPacket = proc(pkt: ptr AVPacket): cint = reader.next(pkt)
       stderr.writeLine(&"Listening on \"{micInput.name}\"... (press Ctrl-C to stop)")
     else:
       error "Microphone capture (:mic) is not supported on this platform"
@@ -124,12 +132,18 @@ proc main*(cArgs: seq[string]) =
       error "No audio stream found"
     audioStream = input.audio[0]
     fmtCtx = input.formatContext
+    readPacket = fileSource(fmtCtx, addr ctrlcStop)
 
   defer:
-    if isMic: avformat_close_input(addr fmtCtx)
-    else: input.close()
+    if isMic:
+      when defined(macosx) or defined(windows) or
+          (defined(linux) and not defined(emscripten)):
+        reader.close() # joins the thread, so it can't be mid-read below
+      avformat_close_input(addr fmtCtx)
+    else:
+      input.close()
 
-  transcribe.run(fmtCtx, audioStream, model, language, translate, format, output,
-                 queue, threshold, prompt, threads, splitWords, isDebug, addr ctrlcStop)
+  transcribe.run(readPacket, audioStream, model, language, translate, format,
+                 output, queue, threshold, prompt, threads, splitWords, isDebug)
   if isMic:
     stderr.writeLine("")

@@ -526,6 +526,10 @@ proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/pack
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
 proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
+proc av_packet_move_ref*(dst, src: ptr AVPacket) {.importc,
+    header: "<libavcodec/packet.h>".}
+proc av_get_bits_per_sample*(codec_id: AVCodecID): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
 let AV_PKT_DATA_DISPLAYMATRIX* {.importc, header: "<libavcodec/packet.h>".}: cint
 proc av_display_rotation_get*(matrix: ptr int32): cdouble {.importc,
     header: "<libavutil/display.h>".}
@@ -616,6 +620,7 @@ const AVERROR_EOF* = AVERROR(MKTAG('E', 'O', 'F', ' '))
 let EAGAIN {.importc: "EAGAIN", header: "<errno.h>".}: cint
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 let ENOENT* {.importc: "ENOENT", header: "<errno.h>".}: cint
+let ENOMEM* {.importc: "ENOMEM", header: "<errno.h>".}: cint
 let AVERROR_INVALIDDATA* {.importc: "AVERROR_INVALIDDATA",
     header: "<libavutil/error.h>".}: cint
 

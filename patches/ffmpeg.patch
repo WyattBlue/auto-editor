@@ -37,3 +37,153 @@ diff --git a/libavformat/webp_anim_dec.c b/libavformat/webp_anim_dec.c
                  pkt->flags |= AV_PKT_FLAG_KEY;
              pkt->pts = AV_NOPTS_VALUE;
              pkt->dts = AV_NOPTS_VALUE;
+diff --git a/libavdevice/avfoundation.m b/libavdevice/avfoundation.m
+--- a/libavdevice/avfoundation.m
++++ b/libavdevice/avfoundation.m
+@@ -43,6 +43,9 @@
+
+ static const int avf_time_base = 1000000;
+
++// ~10 minutes of 10ms buffers
++#define AVF_AUDIO_QUEUE_MAX 65536
++
+ static const AVRational avf_time_base_q = {
+     .num = 1,
+     .den = avf_time_base
+@@ -131,7 +134,10 @@
+     AVCaptureVideoDataOutput *video_output;
+     AVCaptureAudioDataOutput *audio_output;
+     CMSampleBufferRef         current_frame;
+-    CMSampleBufferRef         current_audio_frame;
++    // Audio buffers queue up (FIFO, retained by the array) until read_packet
++    // takes them, so a reader that stalls for longer than one ~10ms buffer
++    // loses nothing. A microphone can't resend, so this is the place to buffer.
++    CFMutableArrayRef         audio_frames;
+
+     AVCaptureDevice          *observed_device;
+ #if !TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+@@ -273,12 +279,13 @@
+ {
+     lock_frames(_context);
+
+-    if (_context->current_audio_frame != nil) {
+-        CFRelease(_context->current_audio_frame);
++    // Only a reader that has died can let the queue run away; cap it rather
++    // than eat all memory, and let the pts jump expose the loss.
++    if (CFArrayGetCount(_context->audio_frames) >= AVF_AUDIO_QUEUE_MAX) {
++        CFArrayRemoveValueAtIndex(_context->audio_frames, 0);
+     }
++    CFArrayAppendValue(_context->audio_frames, audioFrame);
+
+-    _context->current_audio_frame = (CMSampleBufferRef)CFRetain(audioFrame);
+-
+     unlock_frames(_context);
+
+     ++_context->audio_frames_captured;
+@@ -310,6 +317,10 @@
+     if (ctx->current_frame) {
+         CFRelease(ctx->current_frame);
+     }
++
++    if (ctx->audio_frames) {
++        CFRelease(ctx->audio_frames);
++    }
+ }
+
+ static int parse_device_name(AVFormatContext *s)
+@@ -695,7 +706,8 @@
+
+     avpriv_set_pts_info(stream, 64, 1, avf_time_base);
+
+-    format_desc = CMSampleBufferGetFormatDescription(ctx->current_audio_frame);
++    CMSampleBufferRef first_frame = (CMSampleBufferRef)CFArrayGetValueAtIndex(ctx->audio_frames, 0);
++    format_desc = CMSampleBufferGetFormatDescription(first_frame);
+     const AudioStreamBasicDescription *basic_desc = CMAudioFormatDescriptionGetStreamBasicDescription(format_desc);
+
+     if (!basic_desc) {
+@@ -743,7 +755,7 @@
+     }
+
+     if (ctx->audio_non_interleaved) {
+-        CMBlockBufferRef block_buffer = CMSampleBufferGetDataBuffer(ctx->current_audio_frame);
++        CMBlockBufferRef block_buffer = CMSampleBufferGetDataBuffer(first_frame);
+         ctx->audio_buffer_size        = CMBlockBufferGetDataLength(block_buffer);
+         ctx->audio_buffer             = av_malloc(ctx->audio_buffer_size);
+         if (!ctx->audio_buffer) {
+@@ -753,9 +765,6 @@
+         }
+     }
+
+-    CFRelease(ctx->current_audio_frame);
+-    ctx->current_audio_frame = nil;
+-
+     unlock_frames(ctx);
+
+     return 0;
+@@ -836,6 +845,11 @@
+     ctx->num_video_devices = [devices count] + [devices_muxed count];
+
+     pthread_mutex_init(&ctx->frame_lock, NULL);
++    ctx->audio_frames = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
++    if (!ctx->audio_frames) {
++        ret = AVERROR(ENOMEM);
++        goto fail;
++    }
+
+ #if !TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+     CGGetActiveDisplayList(0, NULL, &num_screens);
+@@ -1173,16 +1187,19 @@
+                 unlock_frames(ctx);
+                 return status;
+             }
+-        } else if (ctx->current_audio_frame != nil) {
+-            CMBlockBufferRef block_buffer = CMSampleBufferGetDataBuffer(ctx->current_audio_frame);
++        } else if (CFArrayGetCount(ctx->audio_frames) > 0) {
++            CMSampleBufferRef audio_frame = (CMSampleBufferRef)CFArrayGetValueAtIndex(ctx->audio_frames, 0);
++            CMBlockBufferRef block_buffer = CMSampleBufferGetDataBuffer(audio_frame);
+             int block_buffer_size         = CMBlockBufferGetDataLength(block_buffer);
+
+             if (!block_buffer || !block_buffer_size) {
++                CFArrayRemoveValueAtIndex(ctx->audio_frames, 0);
+                 unlock_frames(ctx);
+                 return AVERROR(EIO);
+             }
+
+             if (ctx->audio_non_interleaved && block_buffer_size > ctx->audio_buffer_size) {
++                CFArrayRemoveValueAtIndex(ctx->audio_frames, 0);
+                 unlock_frames(ctx);
+                 return AVERROR_BUFFER_TOO_SMALL;
+             }
+@@ -1195,7 +1212,7 @@
+             CMItemCount count;
+             CMSampleTimingInfo timing_info;
+
+-            if (CMSampleBufferGetOutputSampleTimingInfoArray(ctx->current_audio_frame, 1, &timing_info, &count) == noErr) {
++            if (CMSampleBufferGetOutputSampleTimingInfoArray(audio_frame, 1, &timing_info, &count) == noErr) {
+                 AVRational timebase_q = av_make_q(1, timing_info.presentationTimeStamp.timescale);
+                 pkt->pts = pkt->dts = av_rescale_q(timing_info.presentationTimeStamp.value, timebase_q, avf_time_base_q);
+             }
+@@ -1208,6 +1225,7 @@
+
+                 OSStatus ret = CMBlockBufferCopyDataBytes(block_buffer, 0, pkt->size, ctx->audio_buffer);
+                 if (ret != kCMBlockBufferNoErr) {
++                    CFArrayRemoveValueAtIndex(ctx->audio_frames, 0);
+                     unlock_frames(ctx);
+                     return AVERROR(EIO);
+                 }
+@@ -1244,13 +1262,13 @@
+             } else {
+                 OSStatus ret = CMBlockBufferCopyDataBytes(block_buffer, 0, pkt->size, pkt->data);
+                 if (ret != kCMBlockBufferNoErr) {
++                    CFArrayRemoveValueAtIndex(ctx->audio_frames, 0);
+                     unlock_frames(ctx);
+                     return AVERROR(EIO);
+                 }
+             }
+
+-            CFRelease(ctx->current_audio_frame);
+-            ctx->current_audio_frame = nil;
++            CFArrayRemoveValueAtIndex(ctx->audio_frames, 0);
+         } else {
+             pkt->data = NULL;
+             unlock_frames(ctx);

@@ -266,14 +266,23 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
     if rc != 0:
       stderr.writeLine(&"transcription failed on segment at {job.startMs} ms; skipping")
 
-proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
+type PacketSource* = proc(pkt: ptr AVPacket): cint
+  ## Fills `pkt` like av_read_frame: 0 on success, AVERROR_EAGAIN to retry,
+  ## any other negative value ends the stream.
+
+proc fileSource*(fmtCtx: ptr AVFormatContext, stop: ptr bool): PacketSource =
+  ## Packets of an open container; the stream ends early once `stop[]` is set.
+  proc(pkt: ptr AVPacket): cint =
+    if stop[]: AVERROR_EOF else: av_read_frame(fmtCtx, pkt)
+
+proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
     model, language: string, translate: bool, format, output: string,
     queue: int, threshold: float32, prompt: string, threads: cint,
-    splitWords, debug: bool, stop: ptr bool, heardMs: ptr int64 = nil) =
-  ## Read `audioStream` from the open `fmtCtx` (a file or the live mic) until it
-  ## ends or `stop[]` is set, transcribing each detected speech segment. Output
-  ## goes to `output` ("-" = stdout). `heardMs`, if given, follows how much
-  ## audio has been read, for a progress display.
+    splitWords, debug: bool, heardMs: ptr int64 = nil) =
+  ## Read `audioStream`'s packets from `readPacket` (a file or the live mic)
+  ## until it ends, transcribing each detected speech segment. Output goes to
+  ## `output` ("-" = stdout). `heardMs`, if given, follows how much audio has
+  ## been read, for a progress display.
   let useApple = model == "apple"
   let useParakeet = not useApple and isParakeetModel(model)
   var wctx: WhisperCtx
@@ -431,14 +440,14 @@ proc run*(fmtCtx: ptr AVFormatContext, audioStream: ptr AVStream,
   var worker: Thread[ptr WorkerArgs]
   createThread(worker, whisperWorker, addr wargs)
 
-  while not stop[]:
-    # avfoundation returns EAGAIN whenever no buffer is ready yet (including right
-    # at startup), so retry on that; only EOF/fatal (e.g. device unplugged) stops.
-    let ret = av_read_frame(fmtCtx, pkt)
+  while true:
+    let ret = readPacket(pkt)
     if ret == AVERROR_EAGAIN:
       sleep(5)
       continue
     if ret < 0:
+      if ret != AVERROR_EOF:
+        warning &"Stopped reading audio: {av_err2str(ret)}"
       break
     if pkt.stream_index == audioStream.index and avcodec_send_packet(dec, pkt) >= 0:
       while avcodec_receive_frame(dec, frame) >= 0:
@@ -484,7 +493,7 @@ proc transcribeFile*(input, model, language: string, threads: int,
   defer: container.close()
   if container.audio.len == 0: error "No audio stream found"
   let lang = if model != "apple" and isParakeetModel(model): "auto" else: language
-  run(container.formatContext, container.audio[0], model, lang,
+  run(fileSource(container.formatContext, stop), container.audio[0], model, lang,
     translate = false, format = "srt", output = output, queue = 30,
     threshold = 0.04, prompt = "", threads = threads.cint, splitWords = true,
-    debug = false, stop = stop, heardMs = heardMs)
+    debug = false, heardMs = heardMs)
