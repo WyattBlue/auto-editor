@@ -2,6 +2,7 @@ import std/[math, strformat, strutils, sequtils, tables]
 
 import ./[ffmpeg, log]
 import ./util/[lang, rational]
+import ./lib/audioutil
 
 var useWebCodecs* = false
 
@@ -760,6 +761,25 @@ proc initLayout*(layout: string): ref AVChannelLayout =
   new(result)
   if av_channel_layout_from_string(addr result[], layout.cstring) < 0:
     error "Invalid layout"
+
+proc channelNames*(layout: string): seq[string] =
+  var parsed, defaulted: AVChannelLayout
+  if av_channel_layout_from_string(addr parsed, layout.cstring) < 0:
+    return
+  let l = if parsed.order == 0:
+    av_channel_layout_default(addr defaulted, parsed.nb_channels)
+    addr defaulted
+  else:
+    addr parsed
+  for i in 0 ..< l.nb_channels:
+    var buf: array[32, char]
+    let channel = av_channel_layout_channel_from_index(l, cuint(i))
+    if av_channel_name(cast[cstring](addr buf[0]), csize_t(buf.len), channel) < 0:
+      return @[]
+    let name = audioChannelName($cast[cstring](addr buf[0]))
+    if name.len == 0:
+      return @[]
+    result.add name
 
 func canonicalName*(codec: ptr AVCodec): string =
   return $avcodec_get_name(codec.id)

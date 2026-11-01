@@ -15,20 +15,42 @@ func toString*(color: RGBColor): string =
   let prefix = if color.yuv: "yuv#" else: "#"
   return toLowerAscii(&"{prefix}{redHex}{greenHex}{blueHex}")
 
+type YuvMatrix* = enum bt601, bt709, bt2020
+
+const yuvCoeffs*: array[YuvMatrix, tuple[kr, kb: float]] =
+  [(0.299, 0.114), (0.2126, 0.0722), (0.2627, 0.0593)]
+
+func yuvMatrix*(colorspace: int): YuvMatrix =
+  case colorspace
+  of 1: bt709
+  of 9, 10: bt2020
+  else: bt601
+
+func yuvToRgb*(y, cb, cr: float, matrix: YuvMatrix, fullRange: bool):
+    tuple[r, g, b: float] =
+  let (kr, kb) = yuvCoeffs[matrix]
+  let luma = if fullRange: y / 255 else: (y - 16) / 219
+  let cs = if fullRange: 255.0 else: 224.0
+  let u = (cb - 128) / cs
+  let v = (cr - 128) / cs
+  let r = luma + 2 * (1 - kr) * v
+  let b = luma + 2 * (1 - kb) * u
+  (r, (luma - kr * r - kb * b) / (1 - kr - kb), b)
+
+func rgbToYuv*(r, g, b: float, matrix: YuvMatrix, fullRange: bool):
+    tuple[y, cb, cr: float] =
+  let (kr, kb) = yuvCoeffs[matrix]
+  let y = kr * r + (1 - kr - kb) * g + kb * b
+  let cb = (b - y) / (2 * (1 - kb))
+  let cr = (r - y) / (2 * (1 - kr))
+  let (ys, yOff, cs) = if fullRange: (255.0, 0.0, 255.0) else: (219.0, 16.0, 224.0)
+  (yOff + y * ys, 128 + cb * cs, 128 + cr * cs)
+
 func toRgb*(color: RGBColor, colorspace = 1, fullRange = false): RGBColor =
   if not color.yuv:
     return color
-  let (kr, kb) = case colorspace
-    of 1: (0.2126, 0.0722)
-    of 9, 10: (0.2627, 0.0593)
-    else: (0.299, 0.114)
-  let cs = if fullRange: 255.0 else: 224.0
-  let y = if fullRange: color.red.float / 255 else: (color.red.float - 16) / 219
-  let cb = (color.green.float - 128) / cs
-  let cr = (color.blue.float - 128) / cs
-  let r = y + 2 * (1 - kr) * cr
-  let b = y + 2 * (1 - kb) * cb
-  let g = (y - kr * r - kb * b) / (1 - kr - kb)
+  let (r, g, b) = yuvToRgb(color.red.float, color.green.float, color.blue.float,
+    yuvMatrix(colorspace), fullRange)
   func toByte(v: float): uint8 = uint8(round(clamp(v, 0.0, 1.0) * 255))
   RGBColor(red: toByte(r), green: toByte(g), blue: toByte(b))
 

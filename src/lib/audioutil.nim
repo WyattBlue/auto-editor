@@ -18,3 +18,8 @@ func audioChannelCode*(name: string): string {.raises: [].} =
   for (friendly, code) in audioChannelNames:
     if name == friendly:
       return code
+
+func audioChannelName*(code: string): string {.raises: [].} =
+  for (friendly, c) in audioChannelNames:
+    if code == c:
+      return friendly

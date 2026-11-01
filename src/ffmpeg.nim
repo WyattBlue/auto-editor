@@ -47,6 +47,14 @@ func toAVRational*(s: string): AVRational {.raises: [ValueError].} =
   if result.num == 0:
     raise newException(ValueError, "Rational cannot be zero: " & s)
 
+func parseFrameRate*(s: string): AVRational {.raises: [ValueError].} =
+  case s
+  of "ntsc": AVRational(num: 30000, den: 1001)
+  of "ntsc_film": AVRational(num: 24000, den: 1001)
+  of "pal": AVRational(num: 25, den: 1)
+  of "film": AVRational(num: 24, den: 1)
+  else: toAVRational(s)
+
 type
   AVMediaType* = cint
   AVDiscard* = cint
@@ -407,6 +415,10 @@ func av_channel_layout_index_from_string*(ch_layout: ptr AVChannelLayout,
 proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout,
     nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>",
     raises: [].}
+proc av_channel_layout_channel_from_index*(channel_layout: ptr AVChannelLayout,
+    idx: cuint): cint {.importc, header: "<libavutil/channel_layout.h>".}
+proc av_channel_name*(buf: cstring, buf_size: csize_t, channel: cint): cint {.importc,
+    header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
     char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_copy*(dst, src: ptr AVChannelLayout): cint {.importc,

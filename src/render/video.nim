@@ -401,20 +401,10 @@ func toYuv(color: RGBColor, tag: YuvTag): tuple[y, u, v: uint8] =
   ## into a planar frame.
   if color.yuv:
     return (color.red, color.green, color.blue)
-  let (kr, kb) = case tag.space
-    of 1: (0.2126, 0.0722)
-    of 9, 10: (0.2627, 0.0593)
-    else: (0.299, 0.114)
-  let r = color.red.float
-  let g = color.green.float
-  let b = color.blue.float
-  let y = kr * r + (1 - kr - kb) * g + kb * b
-  let cb = (b - y) / (2 * (1 - kb))
-  let cr = (r - y) / (2 * (1 - kr))
-  let (yScale, yOff, cScale) =
-    if tag.range == 2: (1.0, 0.0, 1.0) else: (219 / 255, 16.0, 224 / 255)
+  let (y, cb, cr) = rgbToYuv(color.red.float / 255, color.green.float / 255,
+    color.blue.float / 255, yuvMatrix(tag.space.int), tag.range == 2)
   func code(v: float): uint8 = uint8(clamp(round(v), 0.0, 255.0))
-  (code(yOff + y * yScale), code(128 + cb * cScale), code(128 + cr * cScale))
+  (code(y), code(cb), code(cr))
 
 proc makeClear(width: cint, height: cint): ptr AVFrame =
   ## A transparent RGBA canvas: the starting picture for a generator layer

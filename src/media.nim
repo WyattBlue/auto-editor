@@ -182,13 +182,14 @@ func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
     return filmNtsc
   return av_d2q(tbFloat, 1000000)
 
+func isStill*(duration: float64, rate: AVRational): bool {.raises: [].} =
+  round(duration * (if rate.isValid: rate.float64 else: 25.0)) <= 1
+
 func isStill*(mi: MediaInfo): bool {.raises: [].} =
   ## A video source of at most one frame: an image. Counted at the source's
   ## own rate, since a still's one frame (1/25 s, as image demuxers give it)
   ## is two or more on a timeline above 37.5 fps.
-  if mi.v.len == 0: return false
-  let rate = if mi.v[0].avg_rate.isValid: mi.v[0].avg_rate.float64 else: 25.0
-  round(mi.duration * rate) <= 1
+  mi.v.len > 0 and isStill(mi.duration, mi.v[0].avg_rate)
 
 func recommendedTimebase*(mi: MediaInfo): AVRational {.raises: [].} =
   ## The timebase auto-editor edits the file in when none is asked for: its
