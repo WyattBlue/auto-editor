@@ -812,6 +812,84 @@ func audioSampleSpan*(start, dur: int64, sampleRate: cint,
   let sampleEnd = (start + dur) * sampleRate.int64 * tb.den div tb.num
   (sampleStart.int, (sampleEnd - sampleStart).int)
 
+proc duckGainEnvelope(keyMix: seq[int32], n: int, d: Action, sr: cint,
+    channels: int): seq[float32] =
+  ## Per-sample gain (1.0 = open) tracking the key's peak: drop toward the
+  ## floor (1 - amount) when it exceeds the threshold, smoothed by a one-pole
+  ## follower whose time constant is the attack (ducking down) or release.
+  result = newSeq[float32](n)
+  let floorG = max(0.0'f32, 1.0'f32 - d.duckAmount.toFloat32)
+  let thr = d.duckThresh.toFloat32
+  let aCoef = exp(-1.0 / (sr.float * max(0.001, d.duckAttack.float / 1000.0))).float32
+  let rCoef = exp(-1.0 / (sr.float * max(0.001, d.duckRelease.float /
+      1000.0))).float32
+  var cur = 1.0'f32
+  for i in 0 ..< n:
+    var peak = 0'i32
+    for ch in 0 ..< channels:
+      let v = abs(keyMix[i * channels + ch])
+      if v > peak: peak = v
+    let target = (if peak.float32 / 32768.0'f32 > thr: floorG else: 1.0'f32)
+    let coef = (if target < cur: aCoef else: rCoef)
+    cur = target + (cur - target) * coef
+    result[i] = cur
+
+# Wrap an interleaved int16 chunk as a planar-float (FLTP) frame for loudnorm.
+proc chunkToFltpFrame(chunk: seq[int16], layout: ref AVChannelLayout, sr: cint,
+    pts: var int64): ptr AVFrame =
+  let channels = layout.nb_channels.int
+  let nFrames = chunk.len div channels
+  var frame = av_frame_alloc()
+  if frame == nil:
+    error "Could not allocate loudnorm input frame"
+  frame.nb_samples = nFrames.cint
+  frame.format = AV_SAMPLE_FMT_FLTP.cint
+  discard av_channel_layout_copy(addr frame.ch_layout, addr layout[])
+  frame.sample_rate = sr.cint
+  frame.pts = pts
+  pts += nFrames
+  if av_frame_get_buffer(frame, 0) < 0:
+    error "Could not allocate loudnorm input frame buffer"
+  for ch in 0 ..< channels:
+    let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
+    for i in 0 ..< nFrames:
+      channelData[i] = chunk[i * channels + ch].cfloat / 32768.0
+  return frame
+
+# Convert a loudnorm output frame (one of several sample formats) to an
+# interleaved int16 chunk.
+proc loudnormOutToChunk(outF: ptr AVFrame, channels: int): seq[int16] =
+  let frameSamples = outF.nb_samples.int
+  let frameChannels = min(outF.ch_layout.nb_channels.int, channels)
+  result = newSeq[int16](frameSamples * channels)
+  if outF.format == AV_SAMPLE_FMT_DBL.cint:
+    let audioData = cast[ptr UncheckedArray[cdouble]](outF.data[0])
+    for i in 0 ..< frameSamples:
+      for ch in 0 ..< frameChannels:
+        let s = max(-1.0, min(1.0, audioData[i * frameChannels + ch]))
+        result[i * channels + ch] = int16(s * 32767.0)
+  elif outF.format == AV_SAMPLE_FMT_FLT.cint:
+    let audioData = cast[ptr UncheckedArray[cfloat]](outF.data[0])
+    for i in 0 ..< frameSamples:
+      for ch in 0 ..< frameChannels:
+        let s = max(-1.0'f32, min(1.0'f32, audioData[i * frameChannels + ch]))
+        result[i * channels + ch] = int16(s * 32767.0)
+  elif outF.format == AV_SAMPLE_FMT_FLTP.cint:
+    for i in 0 ..< frameSamples:
+      for ch in 0 ..< frameChannels:
+        if outF.data[ch] != nil:
+          let channelData = cast[ptr UncheckedArray[cfloat]](outF.data[ch])
+          let s = max(-1.0'f32, min(1.0'f32, channelData[i]))
+          result[i * channels + ch] = int16(s * 32767.0)
+  elif outF.format == AV_SAMPLE_FMT_S16P.cint:
+    for i in 0 ..< frameSamples:
+      for ch in 0 ..< frameChannels:
+        if outF.data[ch] != nil:
+          let channelData = cast[ptr UncheckedArray[int16]](outF.data[ch])
+          result[i * channels + ch] = channelData[i]
+  else:
+    error &"Unexpected output format from loudnorm: {outF.format}"
+
 proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], norm: Norm,
     cache: MediaCache = nil, fromSample = 0, stop: ptr Atomic[bool] = nil):
@@ -872,26 +950,37 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
     if li < tl.a.len and tl.a[li].len > 0:
       activeLayers.add li
 
-  proc duckGainEnvelope(keyMix: seq[int32], n: int, d: Action): seq[float32] =
-    ## Per-sample gain (1.0 = open) tracking the key's peak: drop toward the
-    ## floor (1 - amount) when it exceeds the threshold, smoothed by a one-pole
-    ## follower whose time constant is the attack (ducking down) or release.
-    result = newSeq[float32](n)
-    let floorG = max(0.0'f32, 1.0'f32 - d.duckAmount.toFloat32)
-    let thr = d.duckThresh.toFloat32
-    let aCoef = exp(-1.0 / (sr.float * max(0.001, d.duckAttack.float / 1000.0))).float32
-    let rCoef = exp(-1.0 / (sr.float * max(0.001, d.duckRelease.float /
-        1000.0))).float32
-    var cur = 1.0'f32
-    for i in 0 ..< n:
-      var peak = 0'i32
-      for ch in 0 ..< targetChannels:
-        let v = abs(keyMix[i * targetChannels + ch])
-        if v > peak: peak = v
-      let target = (if peak.float32 / 32768.0'f32 > thr: floorG else: 1.0'f32)
-      let coef = (if target < cur: aCoef else: rCoef)
-      cur = target + (cur - target) * coef
-      result[i] = cur
+  # The clip's samples after its own effects, and their layout. Empty when the
+  # clip has nothing to play. `durSamples` is its output span.
+  proc loadClip(clip: Clip, startSample, durSamples: int):
+      (seq[int16], ref AVChannelLayout) =
+    let speed = clipSpeed(tl.effects, clip)
+    var srcData: seq[int16]
+    var srcSr = sr
+    var srcLayout = tl.layout
+    if clip.src == nil:
+      # A source-less clip is a synthesized layer (`add:tone`) or the silent
+      # base that carries one; there is no getter to read from.
+      var tone: Action
+      if not toneOf(tl.effects[clip.effects], tone):
+        return (@[], srcLayout)
+      # Match the source path's speed-scaled span, so a chained `atempo`
+      # lands back on `dur` instead of leaving a gap.
+      srcData = synthTone(tableFor(tone), noteFreq(tone.note), startSample,
+        int(round(durSamples.float64 * speed)), targetChannels, sr)
+    else:
+      let key = (clip.src[], clip.stream)
+      if key notin samples:
+        return (@[], srcLayout)
+      let getter = samples[key]
+      srcSr = getter.stream.codecpar.sample_rate
+      srcLayout = getter.layout
+      let sourceSr = srcSr.float64
+      let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
+      let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
+      srcData = getter.get(sampStart, sampEnd)
+    (processAudioClip(tl.effects, clip, srcData, srcSr, sr, srcLayout, tb.float),
+      srcLayout)
 
   proc mixRangeDucked(layers: seq[int], startSample, count: int): seq[int32] =
     ## Interleaved int32 mix of `layers` over output samples
@@ -906,37 +995,13 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let lo = max(cStart, startSample)
         let hi = min(cStart + cDur, startSample + count)
         if hi <= lo: continue
-        let effectGroup = tl.effects[clip.effects]
-        var speed = 1.0
         var duckAct: Action
         var hasDuck = false
-        for e in effectGroup:
-          if e.kind == actSpeed:
-            speed *= e.val
-          elif e.kind == actDuck:
+        for e in tl.effects[clip.effects]:
+          if e.kind == actDuck:
             duckAct = e
             hasDuck = true
-        var srcData: seq[int16]
-        var srcSr = sr
-        var srcLayout = tl.layout
-        if clip.src == nil:
-          var tone: Action
-          if not toneOf(effectGroup, tone):
-            continue # silent base layer: contributes nothing
-          srcData = synthTone(tableFor(tone), noteFreq(tone.note), cStart,
-            int(round(cDur.float64 * speed)), targetChannels, sr)
-        else:
-          let key = (clip.src[], clip.stream)
-          if key notin samples: continue
-          let getter = samples[key]
-          srcSr = getter.stream.codecpar.sample_rate
-          srcLayout = getter.layout
-          let sourceSr = srcSr.float64
-          let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
-          let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
-          srcData = getter.get(sampStart, sampEnd)
-        var processed = processAudioClip(tl.effects, clip, srcData,
-            srcSr, sr, srcLayout, tb.float)
+        var (processed, srcLayout) = loadClip(clip, cStart, cDur)
         if processed.len == 0: continue
         let srcCh = srcLayout.nb_channels
         let avail = processed.len div srcCh
@@ -944,7 +1009,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           let above = activeLayers.filterIt(it > li)
           if above.len > 0:
             let n = min(avail, cDur)
-            let env = duckGainEnvelope(mixRangeDucked(above, cStart, n), n, duckAct)
+            let env = duckGainEnvelope(mixRangeDucked(above, cStart, n), n, duckAct,
+              sr, targetChannels)
             for local in 0 ..< n:
               let g = env[local]
               for ch in 0 ..< srcCh:
@@ -1030,84 +1096,50 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           not sameRun(tl.effects, clip, tl.a[bestLi][idx + 1])
 
         let effectGroup = tl.effects[clip.effects]
-        var speed = 1.0
-        for effect in effectGroup:
-          if effect.kind == actSpeed:
-            speed *= effect.val
-
         let (startSample, durSamples) =
           audioSampleSpan(clip.start, clip.dur, sr, tb)
-
-        # A source-less clip is a synthesized layer (`add:tone`) or the silent
-        # base that carries one; there is no getter to read from.
-        var srcData: seq[int16]
-        var srcSr = sr
-        var srcLayout = tl.layout
-        var haveData = false
-        if clip.src == nil:
-          var tone: Action
-          if toneOf(effectGroup, tone):
-            # Match the source path's speed-scaled span, so a chained `atempo`
-            # lands back on `dur` instead of leaving a gap.
-            srcData = synthTone(tableFor(tone), noteFreq(tone.note), startSample,
-              int(round(durSamples.float64 * speed)), targetChannels, sr)
-            haveData = true
-        else:
-          let key = (clip.src[], clip.stream)
-          if key in samples:
-            let getter = samples[key]
-            srcSr = getter.stream.codecpar.sample_rate
-            srcLayout = getter.layout
-            let sourceSr = srcSr.float64
-            let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
-            let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
-            srcData = getter.get(sampStart, sampEnd)
-            haveData = true
-
-        if haveData:
-          let processedData = processAudioClip(tl.effects, clip, srcData,
-              srcSr, sr, srcLayout, tb.float)
-
-          if processedData.len > 0:
-            let sourceChannels = srcLayout.nb_channels
-            let numSamples = processedData.len div sourceChannels
-            let n = min(durSamples, numSamples)
-            # Autoduck: scale this clip by the sidechain (active layers above it).
-            var duckEnv: seq[float32]
-            block:
-              for e in effectGroup:
-                if e.kind == actDuck:
-                  let above = activeLayers.filterIt(it > bestLi)
-                  if above.len > 0:
-                    duckEnv = duckGainEnvelope(
-                      mixRangeDucked(above, startSample, n), n, e)
-                  break
-            let neededFrames = startSample + n - bufStart
-            if neededFrames * targetChannels > acc.len:
-              acc.setLen(neededFrames * targetChannels)
-            for i in 0 ..< n:
-              let outputSampleIndex = startSample + i
-              # A clip running into the start contributes from there on.
-              if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
-                let fadeIn = (
-                  if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) /
-                      fadeSamples.float32
-                  else: 1.0'f32
-                )
-                let tailDist = max(0, n - 1 - i)
-                let fadeOut = (
-                  if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) /
-                      fadeSamples.float32
-                  else: 1.0'f32
-                )
-                let gain = min(1.0'f32, min(fadeIn, fadeOut))
-                let baseIndex = (outputSampleIndex - bufStart) * targetChannels
-                let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
-                for ch in 0 ..< min(targetChannels, sourceChannels):
-                  let sourceIndex = i * sourceChannels + ch
-                  if sourceIndex < processedData.len:
-                    acc[baseIndex + ch] += int32(round(processedData[
-                        sourceIndex].float32 * gain * dg))
+        let (processedData, srcLayout) = loadClip(clip, startSample, durSamples)
+        if processedData.len > 0:
+          let sourceChannels = srcLayout.nb_channels
+          let numSamples = processedData.len div sourceChannels
+          let n = min(durSamples, numSamples)
+          # Autoduck: scale this clip by the sidechain (active layers above it).
+          var duckEnv: seq[float32]
+          block:
+            for e in effectGroup:
+              if e.kind == actDuck:
+                let above = activeLayers.filterIt(it > bestLi)
+                if above.len > 0:
+                  duckEnv = duckGainEnvelope(
+                    mixRangeDucked(above, startSample, n), n, e, sr,
+                    targetChannels)
+                break
+          let neededFrames = startSample + n - bufStart
+          if neededFrames * targetChannels > acc.len:
+            acc.setLen(neededFrames * targetChannels)
+          for i in 0 ..< n:
+            let outputSampleIndex = startSample + i
+            # A clip running into the start contributes from there on.
+            if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
+              let fadeIn = (
+                if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) /
+                    fadeSamples.float32
+                else: 1.0'f32
+              )
+              let tailDist = max(0, n - 1 - i)
+              let fadeOut = (
+                if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) /
+                    fadeSamples.float32
+                else: 1.0'f32
+              )
+              let gain = min(1.0'f32, min(fadeIn, fadeOut))
+              let baseIndex = (outputSampleIndex - bufStart) * targetChannels
+              let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
+              for ch in 0 ..< min(targetChannels, sourceChannels):
+                let sourceIndex = i * sourceChannels + ch
+                if sourceIndex < processedData.len:
+                  acc[baseIndex + ch] += int32(round(processedData[
+                      sourceIndex].float32 * gain * dg))
 
         # Everything below the next clip's start can receive no further writes.
         var hasRemaining = false
@@ -1151,61 +1183,6 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       result.add (newFrame, frameIndex)
       frameIndex += 1
     samplesYielded += chunkFrames
-
-  # Wrap an interleaved int16 chunk as a planar-float (FLTP) frame for loudnorm.
-  var fltpPts = 0'i64
-  proc chunkToFltpFrame(chunk: seq[int16]): ptr AVFrame =
-    let nFrames = chunk.len div targetChannels
-    var frame = av_frame_alloc()
-    if frame == nil:
-      error "Could not allocate loudnorm input frame"
-    frame.nb_samples = nFrames.cint
-    frame.format = AV_SAMPLE_FMT_FLTP.cint
-    discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
-    frame.sample_rate = sr.cint
-    frame.pts = fltpPts
-    fltpPts += nFrames
-    if av_frame_get_buffer(frame, 0) < 0:
-      error "Could not allocate loudnorm input frame buffer"
-    for ch in 0 ..< targetChannels:
-      let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
-      for i in 0 ..< nFrames:
-        channelData[i] = chunk[i * targetChannels + ch].cfloat / 32768.0
-    return frame
-
-  # Convert a loudnorm output frame (one of several sample formats) to an
-  # interleaved int16 chunk.
-  proc loudnormOutToChunk(outF: ptr AVFrame): seq[int16] =
-    let frameSamples = outF.nb_samples.int
-    let frameChannels = min(outF.ch_layout.nb_channels.int, targetChannels)
-    result = newSeq[int16](frameSamples * targetChannels)
-    if outF.format == AV_SAMPLE_FMT_DBL.cint:
-      let audioData = cast[ptr UncheckedArray[cdouble]](outF.data[0])
-      for i in 0 ..< frameSamples:
-        for ch in 0 ..< frameChannels:
-          let s = max(-1.0, min(1.0, audioData[i * frameChannels + ch]))
-          result[i * targetChannels + ch] = int16(s * 32767.0)
-    elif outF.format == AV_SAMPLE_FMT_FLT.cint:
-      let audioData = cast[ptr UncheckedArray[cfloat]](outF.data[0])
-      for i in 0 ..< frameSamples:
-        for ch in 0 ..< frameChannels:
-          let s = max(-1.0'f32, min(1.0'f32, audioData[i * frameChannels + ch]))
-          result[i * targetChannels + ch] = int16(s * 32767.0)
-    elif outF.format == AV_SAMPLE_FMT_FLTP.cint:
-      for i in 0 ..< frameSamples:
-        for ch in 0 ..< frameChannels:
-          if outF.data[ch] != nil:
-            let channelData = cast[ptr UncheckedArray[cfloat]](outF.data[ch])
-            let s = max(-1.0'f32, min(1.0'f32, channelData[i]))
-            result[i * targetChannels + ch] = int16(s * 32767.0)
-    elif outF.format == AV_SAMPLE_FMT_S16P.cint:
-      for i in 0 ..< frameSamples:
-        for ch in 0 ..< frameChannels:
-          if outF.data[ch] != nil:
-            let channelData = cast[ptr UncheckedArray[int16]](outF.data[ch])
-            result[i * targetChannels + ch] = channelData[i]
-    else:
-      error &"Unexpected output format from loudnorm: {outF.format}"
 
   # EBU's loudnorm may emit a slightly different sample count than the timeline;
   # cap the apply pass to `totalSamples` so output duration is preserved.
@@ -1290,11 +1267,11 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       let analysisSink = analysisGraph.add("abuffersink")
       analysisGraph.linkNodes(analysisSrc, analysisFilter, analysisSink).configure()
 
-      fltpPts = 0
+      var fltpPts = 0'i64
       block:
         let produce = newTimelineProducer()
         for chunk in produce():
-          var f = chunkToFltpFrame(chunk)
+          var f = chunkToFltpFrame(chunk, tl.layout, sr, fltpPts)
           analysisGraph.push(f)
           av_frame_free(addr f)
           while analysisGraph.pullTransient() != nil:
@@ -1341,14 +1318,14 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       block:
         let produce = newTimelineProducer()
         for chunk in produce():
-          var f = chunkToFltpFrame(chunk)
+          var f = chunkToFltpFrame(chunk, tl.layout, sr, fltpPts)
           loudnormGraph.push(f)
           av_frame_free(addr f)
           while true:
             let outF = loudnormGraph.pullTransient()
             if outF == nil:
               break
-            rechunkBuf.add loudnormOutToChunk(outF)
+            rechunkBuf.add loudnormOutToChunk(outF, targetChannels)
           for fr in drainRechunk(false):
             yield fr
       loudnormGraph.flush()
@@ -1356,7 +1333,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let outF = loudnormGraph.pullTransient()
         if outF == nil:
           break
-        rechunkBuf.add loudnormOutToChunk(outF)
+        rechunkBuf.add loudnormOutToChunk(outF, targetChannels)
       loudnormGraph.cleanup()
 
       # Pad with silence if loudnorm produced fewer samples than the timeline.
