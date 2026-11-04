@@ -637,14 +637,17 @@ proc open*(ctx: ptr AVCodecContext) =
   # Only for encoders
   ensureEncoderTimeBase(ctx)
   ctx.strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL
+  # A failed avcodec_open2 nulls ctx.codec, so read it before the call.
   let codecName =
     if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name
     else: "unknown"
+  when defined(emscripten):
+    let codecId = if ctx.codec != nil: ctx.codec.id else: ID_NONE
   let ret = avcodec_open2(ctx, ctx.codec, nil)
   if ret < 0:
     when defined(emscripten):
       if codecName.endsWith("_web"):
-        error &"This browser cannot encode {avcodec_get_name(ctx.codec.id)}"
+        error &"This browser cannot encode {avcodec_get_name(codecId)}"
     error &"Could not open encoder '{codecName}': {av_err2str(ret)}"
 
 proc setProfileOrErr*(ctx: ptr AVCodecContext, to: string) =
