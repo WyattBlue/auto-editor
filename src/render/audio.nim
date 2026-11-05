@@ -104,6 +104,9 @@ type
     decoderCtx*: ptr AVCodecContext
     layout*: ref AVChannelLayout
     rate*: cint
+    # Brings every decoded frame to `layout`: a stream can switch channel
+    # configurations mid-way (AAC), and `get` fills a buffer sized by `layout`.
+    resampler: AudioResampler
 
 func clamp16(v: int32): int16 {.inline.} =
   int16(max(-32768'i32, min(32767'i32, v)))
@@ -183,6 +186,7 @@ proc newGetter(path: string, stream: int32, rate: cint): Getter =
   discard av_channel_layout_copy(
     addr result.layout[], addr result.stream.codecpar.ch_layout
   )
+  result.resampler = newAudioResampler(AV_SAMPLE_FMT_NONE, result.layout, 0)
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
@@ -234,10 +238,10 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   var samplesProcessed = 0
 
   # Shared by the demux loop and the end-of-stream decoder drain below.
-  template processFrame() =
+  template processFrame(frame: ptr AVFrame) =
     let channels = frame.ch_layout.nb_channels
-    # `result` was sized from the stream's declared layout; a mid-stream
-    # channel change (e.g. AAC PCE) would overrun it in the copies below.
+    # `result` was sized from the stream's declared layout; the getter's
+    # resampler converts to it, so this only guards the copies below.
     if channels != getter.channels:
       error "Audio channel count changed mid-stream"
     let samples = frame.nb_samples
@@ -329,6 +333,15 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     totalSamples += samplesToProcess
     samplesProcessed += samples
 
+  template processDecoded() =
+    # `processFrame` may `continue` the loop, so free after it.
+    let converted = getter.resampler.resample(frame)
+    for f in converted:
+      processFrame(f)
+    for f in converted:
+      var f = f
+      av_frame_free(addr f)
+
   while av_read_frame(container.formatContext, packet) >= 0 and
       totalSamples < targetSamples:
     defer: av_packet_unref(packet)
@@ -337,15 +350,14 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
       if avcodec_send_packet(decoderCtx, packet) >= 0:
         while avcodec_receive_frame(decoderCtx, frame) >= 0 and
             totalSamples < targetSamples:
-          processFrame()
-
+          processDecoded()
 
   # Flush the decoder: CAP_DELAY decoders may hold the tail frames.
   if totalSamples < targetSamples:
     discard avcodec_send_packet(decoderCtx, nil)
     while avcodec_receive_frame(decoderCtx, frame) >= 0 and
         totalSamples < targetSamples:
-      processFrame()
+      processDecoded()
 
 func atempoChain(speed: float): seq[string] =
   ## atempo only behaves over a limited factor range, so a big tempo change is

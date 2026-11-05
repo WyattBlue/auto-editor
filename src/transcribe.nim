@@ -325,38 +325,48 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
   defer: (if output != "-": outFile.close())
 
   # Resample whatever the device gives us to mono f32 @16k for whisper.
-  let sr = audioStream.codecpar.sample_rate
-  let fmt = cast[AVSampleFormat](audioStream.codecpar.format)
-  let fmtName = av_get_sample_fmt_name(fmt.cint)
-  let chl = $audioStream.codecpar.ch_layout
-  let tb = audioStream.time_base
-  let bufferArgs = &"sample_rate={sr}:sample_fmt={fmtName}:channel_layout={chl}:time_base={tb.num}/{tb.den}"
-
-  let graph = avfilter_graph_alloc()
-  if graph == nil: error "out of memory"
+  var graph: ptr AVFilterGraph
+  var srcCtx, sinkCtx: ptr AVFilterContext
+  var inRate, inFmt: cint
+  var inLayout: AVChannelLayout
   defer: avfilter_graph_free(addr graph)
 
-  var srcCtx, resCtx, afmtCtx, sinkCtx: ptr AVFilterContext
-  var ret = avfilter_graph_create_filter(addr srcCtx,
-    avfilter_get_by_name("abuffer"), nil, bufferArgs.cstring, nil, graph)
-  if ret >= 0:
-    ret = avfilter_graph_create_filter(addr resCtx,
-      avfilter_get_by_name("aresample"), nil, "16000", nil, graph)
-  if ret >= 0:
-    ret = avfilter_graph_create_filter(addr afmtCtx,
-      avfilter_get_by_name("aformat"), nil,
-      "sample_fmts=flt:channel_layouts=mono:sample_rates=16000", nil, graph)
-  if ret >= 0:
-    ret = avfilter_graph_create_filter(addr sinkCtx,
-      avfilter_get_by_name("abuffersink"), nil, nil, nil, graph)
-  if ret < 0: error "Failed to create audio filters"
-  if avfilter_link(srcCtx, 0, resCtx, 0) < 0 or
-      avfilter_link(resCtx, 0, afmtCtx, 0) < 0 or
-      avfilter_link(afmtCtx, 0, sinkCtx, 0) < 0:
-    error "Failed to connect filters"
-  graph.nb_threads = threads
-  if avfilter_graph_config(graph, nil) < 0:
-    error "Failed to configure filter graph"
+  proc buildGraph(rate, fmt: cint, layout: ptr AVChannelLayout) =
+    avfilter_graph_free(addr graph)
+    inRate = rate
+    inFmt = fmt
+    discard av_channel_layout_copy(addr inLayout, layout)
+    let fmtName = av_get_sample_fmt_name(fmt)
+    let tb = audioStream.time_base
+    let bufferArgs = &"sample_rate={rate}:sample_fmt={fmtName}:channel_layout={layout[]}:time_base={tb.num}/{tb.den}"
+
+    graph = avfilter_graph_alloc()
+    if graph == nil: error "out of memory"
+
+    var resCtx, afmtCtx: ptr AVFilterContext
+    var ret = avfilter_graph_create_filter(addr srcCtx,
+      avfilter_get_by_name("abuffer"), nil, bufferArgs.cstring, nil, graph)
+    if ret >= 0:
+      ret = avfilter_graph_create_filter(addr resCtx,
+        avfilter_get_by_name("aresample"), nil, "16000", nil, graph)
+    if ret >= 0:
+      ret = avfilter_graph_create_filter(addr afmtCtx,
+        avfilter_get_by_name("aformat"), nil,
+        "sample_fmts=flt:channel_layouts=mono:sample_rates=16000", nil, graph)
+    if ret >= 0:
+      ret = avfilter_graph_create_filter(addr sinkCtx,
+        avfilter_get_by_name("abuffersink"), nil, nil, nil, graph)
+    if ret < 0: error "Failed to create audio filters"
+    if avfilter_link(srcCtx, 0, resCtx, 0) < 0 or
+        avfilter_link(resCtx, 0, afmtCtx, 0) < 0 or
+        avfilter_link(afmtCtx, 0, sinkCtx, 0) < 0:
+      error "Failed to connect filters"
+    graph.nb_threads = threads
+    if avfilter_graph_config(graph, nil) < 0:
+      error "Failed to configure filter graph"
+
+  buildGraph(audioStream.codecpar.sample_rate, audioStream.codecpar.format,
+    addr audioStream.codecpar.ch_layout)
 
   var oc = OutCtx(f: outFile, format: format, splitWords: splitWords)
   let maxSeg = queue * Rate
@@ -432,6 +442,23 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
   let pkt = av_packet_alloc()
   defer: av_packet_free(addr pkt)
 
+  proc drainSink() =
+    while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
+      gateFrame(outFrame)
+      av_frame_unref(outFrame)
+
+  proc feed(fr: ptr AVFrame) =
+    # abuffer refuses frames that differ from its setup, and a stream can
+    # switch channel configurations mid-way (AAC): finish this graph and
+    # build one for the new input.
+    if fr.sample_rate != inRate or fr.format != inFmt or
+        av_channel_layout_compare(addr fr.ch_layout, addr inLayout) != 0:
+      discard av_buffersrc_write_frame(srcCtx, nil)
+      drainSink()
+      buildGraph(fr.sample_rate, fr.format, addr fr.ch_layout)
+    discard av_buffersrc_write_frame(srcCtx, fr)
+    drainSink()
+
   var wargs = WorkerArgs(wctx: wctx, apple: useApple, parakeet: useParakeet,
     oc: addr oc, jobs: addr jobs,
     language: language, translate: (if translate: 1.cint else: 0.cint),
@@ -451,29 +478,21 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
       break
     if pkt.stream_index == audioStream.index and avcodec_send_packet(dec, pkt) >= 0:
       while avcodec_receive_frame(dec, frame) >= 0:
-        discard av_buffersrc_write_frame(srcCtx, frame)
+        feed(frame)
         av_frame_unref(frame)
-        while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
-          gateFrame(outFrame)
-          av_frame_unref(outFrame)
     av_packet_unref(pkt)
 
   # Flush the decoder first: delay codecs (AAC/MP3) still hold the last frames,
   # which carry the end of the final utterance.
   discard avcodec_send_packet(dec, nil)
   while avcodec_receive_frame(dec, frame) >= 0:
-    discard av_buffersrc_write_frame(srcCtx, frame)
+    feed(frame)
     av_frame_unref(frame)
-    while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
-      gateFrame(outFrame)
-      av_frame_unref(outFrame)
 
   # Drain the resampler, enqueue whatever utterance was in progress, then let the
   # worker finish the whole backlog (Ctrl-C included) before we tear anything down.
   discard av_buffersrc_write_frame(srcCtx, nil)
-  while av_buffersink_get_frame_flags(sinkCtx, outFrame, 0) >= 0:
-    gateFrame(outFrame)
-    av_frame_unref(outFrame)
+  drainSink()
   flushSeg()
 
   let pending = jobs.peek()

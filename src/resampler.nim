@@ -41,16 +41,49 @@ proc `=destroy`*(resampler: var AudioResampler) =
 
 proc `=copy`*(dest: var AudioResampler, src: AudioResampler) {.error.}
 
+proc collect(resampler: var AudioResampler, into: var seq[ptr AVFrame]) =
+  while true:
+    var outFrame = av_frame_alloc()
+    if outFrame == nil:
+      error "Could not alloc output frame"
+    if av_buffersink_get_frame(resampler.abuffersink, outFrame) < 0:
+      av_frame_free(addr outFrame)
+      break
+    into.add(outFrame)
+
+proc cloneFrame(frame: ptr AVFrame): ptr AVFrame =
+  result = av_frame_clone(frame)
+  if result == nil:
+    error "Could not clone passthrough frame"
+
+func matchesTemplate(resampler: AudioResampler, frame: ptr AVFrame): bool =
+  frame.format == resampler.templateFormat and
+    frame.sample_rate == resampler.templateRate and
+    av_channel_layout_compare(addr frame.ch_layout,
+      addr resampler.templateLayout) == 0
+
 proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFrame] =
+  let configured = resampler.graph != nil or resampler.isPassthrough
   # We don't have any input, so don't bother even setting up
-  if resampler.graph == nil and frame == nil:
+  if not configured and frame == nil:
     return @[]
 
+  # The input can change mid-stream (an AAC stream may switch channel
+  # configurations). The output stays as first set up: finish the graph built
+  # for the old input and build another for the new one.
+  if configured and frame != nil and not resampler.matchesTemplate(frame):
+    if resampler.graph != nil:
+      discard av_buffersrc_write_frame(resampler.abuffer, nil)
+      resampler.collect(result)
+      avfilter_graph_free(addr resampler.graph)
+      resampler.abuffer = nil
+      resampler.abuffersink = nil
+    resampler.isPassthrough = false
+
   if resampler.isPassthrough:
-    let cloned = av_frame_clone(frame)
-    if cloned == nil:
-      error "Could not clone passthrough frame"
-    return @[cloned]
+    # Nothing is buffered, so a flush has nothing to return.
+    if frame == nil: return @[]
+    return @[cloneFrame(frame)]
 
   # Take source settings from the first frame
   if resampler.graph == nil:
@@ -72,10 +105,8 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
         resampler.frameSize == 0 and
         av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout) == 0):
       resampler.isPassthrough = true
-      let cloned = av_frame_clone(frame)
-      if cloned == nil:
-        error "Could not clone passthrough frame"
-      return @[cloned]
+      result.add cloneFrame(frame)
+      return
 
     resampler.graph = avfilter_graph_alloc()
     if resampler.graph == nil:
@@ -117,24 +148,8 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if ret >= 0: ret = avfilter_graph_config(resampler.graph, nil)
     if ret < 0: error "Failed to connect filters"
 
-  if frame != nil:
-    # Only validate critical properties that would break the filter graph
-    if (frame.format != resampler.templateFormat or
-        frame.sample_rate != resampler.templateRate or
-        av_channel_layout_compare(addr frame.ch_layout, addr resampler.templateLayout) != 0):
-      error "Frame does not match resampler setup"
-
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
   if ret < 0:
     error &"Error pushing frame to filter: {ret}"
 
-  while true:
-    var outFrame = av_frame_alloc()
-    if outFrame == nil:
-      error "Could not alloc output frame"
-
-    if av_buffersink_get_frame(resampler.abuffersink, outFrame) < 0:
-      av_frame_free(addr outFrame)
-      break
-
-    result.add(outFrame)
+  resampler.collect(result)
