@@ -266,8 +266,8 @@ let fribidi = Package(
 )
 let harfbuzz = Package(
   name: "harfbuzz",
-  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/15.0.0/harfbuzz-15.0.0.tar.xz",
-  sha256: "968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df",
+  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/15.1.0/harfbuzz-15.1.0.tar.xz",
+  sha256: "0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d",
   buildSystem: "meson",
   buildArguments: @["--auto-features=disabled", "-Dtests=disabled",
     "-Ddocs=disabled", "-Dutilities=disabled", "-Dintrospection=disabled",
