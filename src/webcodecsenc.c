@@ -47,6 +47,8 @@ enum {
 
 #define WE_STATUS_RESIZE 4
 #define WE_MIN_OUTPUT_CAPACITY (64 * 1024)
+/* x264's keyint; libavcodec's own default of 12 is far too dense. */
+#define WE_DEFAULT_GOP 250
 
 typedef struct WebEncContext {
     int handle;
@@ -303,9 +305,8 @@ static int webenc_receive_packet(AVCodecContext *avctx, AVPacket *pkt)
         (s->kind != WE_KIND_AAC ? 1 : frame->nb_samples);
     double timestamp_us = av_q2d(avctx->time_base) * pts * 1000000.0;
     double duration_us = av_q2d(avctx->time_base) * duration * 1000000.0;
-    int key = s->kind != WE_KIND_AAC &&
-        (s->frame_count == 0 ||
-         (avctx->gop_size > 0 && s->frame_count % avctx->gop_size == 0));
+    int gop = avctx->gop_size > 0 ? avctx->gop_size : WE_DEFAULT_GOP;
+    int key = s->kind != WE_KIND_AAC && s->frame_count % gop == 0;
 
     ret = ae_we_encode(s->handle, s->input, input_size,
                        avctx->width, avctx->height, frame->nb_samples,
@@ -397,6 +398,12 @@ static av_cold int webenc_init(AVCodecContext *avctx)
     return 0;
 }
 
+/* Leave gop_size unset unless the caller chose one, as libx264 does. */
+static const FFCodecDefault webenc_defaults[] = {
+    { "g", "-1" },
+    { NULL },
+};
+
 static av_cold int webenc_close(AVCodecContext *avctx)
 {
     WebEncContext *s = avctx->priv_data;
@@ -419,6 +426,7 @@ const FFCodec ff_h264_web_encoder = {
     .init           = webenc_init,
     FF_CODEC_RECEIVE_PACKET_CB(webenc_receive_packet),
     .close          = webenc_close,
+    .defaults       = webenc_defaults,
     .p.capabilities = AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_NOT_INIT_THREADSAFE,
@@ -435,6 +443,7 @@ const FFCodec ff_aac_web_encoder = {
     .init           = webenc_init,
     FF_CODEC_RECEIVE_PACKET_CB(webenc_receive_packet),
     .close          = webenc_close,
+    .defaults       = webenc_defaults,
     .p.capabilities = AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_NOT_INIT_THREADSAFE,
@@ -454,6 +463,7 @@ const FFCodec ff_##short_name##_web_encoder = {                   \
     .init           = webenc_init,                                \
     FF_CODEC_RECEIVE_PACKET_CB(webenc_receive_packet),            \
     .close          = webenc_close,                               \
+    .defaults       = webenc_defaults,                            \
     .p.capabilities = AV_CODEC_CAP_DELAY,                         \
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |                 \
                       FF_CODEC_CAP_NOT_INIT_THREADSAFE,           \
