@@ -727,7 +727,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
 
   # Manually combine libraries for multi-bit-depth support
   echo "Combining x265 libraries for multi-bit-depth support..."
-  if defined(macosx) and not isWasm:
+  if defined(macosx) and kind == native:
     exec &"libtool -static -o {dir8bit}/libx265_combined.a {dir8bit}/libx265.a {dir10bit}/libx265_main10.a"
   else:
     let arCommand = (
