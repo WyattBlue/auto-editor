@@ -266,7 +266,7 @@ proc whisperWorker(a: ptr WorkerArgs) {.thread.} =
     if rc != 0:
       stderr.writeLine(&"transcription failed on segment at {job.startMs} ms; skipping")
 
-type PacketSource* = proc(pkt: ptr AVPacket): cint
+type PacketSource* = proc(pkt: ptr AVPacket): cint {.gcsafe.}
   ## Fills `pkt` like av_read_frame: 0 on success, AVERROR_EAGAIN to retry,
   ## any other negative value ends the stream.
 
