@@ -803,8 +803,12 @@ func time*(frame: ptr AVFrame, tb: AVRational): float64 =
 
 func dialogue*(assText: string): string =
   let textLen = assText.len
+  # A `{` opens an override block only when a `}` follows somewhere; knowing
+  # the last one up front avoids searching ahead from every `{`.
+  let lastClose = assText.rfind('}')
+  result = newStringOfCap(textLen) # the output is never longer than the input
   var
-    i: int64 = 0
+    i = 0
     curChar: char
     nextChar: char
     commaCount: int8 = 0
@@ -830,7 +834,7 @@ func dialogue*(assText: string): string =
         result &= " "
         i += 2
         continue
-      if curChar == '{' and assText.find('}', int(i) + 1) != -1:
+      if curChar == '{' and i < lastClose:
         state = true
       else:
         result &= curChar
