@@ -310,9 +310,6 @@ addToLibrary({
             optimizeForLatency: true,
           }
         : { codec, sampleRate, numberOfChannels: channels, description };
-      if (kind === 1 || kind === 5) {
-        config.hardwareAcceleration = 'prefer-hardware';
-      }
       const supported = kind === 2
         ? await AudioDecoder.isConfigSupported(config)
         : await VideoDecoder.isConfigSupported(config);
