@@ -1801,6 +1801,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       frameIndex = min(seekTarget, target - 1)
 
     var didDecode = false
+    # The clip going out of a transition can run past its file's last frame,
+    # as at a cut between two whole files. Premiere repeats that frame when a
+    # cut has no handle media, so hold it rather than drop to the background.
+    let holdPastEnd = obj.win >= 0 and not obj.incoming
+    var lastGood: ptr AVFrame = nil
+    var fromHeld = false
     while frameIndex < target:
       if target - frameIndex > ss.kfInterval and frameIndex > seekThreshold:
         if st.lastSeekTarget != target:
@@ -1827,6 +1833,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         foundFrame = true
         break
 
+      if foundFrame and holdPastEnd:
+        if lastGood != nil: av_frame_free(addr lastGood)
+        lastGood = av_frame_clone(frame)
+
       if not foundFrame:
         if looping and frameIndex >= 0:
           loopBase += frameIndex + 1
@@ -1836,6 +1846,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           st.lastSeekTarget = -1
           frameIndex = -1
           continue
+
+        if holdPastEnd and (lastGood != nil or st.held != nil):
+          av_frame_free(addr frame)
+          if lastGood != nil:
+            frame = lastGood
+            lastGood = nil
+            didDecode = true
+          else:
+            frame = av_frame_clone(st.held) # already rotated
+            fromHeld = true
+          break
 
         didDecode = false
         av_frame_free(addr frame)
@@ -1875,6 +1896,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr frame)
         frame = rotGraph.pull()
 
+    if lastGood != nil: av_frame_free(addr lastGood)
     st.frameIndex = frameIndex
     st.seekThreshold = seekThreshold
     st.seekFrame = seekFrame
@@ -1889,7 +1911,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         var old = st.held
         av_frame_free(addr old)
       st.held = av_frame_clone(frame)
-    return (frame, didDecode)
+    return (frame, didDecode or fromHeld)
 
   # Output colorspace/range for overlays, from the encoder (stable). Declaring
   # these on the base buffer keeps the composite yuv420p (not gbrp) and makes the
