@@ -2,7 +2,7 @@ import std/[envvars, options, os, strformat, tables, times]
 when not defined(emscripten):
   import std/strutils
 
-import ./[action, cli, editexpr, transitions]
+import ./[action, cli, editexpr, ffmpeg, transitions]
 export editexpr, transitions
 import ./util/[color, rational, term]
 
@@ -135,8 +135,12 @@ type AudioSettings* = object
   bitrate*: int = -1
   normalize*: Norm = Norm(kind: nkNull)
 
+type VideoHook* = proc (frame: ptr AVFrame, data: pointer): ptr AVFrame {.nimcall, gcsafe.}
+
 type mainArgs* = object
   inputs*: seq[string]
+  videoHook*: VideoHook
+  videoHookData*: pointer
 
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s

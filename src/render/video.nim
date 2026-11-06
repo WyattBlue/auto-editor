@@ -2051,6 +2051,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         else: av_frame_clone(nullFrame)
       if frame == nil:
         error &"Failed to create fallback frame at {index}tb"
+    if args.videoHook != nil:
+      frame = args.videoHook(frame, args.videoHookData)
     let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
     if reformatted != nil and reformatted != frame:
       av_frame_free(addr frame)
