@@ -693,6 +693,9 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
     got_sub_ptr: ptr cint, avpkt: ptr AVPacket): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_encode_subtitle*(avctx: ptr AVCodecContext, buf: ptr uint8,
+    buf_size: cint, sub: ptr AVSubtitle): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
 proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
 

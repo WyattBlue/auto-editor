@@ -3,7 +3,7 @@ from std/math import ceil, round
 import ../util/xml
 
 import ../[ffmpeg, log, media, timeline]
-import ../util/[fun, rational]
+import ../util/[fun, lang, rational]
 import ../lib/speedmap
 
 #[
@@ -97,9 +97,70 @@ func mediaFraction(frames: float64, tb: AVRational): string {.raises: [].} =
   let n = int64(round(frames * 1000))
   if n == 0: "0s" else: &"{n * tb.den}/{tb.num * 1000}s"
 
+func fcpLang(lang: Lang): string {.raises: [].} =
+  ## The two-letter code a caption role wants; English when unknown, since
+  ## the role needs one.
+  case $lang
+  of "eng", "und", "": "en"
+  of "spa": "es"
+  of "fra", "fre": "fr"
+  of "deu", "ger": "de"
+  of "ita": "it"
+  of "por": "pt"
+  of "jpn": "ja"
+  of "kor": "ko"
+  of "zho", "chi": "zh"
+  of "rus": "ru"
+  of "ara": "ar"
+  of "hin": "hi"
+  of "nld", "dut": "nl"
+  of "swe": "sv"
+  of "pol": "pl"
+  of "tur": "tr"
+  else: $lang # a three-letter tag is itself a language subtag
+
+proc anchorCaptions(asset: XmlNode, tl: v3, clip: Clip, startPoint: int64,
+    lo, hi: int64, styleId: var int) {.raises: [].} =
+  ## The cues starting in timeline frames [lo, hi), connected to `asset`, the
+  ## clip they start during. A cue before the clip is clipped to its start.
+  for t, track in tl.c:
+    for cue in track.cues:
+      if cue.start < lo or cue.start >= hi: continue
+      let start = max(cue.start, clip.start)
+      let dur = cue.start + cue.dur - start
+      if dur <= 0: continue
+      inc styleId
+      let caption = newElement("caption")
+      var name = cue.text
+      let nl = name.find('\n')
+      if nl >= 0: name = name[0 ..< nl]
+      caption.attrs = {
+        "lane": $(t + 1),
+        "offset": fraction(clip.offset + startPoint + start - clip.start, tl.tb),
+        "name": name,
+        "duration": fraction(dur, tl.tb),
+        "role": "SRT?captionFormat=SRT." & fcpLang(track.lang),
+      }.toXmlAttributes
+      let text = newElement("text")
+      let styled = newElement("text-style")
+      styled.attrs = {"ref": "ts" & $styleId}.toXmlAttributes
+      styled.add newText(cue.text)
+      text.add styled
+      caption.add text
+      let def = newElement("text-style-def")
+      def.attrs = {"id": "ts" & $styleId}.toXmlAttributes
+      let style = newElement("text-style")
+      style.attrs = {"font": "Helvetica", "fontSize": "63", "fontFace": "Regular",
+        "fontColor": "1 1 1 1", "backgroundColor": "0 0 0 0.75",
+        "alignment": "center"}.toXmlAttributes
+      def.add style
+      caption.add def
+      asset.add caption
+
 proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
     ptrToIdx: Table[ptr string, int], projName: string, srcDur: int,
-    clip: Clip) =
+    clip: Clip): (XmlNode, int64) =
+  ## The clip's element, and its media's start point.
   let i = ptrToIdx.getOrDefault(clip.src)
   let startPoint = parseSMPTE(sources[i].timecode, tl.tb)
 
@@ -146,6 +207,7 @@ proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
         point(clip.offset + clip.dur + int64(ceil((srcDur.float - value) / last)),
           srcDur.float, "linear")
     asset.add timemap
+  (asset, startPoint)
 
 proc addTransition(spine: XmlNode, tl: v3, dissolveId: string,
     t: Transition) {.raises: [].} =
@@ -255,9 +317,10 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
     for i in countdown(tl.a.len - 1, 1):
       for clip in tl.a[i]:
         if clip.src != nil:
-          spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
+          discard spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
 
   let plan = transitionPlan(clips, transitions)
+  var styleId = 0
   for i, clip in clips:
     if clip.src != nil:
       # A centered incoming transition is already emitted as the previous
@@ -265,7 +328,18 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
       if plan[i].incoming >= 0 and
           transitions[plan[i].incoming].alignment == taStart:
         spine.addTransition(tl, dissolveId, transitions[plan[i].incoming])
-      spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
+      let (asset, startPoint) = spine.makeClip(tl, sources, ptrToIdx, projName,
+        srcDur, clip)
+      # Cues up to the next clip with media belong to this one: a gap writes
+      # no element, and cues before the first clip or after the last are
+      # those clips' too.
+      let lo = (if i == 0: 0'i64 else: clip.start)
+      var hi = high(int64)
+      for later in clips[i + 1 .. ^1]:
+        if later.src != nil:
+          hi = later.start
+          break
+      asset.anchorCaptions(tl, clip, startPoint, lo, hi, styleId)
       if plan[i].outgoing >= 0:
         spine.addTransition(tl, dissolveId, transitions[plan[i].outgoing])
 

@@ -5,7 +5,7 @@
 import std/[algorithm, math, os, strformat, strutils, tables]
 
 import ../[action, av, log, timeline]
-import ../util/[color, fun, rational, xml]
+import ../util/[color, fun, lang, rational, xml]
 import ../lib/speedmap
 
 # Tags common in FCPXML, so the parsed tree can share their strings.
@@ -13,7 +13,8 @@ const fcp11Tags = ["fcpxml", "resources", "format", "asset", "media-rep",
   "effect", "library", "event", "project", "sequence", "spine", "asset-clip",
   "clip", "video", "audio", "gap", "transition", "filter-video",
   "filter-audio", "param", "timeMap", "timept", "adjust-volume", "metadata",
-  "md", "array", "string", "conform-rate", "audio-channel-source"]
+  "md", "array", "string", "conform-rate", "audio-channel-source", "caption",
+  "text", "text-style", "text-style-def"]
 
 type
   Asset = object
@@ -38,6 +39,7 @@ type
     effects: seq[Actions]
     effectIndex: EffectIndex
     lanes: Table[int, seq[Placed]] # connected clips by lane
+    captions: seq[(string, CaptionTrack)] # by role, in order of appearance
     dropped: CountTable[string]
 
 func uiName(tag: string): string =
@@ -161,6 +163,55 @@ proc place(r: var Reader, n: XmlNode, start: int64): (bool, Placed) =
     effects: effects, stream: 0)
   (true, Placed(clip: clip, video: asset.hasVideo, audio: asset.hasAudio))
 
+func langOfRole(role: string): Lang =
+  ## The language in a caption role such as "SRT?captionFormat=SRT.en-US".
+  let key = role.find("captionFormat=")
+  if key < 0: return toLang("")
+  var code = role[key + "captionFormat=".len .. ^1]
+  let dot = code.find('.')
+  if dot < 0: return toLang("")
+  code = code[dot + 1 .. ^1]
+  let dash = code.find('-')
+  if dash >= 0: code = code[0 ..< dash]
+  case code
+  of "en": toLang("eng")
+  of "es": toLang("spa")
+  of "fr": toLang("fra")
+  of "de": toLang("deu")
+  of "it": toLang("ita")
+  of "pt": toLang("por")
+  of "ja": toLang("jpn")
+  of "ko": toLang("kor")
+  of "zh": toLang("zho")
+  of "ru": toLang("rus")
+  of "ar": toLang("ara")
+  of "hi": toLang("hin")
+  of "nl": toLang("nld")
+  of "sv": toLang("swe")
+  of "pl": toLang("pol")
+  of "tr": toLang("tur")
+  else: toLang(code)
+
+proc readCaption(r: var Reader, n: XmlNode, start: int64) =
+  ## A caption connected at timeline frame `start`; each role is a track.
+  let dur = r.frames(n.attrSeconds("offset") + n.attrSeconds("duration")) -
+    r.frames(n.attrSeconds("offset"))
+  var lines: seq[string]
+  for c in n:
+    if c.kind == xnElement and c.tag == "text":
+      lines.add c.innerText
+  let text = lines.join("\n")
+  if dur <= 0 or text.len == 0 or start < 0:
+    r.dropped.inc "caption"
+    return
+  let role = n.attr("role")
+  for (key, track) in r.captions.mitems:
+    if key == role:
+      track.cues.add Caption(start: start, dur: dur, text: text)
+      return
+  r.captions.add (role, CaptionTrack(lang: langOfRole(role),
+    cues: @[Caption(start: start, dur: dur, text: text)]))
+
 proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =
   ## Clips connected to `parent`, which starts at timeline frame `parentStart`.
   ## Their offsets are in the parent's own time, which begins at its start.
@@ -177,6 +228,9 @@ proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =
       continue
     if c.attr("enabled") == "0": continue
     let start = parentStart + r.frames(c.attrSeconds("offset") - origin)
+    if c.tag == "caption":
+      r.readCaption(c, start)
+      continue
     let (ok, placed) = r.place(c, start)
     if ok:
       r.lanes.mgetOrPut(lane, @[]).add placed
@@ -367,6 +421,10 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
 
   if result.v.len == 0 and result.a.len == 0:
     error "No clips found in the FCPXML"
+
+  for (_, track) in r.captions.mitems:
+    track.cues.sort(proc(a, b: Caption): int = cmp(a.start, b.start))
+    result.c.add track
 
   if transitions.len > 0:
     if video.len > 0:

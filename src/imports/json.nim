@@ -142,6 +142,40 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
         track.add(parseClip(audioNode, interner, result.effects, effectIndex))
       result.a.add track
 
+  # Subtitle streams carried through the cuts, indexed like the sources'
+  # subtitle streams.
+  let sNode = jsonNode{"sidecar"}
+  if sNode != nil and sNode.kind == JArray:
+    for trackNode in sNode:
+      if trackNode.kind != JArray or trackNode.len == 0:
+        error "'sidecar' layers must be non-empty arrays"
+      var track: seq[Clip]
+      for clipNode in trackNode:
+        track.add(parseClip(clipNode, interner, result.effects, effectIndex))
+      result.s.add track
+
+  let cNode = jsonNode{"c"}
+  if cNode != nil and cNode.kind == JArray:
+    for trackNode in cNode:
+      if trackNode.kind != JObject:
+        error "'c' tracks must be objects"
+      var track = CaptionTrack(lang: toLang(trackNode{"lang"}.getStr("")))
+      let cues = trackNode{"cues"}
+      if cues == nil or cues.kind != JArray or cues.len == 0:
+        error "'c' tracks need a non-empty 'cues' array"
+      for cueNode in cues:
+        let textNode = cueNode{"text"}
+        if textNode == nil or textNode.kind != JString:
+          error "Caption cues need a 'text' string"
+        let cue = Caption(start: cueNode{"start"}.getBiggestInt(-1),
+          dur: cueNode{"dur"}.getBiggestInt(-1), text: textNode.getStr)
+        if cue.start < 0:
+          error "Invalid caption start json value"
+        if cue.dur <= 0:
+          error "Invalid caption dur json value"
+        track.cues.add cue
+      result.c.add track
+
   let langsNode = jsonNode{"langs"}
   if langsNode != nil and langsNode.kind == JArray:
     for trackNode in langsNode:

@@ -29,6 +29,14 @@ func tracksToJson(tracks: seq[seq[Clip]],
       trackArray.add(clipObj)
     result.add(trackArray)
 
+func captionsToJson(tracks: seq[CaptionTrack]): JsonNode {.raises: [].} =
+  result = newJArray()
+  for track in tracks:
+    var cues = newJArray()
+    for cue in track.cues:
+      cues.add %*{"start": cue.start, "dur": cue.dur, "text": cue.text}
+    result.add %*{"lang": $track.lang, "cues": cues}
+
 func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
   result = newJArray()
   for track in tracks:
@@ -75,8 +83,10 @@ func `%`*(self: v3): JsonNode {.raises: [].} =
     "samplerate": self.sr,
     "layout": $(self.layout),
     "langs": self.langs,
+    "c": captionsToJson(self.c),
     "v": tracksToJson(self.v, self.effects),
     "a": tracksToJson(self.a, self.effects),
+    "sidecar": tracksToJson(self.s, self.effects),
   }
   if self.vt.len > 0 or self.at.len > 0:
     result["transitions"] = %*{

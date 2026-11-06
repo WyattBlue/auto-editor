@@ -29,6 +29,16 @@ type Clip* = object
   stream*: int16
   effects*: uint32 # Reference to global effects in Timeline.
 
+type Caption* = object
+  ## A cue shown from `start` for `dur` timeline frames.
+  start*: int64
+  dur*: int64
+  text*: string
+
+type CaptionTrack* = object
+  lang*: Lang
+  cues*: seq[Caption]
+
 export transitions
 
 type
@@ -57,7 +67,8 @@ type v3* = object
   sr*: cint
   v*: seq[seq[Clip]]
   a*: seq[seq[Clip]]
-  s*: seq[seq[Clip]]
+  s*: seq[seq[Clip]] # Sources' subtitle streams carried through the cuts.
+  c*: seq[CaptionTrack] # Inline captions, rendered as a subtitle stream each.
   langs*: seq[Lang]   # Video, Audio (flattened).
   effects*: seq[Actions]
   numberOfSrc*: int

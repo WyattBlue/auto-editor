@@ -99,7 +99,8 @@ proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
 
 proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   ## What exporting `tl` as `kind` leaves out: action names, then counts of
-  ## video, audio, generated and subtitle tracks. Empty when nothing is lost.
+  ## video, audio, generated, subtitle and caption tracks. Empty when nothing
+  ## is lost.
   if not kind.isEditorExport:
     return
   let sup = support(kind)
@@ -121,6 +122,12 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   for layer in tl.s:
     if layer.len > 0: inc subs
   if subs > 0: result.add plural(subs, "subtitle track")
+  # FCPXML is the one editor format with a place for captions.
+  if kind notin {exFinalCutPro, exResolve}:
+    var captions = 0
+    for track in tl.c:
+      if track.cues.len > 0: inc captions
+    if captions > 0: result.add plural(captions, "caption track")
 
 proc warnDrops*(tl: v3, kind: ExportKind) {.raises: [].} =
   let drops = exportDrops(tl, kind)

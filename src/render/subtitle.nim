@@ -1,31 +1,52 @@
+import std/[strformat, strutils]
+
 import ../[av, log, ffmpeg, timeline]
 import ../util/rational
 
-# Remux subtitle packets from source onto the cut timeline, clipping each cue's
-# visible window to its clip boundary. A cue that overlaps a cut-in point is kept
-# (its start clamped to the cut) and one that runs past a cut-out is shortened, so
-# subtitles stay in sync with the edited video instead of dropping or bleeding over.
-# Works for text subs (SRT/ASS/WebVTT); bitmap subs (DVD/PGS) pass through with
-# adjusted timing only.
-proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVStream,
+# Remux subtitle packets from each clip's source onto the cut timeline,
+# clipping each cue's visible window to its clip boundary. A cue that overlaps
+# a cut-in point is kept (its start clamped to the cut) and one that runs past
+# a cut-out is shortened, so subtitles stay in sync with the edited video
+# instead of dropping or bleeding over. Works for text subs (SRT/ASS/WebVTT);
+# bitmap subs (DVD/PGS) pass through with adjusted timing only.
+proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
     output: var OutputContainer, timelineTb: AVRational) =
+  ## Packets can't be converted here, so a clip whose stream isn't the
+  ## output's codec is left out, with a warning once per file.
   if layer.len == 0:
     return
-
-  # Open source container for each remux operation
-  var srcContainer = (try: av.open(sourcePath) except IOError as e: error e.msg)
-  defer: srcContainer.close()
 
   let outTb = outputStream.time_base
   # timelineTb is the frame rate, so one frame lasts 1/timelineTb seconds.
   let frameTb = av_inv_q(timelineTb)
 
+  var srcContainer: InputContainer
+  var openPath = ""
+  defer:
+    if openPath != "": srcContainer.close()
+  var leftOut: seq[string]
+
   for clipIdx, clip in layer:
+    if clip.src == nil:
+      continue
+    let sourcePath = clip.src[]
+    if sourcePath != openPath:
+      if openPath != "": srcContainer.close()
+      openPath = ""
+      srcContainer = (try: av.open(sourcePath) except IOError as e: error e.msg)
+      openPath = sourcePath
     if clip.stream >= srcContainer.subtitle.len:
       continue
 
     var streamIndex = srcContainer.subtitle[clip.stream].index
     var stream = srcContainer.formatContext.streams[streamIndex]
+    if stream.codecpar.codec_id != outputStream.codecpar.codec_id:
+      if sourcePath notin leftOut:
+        leftOut.add sourcePath
+        warning &"Subtitles of {sourcePath} are " &
+          $avcodec_get_name(stream.codecpar.codec_id) & ", not " &
+          $avcodec_get_name(outputStream.codecpar.codec_id) & "; left out"
+      continue
     var srcTb = stream.time_base
 
     # The clip selects source interval [clipStartSrc, clipEndSrc) in source ticks.
@@ -43,7 +64,9 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
         # the demuxer at the beginning; scanning forward below is slower but
         # preserves cues that overlap the clip boundary.
         srcContainer.close()
+        openPath = ""
         srcContainer = (try: av.open(sourcePath) except IOError as e: error e.msg)
+        openPath = sourcePath
         if clip.stream >= srcContainer.subtitle.len:
           continue
         streamIndex = srcContainer.subtitle[clip.stream].index
@@ -96,6 +119,49 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
       output.mux(outPacket)
       av_packet_unref(addr outPacket)
 
+proc writeCaptions*(track: CaptionTrack, ctx: ptr AVCodecContext,
+    outputStream: ptr AVStream, output: var OutputContainer, timelineTb: AVRational) =
+  ## Encode `track`'s cues as `outputStream`'s packets through `ctx`, an
+  ## encoder from `addCaptionStream`.
+  let frameTb = av_inv_q(timelineTb)
+  var buf = newSeq[uint8](1 shl 16)
+  for cue in track.cues:
+    let pts = av_rescale_q(cue.start, frameTb, ctx.time_base)
+    let dur = max(1'i64,
+      av_rescale_q(cue.start + cue.dur, frameTb, ctx.time_base) - pts)
+
+    # A dialogue line without its timing, which the packet carries.
+    let line = "0,0,Default,,0,0,0,," &
+      cue.text.replace("\r\n", "\n").replace("\n", "\\N")
+    var rect: AVSubtitleRect
+    rect.`type` = SUBTITLE_ASS
+    rect.ass = line.cstring
+    var rectPtr = addr rect
+    var sub: AVSubtitle
+    sub.format = 1 # text
+    sub.end_display_time = uint32(dur) # ctx.time_base is milliseconds
+    sub.num_rects = 1
+    sub.rects = cast[ptr UncheckedArray[ptr AVSubtitleRect]](addr rectPtr)
+    sub.pts = av_rescale_q(cue.start, frameTb, AVRational(num: 1, den: AV_TIME_BASE))
+
+    let size = avcodec_encode_subtitle(ctx, addr buf[0], buf.len.cint, addr sub)
+    if size < 0:
+      error "Could not encode caption: " & av_err2str(size)
+    if size == 0:
+      continue
+
+    var packet: AVPacket
+    if av_new_packet(addr packet, size) < 0:
+      error "Could not allocate caption packet"
+    copyMem(packet.data, addr buf[0], size)
+    packet.stream_index = outputStream.index
+    packet.time_base = ctx.time_base
+    packet.pts = pts
+    packet.dts = pts
+    packet.duration = dur
+    output.mux(packet)
+    av_packet_unref(addr packet)
+
 proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
     timelineTb: AVRational) =
   ## Write every subtitle stream in a sidecar file, retimed to `layer`.
@@ -109,10 +175,13 @@ proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
   # The muxer may finalize stream time bases while writing its header.
   output.startEncoding()
 
+  # The clips follow the media's cuts, but read the sidecar's streams.
+  var sidecar = sourcePath
   for i, outputStream in outputStreams:
     var subtitleLayer = layer
     for clip in subtitleLayer.mitems:
+      clip.src = addr sidecar
       clip.stream = i.int16
-    remuxSubtitles(sourcePath, subtitleLayer, outputStream, output, timelineTb)
+    remuxSubtitles(subtitleLayer, outputStream, output, timelineTb)
 
   output.close()

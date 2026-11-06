@@ -297,7 +297,6 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
 
   # Setup subtitle streams
   var subtitleStreams: seq[ptr AVStream] = @[]
-  var subtitleSources: seq[string] = @[]
 
   if includeSubtitle and tl.s.len > 0:
     for i in 0..<tl.s.len:
@@ -321,13 +320,21 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
 
         let srcStream = srcContainer.subtitle[streamIdx]
 
-        # Add subtitle stream to output by copying from template
+        # The layer's first clip is the template; later clips may come from
+        # other files, which the remuxer opens as it reaches them.
         let sOutStream = output.addStreamFromTemplate(srcStream)
         subtitleStreams.add(sOutStream)
-        subtitleSources.add(sourcePath)
 
         if ownsContainer:
           srcContainer.close()
+
+  # Inline captions become a text subtitle stream each.
+  var captionStreams: seq[(int, ptr AVStream, ptr AVCodecContext)]
+  if includeSubtitle:
+    for i, track in tl.c:
+      if track.cues.len > 0:
+        let (stream, ctx) = output.addCaptionStream(rules.defaultSub, track.lang)
+        captionStreams.add (i, stream, ctx)
 
   var imageStreams: seq[(ptr AVStream, ptr AVPacket)] = @[]
   var imageSourceCtx: ptr AVFormatContext = nil
@@ -398,6 +405,9 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
     let name = $sStream.name()
     if name != "":
       encoderTitles.add (if noColor: name else: &"\e[93m{name}")
+  for (_, _, ctx) in captionStreams:
+    let name = ctx.codec.canonicalName
+    encoderTitles.add (if noColor: name else: &"\e[93m{name}")
 
   if noColor:
     title &= encoderTitles.join("+")
@@ -553,9 +563,11 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   # Process subtitle streams
   if includeSubtitle:
     for i in 0..<subtitleStreams.len:
-      let layer = tl.s[i]
-      let sourcePath = subtitleSources[i]
-      let outputStream = subtitleStreams[i]
-      remuxSubtitles(sourcePath, layer, outputStream, output, tl.tb)
+      remuxSubtitles(tl.s[i], subtitleStreams[i], output, tl.tb)
+    for (i, stream, ctx) in captionStreams:
+      writeCaptions(tl.c[i], ctx, stream, output, tl.tb)
+  for (_, _, ctx) in captionStreams:
+    var encoder = ctx
+    avcodec_free_context(addr encoder)
 
   output.close()

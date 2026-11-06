@@ -543,6 +543,57 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
+# What the text subtitle encoders parse cues against: a dialogue line names
+# the Default style, and the format line gives the fields of a packet.
+const assHeader = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,16,&Hffffff,&Hffffff,&H0,&H0,0,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+proc addCaptionStream*(self: var OutputContainer, codecId: AVCodecID,
+    lang: Lang): (ptr AVStream, ptr AVCodecContext) =
+  ## A text subtitle stream of `codecId`, with the open encoder that
+  ## `writeCaptions` feeds cues through.
+  let format = self.formatCtx
+  let codec = avcodec_find_encoder(codecId)
+  if codec == nil:
+    error "No encoder for " & $avcodec_get_name(codecId) & " subtitles"
+  if avformat_query_codec(format.oformat, codec.id, FF_COMPLIANCE_NORMAL) == 0:
+    let formatName = if format.oformat.name != nil: $format.oformat.name else: "unknown"
+    error &"Format '{formatName}' does not support codec '{codec.name}'"
+
+  let ctx = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    error "Could not allocate codec context"
+  ctx.time_base = AVRational(num: 1, den: 1000)
+  # avcodec_free_context frees the header, so it must be its own allocation.
+  ctx.subtitle_header = cast[ptr uint8](av_strdup(assHeader.cstring))
+  ctx.subtitle_header_size = assHeader.len.cint
+  if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
+    ctx.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+  if avcodec_open2(ctx, codec, nil) < 0:
+    error "Could not open encoder '" & $codec.name & "'"
+
+  let stream = avformat_new_stream(format, codec)
+  if stream == nil:
+    error "Could not allocate output stream"
+  self.streams.add stream
+  stream.time_base = ctx.time_base
+  if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
+    error "Could not set ctx parameters"
+  if $lang != "und":
+    discard av_dict_set(addr stream.metadata, "language", cstring($lang), 0)
+  return (stream, ctx)
+
 proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational,
     lang: Lang,
 
