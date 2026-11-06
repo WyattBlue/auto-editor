@@ -65,7 +65,8 @@ addToLibrary({
         size = width * height * 4;
       }
       if (size > outCapacity) {
-        throw new RangeError('decoded video frame exceeds staging buffer');
+        AEWebCodecs.ctrl(entry)[13] = size;
+        return false;
       }
 
       const copyOptions = format === 'RGBA'
@@ -88,6 +89,7 @@ addToLibrary({
       view[10] = layout[2]?.stride ?? 0;
       view[13] = size;
       AEWebCodecs.timestamp(view, frame.timestamp);
+      return true;
     },
 
     emitAudio: function(entry, sample, outPtr, outCapacity) {
@@ -96,7 +98,8 @@ addToLibrary({
       const planeSize = frames * 4;
       const size = planeSize * channels;
       if (size > outCapacity) {
-        throw new RangeError('decoded audio frame exceeds staging buffer');
+        AEWebCodecs.ctrl(entry)[13] = size;
+        return false;
       }
 
       for (let plane = 0; plane < channels; plane++) {
@@ -120,24 +123,29 @@ addToLibrary({
       view[14] = channels;
       view[15] = sample.sampleRate;
       AEWebCodecs.timestamp(view, sample.timestamp);
+      return true;
     },
 
     emitOne: async function(entry, outPtr, outCapacity) {
-      const sample = entry.outputs.shift();
+      const sample = entry.outputs[0];
       if (!sample) {
         AEWebCodecs.complete(entry, 2);
         return;
       }
+      let copied = false;
       try {
-        if (entry.kind !== 2) {
-          await AEWebCodecs.emitVideo(entry, sample, outPtr, outCapacity);
-        } else {
-          AEWebCodecs.emitAudio(entry, sample, outPtr, outCapacity);
-        }
-        AEWebCodecs.complete(entry, 1);
+        copied = entry.kind !== 2
+          ? await AEWebCodecs.emitVideo(entry, sample, outPtr, outCapacity)
+          : AEWebCodecs.emitAudio(entry, sample, outPtr, outCapacity);
       } finally {
-        sample.close();
+        if (copied) {
+          entry.outputs.shift();
+          sample.close();
+        }
       }
+      // A sample too large for the staging buffer stays queued; C grows the
+      // buffer to the reported size and pulls again.
+      AEWebCodecs.complete(entry, copied ? 1 : 4);
     },
 
     fail: function(entry, error) {

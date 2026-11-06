@@ -55,6 +55,9 @@ enum {
     WC_CMD_RESET = 3,
 };
 
+/* The queued sample needs WC_DATA_SIZE bytes; grow the staging buffer and pull. */
+#define WC_STATUS_RESIZE 4
+
 typedef struct WebCodecsDecContext {
     int handle;
     int kind;
@@ -101,6 +104,39 @@ static int webcodecs_wait(AVCodecContext *avctx)
     return status;
 }
 
+static int webcodecs_grow_staging(AVCodecContext *avctx)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+    int size = s->ctrl[WC_DATA_SIZE];
+    uint8_t *staging;
+
+    if (size <= s->staging_capacity)
+        return AVERROR_INVALIDDATA;
+    staging = av_realloc(s->staging, size);
+    if (!staging)
+        return AVERROR(ENOMEM);
+    s->staging = staging;
+    s->staging_capacity = size;
+    return 0;
+}
+
+/* Resolve a bridge status, pulling again after any staging-buffer resize. */
+static int webcodecs_settle(AVCodecContext *avctx, int status)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+
+    while (status == WC_STATUS_RESIZE) {
+        int ret = webcodecs_grow_staging(avctx);
+        if (ret < 0)
+            return ret;
+        if (ae_wc_command(s->handle, WC_CMD_PULL, s->staging,
+                          s->staging_capacity) < 0)
+            return AVERROR_EXTERNAL;
+        status = webcodecs_wait(avctx);
+    }
+    return status;
+}
+
 static int webcodecs_run_command(AVCodecContext *avctx, int command)
 {
     WebCodecsDecContext *s = avctx->priv_data;
@@ -108,7 +144,7 @@ static int webcodecs_run_command(AVCodecContext *avctx, int command)
     if (ae_wc_command(s->handle, command, s->staging,
                       s->staging_capacity) < 0)
         return AVERROR_EXTERNAL;
-    return webcodecs_wait(avctx);
+    return webcodecs_settle(avctx, webcodecs_wait(avctx));
 }
 
 static int64_t webcodecs_timestamp(const int32_t *ctrl)
@@ -127,10 +163,15 @@ static int webcodecs_take_staging(WebCodecsDecContext *s, AVFrame *frame)
     if (size <= 0 || size > s->staging_capacity)
         return AVERROR_INVALIDDATA;
 
-    next = av_malloc(s->staging_capacity);
+    /*
+     * The frame keeps the staging buffer, so size its replacement for the
+     * frame just copied: the next one is almost always the same size, and a
+     * larger one grows it through WC_STATUS_RESIZE.
+     */
+    next = av_malloc(size);
     if (!next)
         return AVERROR(ENOMEM);
-    buffer = av_buffer_create(s->staging, s->staging_capacity,
+    buffer = av_buffer_create(s->staging, size,
                               av_buffer_default_free, NULL, 0);
     if (!buffer) {
         av_free(next);
@@ -138,6 +179,7 @@ static int webcodecs_take_staging(WebCodecsDecContext *s, AVFrame *frame)
     }
 
     s->staging = next;
+    s->staging_capacity = size;
     frame->buf[0] = buffer;
     return 0;
 }
@@ -315,7 +357,7 @@ static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
         if (ret < 0)
             return AVERROR_EXTERNAL;
 
-        status = webcodecs_wait(avctx);
+        status = webcodecs_settle(avctx, webcodecs_wait(avctx));
         if (status < 0)
             return AVERROR_EXTERNAL;
         if (status == 1) {
@@ -356,7 +398,9 @@ static av_cold int webcodecs_init(AVCodecContext *avctx)
     if (webcodecs_is_video(s)) {
         if (avctx->width <= 0 || avctx->height <= 0)
             return AVERROR(EINVAL);
-        capacity = (int64_t)avctx->width * avctx->height * 4;
+        /* An I420 picture; RGBA output grows it through WC_STATUS_RESIZE. */
+        capacity = (int64_t)avctx->width * avctx->height +
+            2 * ((avctx->width + 1) / 2) * (int64_t)((avctx->height + 1) / 2);
     } else {
         int channels = FFMAX(avctx->ch_layout.nb_channels, 2);
         capacity = (int64_t)channels * 8192 * sizeof(float);
