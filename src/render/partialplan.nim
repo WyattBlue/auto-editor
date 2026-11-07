@@ -4,6 +4,7 @@ from std/math import round
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/rational
 import ./[h264, hevc, smart]
+from ./video import reformat
 
 func readBit(data: ptr UncheckedArray[uint8], size: int, pos: var int): int =
   if pos >= size * 8:
@@ -409,18 +410,24 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
             continue
           if sourceFrame >= span.srcEnd:
             break
+          # A WebCodecs decoder hands over whatever layout the browser picked
+          # (NV12 from hardware decoders), while the encoder was opened for
+          # the stream's own format.
+          var toEncode = decoded.reformat(AVPixelFormat(encoder.pix_fmt))
           if lastDecoded != nil:
             av_frame_free(addr lastDecoded)
-          lastDecoded = av_frame_clone(decoded)
-          decoded.pts = span.outStart + encoded
-          decoded.time_base = frameTb
-          decoded.duration = 1
-          decoded.pict_type =
+          lastDecoded = av_frame_clone(toEncode)
+          toEncode.pts = span.outStart + encoded
+          toEncode.time_base = frameTb
+          toEncode.duration = 1
+          toEncode.pict_type =
             if firstFrameInRun: AV_PICTURE_TYPE_I
             else: AV_PICTURE_TYPE_NONE
           firstFrameInRun = false
-          for encodedPacket in encoder.encode(decoded, packet):
+          for encodedPacket in encoder.encode(toEncode, packet):
             emitEncoded(encodedPacket)
+          if toEncode != decoded:
+            av_frame_free(addr toEncode)
           inc encoded
 
         # Container duration rounding can leave the timeline one frame longer
