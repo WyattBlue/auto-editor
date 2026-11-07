@@ -28,6 +28,11 @@ enum {
     WE_DESC_OFFSET,
     WE_DESC_SIZE,
     WE_MORE,
+    /* Color tags the browser was told to write, as AVCOL_* values. */
+    WE_MATRIX,
+    WE_RANGE,
+    WE_PRIMARIES,
+    WE_TRC,
     WE_CTRL_SIZE,
 };
 
@@ -69,6 +74,7 @@ extern int ae_we_init(int kind, int32_t *ctrl,
                       int sample_rate, int channels,
                       double frame_rate, double bit_rate,
                       int profile, int level,
+                      int matrix, int range, int primaries, int trc,
                       uint8_t *output, int output_capacity);
 extern int ae_we_encode(int handle, const uint8_t *input, int input_size,
                         int width, int height, int samples,
@@ -386,6 +392,8 @@ static av_cold int webenc_init(AVCodecContext *avctx)
                            avctx->ch_layout.nb_channels,
                            frame_rate, avctx->bit_rate,
                            avctx->profile, avctx->level,
+                           avctx->colorspace, avctx->color_range,
+                           avctx->color_primaries, avctx->color_trc,
                            s->output, s->output_capacity);
     if (!s->handle)
         return AVERROR(ENOSYS);
@@ -395,6 +403,16 @@ static av_cold int webenc_init(AVCodecContext *avctx)
     status = webenc_update_extradata(avctx);
     if (status < 0)
         return status;
+    if (s->kind != WE_KIND_AAC) {
+        /*
+         * The browser always writes a color description, so tag the
+         * container the same way rather than leaving it unspecified.
+         */
+        avctx->colorspace = s->ctrl[WE_MATRIX];
+        avctx->color_range = s->ctrl[WE_RANGE];
+        avctx->color_primaries = s->ctrl[WE_PRIMARIES];
+        avctx->color_trc = s->ctrl[WE_TRC];
+    }
     return 0;
 }
 

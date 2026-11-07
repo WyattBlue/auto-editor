@@ -8,7 +8,7 @@ addToLibrary({
     handles: new Map(),
 
     ctrl: function(entry) {
-      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 10);
+      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 14);
     },
 
     complete: function(entry, status) {
@@ -98,6 +98,28 @@ addToLibrary({
       return `hvc1.${hevcProfile}.${compatibility}.L${hevcLevel}.B0`;
     },
 
+    colorSpace: function(matrix, range, primaries, trc) {
+      // AVCOL_* values to a VideoColorSpaceInit. The browser cannot write an
+      // unspecified color description, so untagged input is called BT.601
+      // (limited range), the same reading auto-editor and swscale give it.
+      const matrices = { 0: 'rgb', 1: 'bt709', 5: 'bt470bg', 6: 'smpte170m', 9: 'bt2020-ncl' };
+      const primariesMap = { 1: 'bt709', 5: 'bt470bg', 6: 'smpte170m', 9: 'bt2020', 12: 'smpte432' };
+      const transfers = { 1: 'bt709', 6: 'smpte170m', 8: 'linear', 13: 'iec61966-2-1', 16: 'pq', 18: 'hlg' };
+      if (!(matrix in matrices)) matrix = 6;
+      if (!(primaries in primariesMap)) primaries = matrix === 1 ? 1 : 6;
+      if (!(trc in transfers)) trc = 1;
+      if (range !== 1 && range !== 2) range = 1;
+      return {
+        init: {
+          matrix: matrices[matrix],
+          primaries: primariesMap[primaries],
+          transfer: transfers[trc],
+          fullRange: range === 2,
+        },
+        codes: [matrix, range, primaries, trc],
+      };
+    },
+
     description: function(metadata) {
       const description = metadata?.decoderConfig?.description;
       return description
@@ -135,6 +157,7 @@ addToLibrary({
             format: 'I420',
             codedWidth: width,
             codedHeight: height,
+            colorSpace: entry.colorSpace,
             timestamp: 0,
             duration: Math.round(1000000 / entry.config.framerate),
           },
@@ -226,6 +249,10 @@ addToLibrary({
     bitRate,
     profile,
     level,
+    matrix,
+    range,
+    primaries,
+    trc,
     outPtr,
     outCapacity,
   ) {
@@ -277,10 +304,12 @@ addToLibrary({
       if (!support.supported) return 0;
 
       const handle = AEWebEncoders.nextHandle++;
+      const color = AEWebEncoders.colorSpace(matrix, range, primaries, trc);
       const entry = {
         kind,
         ctrlPtr,
         config: support.config,
+        colorSpace: color.init,
         encoder: null,
         outputs: [],
         outputWaiter: null,
@@ -289,6 +318,7 @@ addToLibrary({
       try {
         AEWebEncoders.createEncoder(entry);
         await AEWebEncoders.prime(entry, outPtr, outCapacity);
+        AEWebEncoders.ctrl(entry).set(color.codes, 10);
       } catch (error) {
         if (entry.encoder) {
           try {
@@ -342,6 +372,7 @@ addToLibrary({
             format: 'I420',
             codedWidth: width,
             codedHeight: height,
+            colorSpace: entry.colorSpace,
             timestamp,
             duration: duration || undefined,
           });
