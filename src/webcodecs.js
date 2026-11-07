@@ -320,7 +320,11 @@ addToLibrary({
           bitDepth,
         );
         if (!codec) return 0;
-        if (kind === 1 && !(extraSize >= 4 && HEAPU8[extraPtr] === 1)) {
+        // Only avcC/hvcC records (configurationVersion 1) are descriptions;
+        // Annex B extradata means the stream is Annex B, which the browser
+        // decodes without one.
+        if ((kind === 1 || kind === 5)
+            && !(extraSize >= 4 && HEAPU8[extraPtr] === 1)) {
           description = undefined;
         } else if (kind === 3 || kind === 4 || kind === 6) {
           description = undefined;
