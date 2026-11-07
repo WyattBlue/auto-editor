@@ -37,6 +37,8 @@ enum {
     WC_DATA_SIZE,
     WC_CHANNELS,
     WC_SAMPLE_RATE,
+    WC_MATRIX,
+    WC_RANGE,
     WC_CTRL_SIZE,
 };
 
@@ -236,6 +238,14 @@ static int webcodecs_make_video_frame(AVCodecContext *avctx, AVFrame *frame)
         if (c[WC_STRIDE0] < width * 4 ||
             c[WC_OFF0] + c[WC_STRIDE0] * height > c[WC_DATA_SIZE])
             return AVERROR_INVALIDDATA;
+        /*
+         * The browser already converted these samples from YUV with the
+         * matrix and range it reports (Firefox decodes H.264 to BGRX with
+         * BT.709 whatever the stream says). Tag the frame with them so the
+         * conversion back to YUV undoes exactly that step.
+         */
+        frame->colorspace = c[WC_MATRIX];
+        frame->color_range = c[WC_RANGE];
     }
 
     for (int i = 0; i < c[WC_PLANES]; i++) {

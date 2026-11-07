@@ -296,13 +296,19 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
   if srcFormat.isRgb == format.isRgb:
     newFrame.color_range = frame.color_range
     newFrame.colorspace = frame.colorspace
-  else:
+  elif format.isRgb or frame.colorspace in [0, 2]:
     # The matrix and range don't carry between RGB and YUV. An RGB source's
     # AVCOL_SPC_RGB tag on a YUV frame makes swscale copy the channels into
     # Y/U/V unconverted, a strong green/purple shift (#1289). Leave them
     # unspecified so swscale uses its defaults.
     newFrame.color_range = 0 # AVCOL_RANGE_UNSPECIFIED
     newFrame.colorspace = if format.isRgb: 0 else: 2 # AVCOL_SPC_RGB / UNSPECIFIED
+  else:
+    # An RGB frame tagged with a YUV matrix came from a decoder that did the
+    # YUV to RGB step itself (a browser VideoDecoder); converting back with
+    # the same matrix and range restores the stream's samples.
+    newFrame.color_range = frame.color_range
+    newFrame.colorspace = frame.colorspace
 
   var ret = av_frame_get_buffer(newFrame, 32)
   if ret < 0:

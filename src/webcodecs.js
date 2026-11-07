@@ -12,7 +12,7 @@ addToLibrary({
     handles: new Map(),
 
     ctrl: function(entry) {
-      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 16);
+      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 18);
     },
 
     complete: function(entry, status) {
@@ -89,6 +89,14 @@ addToLibrary({
       view[9] = layout[2]?.offset ?? 0;
       view[10] = layout[2]?.stride ?? 0;
       view[13] = size;
+      if (format === 'RGBA') {
+        // AVCOL_SPC_* and AVCOL_RANGE_* codes of the conversion the browser
+        // already applied; C puts them on the frame so swscale can undo it.
+        const space = frame.colorSpace ?? {};
+        const matrices = { rgb: 0, bt709: 1, bt470bg: 5, smpte170m: 6, 'bt2020-ncl': 9 };
+        view[16] = matrices[space.matrix] ?? 2;
+        view[17] = space.fullRange == null ? 0 : space.fullRange ? 2 : 1;
+      }
       AEWebCodecs.timestamp(view, frame.timestamp);
       return true;
     },
