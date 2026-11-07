@@ -1153,14 +1153,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       error "Failed to allocate proxy scale sws context"
     discard av_opt_set_int(scaleCtx, "threads", 0, 0)
 
-  # Create a persistent sws context for the per-frame pixel format conversion.
-  # Reusing it avoids the per-frame alloc/init overhead of the new sws API.
-  var reformatCtx: ptr SwsContext = nil
-  if pix_fmt != srcPixFmt:
-    reformatCtx = sws_alloc_context()
-    if reformatCtx == nil:
-      error "Failed to allocate reformat sws context"
-    discard av_opt_set_int(reformatCtx, "threads", 0, 0)
+  # One sws context for the per-frame pixel format conversion. It is kept
+  # even when the stream's format matches the output: a decoder may still
+  # hand back another layout (a browser's NV12 for a yuv420p stream), and
+  # swscale only initializes the context on the first frame that needs it.
+  var reformatCtx = sws_alloc_context()
+  if reformatCtx == nil:
+    error "Failed to allocate reformat sws context"
+  discard av_opt_set_int(reformatCtx, "threads", 0, 0)
 
   # Allocated on the first zoom; swscale rebuilds it itself when the geometry
   # changes, so a constant zoom pays the init cost once.

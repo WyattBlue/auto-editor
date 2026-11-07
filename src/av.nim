@@ -218,7 +218,9 @@ proc findDecoder*(codecId: AVCodecID): ptr AVCodec =
 proc canDecode*(codecId: AVCodecID): bool =
   findDecoder(codecId) != nil
 
-proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
+proc initDecoder*(codecpar: ptr AVCodecParameters,
+    threads: cint = 0): ptr AVCodecContext =
+  ## `threads` is FFmpeg's thread_count: 0 picks one per core.
   var codec = findDecoder(codecpar.codec_id)
   if codec == nil:
     error &"Decoder not found: {avcodec_get_name(codecpar.codec_id)}"
@@ -227,7 +229,7 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   if result == nil:
     error "Could not allocate decoder ctx"
 
-  result.thread_count = 0 # Auto-detect CPU cores
+  result.thread_count = threads
   if result.codec_type == AVMEDIA_TYPE_VIDEO:
     result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
@@ -244,7 +246,7 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
         if codec != nil:
           result = avcodec_alloc_context3(codec)
           if result != nil:
-            result.thread_count = 0
+            result.thread_count = threads
             if result.codec_type == AVMEDIA_TYPE_VIDEO:
               result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
             if avcodec_parameters_to_context(result, codecpar) >= 0 and
