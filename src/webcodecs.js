@@ -12,7 +12,7 @@ addToLibrary({
     handles: new Map(),
 
     ctrl: function(entry) {
-      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 18);
+      return new Int32Array(wasmMemory.buffer, entry.ctrlPtr, 16);
     },
 
     complete: function(entry, status) {
@@ -59,24 +59,27 @@ addToLibrary({
         ];
         size = width * height + 2 * chromaWidth * chromaHeight;
       } else {
-        format = 'RGBA';
-        formatCode = 2;
-        layout = [{ offset: 0, stride: width * 4 }];
-        size = width * height * 4;
+        // Anything else (Firefox's BGRX, 10-bit, 4:2:2) has been converted
+        // or must be, so the samples are no longer the stream's own. Report
+        // the format without copying; C switches to FFmpeg's decoder.
+        const view = AEWebCodecs.ctrl(entry);
+        view[1] = 2;
+        view[2] = width;
+        view[3] = height;
+        view[4] = 0;
+        view[13] = 0;
+        AEWebCodecs.timestamp(view, frame.timestamp);
+        return true;
       }
       if (size > outCapacity) {
         AEWebCodecs.ctrl(entry)[13] = size;
         return false;
       }
 
-      if (format === 'RGBA') {
-        await AEWebCodecs.copyRgba(frame, rect, outPtr, size);
-      } else {
-        await frame.copyTo(
-          new Uint8Array(wasmMemory.buffer, outPtr, size),
-          { layout, rect },
-        );
-      }
+      await frame.copyTo(
+        new Uint8Array(wasmMemory.buffer, outPtr, size),
+        { layout, rect },
+      );
       const view = AEWebCodecs.ctrl(entry);
       view[1] = formatCode;
       view[2] = width;
@@ -89,44 +92,8 @@ addToLibrary({
       view[9] = layout[2]?.offset ?? 0;
       view[10] = layout[2]?.stride ?? 0;
       view[13] = size;
-      if (format === 'RGBA') {
-        // AVCOL_SPC_* and AVCOL_RANGE_* codes of the conversion the browser
-        // already applied; C puts them on the frame so swscale can undo it.
-        const space = frame.colorSpace ?? {};
-        const matrices = { rgb: 0, bt709: 1, bt470bg: 5, smpte170m: 6, 'bt2020-ncl': 9 };
-        view[16] = matrices[space.matrix] ?? 2;
-        view[17] = space.fullRange == null ? 0 : space.fullRange ? 2 : 1;
-      }
       AEWebCodecs.timestamp(view, frame.timestamp);
       return true;
-    },
-
-    rgbaCanvas: null,
-
-    copyRgba: async function(frame, rect, outPtr, size) {
-      const { width, height } = rect;
-      try {
-        await frame.copyTo(
-          new Uint8Array(wasmMemory.buffer, outPtr, size),
-          { format: 'RGBA', layout: [{ offset: 0, stride: width * 4 }], rect },
-        );
-        return;
-      } catch {
-        // Firefox's copyTo() converts no formats and Safari reports null for
-        // some hardware frames; a canvas converts anything the browser can draw.
-      }
-      let canvas = AEWebCodecs.rgbaCanvas;
-      if (!canvas) {
-        canvas = new OffscreenCanvas(width, height);
-        AEWebCodecs.rgbaCanvas = canvas;
-      } else if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-      }
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(frame, 0, 0, width, height);
-      const image = ctx.getImageData(0, 0, width, height);
-      new Uint8Array(wasmMemory.buffer, outPtr, size).set(image.data);
     },
 
     emitAudio: function(entry, sample, outPtr, outCapacity) {

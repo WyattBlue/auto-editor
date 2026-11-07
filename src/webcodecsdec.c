@@ -18,6 +18,7 @@
 
 #include "avcodec.h"
 #include "codec_internal.h"
+#include "codec_par.h"
 #include "decode.h"
 
 enum {
@@ -37,8 +38,6 @@ enum {
     WC_DATA_SIZE,
     WC_CHANNELS,
     WC_SAMPLE_RATE,
-    WC_MATRIX,
-    WC_RANGE,
     WC_CTRL_SIZE,
 };
 
@@ -60,6 +59,16 @@ enum {
 /* The queued sample needs WC_DATA_SIZE bytes; grow the staging buffer and pull. */
 #define WC_STATUS_RESIZE 4
 
+/* The browser handed back samples it had already converted (WC_FORMAT 2). */
+#define WC_FORMAT_CONVERTED 2
+
+/*
+ * Kinds whose browser decoder returned converted frames once. The browser
+ * picks the output format per codec, not per file, so later instances go
+ * straight to FFmpeg's decoder instead of probing again.
+ */
+static int webcodecs_native_kinds;
+
 typedef struct WebCodecsDecContext {
     int handle;
     int kind;
@@ -71,6 +80,16 @@ typedef struct WebCodecsDecContext {
     AVPacket *packet;
     uint8_t *staging;
     int staging_capacity;
+    /*
+     * Packets fed to the browser before its first frame, replayed into
+     * FFmpeg's decoder when that frame turns out to be converted.
+     */
+    AVPacket **held;
+    int held_count;
+    int held_capacity;
+    int probing;
+    AVCodecContext *native;
+    int native_flushed;
 } WebCodecsDecContext;
 
 static int webcodecs_is_video(const WebCodecsDecContext *s)
@@ -204,8 +223,6 @@ static int webcodecs_make_video_frame(AVCodecContext *avctx, AVFrame *frame)
         avctx->pix_fmt = AV_PIX_FMT_YUV420P;
     else if (format == 1)
         avctx->pix_fmt = AV_PIX_FMT_NV12;
-    else if (format == 2)
-        avctx->pix_fmt = AV_PIX_FMT_RGBA;
     else
         return AVERROR_INVALIDDATA;
 
@@ -226,7 +243,7 @@ static int webcodecs_make_video_frame(AVCodecContext *avctx, AVFrame *frame)
             c[WC_OFF1] + c[WC_STRIDE1] * chroma_height > c[WC_DATA_SIZE] ||
             c[WC_OFF2] + c[WC_STRIDE2] * chroma_height > c[WC_DATA_SIZE])
             return AVERROR_INVALIDDATA;
-    } else if (format == 1) {
+    } else {
         int chroma_width = 2 * ((width + 1) / 2);
         int chroma_height = (height + 1) / 2;
         if (c[WC_STRIDE0] < width ||
@@ -234,18 +251,6 @@ static int webcodecs_make_video_frame(AVCodecContext *avctx, AVFrame *frame)
             c[WC_OFF0] + c[WC_STRIDE0] * height > c[WC_DATA_SIZE] ||
             c[WC_OFF1] + c[WC_STRIDE1] * chroma_height > c[WC_DATA_SIZE])
             return AVERROR_INVALIDDATA;
-    } else {
-        if (c[WC_STRIDE0] < width * 4 ||
-            c[WC_OFF0] + c[WC_STRIDE0] * height > c[WC_DATA_SIZE])
-            return AVERROR_INVALIDDATA;
-        /*
-         * The browser already converted these samples from YUV with the
-         * matrix and range it reports (Firefox decodes H.264 to BGRX with
-         * BT.709 whatever the stream says). Tag the frame with them so the
-         * conversion back to YUV undoes exactly that step.
-         */
-        frame->colorspace = c[WC_MATRIX];
-        frame->color_range = c[WC_RANGE];
     }
 
     for (int i = 0; i < c[WC_PLANES]; i++) {
@@ -305,19 +310,174 @@ static int webcodecs_make_audio_frame(AVCodecContext *avctx, AVFrame *frame)
     return 0;
 }
 
+static void webcodecs_free_held(WebCodecsDecContext *s)
+{
+    for (int i = 0; i < s->held_count; i++)
+        av_packet_free(&s->held[i]);
+    s->held_count = 0;
+}
+
+static int webcodecs_hold_packet(WebCodecsDecContext *s)
+{
+    AVPacket *copy;
+
+    if (s->held_count == s->held_capacity) {
+        int capacity = s->held_capacity ? 2 * s->held_capacity : 16;
+        AVPacket **held = av_realloc_array(s->held, capacity, sizeof(*held));
+        if (!held)
+            return AVERROR(ENOMEM);
+        s->held = held;
+        s->held_capacity = capacity;
+    }
+    copy = av_packet_clone(s->packet);
+    if (!copy)
+        return AVERROR(ENOMEM);
+    s->held[s->held_count++] = copy;
+    return 0;
+}
+
+static int webcodecs_open_native(AVCodecContext *avctx)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+    const AVCodec *codec;
+    void *iter = NULL;
+    AVCodecParameters *par;
+    int ret;
+
+    while ((codec = av_codec_iterate(&iter))) {
+        if (av_codec_is_decoder(codec) && codec->id == avctx->codec_id &&
+            !(codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL) &&
+            strcmp(codec->name, avctx->codec->name))
+            break;
+    }
+    if (!codec)
+        return AVERROR_DECODER_NOT_FOUND;
+
+    s->native = avcodec_alloc_context3(codec);
+    par = avcodec_parameters_alloc();
+    if (!s->native || !par) {
+        avcodec_parameters_free(&par);
+        return AVERROR(ENOMEM);
+    }
+    ret = avcodec_parameters_from_context(par, avctx);
+    if (ret >= 0)
+        ret = avcodec_parameters_to_context(s->native, par);
+    avcodec_parameters_free(&par);
+    if (ret < 0)
+        return ret;
+    s->native->pkt_timebase = avctx->pkt_timebase;
+    s->native->time_base = avctx->time_base;
+    s->native->thread_count = avctx->thread_count;
+    s->native->thread_type = avctx->thread_type;
+    s->native->flags = avctx->flags;
+    s->native->flags2 = avctx->flags2;
+    return avcodec_open2(s->native, codec, NULL);
+}
+
+static int webcodecs_native_frame(AVCodecContext *avctx, AVFrame *frame)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+
+    for (;;) {
+        int ret = avcodec_receive_frame(s->native, frame);
+        if (ret == 0) {
+            avctx->pix_fmt = frame->format;
+            avctx->width = frame->width;
+            avctx->height = frame->height;
+            return 0;
+        }
+        if (ret != AVERROR(EAGAIN))
+            return ret;
+
+        if (s->held_count) {
+            ret = avcodec_send_packet(s->native, s->held[0]);
+            if (ret < 0)
+                return ret;
+            av_packet_free(&s->held[0]);
+            s->held_count--;
+            memmove(s->held, s->held + 1, s->held_count * sizeof(*s->held));
+            continue;
+        }
+        if (s->draining) {
+            if (s->native_flushed)
+                return AVERROR_EOF;
+            s->native_flushed = 1;
+            ret = avcodec_send_packet(s->native, NULL);
+            if (ret < 0)
+                return ret;
+            continue;
+        }
+        ret = ff_decode_get_packet(avctx, s->packet);
+        if (ret == AVERROR_EOF) {
+            s->draining = 1;
+            continue;
+        }
+        if (ret < 0)
+            return ret;
+        ret = avcodec_send_packet(s->native, s->packet);
+        av_packet_unref(s->packet);
+        if (ret < 0)
+            return ret;
+    }
+}
+
+/*
+ * The browser's first frame was converted (Firefox decodes H.264 to BGRX
+ * through BT.709 whatever the stream says, and clips while doing so), so
+ * its output cannot reproduce the stream's samples. Replay the held
+ * packets into FFmpeg's decoder and serve everything from it.
+ */
+static int webcodecs_switch_to_native(AVCodecContext *avctx)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+    int ret;
+
+    av_log(avctx, AV_LOG_VERBOSE,
+           "WebCodecs returns converted frames; decoding with FFmpeg\n");
+    __atomic_or_fetch(&webcodecs_native_kinds, 1 << s->kind, __ATOMIC_RELAXED);
+    ret = webcodecs_open_native(avctx);
+    if (ret < 0)
+        return ret;
+    ae_wc_close(s->handle);
+    s->handle = 0;
+    s->may_have_output = 0;
+    s->probing = 0;
+    return 0;
+}
+
+static int webcodecs_deliver(AVCodecContext *avctx, AVFrame *frame)
+{
+    WebCodecsDecContext *s = avctx->priv_data;
+
+    if (!webcodecs_is_video(s))
+        return webcodecs_make_audio_frame(avctx, frame);
+    if (s->ctrl[WC_FORMAT] == WC_FORMAT_CONVERTED) {
+        int ret = webcodecs_switch_to_native(avctx);
+        if (ret < 0)
+            return ret;
+        return webcodecs_native_frame(avctx, frame);
+    }
+    if (s->probing) {
+        webcodecs_free_held(s);
+        s->probing = 0;
+    }
+    return webcodecs_make_video_frame(avctx, frame);
+}
+
 static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
 {
     WebCodecsDecContext *s = avctx->priv_data;
     int status;
+
+    if (s->native)
+        return webcodecs_native_frame(avctx, frame);
 
     if (s->may_have_output) {
         status = webcodecs_run_command(avctx, WC_CMD_PULL);
         if (status < 0)
             return AVERROR_EXTERNAL;
         if (status == 1)
-            return webcodecs_is_video(s)
-                ? webcodecs_make_video_frame(avctx, frame)
-                : webcodecs_make_audio_frame(avctx, frame);
+            return webcodecs_deliver(avctx, frame);
         s->may_have_output = 0;
     }
 
@@ -330,9 +490,7 @@ static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
                 return AVERROR_EXTERNAL;
             if (status == 1) {
                 s->may_have_output = 1;
-                return webcodecs_is_video(s)
-                    ? webcodecs_make_video_frame(avctx, frame)
-                    : webcodecs_make_audio_frame(avctx, frame);
+                return webcodecs_deliver(avctx, frame);
             }
             return AVERROR_EOF;
         }
@@ -359,6 +517,11 @@ static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
             ? av_q2d(packet_time_base) * s->packet->duration * 1000000.0
             : 0.0;
 
+        if (s->probing) {
+            ret = webcodecs_hold_packet(s);
+            if (ret < 0)
+                return ret;
+        }
         ret = ae_wc_decode(s->handle, s->packet->data, s->packet->size,
                            timestamp, duration,
                            !!(s->packet->flags & AV_PKT_FLAG_KEY),
@@ -372,9 +535,7 @@ static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
             return AVERROR_EXTERNAL;
         if (status == 1) {
             s->may_have_output = 1;
-            return webcodecs_is_video(s)
-                ? webcodecs_make_video_frame(avctx, frame)
-                : webcodecs_make_audio_frame(avctx, frame);
+            return webcodecs_deliver(avctx, frame);
         }
     }
 
@@ -400,15 +561,20 @@ static av_cold int webcodecs_init(AVCodecContext *avctx)
     else
         s->kind = WC_KIND_AUDIO;
     s->packet_time_base = (AVRational){ 1, 1000000 };
-    s->ctrl = av_mallocz(WC_CTRL_SIZE * sizeof(*s->ctrl));
     s->packet = av_packet_alloc();
-    if (!s->ctrl || !s->packet)
+    if (!s->packet)
         return AVERROR(ENOMEM);
+    if (__atomic_load_n(&webcodecs_native_kinds, __ATOMIC_RELAXED) & (1 << s->kind))
+        return webcodecs_open_native(avctx);
+    s->ctrl = av_mallocz(WC_CTRL_SIZE * sizeof(*s->ctrl));
+    if (!s->ctrl)
+        return AVERROR(ENOMEM);
+    s->probing = webcodecs_is_video(s);
 
     if (webcodecs_is_video(s)) {
         if (avctx->width <= 0 || avctx->height <= 0)
             return AVERROR(EINVAL);
-        /* An I420 picture; RGBA output grows it through WC_STATUS_RESIZE. */
+        /* An I420 picture; a larger one grows it through WC_STATUS_RESIZE. */
         capacity = (int64_t)avctx->width * avctx->height +
             2 * ((avctx->width + 1) / 2) * (int64_t)((avctx->height + 1) / 2);
     } else {
@@ -446,10 +612,14 @@ static av_cold void webcodecs_flush(AVCodecContext *avctx)
 {
     WebCodecsDecContext *s = avctx->priv_data;
 
-    if (s->handle)
+    if (s->native)
+        avcodec_flush_buffers(s->native);
+    else if (s->handle)
         webcodecs_run_command(avctx, WC_CMD_RESET);
+    webcodecs_free_held(s);
     av_packet_unref(s->packet);
     s->draining = 0;
+    s->native_flushed = 0;
     s->may_have_output = 0;
     s->synthetic_ts = 0;
 }
@@ -460,6 +630,9 @@ static av_cold int webcodecs_close(AVCodecContext *avctx)
 
     if (s->handle)
         ae_wc_close(s->handle);
+    avcodec_free_context(&s->native);
+    webcodecs_free_held(s);
+    av_freep(&s->held);
     av_packet_free(&s->packet);
     av_freep(&s->staging);
     av_freep(&s->ctrl);
