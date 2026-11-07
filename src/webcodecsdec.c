@@ -88,6 +88,7 @@ typedef struct WebCodecsDecContext {
     int held_count;
     int held_capacity;
     int probing;
+    int open_native;
     AVCodecContext *native;
     int native_flushed;
 } WebCodecsDecContext;
@@ -367,8 +368,14 @@ static int webcodecs_open_native(AVCodecContext *avctx)
         return ret;
     s->native->pkt_timebase = avctx->pkt_timebase;
     s->native->time_base = avctx->time_base;
+    /* Still the caller's request: AUTO_THREADS keeps avcodec_open2 from
+     * clamping it to 1 on a wrapper that advertises no threading. */
     s->native->thread_count = avctx->thread_count;
     s->native->thread_type = avctx->thread_type;
+    /* Threaded libvpx dies on the web: a tile worker attempts a JSPI
+     * suspend beneath libvpx's setjmp trampoline, which is refused. */
+    if (!strncmp(codec->name, "libvpx", 6))
+        s->native->thread_count = 1;
     s->native->flags = avctx->flags;
     s->native->flags2 = avctx->flags2;
     return avcodec_open2(s->native, codec, NULL);
@@ -469,6 +476,12 @@ static int webcodecs_output_frame(AVCodecContext *avctx, AVFrame *frame)
     WebCodecsDecContext *s = avctx->priv_data;
     int status;
 
+    if (s->open_native) {
+        status = webcodecs_open_native(avctx);
+        if (status < 0)
+            return status;
+        s->open_native = 0;
+    }
     if (s->native)
         return webcodecs_native_frame(avctx, frame);
 
@@ -564,8 +577,13 @@ static av_cold int webcodecs_init(AVCodecContext *avctx)
     s->packet = av_packet_alloc();
     if (!s->packet)
         return AVERROR(ENOMEM);
-    if (__atomic_load_n(&webcodecs_native_kinds, __ATOMIC_RELAXED) & (1 << s->kind))
-        return webcodecs_open_native(avctx);
+    if (__atomic_load_n(&webcodecs_native_kinds, __ATOMIC_RELAXED) & (1 << s->kind)) {
+        /* Opened at the first decode: avcodec_open2 holds the codec lock
+         * around this init, and opening a decoder that needs the same lock
+         * (libvpx) from here deadlocks. */
+        s->open_native = 1;
+        return 0;
+    }
     s->ctrl = av_mallocz(WC_CTRL_SIZE * sizeof(*s->ctrl));
     if (!s->ctrl)
         return AVERROR(ENOMEM);
@@ -652,7 +670,8 @@ const FFCodec ff_##short_name##_webcodecs_decoder = {                  \
     .flush          = webcodecs_flush,                                 \
     .close          = webcodecs_close,                                 \
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |                      \
-                      FF_CODEC_CAP_NOT_INIT_THREADSAFE,                \
+                      FF_CODEC_CAP_NOT_INIT_THREADSAFE |               \
+                      FF_CODEC_CAP_AUTO_THREADS,                       \
     .p.wrapper_name = "webcodecs",                                     \
 };
 
