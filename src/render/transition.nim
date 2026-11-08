@@ -35,6 +35,32 @@ func clamp01(t: float32): float32 {.inline.} = clamp(t, 0'f32, 1'f32)
 func smooth(e0, e1, x: float32): float32 {.inline.} =
   let t = clamp01((x - e0) / (e1 - e0))
   t * t * (3 - 2 * t)
+
+func dissolveCurve*(p, easeIn, easeOut: float32): float32 =
+  ## How far a Cross Dissolve has mixed into the incoming picture at
+  ## progress `p`, as Premiere 26's: a cubic Bezier from (0, 0) to (1, 1)
+  ## with handles at (h * easeIn / 100, 0) and (1 - h * easeOut / 100, 1).
+  ## Measured on Premiere Pro 26.5.2 exports, the handles reach 0.915 of
+  ## the ease value; 0/0 is a straight line.
+  if p != p: return 0
+  if p <= 0: return 0
+  if p >= 1: return 1
+  const h = 0.915'f32
+  func handle(v: float32): float32 =
+    if v != v: 0'f32 else: clamp(v / 100, 0'f32, 1'f32) * h
+  let x1 = handle(easeIn)
+  let x2 = 1 - handle(easeOut)
+  # x(s) rises from 0 to 1 since both handles stay inside [0, 1].
+  func x(s: float32): float32 =
+    3 * (1 - s) * (1 - s) * s * x1 + 3 * (1 - s) * s * s * x2 + s * s * s
+  var lo = 0'f32
+  var hi = 1'f32
+  for _ in 0 ..< 30:
+    let mid = 0.5'f32 * (lo + hi)
+    if x(mid) < p: lo = mid else: hi = mid
+  let s = 0.5'f32 * (lo + hi)
+  3 * (1 - s) * s * s + s * s * s
+
 func easeInOut(t: float32): float32 {.inline.} =
   let t = clamp01(t)
   if t < 0.5: 4 * t * t * t else: 1 - pow(-2 * t + 2, 3) / 2
@@ -422,10 +448,11 @@ func mirrored(v, n: float32): float32 {.inline.} =
   n - abs(n - m)
 
 proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
-    frames: int, seed: uint32, color: C = black): Img =
+    frames: int, seed: uint32, color: C = black,
+    inEase = defaultEase, outEase = defaultEase): Img =
   ## `frame` counts frames into the transition, of its `frames`, for flicker
   ## that changes every frame and blur that spans one. `color` is the dip
-  ## color.
+  ## color; `inEase` and `outEase` shape a dissolve.
   let (w, h) = (a.w, a.h)
   let (fw, fh) = (w.float32, h.float32)
   let e = easeInOut(p)
@@ -433,7 +460,10 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   let mid = smooth(0.42, 0.58, p)
 
   case kind
-  of tkDissolve, tkCrossDissolveLegacy:
+  of tkDissolve:
+    result = mixImg(a, b, dissolveCurve(p, inEase, outEase))
+
+  of tkCrossDissolveLegacy:
     result = mixImg(a, b, p)
 
   of tkMorphCut:

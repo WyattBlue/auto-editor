@@ -49,6 +49,7 @@ type
     at*: int64
     dur*: int64
     alignment*: TransitionAlignment
+    easeIn*, easeOut*: float32 = defaultEase ## a dissolve's curve, 0 to 100
   TransitionLink* = object
     incoming*: int32 = -1
     outgoing*: int32 = -1
@@ -58,6 +59,7 @@ type
     start*, dur*: int64
     kind*: TransitionKind
     alignment*: TransitionAlignment
+    easeIn*, easeOut*: float32 = defaultEase
 
 type v3* = object
   layout*: ref AVChannelLayout
@@ -600,7 +602,8 @@ proc bakeTransitions*(source: v3): v3 =
     for t in transitions:
       if isVideo:
         windows.add TransitionWindow(start: t.spanStart, dur: t.dur,
-          kind: t.kind, alignment: t.alignment)
+          kind: t.kind, alignment: t.alignment, easeIn: t.easeIn,
+          easeOut: t.easeOut)
     let plan = transitionPlan(track, transitions)
     let partsPerClip = (if isVideo: 1 else: 3)
     var outTrack = newSeqOfCap[Clip](track.len * partsPerClip + 2)

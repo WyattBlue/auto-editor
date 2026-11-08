@@ -2301,7 +2301,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let dip: tuple[r, g, b: float32] = (tl.bg.red.float32, tl.bg.green.float32,
             tl.bg.blue.float32)
           let img = render(w.kind, fromF.toImg, toF.toImg, below.toImg, p,
-            local.int, w.dur.int, seed, dip)
+            local.int, w.dur.int, seed, dip, w.easeIn, w.easeOut)
           acc = img.fromImg(fromF)
           av_frame_free(addr fromF)
           av_frame_free(addr toF)

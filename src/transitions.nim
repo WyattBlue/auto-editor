@@ -53,6 +53,7 @@ type
 const audioKinds* = {tkDissolve, tkConstantPower, tkExponentialFade}
 const videoKinds* = {low(TransitionKind) .. high(TransitionKind)} -
   {tkConstantPower, tkExponentialFade}
+const defaultEase* = 34'f32 ## Premiere's Ease In and Ease Out for a dissolve
 
 func ti(id, name, matchName: string): TransitionInfo =
   TransitionInfo(id: id, name: name, matchName: matchName)

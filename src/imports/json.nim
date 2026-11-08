@@ -51,6 +51,9 @@ proc parseClip(node: JsonNode, interner: var StringInterner,
 
   result.effects = index.intern(effects, group)
 
+func clampEase(v: float): float32 =
+  if v != v: defaultEase else: float32(clamp(v, 0.0, 100.0))
+
 proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =
   let kind = node{"kind"}.getStr("")
   if not parseTransitionKind(kind, result.kind):
@@ -64,6 +67,8 @@ proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =
   of "center": result.alignment = taCenter
   of "end": result.alignment = taEnd
   else: error "Invalid transition alignment"
+  result.easeIn = clampEase(node{"easeIn"}.getFloat(defaultEase))
+  result.easeOut = clampEase(node{"easeOut"}.getFloat(defaultEase))
 
 proc parseTransitions(node: JsonNode,
     trackCount: int): seq[seq[Transition]] {.raises: [AutoEditorError].} =

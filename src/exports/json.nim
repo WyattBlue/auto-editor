@@ -42,7 +42,7 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
   for track in tracks:
     var arr = newJArray()
     for t in track:
-      arr.add %*{
+      var node = %*{
         "kind": $t.kind,
         "at": t.at,
         "dur": t.dur,
@@ -51,6 +51,9 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
         of taCenter: "center"
         of taEnd: "end")
       }
+      if t.easeIn != defaultEase: node["easeIn"] = %t.easeIn
+      if t.easeOut != defaultEase: node["easeOut"] = %t.easeOut
+      arr.add node
     result.add arr
 
 func `%`(self: v1): JsonNode {.raises: [].} =
