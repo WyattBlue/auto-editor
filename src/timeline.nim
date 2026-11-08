@@ -479,12 +479,28 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
     for p in placed:
       if p.video == video and p.dur > 0 and p.align in 0 .. 2: wanted.add p
     wanted.sort(proc (a, b: PlacedTransition): int = cmp(a.at, b.at))
+    # Clips in order and apart have their starts and ends in order too, so
+    # a search finds the few within two frames instead of a scan of all.
+    var ordered = true
+    for i, c in clips:
+      if c.dur < 0 or (i > 0 and c.start < clips[i - 1].start + clips[i - 1].dur):
+        ordered = false
+        break
     var priorEnd = low(int64)
     for p in wanted:
       let align = TransitionAlignment(p.align)
       var best = -1
       var bestDist = 3'i64
-      for i, c in clips:
+      var first = 0
+      var last = clips.len
+      if ordered:
+        let atEnd = align == taEnd
+        proc edgeCmp(c: Clip, key: int64): int =
+          cmp((if atEnd: c.start + c.dur else: c.start), key)
+        first = clips.lowerBound(p.at - 2, edgeCmp)
+        last = clips.upperBound(p.at + 2, edgeCmp)
+      for i in first ..< last:
+        let c = clips[i]
         # Start: a clip begins here; end: one ends; center: one ends where
         # the next begins.
         let edge = case align

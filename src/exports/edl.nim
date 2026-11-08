@@ -23,6 +23,8 @@ type
     dur: int64    # transition frames; -1 on a cut
     srcIn, srcOut, recIn, recOut: int64
 
+  EventKey = (ptr string, int16, int64, int64, int64)
+
   Event = object
     lines: seq[Line]
     comments: seq[string]
@@ -32,7 +34,7 @@ type
     # Linked cut events of one clip on V and A merge into one: the clip's
     # source, stream, bounds and source in point.
     mergeable: bool
-    key: (ptr string, int16, int64, int64, int64)
+    key: EventKey
     order: (int64, int)
 
 func channelCode(channels: set[Channel]): string =
@@ -96,7 +98,7 @@ type TrackExport = object
   transitions: seq[Transition]
 
 proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
-    base: int64): seq[Event] =
+    paths: Table[ptr string, string], base: int64): seq[Event] =
   let plan = transitionPlan(track.clips, track.transitions)
   let order = (if track.video: 0 else: ord(track.channel))
 
@@ -147,14 +149,14 @@ proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
       line.recOut = recOut
       ev.lines.add line
       ev.comments.add "TO CLIP NAME: " & name
-      ev.comments.add "SOURCE FILE: " & absolutePath(clip.src[])
+      ev.comments.add "SOURCE FILE: " & paths[clip.src]
       ev.comments.add "EFFECT NAME: " & transitionName(t.kind, track.video)
     else:
       let srcIn = clip.sourceAt(recIn)
       ev.lines.add Line(reel: reel, trans: "C", dur: -1, srcIn: srcIn,
         srcOut: srcIn + (recOut - recIn), recIn: recIn, recOut: recOut)
       ev.comments.add "FROM CLIP NAME: " & name
-      ev.comments.add "SOURCE FILE: " & absolutePath(clip.src[])
+      ev.comments.add "SOURCE FILE: " & paths[clip.src]
 
     if speed != 1.0:
       # `M2 REEL fps source-in`: the source frames played a second.
@@ -185,6 +187,10 @@ proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
 proc edlWrite*(name, output: string, tl: v3) =
   let base = timecodeBase(tl.tb)
   let reels = assignReels(tl)
+  # absolutePath reads the cwd from the OS each call; resolve each file once.
+  var paths: Table[ptr string, string]
+  for src in reels.keys:
+    paths[src] = absolutePath(src[])
 
   var tracks: seq[TrackExport]
   if tl.v.len > 0:
@@ -197,17 +203,19 @@ proc edlWrite*(name, output: string, tl: v3) =
     warning "EDLs hold four audio channels; audio tracks past the fourth were left out"
 
   var events: seq[Event]
+  var mergeable: Table[EventKey, seq[int]] # key to events, in order
   for track in tracks:
-    for ev in trackEvents(tl, track, reels, base):
+    for ev in trackEvents(tl, track, reels, paths, base):
       var merged = false
       if ev.mergeable:
-        for prev in events.mitems:
-          if prev.mergeable and prev.key == ev.key and
-              channelCode(prev.channels + ev.channels) != "":
-            prev.channels.incl ev.channels
+        for i in mergeable.getOrDefault(ev.key):
+          if channelCode(events[i].channels + ev.channels) != "":
+            events[i].channels.incl ev.channels
             merged = true
             break
       if not merged:
+        if ev.mergeable:
+          mergeable.mgetOrPut(ev.key, @[]).add events.len
         events.add ev
   events.sort(proc (a, b: Event): int = cmp(a.order, b.order))
 

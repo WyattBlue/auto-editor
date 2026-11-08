@@ -276,7 +276,7 @@ proc trackPanner(): JsonNode =
     keyframeParam("Balance", 0),
   ))
 
-proc mediaRef(mi: MediaInfo, rate, availDur: float): JsonNode =
+proc mediaRef(url: string, rate, availDur: float): JsonNode =
   ## `availDur` is the available media length in frames. For a still image this
   ## must cover the clip's source range, not the still's 1-frame "duration":
   ## Premiere maps a clip's effect-keyframe times against the media extent, so a
@@ -293,7 +293,7 @@ proc mediaRef(mi: MediaInfo, rate, availDur: float): JsonNode =
         "start_time": rationalTime(rate, 0.0)
     },
     "available_image_bounds": nil,
-    "target_url": mi.path.absPath.pathToUri()
+    "target_url": url
   }
   }
 
@@ -313,8 +313,8 @@ proc hasAction(actions: Actions, kind: ActionKind): bool =
     if a.kind == kind:
       return true
 
-proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
-    tb: AVRational, isVideo: bool, linkId: int, nbCh: int,
+proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, url: string,
+    rate: float, tb: AVRational, isVideo: bool, linkId: int, nbCh: int,
     res: (int32, int32)): JsonNode =
   let speed = clipSpeed(actions)
   let srcStart = round(clip.offset.float * speed)
@@ -368,7 +368,7 @@ proc buildClip(clip: Clip, actions: Actions, mi: MediaInfo, rate: float,
     "effects": effectsArr,
     "markers": newJArray(),
     "enabled": true,
-    "media_references": mediaRef(mi, rate, availDur),
+    "media_references": mediaRef(url, rate, availDur),
     "active_media_reference_key": "DEFAULT_MEDIA"
   }
 
@@ -435,7 +435,8 @@ proc bgClip(mi: MediaInfo, tl: v3, rate: float): JsonNode =
     ),
     "markers": newJArray(),
     "enabled": true,
-    "media_references": mediaRef(mi, rate, tl.len.float),
+    "media_references": mediaRef(mi.path.absPath.pathToUri(), rate,
+      tl.len.float),
     "active_media_reference_key": "DEFAULT_MEDIA"
   }
 
@@ -483,8 +484,11 @@ proc otioWrite*(name, output: string, tl: v3) =
   let nbCh = (if tl.layout != nil: tl.layout.nb_channels.int else: 2)
 
   var ptrToMi = initTable[ptr string, MediaInfo]()
+  # absPath reads the cwd from the OS each call; resolve each file once.
+  var urls = initTable[ptr string, string]()
   for ptrSrc in tl.uniqueSources:
     ptrToMi[ptrSrc] = initMediaInfo(ptrSrc[])
+    urls[ptrSrc] = ptrToMi[ptrSrc].path.absPath.pathToUri()
 
   let children = newJArray()
 
@@ -540,8 +544,9 @@ proc otioWrite*(name, output: string, tl: v3) =
           clipArr.add transitionNode(rate, t, true)
       if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
       let actions = tl.effects[clip.effects]
-      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = true, linkId = linkIdFor(clip), nbCh = nbCh, res = tl.res)
+      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
+        rate, tb = tl.tb, isVideo = true, linkId = linkIdFor(clip), nbCh = nbCh,
+        res = tl.res)
       cursor = clip.start + clip.dur
       if transitionLinks[j].outgoing >= 0:
         let t = transitions[transitionLinks[j].outgoing]
@@ -578,8 +583,9 @@ proc otioWrite*(name, output: string, tl: v3) =
           clipArr.add transitionNode(rate, t, false)
       if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
       let actions = tl.effects[clip.effects]
-      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], rate, tb = tl.tb,
-        isVideo = false, linkId = linkIdFor(clip), nbCh = nbCh, res = tl.res)
+      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
+        rate, tb = tl.tb, isVideo = false, linkId = linkIdFor(clip), nbCh = nbCh,
+        res = tl.res)
       cursor = clip.start + clip.dur
       if transitionLinks[j].outgoing >= 0:
         let t = transitions[transitionLinks[j].outgoing]

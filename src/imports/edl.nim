@@ -189,14 +189,25 @@ func guessRate(p: Parsed): AVRational =
   else: AVRational(num: 24, den: 1)
 
 type Track = object
-  clips: seq[Clip]
+  clips: seq[Clip] # by start, none overlapping
+  maxDur: int64
+
+func byStart(c: Clip, key: int64): int = cmp(c.start, key)
+
+func has(track: Track, clip: Clip): bool =
+  ## Whether the track holds `clip`. No two of its clips start together.
+  let i = track.clips.lowerBound(clip.start, byStart)
+  i < track.clips.len and track.clips[i] == clip
 
 proc overwrite(track: var Track, clip: Clip) =
   ## Lay `clip` over the track, as an EDL event records over what was there.
   let lo = clip.start
   let hi = clip.start + clip.dur
+  # Clips starting by lo - maxDur end by lo, so only those after them can be
+  # cut; rebuilding just that tail keeps a long cut list linear.
+  let first = track.clips.upperBound(lo - track.maxDur, byStart)
   var kept: seq[Clip]
-  for c in track.clips:
+  for c in track.clips.toOpenArray(first, track.clips.high):
     let cEnd = c.start + c.dur
     if cEnd <= lo or c.start >= hi:
       kept.add c
@@ -213,7 +224,9 @@ proc overwrite(track: var Track, clip: Clip) =
       kept.add right
   kept.add clip
   kept.sort(proc (a, b: Clip): int = cmp(a.start, b.start))
-  track.clips = kept
+  track.clips.setLen(first)
+  track.clips.add kept
+  track.maxDur = max(track.maxDur, clip.dur)
 
 type Importer = object
   base: int64
@@ -275,8 +288,7 @@ proc lay(im: var Importer, line: Line, start, dur, srcFrames: int64,
       effects: effects, stream: stream)
     # The same stream laid again on another channel would play twice over.
     for i in 0 ..< min(layer, im.audio.len):
-      for c in im.audio[i].clips:
-        if c == clip: return
+      if im.audio[i].has(clip): return
     while im.audio.len <= layer: im.audio.add Track()
     im.audio[layer].overwrite clip
 
