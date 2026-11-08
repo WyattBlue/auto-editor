@@ -1014,12 +1014,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if sar.isValid:
       encoderCtx.sample_aspect_ratio = sar
 
-  # The format frames will arrive in, or NONE when the timeline carries no video
-  # source at all and every frame is synthesized.
-  let srcPixFmt =
-    if firstSrc != nil: AVPixelFormat(myCache.cns[firstSrc].video[0].codecpar.format)
-    else: AV_PIX_FMT_NONE
-
   if video.bitrate >= 0:
     encoderCtx.bit_rate = video.bitrate
     debug(&"video bitrate: {encoderCtx.bit_rate}")

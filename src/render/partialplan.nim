@@ -413,7 +413,7 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
           # A WebCodecs decoder hands over whatever layout the browser picked
           # (NV12 from hardware decoders), while the encoder was opened for
           # the stream's own format.
-          var toEncode = decoded.reformat(AVPixelFormat(encoder.pix_fmt))
+          var toEncode = decoded.reformat(encoder.pix_fmt)
           if lastDecoded != nil:
             av_frame_free(addr lastDecoded)
           lastDecoded = av_frame_clone(toEncode)
