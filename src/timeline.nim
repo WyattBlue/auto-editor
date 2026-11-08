@@ -45,11 +45,11 @@ type
   TransitionAlignment* = enum
     taStart, taCenter, taEnd
   Transition* = object
-    kind*: TransitionKind
     at*: int64
     dur*: int64
-    alignment*: TransitionAlignment
     easeIn*, easeOut*: float32 = defaultEase ## a dissolve's curve, 0 to 100
+    kind*: TransitionKind
+    alignment*: TransitionAlignment
   TransitionLink* = object
     incoming*: int32 = -1
     outgoing*: int32 = -1
@@ -57,9 +57,9 @@ type
     ## A baked video transition: the frames from `start` for `dur` on its
     ## track blend the clips there by `kind`.
     start*, dur*: int64
+    easeIn*, easeOut*: float32 = defaultEase
     kind*: TransitionKind
     alignment*: TransitionAlignment
-    easeIn*, easeOut*: float32 = defaultEase
 
 type v3* = object
   layout*: ref AVChannelLayout
