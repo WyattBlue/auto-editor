@@ -52,7 +52,7 @@ func reelName(path: string): string =
   ## Eight characters of the file's stem, in the charset every reader takes.
   for ch in agSplitFile(path).name:
     if result.len == 8: break
-    if ch in {'a' .. 'z'}: result.add chr(ord(ch) - 32)
+    if ch in {'a' .. 'z'}: result.add toUpperAscii(ch)
     elif ch in {'A' .. 'Z', '0' .. '9'}: result.add ch
     elif ch in {' ', '-', '_', '.'}: result.add '_'
   if result.len == 0: result = "AX"

@@ -1,6 +1,8 @@
 ## The kinds of edit-point transitions, after Premiere Pro's own (its Film
 ## Impact, Morph Cut and Immersive Video sets, and its audio crossfades).
 
+from std/strutils import toLowerAscii
+
 type
   TransitionKind* = enum
     tkDissolve # Cross Dissolve on video, Constant Gain on audio
@@ -225,7 +227,7 @@ func kindFromMatchName*(matchName: string, kind: var TransitionKind): bool =
 
 func normalized(name: string): string =
   for ch in name:
-    if ch in {'A' .. 'Z'}: result.add chr(ord(ch) + 32)
+    if ch in {'A' .. 'Z'}: result.add toLowerAscii(ch)
     elif ch in {'a' .. 'z', '0' .. '9', '+'}: result.add ch
 
 func kindFromName*(name: string, video: bool, kind: var TransitionKind): bool =
