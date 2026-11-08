@@ -1,0 +1,44 @@
+--- a/ggml/src/ggml-metal/CMakeLists.txt
++++ b/ggml/src/ggml-metal/CMakeLists.txt
+@@ -122,6 +122,9 @@
+             COMMAND sed -e "/__embed_ggml-common.h__/r ${METALLIB_COMMON}" -e "/__embed_ggml-common.h__/d" < "${EMBED}.tmp2" > "${EMBED}.tmp3"
+             # Step 4: inline ggml-metal-impl.h
+             COMMAND sed -e "/\#include \"ggml-metal-impl.h\"/r ${METALLIB_IMPL}" -e "/\#include \"ggml-metal-impl.h\"/d" < "${EMBED}.tmp3" > "${EMBED}"
++            # Step 4b: LZMA-compress it; the shared headers repeat in every
++            #   kind, so this is about an eighth of the size
++            COMMAND compression_tool -encode -a lzma -i "${EMBED}" -o "${EMBED}.xz"
+             # Step 5: emit an asm chunk with kind-specific start/end symbols
+             #   note: '-' is illegal in C symbols, so we use kind_sym; the macOS
+             #   section name is limited to 16 chars so we keep it shared
+@@ -129,7 +132,7 @@
+             COMMAND echo ".section __DATA,__ggml_metallib"                       >  "${ASM}"
+             COMMAND echo ".globl _ggml_metallib_${kind_sym}_start"               >> "${ASM}"
+             COMMAND echo "_ggml_metallib_${kind_sym}_start:"                     >> "${ASM}"
+-            COMMAND echo .incbin "\"${EMBED}\""                                  >> "${ASM}"
++            COMMAND echo .incbin "\"${EMBED}.xz\""                               >> "${ASM}"
+             COMMAND echo ".globl _ggml_metallib_${kind_sym}_end"                 >> "${ASM}"
+             COMMAND echo "_ggml_metallib_${kind_sym}_end:"                       >> "${ASM}"
+             DEPENDS ${HEADERS_FOR_SRC} ../ggml-common.h ggml-metal-impl.h
+--- a/ggml/src/ggml-metal/ggml-metal-device.m
++++ b/ggml/src/ggml-metal/ggml-metal-device.m
+@@ -485,10 +485,16 @@
+ 
+     const bool ok = ggml_metal_library_compile_all(res, device, prep,
+         ^NSString * (int kind, NSError ** err) {
+-            (void) err;
+-            return [[NSString alloc] initWithBytes:lib_start[kind]
+-                                            length:(lib_end[kind] - lib_start[kind])
+-                                          encoding:NSUTF8StringEncoding];
++            // embedded LZMA-compressed (xz), see CMakeLists.txt
++            NSData * packed = [NSData dataWithBytesNoCopy:(void *) lib_start[kind]
++                                                   length:(lib_end[kind] - lib_start[kind])
++                                             freeWhenDone:NO];
++            NSData * data = [packed decompressedDataUsingAlgorithm:NSDataCompressionAlgorithmLZMA
++                                                             error:err];
++            if (data == nil) {
++                return nil;
++            }
++            return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+         }, "embedded data");
+ 
+     if (!ok) {
