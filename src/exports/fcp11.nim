@@ -183,7 +183,9 @@ proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
   let map = initSpeedMap(effectGroup)
   if map.mean != 1.0 or map.ramp:
     let timemap = newElement("timeMap")
-    proc point(time: int64, value: float64, interp: string) {.raises: [].} =
+    # A template, not a closure: capturing `tl` would copy the whole
+    # timeline on every call.
+    template point(time: int64, value: float64, interp: string) =
       let p = newElement("timept")
       p.attrs = {"time": fraction(time, tl.tb), "value": mediaFraction(value, tl.tb),
         "interp": interp}.toXmlAttributes
@@ -335,9 +337,9 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
       # those clips' too.
       let lo = (if i == 0: 0'i64 else: clip.start)
       var hi = high(int64)
-      for later in clips[i + 1 .. ^1]:
-        if later.src != nil:
-          hi = later.start
+      for j in i + 1 ..< clips.len:
+        if clips[j].src != nil:
+          hi = clips[j].start
           break
       asset.anchorCaptions(tl, clip, startPoint, lo, hi, styleId)
       if plan[i].outgoing >= 0:
