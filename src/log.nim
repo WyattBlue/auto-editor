@@ -117,6 +117,7 @@ type PlacedTransition* = object
   align*: int
   video*: bool
   kind*: TransitionKind
+  easeIn*, easeOut*: float32 = defaultEase
 
 type VideoSettings* = object
   codec*: string = "auto"

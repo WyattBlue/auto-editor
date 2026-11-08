@@ -501,7 +501,7 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
       let c = clips[best]
       let fits = p.kind in (if video: videoKinds else: audioKinds)
       var t = Transition(kind: (if fits: p.kind else: tkDissolve),
-        alignment: align, dur: p.dur)
+        alignment: align, dur: p.dur, easeIn: p.easeIn, easeOut: p.easeOut)
       case align
       of taStart:
         t.at = c.start
