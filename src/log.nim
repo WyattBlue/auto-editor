@@ -17,7 +17,7 @@ type
     modern, classic, ascii, machine, none
   ExportKind* = enum
     exAuto, exDefault, exClipSequence, exV1, exV2, exV3, exPremiere, exResolveFcp7,
-    exFinalCutPro, exResolve, exShotcut, exKdenlive, exPremiereOtio
+    exFinalCutPro, exResolve, exShotcut, exKdenlive, exPremiereOtio, exEdl
   ExportSpec* = object
     kind*: ExportKind
     name*: string
@@ -40,6 +40,7 @@ func `$`*(kind: ExportKind): string {.raises: [].} =
   of exShotcut: "shotcut"
   of exKdenlive: "kdenlive"
   of exPremiereOtio: "premiere-otio"
+  of exEdl: "edl"
 
 func pack*(flag: bool, number: int64): PackedInt {.raises: [].} =
   let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64

@@ -165,8 +165,8 @@ Instead of rendering, export a project you can open in your editor:
 auto-editor video.mp4 --export premiere
 ```
 
-Auto-editor can also export to `resolve`, `final-cut-pro`, `shotcut`, and
-`kdenlive`. To get each kept section as its own file, use `clip-sequence`:
+Auto-editor can also export to `resolve`, `final-cut-pro`, `shotcut`,
+`kdenlive`, and `edl`. To get each kept section as its own file, use `clip-sequence`:
 
 ```sh
 auto-editor video.mp4 --export clip-sequence

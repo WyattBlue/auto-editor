@@ -95,6 +95,7 @@ Auto-Editor can also export to:
 - Final Cut Pro with `--export final-cut-pro`
 - ShotCut with `--export shotcut`
 - Kdenlive with `--export kdenlive`
+- CMX 3600 EDL with `--export edl`
 - Individual media clips with `--export clip-sequence`
 
 <h2 align="center">More Options</h2>

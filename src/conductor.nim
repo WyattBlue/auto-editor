@@ -7,8 +7,8 @@ import ./[av, action, edit, ffmpeg, license, log, media, stats, timeline]
 import ./lib/editutil
 import ./util/[color, bar, fun, lang, rules, rational]
 
-import ./imports/[fcp7, fcp11, json]
-import ./exports/[drops, fcp7, fcp11, json, shotcut, kdenlive, otio]
+import ./imports/[edl, fcp7, fcp11, json]
+import ./exports/[drops, edl, fcp7, fcp11, json, shotcut, kdenlive, otio]
 import ./render/[format, subtitle]
 
 proc freeActions*(args: mainArgs, tl: v3) =
@@ -59,6 +59,7 @@ proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorErro
     elif exportStr.prefixEquals("shotcut", kindEnd): exShotcut
     elif exportStr.prefixEquals("kdenlive", kindEnd): exKdenlive
     elif exportStr.prefixEquals("premiere-otio", kindEnd): exPremiereOtio
+    elif exportStr.prefixEquals("edl", kindEnd): exEdl
     else: error &"Unknown export format: {exportStr[0 ..< kindEnd]}"
 
   if colonPos == -1:
@@ -158,6 +159,7 @@ proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
     of exShotcut: ".mlt"
     of exKdenlive: ".kdenlive"
     of exPremiereOtio: ".otio"
+    of exEdl: ".edl"
     of exV1: (if ext == ".json": ext else: ".v1")
     of exV2: ".v2"
     of exV3: ".v3"
@@ -191,6 +193,7 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
       of ".mlt": myExport = exShotcut
       of ".kdenlive": myExport = exKdenlive
       of ".otio": myExport = exPremiereOtio
+      of ".edl": myExport = exEdl
       of ".json", ".v1": myExport = exV1
       of ".v2": myExport = exV2
       of ".v3": myExport = exV3
@@ -450,6 +453,10 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       tlV3 = fcp7ReadXml(input, interner)
       tlV3.applyArgs(args, audio)
       usePath = input
+    elif inputExt == ".edl":
+      tlV3 = edlRead(input, interner, args.frameRate)
+      tlV3.applyArgs(args, audio)
+      usePath = input
     elif inputExt in [".fcpxml", ".fcpxmld"]:
       tlV3 = fcp11ReadXml(input, interner)
       tlV3.applyArgs(args, audio)
@@ -701,6 +708,9 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
     return
   of exPremiereOtio:
     otioWrite(tlName, output, tlV3)
+    return
+  of exEdl:
+    edlWrite(tlName, output, tlV3)
     return
   of exDefault, exClipSequence:
     discard

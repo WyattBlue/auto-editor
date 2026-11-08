@@ -96,6 +96,7 @@ video kinds; audio tracks take `dissolve`, `constant-power` or
 | `premiere`, `resolve-fcp7` (FCP7 XML) | Cross Dissolve; the dips (as Dip to Color Dissolve, which Premiere reads as its Dip to Black or White); `wipe` (as Edge Wipe); Cross Fade (0dB) or (+3dB) for audio. Every other kind becomes a dissolve. |
 | `final-cut-pro`, `resolve` (FCPXML) | Cross Dissolve spine transitions. |
 | `shotcut`, `kdenlive` | Same-track dissolves and crossfades, fade filters at the ends. |
+| `edl` | Dissolves (`D`) and `wipe` (`W001`) events; every kind is named in an `* EFFECT NAME:` comment, which the EDL import reads back. Editors play the kinds their EDL readers know. |
 | `v3` | Every kind, unchanged. |
 
 To bring the kinds into Premiere, use `premiere-otio`. `v1`, `v2` and

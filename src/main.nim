@@ -650,7 +650,7 @@ judge making cuts.
         let outputExt = agSplitFile(args.output).ext.toLowerAscii
         let keepRecording = args.`export`.kind notin
           {exAuto, exDefault, exClipSequence} or
-          outputExt in [".xml", ".fcpxml", ".mlt", ".kdenlive", ".otio",
+          outputExt in [".xml", ".fcpxml", ".mlt", ".kdenlive", ".otio", ".edl",
                         ".json", ".v1", ".v2", ".v3"]
         var capturePath: string
         if keepRecording:

@@ -85,6 +85,7 @@ The native render and every editor export carry transitions:
 | `final-cut-pro`, `resolve` (FCPXML) | Cross Dissolve spine transitions |
 | `shotcut` | Same-track transitions (luma + mix), fade filters at the ends |
 | `kdenlive` | Same-track mixes, fade filters at the ends |
+| `edl` | Dissolves and `wipe` as EDL events, every kind by name in an `EFFECT NAME` comment |
 
 FCP7 XML, FCPXML, Shotcut and Kdenlive have no way to name most of Premiere's
 transitions, so those exports dissolve where the timeline has another kind.

@@ -35,11 +35,12 @@ func support(kind: ExportKind): Support {.raises: [].} =
   of exPremiereOtio:
     Support(actions: {actSpeed, actOpacity, actPos, actRotate, actSpin,
       actInvert, actHflip, actVflip}, v: lrAll, a: lrAll)
+  of exEdl: Support(actions: {actSpeed}, v: lrBase, a: lrAll)
   else: Support(v: lrAll, a: lrAll)
 
 func isEditorExport*(kind: ExportKind): bool {.raises: [].} =
   kind in {exPremiere, exResolveFcp7, exFinalCutPro, exResolve, exShotcut,
-    exKdenlive, exPremiereOtio}
+    exKdenlive, exPremiereOtio, exEdl}
 
 func appliesTo(kind: ActionKind, video: bool): bool {.raises: [].} =
   # Every clip of a section shares its action group, so a video clip also
