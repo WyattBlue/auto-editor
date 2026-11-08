@@ -4,14 +4,14 @@ import ffmpeg
 import util/rational
 
 type AudioResampler* = object
-  graph*: ptr AVFilterGraph
   layout: AVChannelLayout
+  templateLayout: AVChannelLayout
+  graph*: ptr AVFilterGraph
   abuffer: ptr AVFilterContext
   abuffersink: ptr AVFilterContext
   frameSize: cint
   templateFormat: cint
   templateRate: cint
-  templateLayout: AVChannelLayout
   format: cint
   rate: cint
   isPassthrough: bool

@@ -286,11 +286,11 @@ proc close*(g: var GapFiller) =
 type
   MicReaderArgs = object
     fmtCtx: ptr AVFormatContext
-    streamIndex: cint
     stop: ptr bool # the caller's Ctrl-C flag
-    quit: bool # set by close()
     packets: Channel[ptr AVPacket]
+    streamIndex: cint
     err: cint # why reading ended; 0 = asked to stop
+    quit: bool # set by close()
 
   MicReader* = ref object
     args: MicReaderArgs

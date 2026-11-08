@@ -58,10 +58,10 @@ type
     # Easing envelope shared by every animatable action (zoom/blur/opacity/
     # brightness/volume/pos). Defaults (off, linear, whole-clip) make a static
     # action sample trivially, so non-animated actions just ignore these.
+    easeDur*: float32        # magnitude in easeDurUnit (ignored for duClip)
     hasEase*: bool
     easeCurve*: Easing
     easeDurUnit*: DurUnit
-    easeDur*: float32        # magnitude in easeDurUnit (ignored for duClip)
     case kind*: ActionKind
     of actInvert, actHflip, actVflip, actLoop, actErosion:
       discard

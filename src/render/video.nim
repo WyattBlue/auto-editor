@@ -16,16 +16,16 @@ type VideoFrame = object
   index: int
   src: ptr string
   effects: Actions
-  gen: bool      # source-less overlay (`add:confetti`): draw on a clear canvas
   local: int     # frame offset within the clip, for animated effects
   srcSecs: float
   dur: int       # clip length in frames
+  layer: int
+  win: int = -1  # the layer's transition window it is in, if any
   x: float32     # overlay placement (canvas pixels, sub-pixel); 0 for the base layer
   y: float32
   scale: float32 # overlay size multiplier; 1.0 for the base layer
+  gen: bool      # source-less overlay (`add:confetti`): draw on a clear canvas
   fit: bool      # no explicit `pos`: fit-and-center to the canvas like the base
-  layer: int
-  win: int = -1  # the layer's transition window it is in, if any
   incoming: bool # in its window, the clip coming in rather than going out
 
 # Identity of a configured effect filter graph: everything that determines the
@@ -205,7 +205,6 @@ type
     ## timeline frame needs it at two places, as across a dissolve, so neither
     ## place makes the other seek back to a keyframe every frame.
     cn: InputContainer
-    ownsCn: bool                # opened for this decoder, not the media cache's
     decoder: ptr AVCodecContext
     held: ptr AVFrame           # last decoded frame, held for forward reuse
     frameIndex: int             # current source position; -1 = none yet
@@ -214,8 +213,9 @@ type
     lastSeekTarget: int         # -1 = no seek performed yet
     lastReqIndex: int           # last obj.index requested (held-frame reuse)
     loopBase: int               # source frames consumed by completed loops
-    hasSeekFrame: bool          # whether seekFrame holds a pending marker
     usedAt: int64               # timeline frame it last decoded for; -1 = never
+    ownsCn: bool                # opened for this decoder, not the media cache's
+    hasSeekFrame: bool          # whether seekFrame holds a pending marker
 
   SrcState = ref object
     kfFrames: seq[int]          # indexed keyframe frame numbers

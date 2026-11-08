@@ -13,8 +13,8 @@ type
     ekAll      ## no frame active
 
   EditMethod* = object
-    threshold*: Unorm16 ## audio, motion, blackdetect
     stream*: int        ## -1 is every audio stream (audio only)
+    threshold*: Unorm16 ## audio, motion, blackdetect
     case kind*: EditMethodKind
     of ekAudio:
       channel*: string ## a channel name such as "left", or "all"
