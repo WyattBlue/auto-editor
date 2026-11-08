@@ -4,9 +4,10 @@
 ## what it holds. Output matches xmltree's `$` except that attributes keep
 ## insertion order.
 
-import std/[parsexml, streams, tables]
+import std/tables
 import std/macros except error
 import ../log
+import ./xmllexer
 
 type
   XmlAttributes* = seq[(string, string)]
@@ -16,7 +17,9 @@ type
     xnText
     xnVerbatimText # written without escaping
 
-  XmlNode* = ref object
+  # A tree, never a cycle: acyclic spares ORC tracking every node as a
+  # possible cycle root, which costs more than parsing on large imports.
+  XmlNode* {.acyclic.} = ref object
     kind*: XmlNodeKind
     str: string # the element name, or a text node's text
     attrs*: XmlAttributes
@@ -206,13 +209,13 @@ type
   XmlTooDeep = object of CatchableError
 
   XmlReader = object
-    x: XmlParser
+    x: XmlLexer
     errors: seq[string]
     tags: seq[string] # literals: a copy shares their storage
     tagIds: Table[string, int]
 
 proc parseElement(r: var XmlReader, depth: int): XmlNode
-    {.raises: [IOError, OSError, ValueError, XmlTooDeep].}
+    {.raises: [IOError, XmlTooDeep].}
 
 proc addText(parent: XmlNode, text: string) =
   # Adjacent runs share one node: innerText reads the same, with fewer nodes.
@@ -222,7 +225,7 @@ proc addText(parent: XmlNode, text: string) =
     parent.children.add newText(text)
 
 proc parseChildren(r: var XmlReader, n: XmlNode, depth: int)
-    {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
+    {.raises: [IOError, XmlTooDeep].} =
   if depth > xmlMaxDepth:
     raise newException(XmlTooDeep, "")
   while true:
@@ -255,7 +258,7 @@ proc parseChildren(r: var XmlReader, n: XmlNode, depth: int)
       r.x.next()
 
 proc parseElement(r: var XmlReader, depth: int): XmlNode
-    {.raises: [IOError, OSError, ValueError, XmlTooDeep].} =
+    {.raises: [IOError, XmlTooDeep].} =
   let id = r.tagIds.getOrDefault(r.x.elementName, -1)
   result = newElement(if id >= 0: r.tags[id] else: r.x.elementName)
   if r.x.kind == xmlElementOpen:
@@ -286,17 +289,15 @@ proc parseXmlFile*(path: string, knownTags: openArray[string] = []): XmlNode
   ## CDATA reads as text; comments and processing instructions are left out.
   ## Elements named in `knownTags`, a const list, share its strings instead
   ## of each holding a copy of its name.
-  var s: FileStream
+  var r: XmlReader
   try:
-    s = openFileStream(path)
+    r.x.open(path)
   except IOError:
     error "Cannot read: " & path
-  var r: XmlReader
   for i, tag in knownTags:
     r.tags.add tag
     r.tagIds[tag] = i
   try:
-    r.x.open(s, path)
     while true:
       r.x.next()
       case r.x.kind
@@ -313,8 +314,9 @@ proc parseXmlFile*(path: string, knownTags: openArray[string] = []): XmlNode
       else:
         r.errors.add errorMsg(r.x, "<some_tag> expected")
         break
-    r.x.close()
-  except IOError, OSError, ValueError:
+  except IOError:
     error "Cannot read: " & path
+  finally:
+    r.x.close()
   if r.errors.len > 0:
     error "Failed to parse XML: " & r.errors[0]
