@@ -632,7 +632,7 @@ judge making cuts.
   # Multiple inputs are handled later by the multi-source render/export policy
   # in conductor.editMedia, which also covers imported timelines.
   if args.adds.len > 0:
-    requireLicense(args, "use the `add` action")
+    requireLicense(args, "use the `add` action", "cli-add")
 
   var micTempPath = ""
   defer:

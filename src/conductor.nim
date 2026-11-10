@@ -675,7 +675,8 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   # file/stdin, which never pass through the CLI-level checks.
   if tlV3.numberOfSrc > 1 and
       exportKind notin {exDefault, exClipSequence}:
-    requireLicense(args, "export a timeline with multiple sources")
+    requireLicense(args, "export a timeline with multiple sources",
+      "cli-multi-src")
 
   warnDrops(tlV3, exportKind)
 
