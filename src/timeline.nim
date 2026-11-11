@@ -111,6 +111,79 @@ func uniqueSources*(self: v3): HashSet[ptr string] {.raises: [].} =
 proc updateNumberOfSrc*(self: var v3) {.raises: [].} =
   self.numberOfSrc = self.uniqueSources.len
 
+proc rescaleKt(kt: var seq[KfTime], k: float64): bool =
+  for t in kt.mitems:
+    if t.unit == kuFrames:
+      t.at = float32(round(t.at.float64 * k))
+      result = true
+
+proc rescaleAction(a: var Action, k: float64): bool =
+  if a.hasEase and a.easeDurUnit == duFrames:
+    a.easeDur = max(1'f32, float32(round(a.easeDur.float64 * k)))
+    result = true
+  case a.kind
+  of actZoom, actBlur, actOpacity, actBrightness, actVolume:
+    result = rescaleKt(a.kt, k) or result
+  of actPos:
+    result = rescaleKt(a.pxKt, k) or result
+    result = rescaleKt(a.pyKt, k) or result
+    result = rescaleKt(a.pscaleKt, k) or result
+  of actPixelate:
+    result = rescaleKt(a.pixWKt, k) or result
+    result = rescaleKt(a.pixHKt, k) or result
+  else: discard
+
+proc rescale*(self: var v3, tb: AVRational) {.raises: [ActionParseError].} =
+  if not tb.isValid or (tb.num == self.tb.num and tb.den == self.tb.den):
+    return
+  let k = float64(tb.num) * float64(self.tb.den) / (float64(tb.den) * float64(self.tb.num))
+  func at(x: int64): int64 = int64(round(x.float64 * k))
+  proc span(start, dur: var int64) =
+    let stop = at(start + dur)
+    start = at(start)
+    dur = max(stop - start, 1)
+
+  var repacked: seq[(int, Actions)]
+  try:
+    for i, e in self.effects:
+      if e.isCut or e.isEmpty: continue
+      var list: seq[Action]
+      var changed = false
+      for a in e:
+        var a = a
+        changed = rescaleAction(a, k) or changed
+        list.add a
+      if changed: repacked.add (i, newActions(list))
+  except ActionParseError as err:
+    for (_, e) in repacked: free(e)
+    raise err
+  for (i, e) in repacked:
+    free(self.effects[i])
+    self.effects[i] = e
+
+  for tracks in [addr self.v, addr self.a, addr self.s]:
+    for track in tracks[].mitems:
+      for clip in track.mitems:
+        clip.offset = at(clip.offset)
+        span(clip.start, clip.dur)
+  for clip in self.clips2.mitems:
+    let stop = at(clip.`end`)
+    clip.start = at(clip.start)
+    clip.`end` = max(stop, clip.start + 1)
+  for track in self.c.mitems:
+    for cue in track.cues.mitems:
+      span(cue.start, cue.dur)
+  for tracks in [addr self.vt, addr self.at]:
+    for track in tracks[].mitems:
+      for t in track.mitems:
+        t.at = at(t.at)
+        t.dur = max(at(t.dur), 1)
+        if t.alignment == taCenter: t.dur = max(t.dur div 2 * 2, 2)
+  for track in self.windows.mitems:
+    for w in track.mitems:
+      span(w.start, w.dur)
+  self.tb = tb
+
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
 
