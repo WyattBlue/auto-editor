@@ -190,9 +190,10 @@ func guessRate(p: Parsed): AVRational =
 
 type Track = object
   clips: seq[Clip] # by start, none overlapping
-  maxDur: int64
 
 func byStart(c: Clip, key: int64): int = cmp(c.start, key)
+
+func byEnd(c: Clip, key: int64): int = cmp(c.start + c.dur, key)
 
 func has(track: Track, clip: Clip): bool =
   ## Whether the track holds `clip`. No two of its clips start together.
@@ -203,9 +204,10 @@ proc overwrite(track: var Track, clip: Clip) =
   ## Lay `clip` over the track, as an EDL event records over what was there.
   let lo = clip.start
   let hi = clip.start + clip.dur
-  # Clips starting by lo - maxDur end by lo, so only those after them can be
-  # cut; rebuilding just that tail keeps a long cut list linear.
-  let first = track.clips.upperBound(lo - track.maxDur, byStart)
+  # Disjoint clips sorted by start are sorted by end too, so only those
+  # ending after lo can be cut; rebuilding just that tail keeps a long cut
+  # list linear.
+  let first = track.clips.upperBound(lo, byEnd)
   var kept: seq[Clip]
   for c in track.clips.toOpenArray(first, track.clips.high):
     let cEnd = c.start + c.dur
@@ -226,7 +228,6 @@ proc overwrite(track: var Track, clip: Clip) =
   kept.sort(proc (a, b: Clip): int = cmp(a.start, b.start))
   track.clips.setLen(first)
   track.clips.add kept
-  track.maxDur = max(track.maxDur, clip.dur)
 
 type Importer = object
   base: int64
