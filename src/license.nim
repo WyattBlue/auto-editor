@@ -92,7 +92,7 @@ proc warnIfOutOfPeriod(payload: JsonNode) =
   if buildDate >= hardExpires:
     stderr.writeLine(
       "This license is expired, you must buy or renew your license. " &
-        "https://app.auto-editor.com/upgrade?from=cli\n\n" &
+        "https://app.auto-editor.com/upgrade?from=cli-renew\n\n" &
         "Alternatively, you may use this program without a license key.\n"
     )
     error "License is expired."
@@ -100,7 +100,7 @@ proc warnIfOutOfPeriod(payload: JsonNode) =
     warning &"License update period ended on {expires}. " &
       "Newer auto-editor releases may require a renewal."
 
-proc requireLicense*(args: mainArgs, feature: string) =
+proc requireLicense*(args: mainArgs, feature, source: string) =
   ## Gate a paid feature behind a valid license key. The key comes from
   ## `-k`/`--license-key` (stored on `args`) or the `AE_PRIVATE_LK` env var.
   ## Errors (and exits) with a feature-specific message when no valid key is set.
@@ -120,9 +120,11 @@ proc requireLicense*(args: mainArgs, feature: string) =
 
   if reason == "":
     error &"You must provide a license key to {feature}.\n" &
-      "Set one with -k/--license-key. You can get a key at https://app.auto-editor.com"
+      "Set one with -k/--license-key. You can get a key at " &
+      "https://app.auto-editor.com/buy?from=" & source
   elif reason == "bfmt":
-    error "License key is in a bad format.\nYou can get a key at https://app.auto-editor.com"
+    error "License key is in a bad format.\nYou can get a key at " &
+      "https://app.auto-editor.com/buy?from=cli-bad-key"
   else:
     error reason
 
