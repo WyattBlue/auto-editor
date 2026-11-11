@@ -148,6 +148,35 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
   for i in start ..< min(stop, actionIndex.len):
     actionIndex[i] = value
 
+proc appendIndices(actionMap: var seq[Actions], extra: Actions, sIdx: int,
+    made: var Table[(int, int), Actions]): seq[int] {.raises: [].} =
+  let n = actionMap.len
+  result = newSeq[int](n)
+  for k in 0 ..< n:
+    let base = actionMap[k]
+    if base.isCut or extra.isEmpty:
+      result[k] = k
+    else:
+      if (sIdx, k) notin made:
+        try:
+          made[(sIdx, k)] = newActions(toSeq(base.items) & toSeq(extra.items))
+        except ActionParseError:
+          made[(sIdx, k)] = base
+      actionMap.add made.getOrDefault((sIdx, k))
+      result[k] = actionMap.len - 1
+
+proc remapRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
+    remap: seq[int], maxLen: int) {.raises: [AutoEditorError].} =
+  let len = if maxLen > 0: maxLen else: actionIndex.len
+  let (start, stop) = normalizeRange(span, tb, len)
+  if start >= stop:
+    error &"Invalid range: start (frame {start}) must come before stop (frame {stop})"
+  let cappedStop: int = min(stop, len)
+  if cappedStop > actionIndex.len:
+    actionIndex.setLen(cappedStop)
+  for i in start ..< min(stop, actionIndex.len):
+    actionIndex[i] = remap[actionIndex[i]]
+
 proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
   ## The extension an export gets from `ext` (the one asked for, or the
   ## input's): a timeline format's own; for media, `ext`, or mp4 when that
@@ -471,6 +500,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
       var tlInitialized = false
       var concatOffset = 0 # where this input starts, inputs laid end to end
+      var appended: Table[(int, int), Actions]
 
       for i in 0 ..< args.inputs.len:
         var container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
@@ -530,6 +560,17 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
         for sIdx in 0 ..< args.setAction.len:
           let actionRange = args.setAction[sIdx]
           let span = (actionRange[1], actionRange[2])
+          if sIdx < args.setActionAppend.len and args.setActionAppend[sIdx]:
+            let remap = appendIndices(actionMap, actionRange[0], sIdx, appended)
+            if args.setActionConcat:
+              let lo = max(toTb(span[0], tbf) - concatOffset, 0)
+              let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
+              if hi > lo:
+                remapRange(actionIndex, (pack(false, lo), pack(false, hi)), tbf, remap,
+                  getConLen())
+            else:
+              remapRange(actionIndex, span, tbf, remap, getConLen())
+            continue
           # A set-action range is an explicit override, conceptually distinct
           # from the `-w:0`/`-w:1` (silent/normal) sections. Give it a unique
           # effects index (never deduping into indices 0/1) so an `add` selector

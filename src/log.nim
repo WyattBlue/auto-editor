@@ -181,6 +181,7 @@ type mainArgs* = object
   progress*: BarType = modern
   transitionKind*: TransitionKind
   setActionConcat*: bool # library-only: setAction frames run across the inputs end to end
+  setActionAppend*: seq[bool]
   resolutionSet*: bool = false
   urlInput*: bool = false
 
