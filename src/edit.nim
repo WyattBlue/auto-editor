@@ -2,7 +2,7 @@ import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editexpr, editlexer, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
 import ./lib/[audioutil, dnorm16]
-import ./util/[bar, fun, rational]
+import ./util/[bar, fun, rational, suggest]
 
 import ./vendor/tinyre/tinyre
 
@@ -18,6 +18,9 @@ func normSymbol(expr: Expr, text: string): NormSymbol =
   if expr.symbolEquals(text, "ebu"): nsEbu
   elif expr.symbolEquals(text, "peak"): nsPeak
   else: nsUnknown
+
+const editSymbolNames = ["or", "and", "xor", "not", "audio", "motion",
+  "blackdetect", "subtitle", "regex", "word", "none", "all"]
 
 func editSymbol(expr: Expr, text: string): EditSymbol =
   if expr.numberEquals(text, "0"): esZero
@@ -105,9 +108,9 @@ proc parseBool(val: string): bool =
   error "Invalid boolean (expected true or false): " & val
 
 proc checkedArgs(expressions: openArray[Expr], text: string,
-    argOrder: openArray[string]): seq[BoundEditArg] =
+    argOrder: openArray[string], name: string): seq[BoundEditArg] =
   try:
-    bindEditArgs(expressions, text, argOrder)
+    bindEditArgs(expressions, text, argOrder, name)
   except ValueError as e:
     error e.msg
 
@@ -154,7 +157,7 @@ proc parseNorm*(norm: string): Norm =
           lra: float32 = 7.0
           tp: float32 = -2.0
           gain: float32 = 0.0
-        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder):
+        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder, "ebu"):
           case argPos:
           of 0: i = parseFloatInRange(val, -70.0, 5.0)
           of 1: lra = parseFloatInRange(val, 1.0, 50.0)
@@ -166,7 +169,7 @@ proc parseNorm*(norm: string): Norm =
       of nsPeak:
         let argOrder = @["t"]
         var t: float32 = -8.0
-        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder):
+        for (argPos, val) in checkedArgs(node[1 ..< node.len], text, argOrder, "peak"):
           case argPos:
           of 0: t = parseFloatInRange(val, -99.0, 0.0)
           else: error "Too many args"
@@ -300,7 +303,8 @@ proc parseEdit*(source: string, filename = "--edit"): EditExpr =
     of esNone: return edit(noneMethod())
     of esAll: return edit(allMethod())
     else:
-      error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
+      let name = text[node[0].`from` ..< node[0].to]
+      error &"Unknown function: {name}{didYouMean(name, editSymbolNames)}"
 
   var lexer = initLexer(filename, source)
   var parser: Parser

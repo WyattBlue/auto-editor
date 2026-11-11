@@ -17,5 +17,6 @@ func didYouMean*(input: string, choices: openArray[string]): string =
       return ""
 
     let limit = max(3, input.len div 3)
-    if bestDist <= limit: "\nDid you mean " & best & "?"
+    # Short choices are within `limit` of anything, so require some overlap.
+    if bestDist <= limit and bestDist < best.len: "\nDid you mean " & best & "?"
     else: ""

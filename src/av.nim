@@ -1,7 +1,7 @@
 import std/[math, strformat, strutils, sequtils, tables]
 
 import ./[ffmpeg, log]
-import ./util/[lang, rational]
+import ./util/[lang, rational, suggest]
 import ./lib/audioutil
 
 var useWebCodecs* = false
@@ -160,6 +160,20 @@ proc initCodec*(name: string): ptr AVCodec =
     if desc != nil:
       result = avcodec_find_encoder(desc.id)
 
+proc encoderNames(): seq[string] =
+  var opaque: pointer = nil
+  while true:
+    let c = av_codec_iterate(addr opaque)
+    if c == nil:
+      break
+    if av_codec_is_encoder(c) != 0:
+      result.add $c.name
+      result.add $avcodec_get_name(c.id)
+  result = result.deduplicate()
+
+proc unknownEncoder(name: string) {.noreturn.} =
+  error &"Encoder not found: {name}{didYouMean(name, encoderNames())}"
+
 proc initEnCtx(codec: ptr AVCodec): ptr AVCodecContext =
   let encoderCtx = avcodec_alloc_context3(codec)
   if encoderCtx == nil:
@@ -179,7 +193,7 @@ proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
 proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
   let codec = initCodec(name)
   if codec == nil:
-    error "Unknown encoder: " & name
+    unknownEncoder(name)
   return (codec, initEnCtx(codec))
 
 proc findSoftwareDecoder(codecId: AVCodecID): ptr AVCodec =
@@ -603,7 +617,7 @@ width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (
         ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
-    error "Encoder not found: " & codecName
+    unknownEncoder(codecName)
   let format = self.formatCtx
 
   # Assert that this format supports the requested codec.
