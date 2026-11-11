@@ -217,6 +217,12 @@ type
 proc parseElement(r: var XmlReader, depth: int): XmlNode
     {.raises: [IOError, XmlTooDeep].}
 
+template addError(r: var XmlReader, msg: string) =
+  # Only the first error is reported, and `errorMsg` rereads the file up to
+  # the error, so a template skips that for the rest of a broken document.
+  if r.errors.len == 0:
+    r.errors.add msg
+
 proc addText(parent: XmlNode, text: string) =
   # Adjacent runs share one node: innerText reads the same, with fewer nodes.
   if parent.children.len > 0 and parent.children[^1].kind == xnText:
@@ -234,10 +240,10 @@ proc parseChildren(r: var XmlReader, n: XmlNode, depth: int)
       if r.x.elementName == n.str:
         r.x.next()
       else:
-        r.errors.add errorMsg(r.x, "</" & n.str & "> expected")
+        r.addError errorMsg(r.x, "</" & n.str & "> expected")
       return
     of xmlEof:
-      r.errors.add errorMsg(r.x, "</" & n.str & "> expected")
+      r.addError errorMsg(r.x, "</" & n.str & "> expected")
       return
     of xmlCharData, xmlWhitespace, xmlCData:
       n.addText r.x.charData
@@ -249,12 +255,12 @@ proc parseChildren(r: var XmlReader, n: XmlNode, depth: int)
     of xmlComment, xmlPI, xmlSpecial:
       r.x.next()
     of xmlError:
-      r.errors.add errorMsg(r.x)
+      r.addError errorMsg(r.x)
       r.x.next()
     of xmlElementStart, xmlElementOpen:
       n.children.add r.parseElement(depth)
     of xmlAttribute, xmlElementClose:
-      r.errors.add errorMsg(r.x, "<some_tag> expected")
+      r.addError errorMsg(r.x, "<some_tag> expected")
       r.x.next()
 
 proc parseElement(r: var XmlReader, depth: int): XmlNode
@@ -272,11 +278,11 @@ proc parseElement(r: var XmlReader, depth: int): XmlNode
         r.x.next()
         break
       of xmlError:
-        r.errors.add errorMsg(r.x)
+        r.addError errorMsg(r.x)
         r.x.next()
         break
       else:
-        r.errors.add errorMsg(r.x, "'>' expected")
+        r.addError errorMsg(r.x, "'>' expected")
         r.x.next()
         break
   else:
@@ -305,14 +311,14 @@ proc parseXmlFile*(path: string, knownTags: openArray[string] = []): XmlNode
         try:
           result = r.parseElement(0)
         except XmlTooDeep:
-          r.errors.add errorMsg(r.x, "elements nested deeper than " &
+          r.addError errorMsg(r.x, "elements nested deeper than " &
             $xmlMaxDepth & " levels")
         break
       of xmlWhitespace, xmlSpecial, xmlPI: discard
       of xmlError:
-        r.errors.add errorMsg(r.x)
+        r.addError errorMsg(r.x)
       else:
-        r.errors.add errorMsg(r.x, "<some_tag> expected")
+        r.addError errorMsg(r.x, "<some_tag> expected")
         break
   except IOError:
     error "Cannot read: " & path
