@@ -2,7 +2,7 @@ import std/[atomics, json, math, strformat, strutils, sequtils, tables]
 
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
 import ../util/rational
-import ../lib/dnorm16
+import ../lib/[biquad, dnorm16]
 import ./convolve
 
 # Import C string functions for JSON capture
@@ -468,6 +468,21 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
 
   return (filterGraph, bufferSrc, bufferSink)
 
+func filtersOf(act: Action, sr: float64): seq[Biquad] =
+  const butterworthQ = 1.0 / sqrt(2.0)
+  # Narrow enough to leave the voice between harmonics alone.
+  const humQ = 30.0
+  case act.kind
+  of actHighpass: @[initBiquad(bqHighpass, act.cutoff.float64, butterworthQ, sr)]
+  of actLowpass: @[initBiquad(bqLowpass, act.cutoff.float64, butterworthQ, sr)]
+  of actDehum:
+    var filters: seq[Biquad]
+    for n in 1 .. act.humHarmonics.int:
+      let f = act.humHz.float64 * n.float64
+      if f < sr * 0.49: filters.add initBiquad(bqNotch, f, humQ, sr)
+    filters
+  else: @[]
+
 proc applyVolume(data: var seq[int16], act: Action, channels: int, sr: cint,
     fps: float) =
   ## Multiply samples by the volume envelope (a static value or keyframe ramp
@@ -725,6 +740,10 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
     of actConvolve:
       runPending()
       applyConvolve(processedData, effect.irPath, channels.int, sourceSr)
+    of actHighpass, actLowpass, actDehum:
+      runPending()
+      applyBiquads(processedData, filtersOf(effect, sourceSr.float64),
+        channels.int)
     else: discard
   if rampTempo.len > 0 and pending.len == 0:
     pending.add Action(kind: actSpeed, val: 1)

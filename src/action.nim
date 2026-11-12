@@ -12,8 +12,9 @@ type
     actSpeed,
     # Can add 3 more [VA] actions
     actVolume = 4,
-    actDeesser, actDuck, actPitch, actTone, actConvolve,
-    # Can add 10 more [A] actions
+    actDeesser, actDuck, actPitch, actTone, actConvolve, actHighpass, actLowpass,
+    actDehum,
+    # Can add 7 more [A] actions
     actInvert = 20,
     actHflip, actVflip, actZoom, actOpacity, actBlur, actBrightness, actLuv, actLens,
     actRotate, actSpin, actDrawbox, actPos, actColorKey, actChromaKey, actLoop,
@@ -97,6 +98,11 @@ type
       kt*: seq[KfTime]       # each keyframe's time, or empty: spread evenly
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
+    of actHighpass, actLowpass:
+      cutoff*: uint16        # Hz
+    of actDehum:
+      humHz*: uint16         # the mains frequency
+      humHarmonics*: uint8   # notches at humHz and its multiples, this many
     of actPitch:
       # Semitones x 100. Cent buckets round-trip as exact decimal semitones
       pCents*: int16
@@ -233,6 +239,12 @@ Keyframes can also say when they are, as `value@time`: a bare frame count, `sec`
     help: """
 Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
 Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the reduction (default 0.5), and `freq` sets the split frequency (default 0.5)."""),
+  ActionDef(name: "highpass", flags: {afAudio}, argSpec: "[hz]", range: rng(10.0, 20000.0),
+    help: "Cut the lows below `hz` (default 80), such as rumble, wind and handling noise under speech. A 12 dB per octave Butterworth filter; chain two for a steeper slope."),
+  ActionDef(name: "lowpass", flags: {afAudio}, argSpec: "[hz]", range: rng(10.0, 20000.0),
+    help: "Cut the highs above `hz` (default 10000), such as hiss. A 12 dB per octave Butterworth filter; chain two for a steeper slope."),
+  ActionDef(name: "dehum", flags: {afAudio}, argSpec: "[hz[:harmonics]]",
+    help: "Remove mains hum: a narrow notch at `hz` (default 60; use 50 where the mains is 50 Hz) and at each of its first `harmonics` multiples (default 4, up to 16)."),
   ActionDef(name: "duck", flags: {afAudio}, argSpec: "[amount[:threshold[:attack[:release]]]]",
     help: """
 Autoduck (sidechain): lower this clip's audio wherever the louder audio layers beneath it (higher track indices) are active, e.g. tuck a music/desktop track under a voice track. Cross-track, so it is applied when the audio layers are mixed; a no-op on the bottom-most layer and on single-layer audio.
@@ -909,6 +921,26 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       vals[idx - 1] = toUnorm16(pFloat(parts[idx]))
     return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
 
+  if parts[0] in ["highpass", "lowpass"] and parts.len <= 2:
+    var hz = (if parts[0] == "highpass": 80.0'f32 else: 10000.0'f32)
+    if parts.len == 2: hz = pFloat(parts[1])
+    if not (hz >= 10.0 and hz <= 20000.0):
+      raise newException(ActionParseError, &"{parts[0]} must be in [10, 20000] Hz")
+    let cutoff = uint16(round(hz))
+    return (if parts[0] == "highpass": Action(kind: actHighpass, cutoff: cutoff)
+      else: Action(kind: actLowpass, cutoff: cutoff))
+
+  if parts[0] == "dehum" and parts.len <= 3:
+    var hz = 60.0'f32
+    var n = 4.0'f32
+    if parts.len >= 2: hz = pFloat(parts[1])
+    if parts.len == 3: n = pFloat(parts[2])
+    if not (hz >= 20.0 and hz <= 1000.0):
+      raise newException(ActionParseError, "dehum must be in [20, 1000] Hz")
+    if not (n >= 1.0 and n <= 16.0 and n == round(n)):
+      raise newException(ActionParseError, "dehum harmonics must be a whole number in [1, 16]")
+    return Action(kind: actDehum, humHz: uint16(round(hz)), humHarmonics: uint8(n))
+
   # duck takes positional args: [amount[:threshold[:attack[:release]]]]
   if parts[0] == "duck" and parts.len <= 5:
     var vals = [0.85'f32, 0.04'f32, 100.0'f32, 500.0'f32]
@@ -1370,6 +1402,9 @@ when not defined(nimscript):
         &"{name}:{rampStr(parts, act.sKt)}{easeSuffix(act)}"
     of actVolume: &"volume:{kfStr(act)}{easeSuffix(act)}"
     of actDeesser: &"deesser:{act.intensity}:{act.maxd}:{act.freq}"
+    of actHighpass: &"highpass:{act.cutoff}"
+    of actLowpass: &"lowpass:{act.cutoff}"
+    of actDehum: &"dehum:{act.humHz}:{act.humHarmonics}"
     of actPitch: &"pitch:{act.pCents.float32 / 100.0'f32}"
     of actTone:
       if act.wave == wSine: &"tone:{act.note}"
@@ -1503,7 +1538,8 @@ when not defined(nimscript):
     case a.kind
     of actInvert, actHflip, actVflip, actLoop, actErosion: 1
     of actChoke: 2
-    of actRotate, actPitch, actTone: 3
+    of actRotate, actPitch, actTone, actHighpass, actLowpass: 3
+    of actDehum: 4
     of actLens: 5
     of actSpeed:
       if a.sKf.len == 0: 5
@@ -1616,6 +1652,17 @@ when not defined(nimscript):
           copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
           yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
           i += 7
+        of actHighpass, actLowpass:
+          var hz: uint16
+          copyMem(addr hz, addr base[i + 1], sizeof(uint16))
+          yield (if kind == actHighpass: Action(kind: actHighpass, cutoff: hz)
+            else: Action(kind: actLowpass, cutoff: hz))
+          i += 3
+        of actDehum:
+          var hz: uint16
+          copyMem(addr hz, addr base[i + 1], sizeof(uint16))
+          yield Action(kind: actDehum, humHz: hz, humHarmonics: base[i + 3])
+          i += 4
         of actDuck:
           var amt, thr: Unorm16
           var atk, rel: uint16
@@ -1915,6 +1962,13 @@ when not defined(nimscript):
         base.writeAt(i, 3, a.maxd)
         base.writeAt(i, 5, a.freq)
         i += 7
+      of actHighpass, actLowpass:
+        base.writeAt(i, 1, a.cutoff)
+        i += 3
+      of actDehum:
+        base.writeAt(i, 1, a.humHz)
+        base[i + 3] = a.humHarmonics
+        i += 4
       of actDuck:
         base.writeAt(i, 1, a.duckAmount)
         base.writeAt(i, 3, a.duckThresh)

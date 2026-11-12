@@ -214,6 +214,27 @@ auto-editor video.mp4 -w:1 deesser:0.5
 auto-editor video.mp4 -w:1 deesser:0.8:0.7:0.4
 ```
 
+### highpass, lowpass
+
+Cut the frequencies below (`highpass`) or above (`lowpass`) a corner, in Hz, from 10 to 20000. `highpass` defaults to 80 Hz, which takes out rumble, wind and handling noise under speech; `lowpass` defaults to 10000 Hz, which tames hiss. Both are 12 dB per octave Butterworth filters; chain two of the same for 24 dB per octave.
+
+```sh
+# Clean up a voice recording's low end
+auto-editor video.mp4 -w:1 highpass
+
+# A telephone-like band
+auto-editor video.mp4 -w:1 highpass:300,lowpass:3400
+```
+
+### dehum
+
+Remove mains hum, `dehum[:hz[:harmonics]]`: a narrow notch at `hz` (default 60, the mains frequency in the Americas; use 50 in most of the rest of the world) and at each multiple of it up to `harmonics` (default 4, from 1 to 16).
+
+```sh
+auto-editor video.mp4 -w:1 dehum:50
+auto-editor video.mp4 -w:1 highpass,dehum:60:8
+```
+
 ### invert
 
 Invert all pixels in the video section.

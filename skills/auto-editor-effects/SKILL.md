@@ -30,6 +30,9 @@ below works as the value of any `-w:N`.
 | `pitch` | shift pitch only, **duration preserved** | `pitch:12` (octave up), `pitch:-7` (−24–24 semitones) |
 | `volume` | scale volume (1=normal, 0.5=−6dB) | `volume:0.2` |
 | `deesser` | reduce sibilance | `deesser:intensity[:max[:freq]]` (each 0–1) |
+| `highpass` | cut lows: rumble, wind (12 dB/oct) | `highpass` (80 Hz), `highpass:120` (10–20000) |
+| `lowpass` | cut highs: hiss (12 dB/oct) | `lowpass` (10000 Hz), `lowpass:8000` (10–20000) |
+| `dehum` | notch out mains hum and harmonics | `dehum` (60 Hz, 4 harmonics), `dehum:50:8` |
 | `tone` | wave from a MIDI note (`add:` generator) | `add:tone:69`, `add:tone:36:saw` |
 | `invert` | invert pixels | — |
 | `zoom` | zoom factor (1=none) | `zoom:2`, `zoom:0.5` (>0–100) |
@@ -126,6 +129,7 @@ auto-editor video.mp4 --set-action add:./logo.png:600:300:1.0,1sec,2sec
 
 ```bash
 auto-editor :mic -w:1 deesser:0.8:0.7:0.4         # record, then clean up speech
+auto-editor podcast.wav -w:1 highpass,dehum:50       # drop rumble and 50 Hz hum
 auto-editor podcast.mp3 -w:0 cut -w:1 speed:1.15      # cut silence, tighten speech
 auto-editor video.mp4 -w:0 volume:0.3                 # duck (not cut) the silence
 auto-editor video.mp4 -w:1 varispeed:1.25             # nightcore (speed + pitch up)
