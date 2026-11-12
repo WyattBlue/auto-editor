@@ -291,6 +291,7 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
   newFrame.height = dstHeight
   newFrame.pts = frame.pts
   newFrame.time_base = frame.time_base
+  newFrame.flags = frame.flags and (8 or 16).cint
   newFrame.color_primaries = frame.color_primaries
   newFrame.color_trc = frame.color_trc
   if srcFormat.isRgb == format.isRgb:
