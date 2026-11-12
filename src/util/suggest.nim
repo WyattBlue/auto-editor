@@ -8,7 +8,7 @@ func didYouMean*(input: string, choices: openArray[string]): string =
     var best = ""
     var bestDist = high(int)
     for choice in choices:
-      let dist = editDistance(input, choice)
+      let dist = editDistanceAscii(input, choice)
       if dist < bestDist:
         best = choice
         bestDist = dist
