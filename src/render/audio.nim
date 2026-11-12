@@ -929,7 +929,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
   ## so it needs 0). A set `stop` ends the iterator at its next call, freeing
   ## what it holds.
 
-  var samples: Table[(string, int16), Getter]
+  # Paths are interned, so a path's pointer names its getter without a copy.
+  var samples: Table[(ptr string, int16), Getter]
   let targetChannels = tl.layout.nb_channels
   let tb = tl.tb
   let sr = tl.sr
@@ -948,7 +949,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       for clip in tl.a[layerIndex]:
         if clip.src == nil:
           continue
-        let key = (clip.src[], clip.stream)
+        let key = (clip.src, clip.stream)
         if key notin samples:
           samples[key] = newGetter(clip.src[], clip.stream, sr)
 
@@ -1000,7 +1001,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       srcData = synthTone(tableFor(tone), noteFreq(tone.note), startSample,
         int(round(durSamples.float64 * speed)), targetChannels, sr)
     else:
-      let key = (clip.src[], clip.stream)
+      let key = (clip.src, clip.stream)
       if key notin samples:
         return (@[], srcLayout)
       let getter = samples[key]
