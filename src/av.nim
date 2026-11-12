@@ -901,6 +901,11 @@ func dialogue*(assText: string): string =
         result &= " "
         i += 2
         continue
+      if curChar == '\\' and nextChar in {'{', '}'}:
+        # libass reads `\{` and `\}` as literal braces, never as a block.
+        result &= nextChar
+        i += 2
+        continue
       if curChar == '{' and i < lastClose:
         state = true
       else:
