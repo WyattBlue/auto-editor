@@ -98,7 +98,7 @@ type TrackExport = object
   transitions: seq[Transition]
 
 proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
-    paths: Table[ptr string, string], base: int64): seq[Event] =
+    paths: Table[ptr string, string], base: int64, drop: bool): seq[Event] =
   let plan = transitionPlan(track.clips, track.transitions)
   let order = (if track.video: 0 else: ord(track.channel))
 
@@ -162,7 +162,7 @@ proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
       # `M2 REEL fps source-in`: the source frames played a second.
       ev.m2Reel = reel
       ev.m2 = &"{speed * base.float64:05.1f}" & "                " &
-        formatTimecode(ev.lines[^1].srcIn, base)
+        formatTimecode(ev.lines[^1].srcIn, base, drop)
     ev.mergeable = not hasFrom and speed == 1.0
     ev.key = (clip.src, clip.stream, recIn, recOut, ev.lines[^1].srcIn)
     ev.order = (recIn, order)
@@ -186,6 +186,9 @@ proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
 
 proc edlWrite*(name, output: string, tl: v3) =
   let base = timecodeBase(tl.tb)
+  # Drop-frame numbering exists only for 29.97 and 59.94, where editors
+  # expect it so record timecode keeps up with the clock.
+  let drop = tl.tb.den == 1001 and tl.tb.num mod 30000 == 0
   let reels = assignReels(tl)
   # absolutePath reads the cwd from the OS each call; resolve each file once.
   var paths: Table[ptr string, string]
@@ -205,7 +208,7 @@ proc edlWrite*(name, output: string, tl: v3) =
   var events: seq[Event]
   var mergeable: Table[EventKey, seq[int]] # key to events, in order
   for track in tracks:
-    for ev in trackEvents(tl, track, reels, paths, base):
+    for ev in trackEvents(tl, track, reels, paths, base, drop):
       var merged = false
       if ev.mergeable:
         for i in mergeable.getOrDefault(ev.key):
@@ -220,7 +223,7 @@ proc edlWrite*(name, output: string, tl: v3) =
   events.sort(proc (a, b: Event): int = cmp(a.order, b.order))
 
   var text = "TITLE: " & name & "\n"
-  text.add "FCM: NON-DROP FRAME\n"
+  text.add (if drop: "FCM: DROP FRAME\n" else: "FCM: NON-DROP FRAME\n")
   for i, ev in events:
     text.add "\n"
     let num = align($(i + 1), 3, '0')
@@ -228,10 +231,10 @@ proc edlWrite*(name, output: string, tl: v3) =
     for line in ev.lines:
       let dur = (if line.dur < 0: "" else: align($line.dur, 3, '0'))
       text.add &"{num}  {line.reel:<8} {chan:<5} {line.trans:<4} {dur:>3} "
-      text.add formatTimecode(line.srcIn, base) & " " &
-        formatTimecode(line.srcOut, base) & " " &
-        formatTimecode(line.recIn, base) & " " &
-        formatTimecode(line.recOut, base) & "\n"
+      text.add formatTimecode(line.srcIn, base, drop) & " " &
+        formatTimecode(line.srcOut, base, drop) & " " &
+        formatTimecode(line.recIn, base, drop) & " " &
+        formatTimecode(line.recOut, base, drop) & "\n"
     if ev.m2 != "":
       text.add &"M2   {ev.m2Reel:<8}       {ev.m2}\n"
     for c in ev.comments:
