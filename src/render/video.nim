@@ -916,14 +916,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var pix_fmt = AV_PIX_FMT_YUV420P
   let targetFps = tl.tb
 
-  # Reference source for encoder config (color/pix_fmt/SAR): the base video
-  # layer's first clip. Don't derive this from uniqueSources iteration order,
-  # which is pointer-hash order over `ptr string` keys and so varies run-to-run
-  # (e.g. an `add:` overlay image could win over the actual video).
-  var firstSrc: ptr string = nil
-  if tl.v.len > 0 and tl.v[0].len > 0:
-    firstSrc = tl.v[0][0].src
-
   for src in tl.uniqueSources:
     # getContainer turns a missing/unreadable source (e.g. `add:gone.mp4`)
     # into a clean error instead of an unhandled IOError.
@@ -938,8 +930,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     # no video stream to decode.
     if myCache.cns[src].video.len == 0:
       continue
-    if firstSrc == nil:
-      firstSrc = src
 
     let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
@@ -981,13 +971,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
-  # For encoder config (colorspace/SAR/pix_fmt) prefer a real, non-still video
-  # source. An audio-only `add` timeline may have only still images over a
-  # synthesized background, in which case yuv420p defaults are used.
-  for s in tl.uniqueSources:
-    if myCache.cns[s].video.len > 0 and not srcs[s].isStill:
-      firstSrc = s
-      break
+  # Reference source for encoder config (color/pix_fmt/SAR): the first real,
+  # non-still video in layer and clip order, so the base layer wins. Not from
+  # uniqueSources, whose order follows the `ptr string` keys' addresses and so
+  # changes from run to run. An audio-only `add` timeline may have only still
+  # images over a synthesized background, in which case yuv420p defaults are
+  # used.
+  var firstSrc: ptr string = nil
+  block pick:
+    for layer in tl.v:
+      for clip in layer:
+        let s = clip.src
+        if s != nil and myCache.cns[s].video.len > 0 and not srcs[s].isStill:
+          firstSrc = s
+          break pick
 
   # Don't inherit color tags / SAR from a still image. PNGs are tagged full-range
   # (which makes the H.264 encoder emit deprecated yuvj420p), so when the only
