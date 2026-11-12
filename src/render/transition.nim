@@ -178,6 +178,9 @@ template eachPixel(res: var Img, w, h: int, body: untyped) =
         dst[].put(x, y, c))
 
 proc mixImg(a, b: Img, t: float32): Img =
+  # The closure would copy every frame it captures; it ends before they do.
+  let a {.cursor.} = a
+  let b {.cursor.} = b
   result.eachPixel(a.w, a.h):
     c = mix(a.get(x, y), b.get(x, y), t)
 
@@ -218,12 +221,16 @@ proc boxBlur(im: Img, rx, ry: int): Img =
     result = tmp
 
 proc halve(im: Img): Img =
+  # The closure would copy the frame it captures; it ends before `im` does.
+  let im {.cursor.} = im
   result.eachPixel(max(1, im.w div 2), max(1, im.h div 2)):
     c = (im.get(2 * x, 2 * y) + im.get(2 * x + 1, 2 * y) +
       im.get(2 * x, 2 * y + 1) + im.get(2 * x + 1, 2 * y + 1)) * 0.25'f32
 
 proc grow(im: Img, w, h: int): Img =
   ## `im` scaled up to `w` by `h`.
+  # The closure would copy the frame it captures; it ends before `im` does.
+  let im {.cursor.} = im
   let kx = im.w.float32 / w.float32
   let ky = im.h.float32 / h.float32
   result.eachPixel(w, h):
@@ -247,6 +254,8 @@ proc zoomBlur(im: Img, cx, cy, strength: float32): Img =
   ## of the way there.
   if strength < 0.002: return im
   if im.w > 480: return im.halve.zoomBlur(cx, cy, strength).grow(im.w, im.h)
+  # The closure would copy the frame it captures; it ends before `im` does.
+  let im {.cursor.} = im
   let n = clamp(int(ceil(strength * 40)), 3, 16)
   let pcx = cx * im.w.float32
   let pcy = cy * im.h.float32
@@ -262,6 +271,8 @@ proc spinBlur(im: Img, angle: float32): Img =
   ## Arcs around the center through `angle` radians.
   if abs(angle) < 0.002: return im
   if im.w > 480: return im.halve.spinBlur(angle).grow(im.w, im.h)
+  # The closure would copy the frame it captures; it ends before `im` does.
+  let im {.cursor.} = im
   let n = clamp(int(ceil(abs(angle) * 30)), 3, 16)
   let cx = im.w.float32 / 2
   let cy = im.h.float32 / 2
@@ -453,6 +464,10 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   ## `frame` counts frames into the transition, of its `frames`, for flicker
   ## that changes every frame and blur that spans one. `color` is the dip
   ## color; `inEase` and `outEase` shape a dissolve.
+  # The closures would copy every frame they capture; they end before they do.
+  let a {.cursor.} = a
+  let b {.cursor.} = b
+  let under {.cursor.} = under
   let (w, h) = (a.w, a.h)
   let (fw, fh) = (w.float32, h.float32)
   let e = easeInOut(p)
@@ -496,7 +511,8 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
                else: color)
     let first = p < 0.5
     let k = (if first: smooth(0, 1, 2 * p) else: 1 - smooth(0, 1, 2 * p - 1))
-    let src = (if first: a else: b).blur(
+    let near {.cursor.} = (if first: a else: b)
+    let src = near.blur(
       if kind == tkDipToColor: bell(p) * fh / 40 else: 0'f32)
     result.eachPixel(w, h):
       c = mix(src.get(x, y), dip, k)

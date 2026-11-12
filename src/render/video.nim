@@ -2120,7 +2120,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # Each layer's clips by start, and those started but not yet ended, so a
   # frame looks only at the clips under it instead of every clip in the layer.
   var byStart = newSeq[seq[int]](tl.v.len)
-  for li, layer in tl.v:
+  for li in 0 ..< tl.v.len:
+    # The sort's closure would copy the whole layer to capture it.
+    let layer {.cursor.} = tl.v[li]
     for ci in 0 ..< layer.len: byStart[li].add ci
     byStart[li].sort(proc(a, b: int): int = cmp(layer[a].start, layer[b].start))
   var nextStart = newSeq[int](tl.v.len)

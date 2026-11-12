@@ -446,7 +446,9 @@ proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
   ## are shortened symmetrically so they cannot overlap a neighboring transition
   ## or consume an entire visible clip.
   if requested <= 0: return
-  let timelineEffects = tl.effects
+  # `build` reads the effects, which nothing here changes; a cursor spares
+  # the nested proc a copy of all of them.
+  let timelineEffects {.cursor.} = tl.effects
 
   proc build(clips: seq[Clip], kind: TransitionKind): seq[Transition] =
     if clips.len == 0: return
@@ -547,6 +549,8 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
   ## plan. Each is snapped to the timeline's own edit point within two frames
   ## (rounding can differ by one) and kept within its clips; one with no such
   ## point, or that would overlap the one before, is left out.
+  # The nested procs would copy `placed` to capture it.
+  let placed {.cursor.} = placed
   proc place(clips: seq[Clip], video: bool): seq[Transition] =
     var wanted: seq[PlacedTransition]
     for p in placed:
