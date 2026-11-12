@@ -298,33 +298,37 @@ iterator channelPeaks*(processor: var AudioProcessor, container: InputContainer,
   var bucketIdx: int64 = 0
   var spb: int64 = 0
 
-  for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
-    if processor.`iterator` == nil:
-      processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        addr decodedFrame.ch_layout, processor.chunkDuration)
-      spb = round(processor.chunkDuration * float64(
-          decodedFrame.sample_rate)).int64
-      let tb = audioStream.time_base
-      let ts = bestPts(decodedFrame)
-      let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
-      firstSamplePos = (pts * int64(decodedFrame.sample_rate) * int64(
-          tb.num)) div int64(tb.den)
-
-    processor.`iterator`.writeFrame(decodedFrame)
-    while processor.`iterator`.hasChunk():
-      yield (firstSamplePos + bucketIdx * spb,
-        processor.`iterator`.readChannelPeaks(channels))
-      bucketIdx += 1
-
-  if processor.`iterator` != nil:
-    processor.`iterator`.flushResampler()
-    while processor.`iterator`.hasChunk():
-      yield (firstSamplePos + bucketIdx * spb,
-        processor.`iterator`.readChannelPeaks(channels))
-      bucketIdx += 1
-    if av_audio_fifo_size(processor.`iterator`.fifo) > 0:
-      yield (firstSamplePos + bucketIdx * spb,
-        processor.`iterator`.readChannelPeaks(channels))
+  var reader = initFrameReader(container, processor.audioIndex,
+    processor.codecCtx, frame)
+  defer: reader.close()
+  var decoded, tailDone = false
+  while true:
+    let iter = processor.`iterator`
+    if iter != nil and iter.hasChunk():
+      discard
+    elif not decoded:
+      if reader.next():
+        if iter == nil:
+          processor.`iterator` = newAudioIterator(frame.sample_rate,
+            addr frame.ch_layout, processor.chunkDuration)
+          spb = round(processor.chunkDuration * float64(
+              frame.sample_rate)).int64
+          let tb = audioStream.time_base
+          let ts = bestPts(frame)
+          let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
+          firstSamplePos = (pts * int64(frame.sample_rate) * int64(
+              tb.num)) div int64(tb.den)
+        processor.`iterator`.writeFrame(frame)
+      else:
+        decoded = true
+        if iter != nil: iter.flushResampler()
+      continue
+    elif not tailDone and iter != nil and av_audio_fifo_size(iter.fifo) > 0:
+      tailDone = true
+    else:
+      break
+    yield (firstSamplePos + bucketIdx * spb, iter.readChannelPeaks(channels))
+    bucketIdx += 1
 
 iterator loudness*(processor: var AudioProcessor, container: InputContainer): Unorm16 =
   var frame = av_frame_alloc()
@@ -337,23 +341,30 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): Un
       processor.`iterator`.cleanup()
     avcodec_free_context(addr processor.codecCtx)
 
-  for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
-    if processor.`iterator` == nil:
-      processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        addr decodedFrame.ch_layout, processor.chunkDuration, processor.channel)
-
-    processor.`iterator`.writeFrame(decodedFrame)
-
-    while processor.`iterator`.hasChunk():
-      yield processor.`iterator`.readChunk()
-
-  if processor.`iterator` != nil:
-    processor.`iterator`.flushResampler()
-    while processor.`iterator`.hasChunk():
-      yield processor.`iterator`.readChunk()
-    # Same partial-tail handling as above.
-    if av_audio_fifo_size(processor.`iterator`.fifo) > 0:
-      yield processor.`iterator`.readChunk()
+  var reader = initFrameReader(container, processor.audioIndex,
+    processor.codecCtx, frame)
+  defer: reader.close()
+  var decoded, tailDone = false
+  while true:
+    let iter = processor.`iterator`
+    if iter != nil and iter.hasChunk():
+      discard
+    elif not decoded:
+      if reader.next():
+        if iter == nil:
+          processor.`iterator` = newAudioIterator(frame.sample_rate,
+            addr frame.ch_layout, processor.chunkDuration, processor.channel)
+        processor.`iterator`.writeFrame(frame)
+      else:
+        decoded = true
+        if iter != nil: iter.flushResampler()
+      continue
+    # A partial last chunk still counts.
+    elif not tailDone and iter != nil and av_audio_fifo_size(iter.fifo) > 0:
+      tailDone = true
+    else:
+      break
+    yield iter.readChunk()
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     stream: int16, channel = -1): seq[Unorm16] =

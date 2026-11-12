@@ -201,51 +201,56 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string,
     if filterGraph != nil:
       avfilter_graph_free(addr filterGraph)
 
-  while av_read_frame(processor.formatCtx, packet) >= 0:
-    defer: av_packet_unref(packet)
+  # A packet's frames are received until the decoder wants more or the
+  # filter holds a frame back; then the next packet is read.
+  var receiving, flushing = false
+  while true:
+    if flushing:
+      if avcodec_receive_frame(processor.codecCtx, frame) < 0:
+        break
+      frame.pts = bestPts(frame)
+      if frame.pts == AV_NOPTS_VALUE:
+        continue
+      prepareFrame()
+      if av_buffersrc_write_frame(bufferSrc, frame) < 0 or
+          av_buffersink_get_frame(bufferSink, filteredFrame) < 0:
+        continue
+    elif receiving:
+      ret = avcodec_receive_frame(processor.codecCtx, frame)
+      if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+        receiving = false
+        continue
+      elif ret < 0:
+        noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
+        receiving = false
+        continue
 
-    if packet.stream_index == processor.videoIndex:
-      ret = avcodec_send_packet(processor.codecCtx, packet)
-      if ret < 0 and ret != AVERROR_EAGAIN:
-        noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
-        ret = AVERROR_EAGAIN
+      frame.pts = bestPts(frame)
+      if frame.pts == AV_NOPTS_VALUE:
+        continue
 
-      while ret >= 0:
-        ret = avcodec_receive_frame(processor.codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-          break
-        elif ret < 0:
-          noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
-          break
+      prepareFrame()
+      if av_buffersrc_write_frame(bufferSrc, frame) < 0:
+        error "Error adding frame to filter"
 
-        frame.pts = bestPts(frame)
-        if frame.pts == AV_NOPTS_VALUE:
-          continue
-
-        prepareFrame()
-        if av_buffersrc_write_frame(bufferSrc, frame) < 0:
-          error "Error adding frame to filter"
-
-        ret = av_buffersink_get_frame(bufferSink, filteredFrame)
-        if ret < 0:
-          continue
-
-        yield filteredFrame
-        av_frame_unref(filteredFrame)
-
-  discard avcodec_send_packet(processor.codecCtx, nil)
-  while avcodec_receive_frame(processor.codecCtx, frame) >= 0:
-    frame.pts = bestPts(frame)
-    if frame.pts == AV_NOPTS_VALUE:
+      if av_buffersink_get_frame(bufferSink, filteredFrame) < 0:
+        receiving = false
+        continue
+    else:
+      if av_read_frame(processor.formatCtx, packet) < 0:
+        discard avcodec_send_packet(processor.codecCtx, nil)
+        flushing = true
+        continue
+      if packet.stream_index == processor.videoIndex:
+        ret = avcodec_send_packet(processor.codecCtx, packet)
+        if ret < 0 and ret != AVERROR_EAGAIN:
+          noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
+        receiving = ret >= 0
+      av_packet_unref(packet)
       continue
 
-    prepareFrame()
-    ret = av_buffersrc_write_frame(bufferSrc, frame)
-    if ret >= 0:
-      ret = av_buffersink_get_frame(bufferSink, filteredFrame)
-      if ret >= 0:
-        yield filteredFrame
-        av_frame_unref(filteredFrame)
+    yield filteredFrame
+    av_frame_unref(filteredFrame)
 
 iterator motionness*(processor: var VideoProcessor, width, blur: int32,
     rect: Unorm24x4): Unorm16 =

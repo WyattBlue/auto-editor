@@ -385,35 +385,57 @@ proc noteDecodeError*(msg: string) {.raises: [].} =
   if decodeErrors == 1:
     warning &"{msg} (skipping packet; further decode errors are only counted)"
 
-iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
-    frame: ptr AVFrame): ptr AVFrame =
-  var ret: cint
-  var packet = container.packet
+type FrameReader* = object
+  ## Decodes one stream of a container to EOF, a frame per `next`.
+  container: InputContainer
+  codecCtx: ptr AVCodecContext
+  frame*: ptr AVFrame
+  index: cint
+  receiving, flushing: bool
+
+proc initFrameReader*(container: InputContainer, index: cint,
+    codecCtx: ptr AVCodecContext, frame: ptr AVFrame): FrameReader =
   # We decode a single stream to EOF here, so let the demuxer skip every other
   # stream instead of reading packets we'd only throw away (big win when
   # analyzing audio in a high-bitrate video file).
   container.setActiveStream(index)
-  defer: container.resetDiscards()
-  while av_read_frame(container.formatContext, packet) >= 0:
-    defer: av_packet_unref(packet)
+  FrameReader(container: container, codecCtx: codecCtx, frame: frame,
+    index: index)
 
-    if packet.stream_index == index:
-      ret = avcodec_send_packet(codecCtx, packet)
-      if ret < 0 and ret != AVERROR_EAGAIN:
-        noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
-      else:
-        while true:
-          ret = avcodec_receive_frame(codecCtx, frame)
-          if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-            break
-          elif ret < 0:
-            noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
-            break
+proc close*(r: FrameReader) =
+  r.container.resetDiscards()
 
-          yield frame
+proc next*(r: var FrameReader): bool =
+  ## Decode the next frame into `r.frame`; false once the stream is drained.
+  let packet = r.container.packet
+  while true:
+    if r.receiving:
+      let ret = avcodec_receive_frame(r.codecCtx, r.frame)
+      if r.flushing:
+        return ret == 0
+      if ret == 0:
+        return true
+      r.receiving = false
+      if ret != AVERROR_EAGAIN and ret != AVERROR_EOF:
+        noteDecodeError &"Error receiving frame from decoder: {av_err2str(ret)}"
+    elif av_read_frame(r.container.formatContext, packet) < 0:
+      discard avcodec_send_packet(r.codecCtx, nil)
+      r.flushing = true
+      r.receiving = true
+    else:
+      if packet.stream_index == r.index:
+        let ret = avcodec_send_packet(r.codecCtx, packet)
+        if ret < 0 and ret != AVERROR_EAGAIN:
+          noteDecodeError &"Error sending packet to decoder: {av_err2str(ret)}"
+        else:
+          r.receiving = true
+      av_packet_unref(packet)
 
-  discard avcodec_send_packet(codecCtx, nil)
-  while avcodec_receive_frame(codecCtx, frame) == 0:
+iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
+    frame: ptr AVFrame): ptr AVFrame =
+  var r = initFrameReader(container, index, codecCtx, frame)
+  defer: r.close()
+  while r.next():
     yield frame
 
 iterator flushDecode*(container: InputContainer, index: cint,
