@@ -1839,6 +1839,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     var seekThreshold = st.seekThreshold
     var seekFrame = st.seekFrame
     var hasSeekFrame = st.hasSeekFrame
+    var seekWant = -1 # a seek must land at or before this frame
+    var seekMargin = 0
     if frameIndex > target:
       # Seek to the largest observed keyframe <= target. A backward seek only
       # ever targets a frame we have already decoded past, so every keyframe up
@@ -1861,6 +1863,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       avcodec_flush_buffers(st.decoder)
       st.resetDeint()
       st.lastSeekTarget = seekTarget
+      seekWant = want
       frameIndex = min(seekTarget, target - 1)
 
     var didDecode = false
@@ -1885,16 +1888,35 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           avcodec_flush_buffers(st.decoder)
           st.resetDeint()
           st.lastSeekTarget = target
+          seekWant = if st.interlaced: max(0, target - 1) else: target
+          seekMargin = 0
 
-      var foundFrame = false
-      if st.nextFrame(myStream, frame):
-        frameIndex = int(round((frame.time(myStream.time_base) -
+      let foundFrame = st.nextFrame(myStream, frame)
+      let index =
+        if not foundFrame: -1
+        else: int(round((frame.time(myStream.time_base) -
           float(st.cn.startPts(myStream) * myStream.time_base)) *
           ss.frameRate.float))
+      if seekWant >= 0 and (not foundFrame or index > seekWant) and
+          seekWant >= seekMargin:
+        # MPEG-TS seeks by estimate and can land past the wanted frame, or
+        # past the last keyframe, which would lose the frames between, so
+        # back off further, doubling, until it doesn't. Even a seek to its
+        # start time can skip the first keyframe; one before it can't.
+        seekMargin = (if seekMargin == 0: max(ss.kfInterval, 1) else: seekMargin * 2)
+        let at = seekWant - seekMargin
+        st.cn.seek(videoFrameToTimestamp(at, ss.frameRate, myStream.time_base) +
+          st.cn.startPts(myStream), stream = myStream)
+        avcodec_flush_buffers(st.decoder)
+        st.resetDeint()
+        frameIndex = max(at, 0) - 1
+        continue
+      seekWant = -1
+      if foundFrame:
+        frameIndex = index
         if frame.pict_type == AV_PICTURE_TYPE_I and
             frameIndex > ss.observedKeyframes[^1]:
           ss.observedKeyframes.add frameIndex
-        foundFrame = true
 
       if foundFrame and holdPastEnd:
         if lastGood != nil: av_frame_free(addr lastGood)

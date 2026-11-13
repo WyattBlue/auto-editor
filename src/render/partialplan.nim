@@ -82,7 +82,8 @@ proc h264Header(input: InputContainer, stream: ptr AVStream): seq[uint8] =
 proc seekToKeyBefore(input: InputContainer, stream: ptr AVStream, ts: int64) =
   ## Seek so the next keyframe read is at or before `ts`. MPEG-TS seeks by
   ## estimate and can land past it, which would drop the frames between, so
-  ## back off a second at a time, doubling, until it doesn't.
+  ## back off a second at a time, doubling, until it doesn't. Even a seek to
+  ## its start time can skip the first keyframe; one before it can't.
   let second = av_rescale_q(1, AVRational(num: 1, den: 1), stream.time_base)
   var margin = 0'i64
   while true:
@@ -96,7 +97,7 @@ proc seekToKeyBefore(input: InputContainer, stream: ptr AVStream, ts: int64) =
           (packet.flags and AV_PKT_FLAG_KEY) != 0:
         key = (if packet.pts != AV_NOPTS_VALUE: packet.pts else: packet.dts)
       av_packet_unref(packet)
-    if key == AV_NOPTS_VALUE or key <= ts or target <= input.startPts(stream):
+    if (key != AV_NOPTS_VALUE and key <= ts) or target < input.startPts(stream):
       input.seek(target, stream = stream)
       return
     margin = (if margin == 0: second else: margin * 2)
