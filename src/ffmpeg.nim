@@ -653,6 +653,7 @@ proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint, nb_channel
 
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
+proc av_mallocz*(size: csize_t): pointer {.importc, header: "<libavutil/mem.h>".}
 
 type SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
 

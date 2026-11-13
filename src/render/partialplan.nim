@@ -60,11 +60,52 @@ proc supportsContainer(codecId: AVCodecID, formatName: string): bool =
   else:
     false
 
-proc supportsStream(stream: ptr AVStream, encoder: ptr AVCodec,
-    codecId: AVCodecID): bool =
+proc h264Header(input: InputContainer, stream: ptr AVStream): seq[uint8] =
+  ## The stream's extradata, or else the parameter sets of its first packet
+  ## that has them: MPEG-TS carries them only in-band. Leaves the demuxer at
+  ## the start.
+  let par = stream.codecpar
+  if par.extradata != nil and par.extradata_size > 0:
+    result = newSeq[uint8](par.extradata_size)
+    copyMem(addr result[0], par.extradata, par.extradata_size)
+    return
+  var seen = 0
+  while seen < 300 and av_read_frame(input.formatContext, input.packet) >= 0:
+    let packet = input.packet
+    if packet.stream_index == stream.index:
+      inc seen
+      result = annexBParameterSets(packet.data, packet.size.int)
+    av_packet_unref(packet)
+    if result.len > 0: break
+  discard av_seek_frame(input.formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
+
+proc seekToKeyBefore(input: InputContainer, stream: ptr AVStream, ts: int64) =
+  ## Seek so the next keyframe read is at or before `ts`. MPEG-TS seeks by
+  ## estimate and can land past it, which would drop the frames between, so
+  ## back off a second at a time, doubling, until it doesn't.
+  let second = av_rescale_q(1, AVRational(num: 1, den: 1), stream.time_base)
+  var margin = 0'i64
+  while true:
+    let target = ts - margin
+    input.seek(target, stream = stream)
+    var key = AV_NOPTS_VALUE
+    while key == AV_NOPTS_VALUE and
+        av_read_frame(input.formatContext, input.packet) >= 0:
+      let packet = input.packet
+      if packet.stream_index == stream.index and
+          (packet.flags and AV_PKT_FLAG_KEY) != 0:
+        key = (if packet.pts != AV_NOPTS_VALUE: packet.pts else: packet.dts)
+      av_packet_unref(packet)
+    if key == AV_NOPTS_VALUE or key <= ts or target <= input.startPts(stream):
+      input.seek(target, stream = stream)
+      return
+    margin = (if margin == 0: second else: margin * 2)
+
+proc supportsStream(input: InputContainer, stream: ptr AVStream,
+    encoder: ptr AVCodec, codecId: AVCodecID): bool =
   let pixelFormat = AVPixelFormat(stream.codecpar.format)
   if codecId == ID_H264:
-    stream.h264SupportsPartialLossless
+    h264SupportsPartialLossless(stream.codecpar.format, h264Header(input, stream))
   elif codecId == ID_HEVC:
     stream.hevcSupportsPartialLossless(encoder)
   elif codecId == ID_VP9:
@@ -166,7 +207,7 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   if stream.codecpar.codec_id != codecId or
       stream.codecpar.width != tl.res[0] or
       stream.codecpar.height != tl.res[1] or
-      not stream.supportsStream(encoder, codecId) or
+      not input.supportsStream(stream, encoder, codecId) or
       not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
     return
 
@@ -226,8 +267,16 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
   let sourcePath = tl.v[0][0].src[]
   var templateInput = try: av.open(sourcePath) except IOError as e: error e.msg
   let sourceStream = templateInput.video[0]
-  let sourceParameterSets = parameterSetsFor(codecId,
-    sourceStream.codecpar.extradata, sourceStream.codecpar.extradata_size)
+  let header =
+    if codecId == ID_H264: h264Header(templateInput, sourceStream)
+    else:
+      let par = sourceStream.codecpar
+      var bytes = newSeq[uint8](max(par.extradata_size, 0))
+      if bytes.len > 0: copyMem(addr bytes[0], par.extradata, bytes.len)
+      bytes
+  let sourceParameterSets =
+    if header.len == 0: newSeq[uint8]()
+    else: parameterSetsFor(codecId, unsafeAddr header[0], header.len)
 
   let stats = smartPlanStats(spans)
   if stats.copiedFrames == 0:
@@ -235,6 +284,19 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     error &"Partial-lossless {label} renderer selected without a complete GOP"
 
   let outputStream = output.addStreamFromTemplate(sourceStream)
+  let sourceAnnexB = codecId == ID_H264 and header.len > 0 and
+    isAnnexB(unsafeAddr header[0], header.len)
+  if sourceAnnexB:
+    # The muxer reads Annex B extradata as Annex B samples, but every sample
+    # here is length-prefixed, so it gets an avcC instead.
+    let avcC = annexBToAvcC(unsafeAddr header[0], header.len)
+    let par = outputStream.codecpar
+    av_freep(addr par.extradata)
+    par.extradata = cast[ptr uint8](av_mallocz(csize_t(avcC.len + 64)))
+    if par.extradata == nil:
+      error "Could not allocate avcC"
+    copyMem(par.extradata, unsafeAddr avcC[0], avcC.len)
+    par.extradata_size = avcC.len.cint
   if sourceStream.metadata != nil:
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
   outputStream.time_base = sourceStream.time_base
@@ -305,9 +367,9 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
 
     for spanIndex, span in spans:
       if span.kind == ssCopy:
-        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base) +
-          input.startPts(stream)
-        input.seek(seekTs, stream = stream)
+        input.seekToKeyBefore(stream,
+          av_rescale_q(span.srcStart, frameTb, stream.time_base) +
+          input.startPts(stream))
         var first = true
         var copied = 0'i64
         var shift = 0'i64
@@ -383,6 +445,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
           outPacket.stream_index = outputStream.index
           if isFirst and isNal:
             outPacket.normalizeLengthPrefixed(sourceParameterSets, label)
+          elif sourceAnnexB:
+            outPacket.normalizeLengthPrefixed(noParameterSets, label)
           av_packet_unref(sourcePacket)
           if codecId == ID_H264 and not sawDts and outPacket.dts == AV_NOPTS_VALUE:
             undated.add outPacket
@@ -406,9 +470,9 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
           firstPacket = true
           firstFrameInRun = true
 
-        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base) +
-          input.startPts(stream)
-        input.seek(seekTs, stream = stream)
+        input.seekToKeyBefore(stream,
+          av_rescale_q(span.srcStart, frameTb, stream.time_base) +
+          input.startPts(stream))
         avcodec_flush_buffers(decoder)
         var encoded = 0'i64
         var lastDecoded: ptr AVFrame = nil
