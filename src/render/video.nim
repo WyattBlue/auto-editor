@@ -219,6 +219,7 @@ type
     deintW, deintH, deintFmt: cint # what deint was built for
     ownsCn: bool                # opened for this decoder, not the media cache's
     deintDone: bool             # deint has been sent end-of-stream
+    interlaced: bool            # has given an interlaced frame; seeks keep it
     hasSeekFrame: bool          # whether seekFrame holds a pending marker
 
   SrcState = ref object
@@ -301,6 +302,7 @@ proc nextFrame(st: DecState, stream: ptr AVStream, frame: ptr AVFrame): bool =
       let bsink = st.deint.add("buffersink")
       st.deint.linkNodes(bsrc, filt, bsink).configure()
       (st.deintW, st.deintH, st.deintFmt) = (frame.width, frame.height, frame.format)
+      st.interlaced = true
     st.deint.push(frame)
 
 proc newDecState(cn: InputContainer, decoder: ptr AVCodecContext,
@@ -1844,7 +1846,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       # sparsely-cued containers can report just a single keyframe).
       # observedKeyframes is kept strictly ascending, so upperBound-1 is the
       # floor; frame 0 is always a valid seek point.
-      let idx = upperBound(ss.observedKeyframes, target) - 1
+      # bwdif needs the frame before the target, so for an interlaced source
+      # land on a keyframe before that one too.
+      let want = if st.interlaced: max(0, target - 1) else: target
+      let idx = upperBound(ss.observedKeyframes, want) - 1
       let seekTarget = if idx >= 0: ss.observedKeyframes[idx] else: 0
       if seekTarget < 0 or seekTarget > target:
         let indexInfo = if ss.hasKfIndex: &"{ss.kfFrames.len} indexed" else: "no index"
@@ -1873,7 +1878,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           hasSeekFrame = true
           debug &"Seek: {frameIndex} -> {target}"
           st.cn.seek(
-            videoFrameToTimestamp(target, ss.frameRate, myStream.time_base) +
+            videoFrameToTimestamp(
+              if st.interlaced: max(0, target - 1) else: target,
+              ss.frameRate, myStream.time_base) +
             st.cn.startPts(myStream), stream = myStream)
           avcodec_flush_buffers(st.decoder)
           st.resetDeint()
