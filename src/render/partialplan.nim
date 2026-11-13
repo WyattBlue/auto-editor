@@ -60,7 +60,8 @@ proc supportsContainer(codecId: AVCodecID, formatName: string): bool =
   else:
     false
 
-proc h264Header(input: InputContainer, stream: ptr AVStream): seq[uint8] =
+proc sourceHeader(input: InputContainer, stream: ptr AVStream,
+    codecId: AVCodecID): seq[uint8] =
   ## The stream's extradata, or else the parameter sets of its first packet
   ## that has them: MPEG-TS carries them only in-band. Leaves the demuxer at
   ## the start.
@@ -74,7 +75,9 @@ proc h264Header(input: InputContainer, stream: ptr AVStream): seq[uint8] =
     let packet = input.packet
     if packet.stream_index == stream.index:
       inc seen
-      result = annexBParameterSets(packet.data, packet.size.int)
+      result =
+        if codecId == ID_HEVC: hevcInBandParameterSets(packet.data, packet.size.int)
+        else: annexBParameterSets(packet.data, packet.size.int)
     av_packet_unref(packet)
     if result.len > 0: break
   discard av_seek_frame(input.formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
@@ -106,9 +109,11 @@ proc supportsStream(input: InputContainer, stream: ptr AVStream,
     encoder: ptr AVCodec, codecId: AVCodecID): bool =
   let pixelFormat = AVPixelFormat(stream.codecpar.format)
   if codecId == ID_H264:
-    h264SupportsPartialLossless(stream.codecpar.format, h264Header(input, stream))
+    h264SupportsPartialLossless(stream.codecpar.format,
+      sourceHeader(input, stream, codecId))
   elif codecId == ID_HEVC:
-    stream.hevcSupportsPartialLossless(encoder)
+    hevcSupportsPartialLossless(stream.codecpar.format, encoder,
+      sourceHeader(input, stream, codecId))
   elif codecId == ID_VP9:
     pixelFormat == AV_PIX_FMT_YUV420P
   elif codecId == ID_AV1:
@@ -274,7 +279,7 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
   var templateInput = try: av.open(sourcePath) except IOError as e: error e.msg
   let sourceStream = templateInput.video[0]
   let header =
-    if codecId == ID_H264: h264Header(templateInput, sourceStream)
+    if isNal: sourceHeader(templateInput, sourceStream, codecId)
     else:
       let par = sourceStream.codecpar
       var bytes = newSeq[uint8](max(par.extradata_size, 0))
@@ -291,17 +296,19 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
 
   let outputStream = output.addStreamFromTemplate(sourceStream)
   let sourceAnnexB = header.len > 0 and isAnnexB(unsafeAddr header[0], header.len)
-  if sourceAnnexB and codecId == ID_H264:
+  if sourceAnnexB and isNal:
     # The muxer reads Annex B extradata as Annex B samples, but every sample
-    # here is length-prefixed, so it gets an avcC instead.
-    let avcC = annexBToAvcC(unsafeAddr header[0], header.len)
+    # here is length-prefixed, so it gets an avcC or hvcC instead.
+    let record =
+      if codecId == ID_H264: annexBToAvcC(unsafeAddr header[0], header.len)
+      else: annexBToHvcC(unsafeAddr header[0], header.len)
     let par = outputStream.codecpar
     av_freep(addr par.extradata)
-    par.extradata = cast[ptr uint8](av_mallocz(csize_t(avcC.len + 64)))
+    par.extradata = cast[ptr uint8](av_mallocz(csize_t(record.len + 64)))
     if par.extradata == nil:
-      error "Could not allocate avcC"
-    copyMem(par.extradata, unsafeAddr avcC[0], avcC.len)
-    par.extradata_size = avcC.len.cint
+      error &"Could not allocate {label} header"
+    copyMem(par.extradata, unsafeAddr record[0], record.len)
+    par.extradata_size = record.len.cint
   if sourceStream.metadata != nil:
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
   outputStream.time_base = sourceStream.time_base
