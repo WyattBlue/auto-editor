@@ -645,11 +645,11 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   if fileExists(buildPath / "lib" / "pkgconfig" / "x265.pc"):
     return
 
-  if defined(macosx) and hostCPU == "amd64" and kind == native:
-    # Skip the project configs: they add auto-editor's own link flags, which
-    # cannot resolve from inside ffmpeg_sources.
-    exec "nim r -d:release --hints:off --skipParentCfg:on --skipProjCfg:on " &
-      "../../scripts/strip_avx512_asm.nim source/common/x86"
+  # On every target, so every build from a shared source tree agrees with
+  # patches/x265.patch. Skip the project configs: they add auto-editor's own
+  # link flags, which cannot resolve from inside ffmpeg_sources.
+  exec "nim r -d:release --hints:off --skipParentCfg:on --skipProjCfg:on " &
+    "../../scripts/strip_avx512_asm.nim source/common/x86 --all"
 
   let isWasm = kind == wasm32 or kind == wasm64
   let cmakePrefix = if isWasm: "emcmake cmake" else: "cmake"

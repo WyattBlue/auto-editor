@@ -22,14 +22,12 @@
  
 --- a/source/common/cpu.cpp
 +++ b/source/common/cpu.cpp
-@@ -177,6 +177,10 @@
+@@ -177,6 +177,8 @@
  
  uint32_t cpu_detect(bool benableavx512 )
  {
-+#if defined(__APPLE__) && X86_64
-+    /* No AVX-512 kernels are assembled here, see strip_avx512_asm.nim */
++    /* No AVX-512 kernels are assembled, see strip_avx512_asm.nim */
 +    benableavx512 = false;
-+#endif
  
      uint32_t cpu = 0;
      uint32_t eax, ebx, ecx, edx;
@@ -39,7 +37,7 @@
      }
      if (cpuMask & X265_CPU_AVX512)
      {
-+#if !defined(__APPLE__) || !X86_64
++#if 0 /* not assembled, see strip_avx512_asm.nim */
          p.cu[BLOCK_16x16].var = PFX(pixel_var_16x16_avx512);
          p.cu[BLOCK_32x32].calcresidual[NONALIGNED] = PFX(getResidual32_avx512);
          p.cu[BLOCK_32x32].calcresidual[ALIGNED] = PFX(getResidual_aligned32_avx512);
@@ -55,7 +53,7 @@
      }
      if (cpuMask & X265_CPU_AVX512)
      {
-+#if !defined(__APPLE__) || !X86_64
++#if 0 /* not assembled, see strip_avx512_asm.nim */
          p.pu[LUMA_32x8].sad = PFX(pixel_sad_32x8_avx512);
        //  p.pu[LUMA_32x16].sad = PFX(pixel_sad_32x16_avx512);
          p.pu[LUMA_32x24].sad = PFX(pixel_sad_32x24_avx512);

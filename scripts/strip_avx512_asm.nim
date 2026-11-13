@@ -6,14 +6,19 @@
 ## Wrap every AVX-512 line of x86inc-style assembly in a guard nasm skips when
 ## it targets macho64, so Intel macOS builds assemble none of it. Other output
 ## formats are untouched, which keeps a cross-build from the same source tree in
-## step with the C-side guards in patches/x264.patch and patches/x265.patch.
+## step with the C-side guards in patches/x264.patch. With `--all` the guard
+## skips every output format instead, matching patches/x265.patch: x265 only
+## runs its AVX-512 kernels when asked to with `--asm avx512`.
 
 import std/[os, sets, strutils, tables]
 
+const marker = "AVX-512 stripped"
+
+var
+  guardOpen = "%ifnidn __OUTPUT_FORMAT__,macho64 ; " & marker & " on Intel macOS"
+  guardClose = "%endif ; " & marker & " on Intel macOS"
+
 const
-  marker = "AVX-512 stripped on Intel macOS"
-  guardOpen = "%ifnidn __OUTPUT_FORMAT__,macho64 ; " & marker
-  guardClose = "%endif ; " & marker
 
   ## Assembler state, not code. These show up both inside AVX-512 sections and
   ## after the last function of one, so they must survive the strip; treating
@@ -199,8 +204,12 @@ proc stripFile(path: string): int =
   if result > 0:
     writeFile(path, output.join("\n") & "\n")
 
-if paramCount() != 1 or not dirExists(paramStr(1)):
-  quit "usage: strip_avx512_asm <x86 assembly directory>"
+let all = paramCount() == 2 and paramStr(2) == "--all"
+if not (paramCount() == 1 or all) or not dirExists(paramStr(1)):
+  quit "usage: strip_avx512_asm <x86 assembly directory> [--all]"
+if all:
+  guardOpen = "%if 0 ; " & marker & " on every target"
+  guardClose = "%endif ; " & marker & " on every target"
 
 var
   total = 0
