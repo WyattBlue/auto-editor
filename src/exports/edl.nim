@@ -243,4 +243,5 @@ proc edlWrite*(name, output: string, tl: v3) =
   if output == "-":
     stdout.write text
   else:
-    writeFile(output, text)
+    try: writeFile(output, text)
+    except IOError: error "Cannot write to: " & output

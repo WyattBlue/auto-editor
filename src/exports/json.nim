@@ -136,4 +136,5 @@ proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
   if output == "-":
     echo pretty(tlJson)
   else:
-    writeFile(output, pretty(tlJson))
+    try: writeFile(output, pretty(tlJson))
+    except IOError: error "Cannot write to: " & output

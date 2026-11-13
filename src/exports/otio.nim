@@ -409,7 +409,8 @@ proc writeSolidPng(path: string, w, h: cint, bg: RGBColor) =
     error "Could not encode background PNG"
   var buf = newString(pkt.size)
   copyMem(addr buf[0], pkt.data, pkt.size)
-  writeFile(path, buf)
+  try: writeFile(path, buf)
+  except IOError: error "Cannot write to: " & path
 
   av_packet_free(addr pkt)
   av_frame_free(addr frame)
@@ -632,4 +633,5 @@ proc otioWrite*(name, output: string, tl: v3) =
   if output == "-":
     echo pretty(timeline, indent = 4)
   else:
-    writeFile(output, pretty(timeline, indent = 4))
+    try: writeFile(output, pretty(timeline, indent = 4))
+    except IOError: error "Cannot write to: " & output
