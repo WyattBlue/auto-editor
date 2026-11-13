@@ -283,6 +283,8 @@ proc nextFrame(st: DecState, stream: ptr AVStream, frame: ptr AVFrame): bool =
           frame.height != st.deintH or frame.format != st.deintFmt):
         # A graph can't change size: drain it, then start another.
         st.deintNext = av_frame_alloc()
+        if st.deintNext == nil:
+          error "Could not allocate frame"
         av_frame_move_ref(st.deintNext, frame)
         st.deint.flush()
         continue
