@@ -162,18 +162,21 @@ proc annexBToLengthPrefixed*(data: ptr uint8, size: int): seq[uint8] =
     pos = next
 
 proc normalizeLengthPrefixed*(packet: ptr AVPacket,
-    parameterSets: openArray[uint8], label: string) =
-  ## Rewrite an Annex B packet in place as four-byte-length NALs, optionally
-  ## prefixed with `parameterSets`, preserving the packet's timing fields.
-  let bytes = cast[ptr UncheckedArray[uint8]](packet.data)
-  var start = 0
-  while start < packet.size.int and
-      startCodeLen(bytes, packet.size.int, start) == 0:
-    inc start
-  if start == packet.size.int and parameterSets.len == 0:
+    parameterSets: openArray[uint8], label: string, annexB: bool) =
+  ## Rewrite a packet in place as four-byte-length NALs, converting it from
+  ## Annex B when `annexB`, optionally prefixed with `parameterSets`,
+  ## preserving the packet's timing fields. The caller says which layout it
+  ## has: a length field of 256 to 511 reads as a start code.
+  if not annexB and parameterSets.len == 0:
     return
 
-  let payload = annexBToLengthPrefixed(packet.data, packet.size.int)
+  var payload: seq[uint8]
+  if annexB:
+    payload = annexBToLengthPrefixed(packet.data, packet.size.int)
+  else:
+    payload.setLen(packet.size.int)
+    if payload.len > 0:
+      copyMem(addr payload[0], packet.data, payload.len)
   let pts = packet.pts
   let dts = packet.dts
   let duration = packet.duration
