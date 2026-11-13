@@ -187,3 +187,695 @@ diff --git a/libavdevice/avfoundation.m b/libavdevice/avfoundation.m
          } else {
              pkt->data = NULL;
              unlock_frames(ctx);
+diff --git a/libavcodec/aac/aacdec.c b/libavcodec/aac/aacdec.c
+index 202c7aa..4e89df6 100644
+--- a/libavcodec/aac/aacdec.c
++++ b/libavcodec/aac/aacdec.c
+@@ -150,6 +150,8 @@ static av_cold int che_configure(AACDecContext *ac,
+             int ret = ac->proc.sbr_ctx_alloc_init(ac, &ac->che[type][id], type);
+             if (ret < 0)
+                 return ret;
++            ac->che[type][id]->ch[0].output = ac->che[type][id]->ch[0].ret_buf;
++            ac->che[type][id]->ch[1].output = ac->che[type][id]->ch[1].ret_buf;
+         }
+         if (type != TYPE_CCE) {
+             if (*channels >= MAX_CHANNELS - (type == TYPE_CPE || (type == TYPE_SCE && ac->oc[1].m4ac.ps == 1))) {
+diff --git a/libavcodec/aac/aacdec_usac.c b/libavcodec/aac/aacdec_usac.c
+index 00b4d45..d2431c5 100644
+--- a/libavcodec/aac/aacdec_usac.c
++++ b/libavcodec/aac/aacdec_usac.c
+@@ -564,6 +564,7 @@ int ff_aac_usac_config_decode(AACDecContext *ac, AVCodecContext *avctx,
+     int elem_id[3 /* SCE, CPE, LFE */];
+ 
+     int map_pos_set = 0;
++    int nb_elements = 0;
+     uint8_t layout_map[MAX_ELEM_ID*4][3] = { 0 };
+ 
+     if (!ac)
+@@ -644,7 +645,6 @@ int ff_aac_usac_config_decode(AACDecContext *ac, AVCodecContext *avctx,
+         if (ret < 0)
+             return ret;
+     } else {
+-        int nb_elements;
+         if ((ret = ff_aac_set_default_channel_config(ac, avctx, layout_map,
+                                                      &nb_elements, channel_config_idx)))
+             return ret;
+@@ -678,6 +678,14 @@ int ff_aac_usac_config_decode(AACDecContext *ac, AVCodecContext *avctx,
+             usac->nb_elems = 0;
+             return AVERROR(EINVAL);
+         }
++        if (map_pos_set && e->type != ID_USAC_EXT &&
++            (map_count >= nb_elements ||
++             layout_map[map_count][0] != (e->type == ID_USAC_LFE ? TYPE_LFE : e->type))) {
++            av_log(ac->avctx, AV_LOG_ERROR, "Element %d does not match the "
++                                            "channel configuration\n", i);
++            usac->nb_elems = 0;
++            return AVERROR_INVALIDDATA;
++        }
+ 
+         av_log(ac->avctx, AV_LOG_DEBUG, "Element present: idx %i, type %i\n",
+                i, e->type);
+@@ -727,6 +735,13 @@ int ff_aac_usac_config_decode(AACDecContext *ac, AVCodecContext *avctx,
+         };
+     }
+ 
++    if (map_pos_set && elem_id[0] + elem_id[1] + elem_id[2] != nb_elements) {
++        av_log(ac->avctx, AV_LOG_ERROR, "Element count does not match the "
++                                        "channel configuration\n");
++        usac->nb_elems = 0;
++        return AVERROR_INVALIDDATA;
++    }
++
+     ret = ff_aac_output_configure(ac, layout_map, elem_id[0] + elem_id[1] + elem_id[2],
+                                   OC_GLOBAL_HDR, 0);
+     if (ret < 0) {
+diff --git a/libavcodec/aacsbr_template.c b/libavcodec/aacsbr_template.c
+index c10f5f3..cc22b64 100644
+--- a/libavcodec/aacsbr_template.c
++++ b/libavcodec/aacsbr_template.c
+@@ -77,8 +77,7 @@ av_cold int AAC_RENAME(ff_aac_sbr_ctx_alloc_init)(AACDecContext *ac,
+ 
+     if (!ext)
+         return AVERROR(ENOMEM);
+-    *che = &ext->ch;
+-    sbr  = &ext->sbr;
++    sbr = &ext->sbr;
+     ext->ch.ch[0].AAC_RENAME(predictor_state) = ext->predictor_state[0];
+     ext->ch.ch[1].AAC_RENAME(predictor_state) = ext->predictor_state[1];
+ 
+@@ -96,20 +95,25 @@ av_cold int AAC_RENAME(ff_aac_sbr_ctx_alloc_init)(AACDecContext *ac,
+                      USE_FIXED ? AV_TX_INT32_MDCT : AV_TX_FLOAT_MDCT,
+                      1, 64, &scale, 0);
+     if (ret < 0)
+-        return ret;
++        goto fail;
+ 
+     scale = USE_FIXED ? -1.0 : -2.0 * 32768;
+     ret = av_tx_init(&sbr->mdct_ana, &sbr->mdct_ana_fn,
+                      USE_FIXED ? AV_TX_INT32_MDCT : AV_TX_FLOAT_MDCT,
+                      1, 64, &scale, 0);
+     if (ret < 0)
+-        return ret;
++        goto fail;
+ 
+     AAC_RENAME(ff_ps_ctx_init)(&sbr->ps);
+     AAC_RENAME(ff_sbrdsp_init)(&sbr->dsp);
+     aacsbr_func_ptr_init(&sbr->c);
+ 
++    *che = &ext->ch;
+     return 0;
++fail:
++    av_tx_uninit(&sbr->mdct);
++    av_free(ext);
++    return ret;
+ }
+ 
+ av_cold void AAC_RENAME(ff_aac_sbr_ctx_close)(ChannelElement *che)
+diff --git a/libavcodec/cbs_av1.c b/libavcodec/cbs_av1.c
+index 4bacebf..e4b2751 100644
+--- a/libavcodec/cbs_av1.c
++++ b/libavcodec/cbs_av1.c
+@@ -1199,7 +1199,7 @@ static int cbs_av1_write_obu(CodedBitstreamContext *ctx,
+     flush_put_bits(pbc);
+     av_assert0(data_pos <= start_pos);
+ 
+-    if (8 * obu->obu_size > put_bits_left(pbc)) {
++    if (obu->obu_size > put_bits_left(pbc) / 8) {
+         av_refstruct_unref(&priv->sequence_header_ref);
+         av_buffer_unref(&priv->frame_header_ref);
+         *priv = av1ctx;
+diff --git a/libavcodec/cbs_h2645.c b/libavcodec/cbs_h2645.c
+index 61b70f4..9329554 100644
+--- a/libavcodec/cbs_h2645.c
++++ b/libavcodec/cbs_h2645.c
+@@ -272,7 +272,7 @@ int ff_cbs_h2645_write_slice_data(CodedBitstreamContext *ctx,
+     av_assert0(data_bit_start >= 0 &&
+                data_size > data_bit_start / 8);
+ 
+-    if (data_size * 8 + 8 > put_bits_left(pbc))
++    if (data_size + 1 > put_bits_left(pbc) / 8)
+         return AVERROR(ENOSPC);
+ 
+     if (!rest)
+diff --git a/libavcodec/cbs_mpeg2.c b/libavcodec/cbs_mpeg2.c
+index 87401d1..57c2205 100644
+--- a/libavcodec/cbs_mpeg2.c
++++ b/libavcodec/cbs_mpeg2.c
+@@ -319,7 +319,7 @@ static int cbs_mpeg2_write_slice(CodedBitstreamContext *ctx,
+         av_assert0(slice->data_bit_start >= 0 &&
+                    slice->data_size > slice->data_bit_start / 8);
+ 
+-        if (slice->data_size * 8 + 8 > put_bits_left(pbc))
++        if (slice->data_size + 1 > put_bits_left(pbc) / 8)
+             return AVERROR(ENOSPC);
+ 
+         // First copy the remaining bits of the first byte
+diff --git a/libavcodec/h264_direct.c b/libavcodec/h264_direct.c
+index 1bc4f91..44942f1 100644
+--- a/libavcodec/h264_direct.c
++++ b/libavcodec/h264_direct.c
+@@ -212,6 +212,7 @@ static void pred_spatial_direct_motion(const H264Context *const h, H264SliceCont
+     int b4_stride = h->b_stride;
+     int mb_xy = sl->mb_xy, mb_y = sl->mb_y;
+     int mb_type_col[2];
++    int col_field = 0;
+     const int16_t (*l1mv0)[2], (*l1mv1)[2];
+     const int8_t *l1ref0, *l1ref1;
+     const int is_b8x8 = IS_8X8(*mb_type);
+@@ -303,6 +304,9 @@ static void pred_spatial_direct_motion(const H264Context *const h, H264SliceCont
+             mb_y  += sl->col_fieldoff;
+             mb_xy += h->mb_stride * sl->col_fieldoff; // non-zero for FL -> FL & differ parity
+         }
++        // Undecoded macroblocks of a broken field picture lack the flag, the
++        // colocated type has to agree with the branch taken here.
++        col_field = MB_TYPE_INTERLACED;
+         goto single_col;
+     } else {                                             // AFL/AFR/FR/FL -> AFR/FR
+         if (IS_INTERLACED(*mb_type)) {                   // AFL       /FL -> AFR/FR
+@@ -329,7 +333,7 @@ static void pred_spatial_direct_motion(const H264Context *const h, H264SliceCont
+         } else {                                         //     AFR/FR    -> AFR/FR
+ single_col:
+             mb_type_col[0] =
+-            mb_type_col[1] = sl->ref_list[1][0].parent->mb_type[mb_xy];
++            mb_type_col[1] = sl->ref_list[1][0].parent->mb_type[mb_xy] | col_field;
+ 
+             sub_mb_type |= MB_TYPE_16x16 | MB_TYPE_DIRECT2; /* B_SUB_8x8 */
+             if (!is_b8x8 && (mb_type_col[0] & MB_TYPE_16x16_OR_INTRA)) {
+@@ -500,6 +504,7 @@ static void pred_temp_direct_motion(const H264Context *const h, H264SliceContext
+     int b4_stride = h->b_stride;
+     int mb_xy = sl->mb_xy, mb_y = sl->mb_y;
+     int mb_type_col[2];
++    int col_field = 0;
+     const int16_t (*l1mv0)[2], (*l1mv1)[2];
+     const int8_t *l1ref0, *l1ref1;
+     const int is_b8x8 = IS_8X8(*mb_type);
+@@ -522,6 +527,9 @@ static void pred_temp_direct_motion(const H264Context *const h, H264SliceContext
+             mb_y  += sl->col_fieldoff;
+             mb_xy += h->mb_stride * sl->col_fieldoff; // non-zero for FL -> FL & differ parity
+         }
++        // Undecoded macroblocks of a broken field picture lack the flag, the
++        // colocated type has to agree with the branch taken here.
++        col_field = MB_TYPE_INTERLACED;
+         goto single_col;
+     } else {                                        // AFL/AFR/FR/FL -> AFR/FR
+         if (IS_INTERLACED(*mb_type)) {              // AFL       /FL -> AFR/FR
+@@ -551,7 +559,7 @@ static void pred_temp_direct_motion(const H264Context *const h, H264SliceContext
+         } else {                                    //     AFR/FR    -> AFR/FR
+ single_col:
+             mb_type_col[0]     =
+-                mb_type_col[1] = sl->ref_list[1][0].parent->mb_type[mb_xy];
++                mb_type_col[1] = sl->ref_list[1][0].parent->mb_type[mb_xy] | col_field;
+ 
+             sub_mb_type = MB_TYPE_16x16 | MB_TYPE_P0L0 | MB_TYPE_P0L1 |
+                           MB_TYPE_DIRECT2;                  /* B_SUB_8x8 */
+diff --git a/libavcodec/h264dec.c b/libavcodec/h264dec.c
+index ca65df2..1f05534 100644
+--- a/libavcodec/h264dec.c
++++ b/libavcodec/h264dec.c
+@@ -948,8 +948,8 @@ static int finalize_frame(H264Context *h, AVFrame *dst, H264Picture *out, int *g
+             av_log(h->avctx, AV_LOG_DEBUG, "Duplicating field %d to fill missing\n", field);
+ 
+             for (p = 0; p<4; p++) {
+-                dst_data[p] = f->data[p] + (field^1)*f->linesize[p];
+-                src_data[p] = f->data[p] +  field   *f->linesize[p];
++                dst_data[p] = FF_PTR_ADD(f->data[p], (field^1)*f->linesize[p]);
++                src_data[p] = FF_PTR_ADD(f->data[p],  field   *f->linesize[p]);
+                 linesizes[p] = 2*f->linesize[p];
+             }
+ 
+diff --git a/libavformat/cafdec.c b/libavformat/cafdec.c
+index 41ae1bc..fae4d7d 100644
+--- a/libavformat/cafdec.c
++++ b/libavformat/cafdec.c
+@@ -277,6 +277,8 @@ static int read_pakt_chunk(AVFormatContext *s, int64_t size)
+     st->nb_frames  = avio_rb64(pb); /* valid frames */
+     priming        = avio_rb32(pb); /* priming frames */
+     caf->remainder = avio_rb32(pb); /* remainder frames */
++    if (st->nb_frames < 0 || INT64_MAX - priming - caf->remainder < st->nb_frames)
++        return AVERROR_INVALIDDATA;
+ 
+     caf->frame_cnt = -(int64_t)priming;
+     st->codecpar->initial_padding = priming;
+diff --git a/libavformat/matroskadec.c b/libavformat/matroskadec.c
+index 18849af..b074354 100644
+--- a/libavformat/matroskadec.c
++++ b/libavformat/matroskadec.c
+@@ -3490,7 +3490,8 @@ static int matroska_read_header(AVFormatContext *s)
+ 
+     if (!matroska->time_scale)
+         matroska->time_scale = 1000000;
+-    if (isnan(matroska->duration))
++    if (isnan(matroska->duration) || matroska->duration < 0 ||
++        matroska->duration >= (double)INT64_MAX / matroska->time_scale)
+         matroska->duration = 0;
+     if (matroska->duration)
+         matroska->ctx->duration = matroska->duration * matroska->time_scale *
+diff --git a/libavformat/mov.c b/libavformat/mov.c
+index e7e29d7..95cbdff 100644
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -1295,7 +1295,7 @@ static int mov_read_clap(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+     int width, height, err = 0;
+     AVRational aperture_width, aperture_height, horiz_off, vert_off;
+     AVRational pc_x, pc_y;
+-    uint64_t top, bottom, left, right;
++    int64_t top, bottom, left, right;
+ 
+     item = get_heif_item(c, c->cur_item_id);
+     st = get_curr_st(c);
+@@ -1323,9 +1323,9 @@ static int mov_read_clap(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+     vert_off.num  = avio_rb32(pb);
+     vert_off.den  = avio_rb32(pb);
+ 
+-    if (aperture_width.num  < 0 || aperture_width.den  < 0 ||
+-        aperture_height.num < 0 || aperture_height.den < 0 ||
+-        horiz_off.den       < 0 || vert_off.den        < 0) {
++    if (aperture_width.num  < 0 || aperture_width.den  <= 0 ||
++        aperture_height.num < 0 || aperture_height.den <= 0 ||
++        horiz_off.den      <= 0 || vert_off.den        <= 0) {
+         err = AVERROR_INVALIDDATA;
+         goto fail;
+     }
+@@ -1354,8 +1354,8 @@ static int mov_read_clap(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+     top    = av_q2d(av_sub_q(pc_y, aperture_height));
+     bottom = av_q2d(av_add_q(pc_y, aperture_height));
+ 
+-    if (bottom > (height - 1) ||
+-        right  > (width  - 1)) {
++    if (top  < 0 || bottom < 0 || bottom > (height - 1) ||
++        left < 0 || right  < 0 || right  > (width  - 1)) {
+         err = AVERROR_INVALIDDATA;
+         goto fail;
+     }
+@@ -4060,7 +4060,8 @@ static int get_edit_list_entry(MOVContext *mov,
+     *edit_list_duration = av_rescale(*edit_list_duration, msc->time_scale,
+                                      global_timescale);
+ 
+-    if (*edit_list_duration + (uint64_t)*edit_list_media_time > INT64_MAX)
++    if (*edit_list_duration < 0 ||
++        *edit_list_duration + (uint64_t)*edit_list_media_time > INT64_MAX)
+         *edit_list_duration = 0;
+ 
+     return 1;
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index 6f93eb3..031b916 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -7844,7 +7844,16 @@ static int mov_create_timecode_track(AVFormatContext *s, int index, int src_inde
+         return AVERROR(ENOMEM);
+     *track->src_track = src_index;
+     track->nb_src_track = 1;
+-    track->timescale = mov->tracks[src_index].timescale;
++    if (mov->mode == MODE_ISM || mov->tracks[src_index].timescale <= 100000)
++        track->timescale = mov->tracks[src_index].timescale;
++    else if (tc.flags & AV_TIMECODE_FLAG_DROPFRAME)
++        track->timescale = tc.fps * 1000;
++    else if (tc.rate.den == 1001 && tc.rate.num > 0 && tc.rate.num <= 100000)
++        track->timescale = tc.rate.num;
++    else if (tc.rate.den == 1 && tc.rate.num > 0 && tc.rate.num <= 1000)
++        track->timescale = tc.rate.num;
++    else
++        track->timescale = tc.fps > 0 ? tc.fps : 30;
+     if (tc.flags & AV_TIMECODE_FLAG_DROPFRAME)
+         track->timecode_flags |= MOV_TIMECODE_FLAG_DROPFRAME;
+ 
+diff --git a/libavformat/mux.c b/libavformat/mux.c
+index ea9838e..84cbf80 100644
+--- a/libavformat/mux.c
++++ b/libavformat/mux.c
+@@ -241,9 +241,16 @@ static int init_muxer(AVFormatContext *s, AVDictionary **options)
+                 goto fail;
+             }
+ 
+-            if (!par->block_align)
+-                par->block_align = par->ch_layout.nb_channels *
+-                                   av_get_bits_per_sample(par->codec_id) >> 3;
++            if (!par->block_align) {
++                int64_t block_align = (int64_t)par->ch_layout.nb_channels *
++                                      av_get_bits_per_sample(par->codec_id) >> 3;
++                if (block_align < 0 || block_align > INT_MAX) {
++                    av_log(s, AV_LOG_ERROR, "invalid channel count\n");
++                    ret = AVERROR(EINVAL);
++                    goto fail;
++                }
++                par->block_align = block_align;
++            }
+             break;
+         case AVMEDIA_TYPE_VIDEO:
+             if ((par->width <= 0 || par->height <= 0) &&
+diff --git a/libavformat/oggenc.c b/libavformat/oggenc.c
+index 5c7e3da..43317e9 100644
+--- a/libavformat/oggenc.c
++++ b/libavformat/oggenc.c
+@@ -192,8 +192,10 @@ static int ogg_buffer_page(AVFormatContext *s, OGGStreamContext *oggstream)
+     OGGPageList **p = &ogg->page_list;
+     OGGPageList *l = av_mallocz(sizeof(*l));
+ 
+-    if (!l)
++    if (!l) {
++        ogg_reset_cur_page(oggstream);
+         return AVERROR(ENOMEM);
++    }
+     l->page = oggstream->page;
+ 
+     oggstream->page.start_granule = ogg_granule_to_timestamp(oggstream, oggstream->page.granule);
+@@ -219,7 +221,7 @@ static int ogg_buffer_data(AVFormatContext *s, AVStream *st,
+     OGGContext *ogg = s->priv_data;
+     int total_segments = size / 255 + 1;
+     const uint8_t *p = data;
+-    int i, segments, len, flush = 0;
++    int i, segments, len, ret, flush = 0;
+ 
+     // Handles VFR by flushing page because this frame needs to have a timestamp
+     // For theora and VP8, keyframes also need to have a timestamp to correctly mark
+@@ -230,15 +232,17 @@ static int ogg_buffer_data(AVFormatContext *s, AVStream *st,
+         (ogg_granule_to_timestamp(oggstream, granule) >
+          ogg_granule_to_timestamp(oggstream, oggstream->last_granule) + 1 ||
+          ogg_key_granule(oggstream, granule))) {
+-        if (oggstream->page.granule != -1)
+-            ogg_buffer_page(s, oggstream);
++        if (oggstream->page.granule != -1 &&
++            (ret = ogg_buffer_page(s, oggstream)) < 0)
++            return ret;
+         flush = 1;
+     }
+ 
+     // avoid a continued page
+     if (!header && oggstream->page.size > 0 &&
+         MAX_PAGE_SIZE - oggstream->page.size < size) {
+-        ogg_buffer_page(s, oggstream);
++        if ((ret = ogg_buffer_page(s, oggstream)) < 0)
++            return ret;
+     }
+ 
+     for (i = 0; i < total_segments; ) {
+@@ -273,17 +277,20 @@ static int ogg_buffer_data(AVFormatContext *s, AVStream *st,
+                                          time_base, AV_TIME_BASE_Q);
+ 
+             if (page->segments_count == 255) {
+-                ogg_buffer_page(s, oggstream);
++                if ((ret = ogg_buffer_page(s, oggstream)) < 0)
++                    return ret;
+             } else if (!header) {
+                 if (ogg->pref_duration > 0 && next - start >= ogg->pref_duration) {
+-                    ogg_buffer_page(s, oggstream);
++                    if ((ret = ogg_buffer_page(s, oggstream)) < 0)
++                        return ret;
+                 }
+             }
+         }
+     }
+ 
+-    if (flush && oggstream->page.granule != -1)
+-        ogg_buffer_page(s, oggstream);
++    if (flush && oggstream->page.granule != -1 &&
++        (ret = ogg_buffer_page(s, oggstream)) < 0)
++        return ret;
+ 
+     return 0;
+ }
+@@ -628,24 +635,33 @@ static int ogg_init(AVFormatContext *s)
+ static int ogg_write_header(AVFormatContext *s)
+ {
+     OGGStreamContext *oggstream = NULL;
+-    int i, j;
++    int i, j, ret;
+ 
+     for (j = 0; j < s->nb_streams; j++) {
+         oggstream = s->streams[j]->priv_data;
+-        ogg_buffer_data(s, s->streams[j], oggstream->header[0],
+-                        oggstream->header_len[0], 0, 1);
++        ret = ogg_buffer_data(s, s->streams[j], oggstream->header[0],
++                              oggstream->header_len[0], 0, 1);
++        if (ret < 0)
++            return ret;
+         oggstream->page.flags |= 2; // bos
+-        ogg_buffer_page(s, oggstream);
++        ret = ogg_buffer_page(s, oggstream);
++        if (ret < 0)
++            return ret;
+     }
+     for (j = 0; j < s->nb_streams; j++) {
+         AVStream *st = s->streams[j];
+         oggstream = st->priv_data;
+         for (i = 1; i < 3; i++) {
+-            if (oggstream->header_len[i])
+-                ogg_buffer_data(s, st, oggstream->header[i],
+-                                oggstream->header_len[i], 0, 1);
++            if (oggstream->header_len[i]) {
++                ret = ogg_buffer_data(s, st, oggstream->header[i],
++                                      oggstream->header_len[i], 0, 1);
++                if (ret < 0)
++                    return ret;
++            }
+         }
+-        ogg_buffer_page(s, oggstream);
++        ret = ogg_buffer_page(s, oggstream);
++        if (ret < 0)
++            return ret;
+     }
+ 
+     oggstream->page.start_granule = AV_NOPTS_VALUE;
+@@ -766,15 +782,16 @@ static int ogg_write_packet_internal(AVFormatContext *s, AVPacket *pkt)
+ 
+ static int ogg_write_packet(AVFormatContext *s, AVPacket *pkt)
+ {
+-    int i;
++    int i, ret;
+ 
+     if (pkt)
+         return pkt->size || !pkt->side_data_elems ? ogg_write_packet_internal(s, pkt) : 0;
+ 
+     for (i = 0; i < s->nb_streams; i++) {
+         OGGStreamContext *oggstream = s->streams[i]->priv_data;
+-        if (oggstream->page.segments_count)
+-            ogg_buffer_page(s, oggstream);
++        if (oggstream->page.segments_count &&
++            (ret = ogg_buffer_page(s, oggstream)) < 0)
++            return ret;
+     }
+ 
+     ogg_write_pages(s, 2);
+@@ -783,14 +800,15 @@ static int ogg_write_packet(AVFormatContext *s, AVPacket *pkt)
+ 
+ static int ogg_write_trailer(AVFormatContext *s)
+ {
+-    int i;
++    int i, ret;
+ 
+     /* flush current page if needed */
+     for (i = 0; i < s->nb_streams; i++) {
+         OGGStreamContext *oggstream = s->streams[i]->priv_data;
+ 
+-        if (oggstream->page.segments_count)
+-            ogg_buffer_page(s, oggstream);
++        if (oggstream->page.segments_count &&
++            (ret = ogg_buffer_page(s, oggstream)) < 0)
++            return ret;
+     }
+ 
+     ogg_write_pages(s, 1);
+diff --git a/libavutil/imgutils.c b/libavutil/imgutils.c
+index 8ff8a6b..1aa6ab0 100644
+--- a/libavutil/imgutils.c
++++ b/libavutil/imgutils.c
+@@ -69,7 +69,7 @@ int image_get_linesize(int width, int plane,
+     linesize = max_step * shifted_w;
+ 
+     if (desc->flags & AV_PIX_FMT_FLAG_BITSTREAM)
+-        linesize = (linesize + 7) >> 3;
++        linesize = (linesize >> 3) + !!(linesize & 7);
+     return linesize;
+ }
+ 
+diff --git a/libavcodec/videotoolboxenc.c b/libavcodec/videotoolboxenc.c
+--- a/libavcodec/videotoolboxenc.c
++++ b/libavcodec/videotoolboxenc.c
+@@ -259,6 +259,9 @@
+ 
+     BufNode *q_head;
+     BufNode *q_tail;
++
++    /* Nodes handed to VideoToolbox and not reported back yet. */
++    BufNode *submitted_head;
+ 
+     int64_t frame_ct_out;
+     int64_t frame_ct_in;
+@@ -381,14 +384,35 @@
+ static void clear_frame_queue(VTEncContext *vtctx)
+ {
+     set_async_error(vtctx, 0);
++}
++
++static void vtenc_submitted_clear(VTEncContext *vtctx)
++{
++    BufNode *info;
++
++    pthread_mutex_lock(&vtctx->lock);
++
++    while (vtctx->submitted_head) {
++        info = vtctx->submitted_head->next;
++        vtenc_free_buf_node(vtctx->submitted_head);
++        vtctx->submitted_head = info;
++    }
++
++    pthread_mutex_unlock(&vtctx->lock);
+ }
+ 
+ static void vtenc_reset(VTEncContext *vtctx)
+ {
+     if (vtctx->session) {
++        /* The session may be retained elsewhere; invalidate before
++         * release so teardown is deterministic.
++         */
++        VTCompressionSessionInvalidate(vtctx->session);
+         CFRelease(vtctx->session);
+         vtctx->session = NULL;
+     }
++
++    vtenc_submitted_clear(vtctx);
+ 
+     if (vtctx->supported_props) {
+         CFRelease(vtctx->supported_props);
+@@ -472,7 +496,38 @@
+     vtctx->q_tail = info;
+ 
+     pthread_cond_signal(&vtctx->cv_sample_sent);
++    pthread_mutex_unlock(&vtctx->lock);
++}
++
++static void vtenc_submitted_add(VTEncContext *vtctx, BufNode *info)
++{
++    pthread_mutex_lock(&vtctx->lock);
++
++    info->next = vtctx->submitted_head;
++    vtctx->submitted_head = info;
++
++    pthread_mutex_unlock(&vtctx->lock);
++}
++
++static BufNode *vtenc_submitted_remove(VTEncContext *vtctx, void *refcon)
++{
++    BufNode **link;
++    BufNode *info;
++
++    pthread_mutex_lock(&vtctx->lock);
++
++    link = &vtctx->submitted_head;
++    while (*link && *link != refcon)
++        link = &(*link)->next;
++    info = *link;
++    if (info) {
++        *link = info->next;
++        info->next = NULL;
++    }
++
+     pthread_mutex_unlock(&vtctx->lock);
++
++    return info;
+ }
+ 
+ static int count_nalus(size_t length_code_size,
+@@ -746,7 +801,12 @@
+ {
+     AVCodecContext *avctx = ctx;
+     VTEncContext   *vtctx = avctx->priv_data;
+-    BufNode *info = sourceFrameCtx;
++    BufNode *info;
++
++    info = vtenc_submitted_remove(vtctx, sourceFrameCtx);
++    /* The node may already be gone if the session was reset. */
++    if (!info)
++        return;
+ 
+     av_buffer_unref(&info->frame_buf);
+     if (vtctx->async_error) {
+@@ -2504,6 +2564,9 @@
+ #endif
+ 
+     time = CMTimeMake(frame->pts * avctx->time_base.num, avctx->time_base.den);
++
++    vtenc_submitted_add(vtctx, node);
++
+     status = VTCompressionSessionEncodeFrame(
+         vtctx->session,
+         cv_img,
+@@ -2513,11 +2576,12 @@
+         node,
+         NULL
+     );
++    /* The submitted list owns the node even when EncodeFrame() fails. */
++    node = NULL;
+ 
+     if (status) {
+         av_log(avctx, AV_LOG_ERROR, "Cannot encode frame: %d\n", status);
+         status = AVERROR_EXTERNAL;
+-        // Not necessary, just in case new code put after here
+         goto out;
+     }
+ 
+@@ -2643,6 +2707,9 @@
+     }
+ 
+     time = CMTimeMake(0, avctx->time_base.den);
++
++    vtenc_submitted_add(vtctx, node);
++
+     status = VTCompressionSessionEncodeFrame(vtctx->session,
+                                              pix_buf,
+                                              time,
+@@ -2650,6 +2717,7 @@
+                                              NULL,
+                                              node,
+                                              NULL);
++    node = NULL;
+ 
+     if (status) {
+         av_log(avctx,
+@@ -2659,7 +2727,6 @@
+         status = AVERROR_EXTERNAL;
+         goto pe_cleanup;
+     }
+-    node = NULL;
+ 
+     //Populates extradata - output frames are flushed and param sets are available.
+     status = VTCompressionSessionCompleteFrames(vtctx->session,
+@@ -2693,8 +2760,8 @@
+     vtctx->frame_ct_out = 0;
+ 
+     av_assert0(status != 0 || (avctx->extradata && avctx->extradata_size > 0));
+-    if (!status)
+-        vtenc_free_buf_node(node);
++    // NULL once the node was submitted, so a set node must be freed.
++    vtenc_free_buf_node(node);
+ 
+     return status;
+ }
+@@ -2703,20 +2770,19 @@
+ {
+     VTEncContext *vtctx = avctx->priv_data;
+ 
+-    if(!vtctx->session) {
+-        pthread_cond_destroy(&vtctx->cv_sample_sent);
+-        pthread_mutex_destroy(&vtctx->lock);
+-        return 0;
++    if (vtctx->session) {
++        /* Drain pending frames before reset discards their nodes. */
++        VTCompressionSessionCompleteFrames(vtctx->session,
++                                           kCMTimeIndefinite);
+     }
+ 
+-    VTCompressionSessionCompleteFrames(vtctx->session,
+-                                       kCMTimeIndefinite);
++    vtenc_reset(vtctx);
++
+     clear_frame_queue(vtctx);
++
+     pthread_cond_destroy(&vtctx->cv_sample_sent);
+     pthread_mutex_destroy(&vtctx->lock);
+ 
+-    vtenc_reset(vtctx);
+-
+     return 0;
+ }
+ 
