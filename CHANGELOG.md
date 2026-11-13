@@ -1,4 +1,4 @@
-# 31.8.1
+# 31.9.0
 
 ## Major
  -
@@ -29,12 +29,11 @@
  - FCP7 XML export writes Premiere's exact source times (`pproTicksIn`/`pproTicksOut`), and import reads them, so clips at fractional speeds keep their in points. Reversed and freeze-frame clips are reported instead of silently playing forward.
  - A transition out of a clip that ends on its file's last frame holds that frame instead of blending with the background.
  - Rendering and transcribing follow an AAC stream that changes its channel layout part way through.
- - Interlaced video is deinterlaced when rendered. VideoToolbox's H.264 and HEVC encoders can't code fields and no encoder was asked to, so interlaced input came out combed, and partial-lossless mixed field-coded and progressive pictures in one stream. Partial-lossless no longer copies interlaced GOPs, so output is progressive wherever the cuts fall.
+ - Interlaced video is deinterlaced when rendered. VideoToolbox's H.264 and HEVC encoders can't code fields and no encoder was asked to, so interlaced input came out combed, and partial-lossless mixed field-coded and progressive pictures in one stream. Output is now progressive wherever the cuts fall.
  - Interlaced video, such as DV and interlaced H.264, no longer fails with "Failed to scale frame" when its pixel format is converted.
  - An `add:` overlay of another video no longer changes the output's color tags from one run to the next; they come from the base layer.
  - MPEG-TS sources no longer freeze, with silent audio, for their first 1.4 seconds and lose as much at the end. Source times count from the file's start, as in ffmpeg, which also drops the silence an MP3's encoder delay added at the end.
- - Cuts in MPEG-TS and AVI sources no longer render a few frames wrong, or lose the end of the file. Their seeks are estimates and could land past the frames a cut needed; partial-lossless also dropped the first GOP.
- - A TS source with more H.264 parameter sets than an MP4 header can hold re-encodes instead of getting a corrupt header.
+ - Cuts in MPEG-TS and AVI sources no longer render a few frames wrong, or lose the end of the file. Their seeks are estimates and could land past the frames a cut needed.
  - Subtitle matching (`--edit subtitle`, `word`) reads `\{` and `\}` as literal braces, as libass draws them.
  - `-c:v h264_videotoolbox` no longer fails with "Could not write packet" when cutting an H.264 source.
  - Partial-lossless rendering no longer drops the first frame of a video that starts just after its audio, and no longer corrupts a copied GOP whose keyframe is between 256 and 511 bytes, which lost frames up to the next keyframe.
@@ -42,7 +41,6 @@
  - `whisper :mic` on macOS no longer loses audio when reading stalls, as while the model loads. A gap that does occur is filled with silence and reported, so timestamps stay aligned.
 
 # Misc.
- - A mistyped edit method, keyword, or encoder gets a suggestion: `--edit audo`, `audio:thresh=4%`, `-c:a acc`. A keyword with no near match lists the ones the method takes.
- - The macOS Apple Silicon binary is 4.6 MB smaller, and another 640 KB smaller from compiling each loop over a clip's actions once.
- - An unknown `--transition` kind gets a suggestion.
+ - A mistyped edit method, keyword, encoder, or `--transition` kind gets a suggestion: `--edit audo`, `audio:thresh=4%`, `-c:a acc`. A keyword with no near match lists the ones the method takes.
+ - The macOS Apple Silicon binary is 5.2 MB smaller.
  - Upgrade SVT-AV1 to 4.3.0, HarfBuzz to 15.1.0, zlib to 1.4 and FriBidi to 1.0.18.
