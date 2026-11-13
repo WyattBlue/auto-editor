@@ -179,6 +179,11 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   # into copied packets: their output decodes as garbage between copied spans.
   if ($encoder.name).endsWith("_web"):
     return
+  # VideoToolbox learns its DTS offset from a session's first frames, so a
+  # short re-encoded run with B-frames emits a DTS past its PTS and the muxer
+  # rejects it.
+  if ($encoder.name).endsWith("_videotoolbox"):
+    return
   let formatName = $output.formatCtx.oformat.name
   if not codecId.supportsContainer(formatName):
     return
