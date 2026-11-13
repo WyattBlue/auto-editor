@@ -41,18 +41,20 @@ unsigned char utf8_length[256] = {
 };
 
 static int uc_len(const char * s, int utf8) {
-  /* return the length of a utf-8 character */
-  if (utf8) {
-    return utf8_length[(unsigned char)s[0]];
-  } else {
-    return 1;
-  }
+  /* return the length of a utf-8 character. A lead byte missing any of its
+     continuation bytes counts as one byte, so a sequence cut off by the end
+     of the string can't step past its terminator. */
+  if (!utf8) return 1;
+  int n = utf8_length[(unsigned char)s[0]];
+  for (int i = 1; i < n; i++)
+    if (((unsigned char)s[i] & 0xc0) != 0x80) return 1;
+  return n;
 }
 
 static int uc_code(const char * s, int utf8) {
   /* the unicode codepoint of the given utf-8 character */
   int dst = (unsigned char)s[0];
-  if (utf8) {
+  if (uc_len(s, utf8) > 1) {
     if (dst < 192) {}
     else if (dst < 224) dst = ((dst & 0x1f) << 6) | (s[1] & 0x3f);
     else if (dst < 240) dst = ((dst & 0x0f) << 12) | ((s[1] & 0x3f) << 6) | (s[2] & 0x3f);
@@ -180,6 +182,7 @@ static int token(const char *re0, int* forward, int utf8) {
 
     case '\\':
       re++;
+      if (!*re) return -1; /* Trailing backslash */
       *forward = 2;
       switch (*re) {
         case 'd': case 'D': case 'w': case 'W': case 's': case 'S':
