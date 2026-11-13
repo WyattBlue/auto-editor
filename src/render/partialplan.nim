@@ -217,6 +217,11 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
       not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
     return
 
+  # Re-encoded frames are deinterlaced, so copying an interlaced source's GOPs
+  # would leave its output interlaced or not depending on where cuts fall.
+  if stream.codecpar.field_order notin [0.cint, 1]:
+    return
+
   let (keyframes, sourceEnd) = scanGops(input, stream, tl.tb, codecId)
   for clip in tl.v[0]:
     if clip.offset < 0 or clip.offset >= sourceEnd or
@@ -225,11 +230,6 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
 
   let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
   let stats = smartPlanStats(plan)
-  # Re-encoded frames are deinterlaced, so copying some of an interlaced
-  # source's GOPs would mix field-coded and progressive pictures in one
-  # stream. Copying all of them keeps it whole.
-  if stream.codecpar.field_order notin [0.cint, 1] and stats.encodeRuns > 0:
-    return
   let averageGop = averageGopFrames(keyframes, sourceEnd)
   if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
     let label = codecId.codecLabel
