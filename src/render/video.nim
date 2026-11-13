@@ -207,6 +207,8 @@ type
     cn: InputContainer
     decoder: ptr AVCodecContext
     held: ptr AVFrame           # last decoded frame, held for forward reuse
+    deint: Graph                # bwdif, from the first interlaced frame on
+    deintNext: ptr AVFrame      # decoded at a size change, while deint drains
     frameIndex: int             # current source position; -1 = none yet
     seekThreshold: int          # don't seek-ahead before this frame
     seekFrame: int              # frame we seeked from, for frames-saved debug
@@ -214,7 +216,9 @@ type
     lastReqIndex: int           # last obj.index requested (held-frame reuse)
     loopBase: int               # source frames consumed by completed loops
     usedAt: int64               # timeline frame it last decoded for; -1 = never
+    deintW, deintH, deintFmt: cint # what deint was built for
     ownsCn: bool                # opened for this decoder, not the media cache's
+    deintDone: bool             # deint has been sent end-of-stream
     hasSeekFrame: bool          # whether seekFrame holds a pending marker
 
   SrcState = ref object
@@ -228,6 +232,74 @@ type
     isStill: bool               # single-frame image source (logo/watermark)
 
 const maxDecoders = 4 # per source; past this a busy decoder seeks instead
+
+proc resetDeint(st: DecState) =
+  ## Drop the deinterlacer's frames, as a seek drops the decoder's.
+  st.deint.cleanup()
+  st.deint = nil
+  st.deintDone = false
+  if st.deintNext != nil:
+    av_frame_free(addr st.deintNext)
+
+proc nextFrame(st: DecState, stream: ptr AVStream, frame: ptr AVFrame): bool =
+  ## Decode the next frame into `frame`, false at the end of the stream.
+  ## No encoder here codes fields (VideoToolbox can't at all), and effects and
+  ## scaling would blend the two, so interlaced pictures come out deinterlaced
+  ## by bwdif. It needs the frame after the one it outputs, so it runs one
+  ## frame behind the decoder; progressive sources never start it.
+  while true:
+    if st.deint != nil and st.deint.tryPull(frame):
+      if frame.pts != AV_NOPTS_VALUE:
+        frame.pts = av_rescale_q(frame.pts, st.deint.sinkTimeBase,
+          stream.time_base)
+      return true
+    if st.deintNext != nil:
+      # The old graph has given up its last frame; the new size starts fresh.
+      st.deint.cleanup()
+      st.deint = nil
+      av_frame_unref(frame)
+      av_frame_move_ref(frame, st.deintNext)
+      av_frame_free(addr st.deintNext)
+    elif st.deintDone:
+      return false
+    else:
+      var got = false
+      for _ in st.cn.flushDecode(stream.index.cint, st.decoder, frame):
+        got = true
+        break
+      if not got and st.deint != nil:
+        # flushDecode also stops on a decode error, after which decoding
+        # resumes; only the decoder's own end of stream ends bwdif's.
+        let ret = avcodec_receive_frame(st.decoder, frame)
+        if ret == 0:
+          got = true
+        elif ret == AVERROR_EOF:
+          st.deint.flush()
+          st.deintDone = true
+          continue
+      if not got:
+        return false
+      if st.deint != nil and (frame.width != st.deintW or
+          frame.height != st.deintH or frame.format != st.deintFmt):
+        # A graph can't change size: drain it, then start another.
+        st.deintNext = av_frame_alloc()
+        av_frame_move_ref(st.deintNext, frame)
+        st.deint.flush()
+        continue
+    if st.deint == nil:
+      if (frame.flags and 8) == 0: # AV_FRAME_FLAG_INTERLACED
+        return true
+      let tb = stream.time_base
+      st.deint = newGraph()
+      let bsrc = st.deint.add("buffer",
+        &"video_size={frame.width}x{frame.height}:pix_fmt={frame.format}:" &
+        &"time_base={tb.num}/{tb.den}:pixel_aspect=1/1:" &
+        &"colorspace={frame.colorspace}:range={frame.color_range}")
+      let filt = st.deint.add("bwdif", "mode=send_frame:parity=auto:deint=interlaced")
+      let bsink = st.deint.add("buffersink")
+      st.deint.linkNodes(bsrc, filt, bsink).configure()
+      (st.deintW, st.deintH, st.deintFmt) = (frame.width, frame.height, frame.format)
+    st.deint.push(frame)
 
 proc newDecState(cn: InputContainer, decoder: ptr AVCodecContext,
     ownsCn: bool): DecState =
@@ -1795,6 +1867,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         videoFrameToTimestamp(seekTarget, ss.frameRate, myStream.time_base),
         stream = myStream)
       avcodec_flush_buffers(st.decoder)
+      st.resetDeint()
       st.lastSeekTarget = seekTarget
       frameIndex = min(seekTarget, target - 1)
 
@@ -1816,20 +1889,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             videoFrameToTimestamp(target, ss.frameRate, myStream.time_base),
             stream = myStream)
           avcodec_flush_buffers(st.decoder)
+          st.resetDeint()
           st.lastSeekTarget = target
 
-      let decoder: ptr AVCodecContext = st.decoder
       var foundFrame = false
-      for decodedFrame in st.cn.flushDecode(
-          myStream.index.cint, decoder, frame):
-        frame = decodedFrame
+      if st.nextFrame(myStream, frame):
         frameIndex = int(round(
-          decodedFrame.time(myStream.time_base) * ss.frameRate.float))
-        if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
+          frame.time(myStream.time_base) * ss.frameRate.float))
+        if frame.pict_type == AV_PICTURE_TYPE_I and
             frameIndex > ss.observedKeyframes[^1]:
           ss.observedKeyframes.add frameIndex
         foundFrame = true
-        break
 
       if foundFrame and holdPastEnd:
         if lastGood != nil: av_frame_free(addr lastGood)
@@ -1841,6 +1911,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           target = obj.index - loopBase
           st.cn.seek(0, stream = myStream)
           avcodec_flush_buffers(st.decoder)
+          st.resetDeint()
           st.lastSeekTarget = -1
           frameIndex = -1
           continue
@@ -2395,6 +2466,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if d.held != nil:
           var hf = d.held
           av_frame_free(addr hf)
+        d.resetDeint()
         var p = d.decoder
         avcodec_free_context(addr p)
         if d.ownsCn: d.cn.close()

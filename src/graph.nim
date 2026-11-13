@@ -2,6 +2,7 @@ import std/strformat
 
 import ffmpeg
 import log
+import ./util/rational
 
 type Graph* = ref object
   # nodes[0] is the buffer/abuffer source; nodes[^1] is the buffer/abuffer sink.
@@ -142,6 +143,20 @@ proc pullTransient*(graph: Graph): ptr AVFrame =
     # silently truncate the stream being drained.
     error &"Error pulling frame from filter graph: {av_err2str(ret)}"
   return graph.recvFrame
+
+proc tryPull*(graph: Graph, dst: ptr AVFrame): bool =
+  ## Move the sink's next frame into `dst`; false while a filter that needs
+  ## more input holds it back, or once the stream has ended.
+  av_frame_unref(dst)
+  let ret = av_buffersink_get_frame(graph.nodes[^1], dst)
+  if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+    return false
+  if ret < 0:
+    error &"Error pulling frame from filter graph: {av_err2str(ret)}"
+  true
+
+proc sinkTimeBase*(graph: Graph): AVRational =
+  av_buffersink_get_time_base(graph.nodes[^1])
 
 proc flush*(graph: Graph) =
   # Flush the filter graph by sending a nil frame

@@ -177,6 +177,11 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
 
   let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
   let stats = smartPlanStats(plan)
+  # Re-encoded frames are deinterlaced, so copying some of an interlaced
+  # source's GOPs would mix field-coded and progressive pictures in one
+  # stream. Copying all of them keeps it whole.
+  if stream.codecpar.field_order notin [0.cint, 1] and stats.encodeRuns > 0:
+    return
   let averageGop = averageGopFrames(keyframes, sourceEnd)
   if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
     let label = codecId.codecLabel
