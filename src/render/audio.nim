@@ -211,7 +211,9 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   if sampleRate <= 0 or not timeBase.isValid:
     error "Invalid stream time base or sample rate"
   let startTimeInSeconds = start.float / sampleRate.float
-  let startPts = int64(startTimeInSeconds * timeBase.den.float / timeBase.num.float)
+  let startOffset = container.startPts(stream)
+  let startPts = int64(startTimeInSeconds * timeBase.den.float /
+    timeBase.num.float) + startOffset
 
   # Seek to the approximate position
   if av_seek_frame(container.formatContext, stream.index, startPts,
@@ -249,8 +251,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     # Convert frame PTS to sample position
     let frameSamplePos =
       if frame.pts != AV_NOPTS_VALUE:
-        int64(frame.pts.float * timeBase.num.float / timeBase.den.float *
-            sampleRate.float)
+        int64((frame.pts - startOffset).float * timeBase.num.float /
+            timeBase.den.float * sampleRate.float)
       else:
         samplesProcessed.int64
 

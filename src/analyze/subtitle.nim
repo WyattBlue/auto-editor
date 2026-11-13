@@ -40,7 +40,8 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
         continue
 
       let
-        startFloat = float(packet.pts * subtitleStream.time_base)
+        startFloat = float((packet.pts - container.startPts(addr subtitleStream)) *
+          subtitleStream.time_base)
         durFloat = float(packet.duration * subtitleStream.time_base)
         # A subtitle is active for any frame it overlaps, so snap outward:
         # floor the start, ceil the end. round() could clip a frame the

@@ -321,6 +321,11 @@ proc quarterTurns*(par: ptr AVCodecParameters): int =
   if ccw != ccw: return 0 # NaN: not a rotation
   floorMod(int(round(-ccw / 90)), 4)
 
+proc startPts*(formatCtx: ptr AVFormatContext, stream: ptr AVStream): int64 =
+  let start = formatCtx.start_time
+  if start == ffmpeg.AV_NOPTS_VALUE: 0'i64
+  else: av_rescale_q(start, AVRational(num: 1, den: AV_TIME_BASE), stream.time_base)
+
 proc scanPackets(formatCtx: ptr AVFormatContext, stream: ptr AVStream,
     minDuration: int64): tuple[endPts, count: int64] =
   ## Read `stream`'s packets from where the demuxer is: the furthest packet
@@ -339,7 +344,7 @@ proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRa
   ## the furthest packet end, or the frame count if they have no timestamps.
   let (endPts, frames) = scanPackets(formatCtx, video, 1)
   if endPts > 0:
-    return endPts * video.time_base
+    return (endPts - formatCtx.startPts(video)) * video.time_base
   if frames > 0 and video.avg_frame_rate.isValid:
     return AVRational(num: cint(frames * video.avg_frame_rate.den),
       den: video.avg_frame_rate.num)
@@ -352,7 +357,9 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   if container.audio.len > 0:
     let audio = container.audio[0]
-    return scanPackets(formatCtx, audio, 0).endPts * audio.time_base
+    let endPts = scanPackets(formatCtx, audio, 0).endPts
+    return (if endPts > 0: endPts - formatCtx.startPts(audio) else: 0) *
+      audio.time_base
 
   if container.video.len > 0:
     let video = container.video[0]
@@ -466,6 +473,11 @@ iterator flushDecode*(container: InputContainer, index: cint,
       if packet.stream_index == index:
         discard avcodec_send_packet(codecCtx, packet)
       av_packet_unref(packet)
+
+proc startPts*(container: InputContainer, stream: ptr AVStream): int64 =
+  ## The container's start time in `stream`'s time base, which is time 0 to
+  ## the timeline. MPEG-TS, for one, starts its timestamps well past zero.
+  container.formatContext.startPts(stream)
 
 proc seek*(container: InputContainer, offset: int64, stream: ptr AVStream = nil) =
   var flags: cint = AVSEEK_FLAG_BACKWARD

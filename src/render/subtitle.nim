@@ -50,8 +50,10 @@ proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
     var srcTb = stream.time_base
 
     # The clip selects source interval [clipStartSrc, clipEndSrc) in source ticks.
-    let clipStartSrc = av_rescale_q(clip.offset, frameTb, srcTb)
-    let clipEndSrc = av_rescale_q(clip.offset + clip.dur, frameTb, srcTb)
+    let clipStartSrc = av_rescale_q(clip.offset, frameTb, srcTb) +
+      srcContainer.startPts(stream)
+    let clipEndSrc = av_rescale_q(clip.offset + clip.dur, frameTb, srcTb) +
+      srcContainer.startPts(stream)
 
     # Seek backward so a cue already on screen at the cut-in is read too.
     # A later clip needs the seek even at source position 0, since the

@@ -315,8 +315,8 @@ when defined(libass):
       var sub: AVSubtitle
       var got: cint = 0
       if avcodec_decode_subtitle2(dec, addr sub, addr got, packet) >= 0 and got != 0:
-        let start = av_rescale_q(sub.pts, AVRational(num: 1, den: AV_TIME_BASE),
-          AVRational(num: 1, den: 1000))
+        let start = av_rescale_q(sub.pts - fmt.start_time.max(0),
+          AVRational(num: 1, den: AV_TIME_BASE), AVRational(num: 1, den: 1000))
         for i in 0 ..< sub.num_rects.int:
           let line = sub.rects[i].ass
           if line == nil: break

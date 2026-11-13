@@ -1864,8 +1864,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
       st.cn.seek(
-        videoFrameToTimestamp(seekTarget, ss.frameRate, myStream.time_base),
-        stream = myStream)
+        videoFrameToTimestamp(seekTarget, ss.frameRate, myStream.time_base) +
+        st.cn.startPts(myStream), stream = myStream)
       avcodec_flush_buffers(st.decoder)
       st.resetDeint()
       st.lastSeekTarget = seekTarget
@@ -1886,16 +1886,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           hasSeekFrame = true
           debug &"Seek: {frameIndex} -> {target}"
           st.cn.seek(
-            videoFrameToTimestamp(target, ss.frameRate, myStream.time_base),
-            stream = myStream)
+            videoFrameToTimestamp(target, ss.frameRate, myStream.time_base) +
+            st.cn.startPts(myStream), stream = myStream)
           avcodec_flush_buffers(st.decoder)
           st.resetDeint()
           st.lastSeekTarget = target
 
       var foundFrame = false
       if st.nextFrame(myStream, frame):
-        frameIndex = int(round(
-          frame.time(myStream.time_base) * ss.frameRate.float))
+        frameIndex = int(round((frame.time(myStream.time_base) -
+          float(st.cn.startPts(myStream) * myStream.time_base)) *
+          ss.frameRate.float))
         if frame.pict_type == AV_PICTURE_TYPE_I and
             frameIndex > ss.observedKeyframes[^1]:
           ss.observedKeyframes.add frameIndex

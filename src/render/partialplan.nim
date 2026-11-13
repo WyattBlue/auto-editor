@@ -106,10 +106,11 @@ proc fillLeadingDts*(packets: openArray[ptr AVPacket], nextDts, frameDuration: i
 
 proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
     codecId: AVCodecID): tuple[keyframes: seq[int64], sourceEnd: int64] =
+  let start = input.startPts(stream)
   while av_read_frame(input.formatContext, input.packet) >= 0:
     let packet = input.packet
     if packet.stream_index == stream.index and packet.pts != AV_NOPTS_VALUE:
-      let frame = frameAt(packet.pts, stream.time_base, fps)
+      let frame = frameAt(packet.pts - start, stream.time_base, fps)
       result.sourceEnd = max(result.sourceEnd, frame + 1)
       if (packet.flags and AV_PKT_FLAG_KEY) != 0 and
           packetIsCopyBoundary(codecId, packet.data, packet.size.int):
@@ -304,7 +305,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
 
     for spanIndex, span in spans:
       if span.kind == ssCopy:
-        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base)
+        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base) +
+          input.startPts(stream)
         input.seek(seekTs, stream = stream)
         var first = true
         var copied = 0'i64
@@ -329,7 +331,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
               sourcePacket.pts == AV_NOPTS_VALUE:
             av_packet_unref(sourcePacket)
             continue
-          let sourceFrame = frameAt(sourcePacket.pts, stream.time_base, tl.tb)
+          let sourceFrame = frameAt(sourcePacket.pts - input.startPts(stream),
+            stream.time_base, tl.tb)
           if sourceFrame >= span.srcEnd:
             # HEVC stops at the next closed random-access picture, not merely at
             # the first packet whose presentation timestamp belongs to the next
@@ -403,14 +406,15 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
           firstPacket = true
           firstFrameInRun = true
 
-        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base)
+        let seekTs = av_rescale_q(span.srcStart, frameTb, stream.time_base) +
+          input.startPts(stream)
         input.seek(seekTs, stream = stream)
         avcodec_flush_buffers(decoder)
         var encoded = 0'i64
         var lastDecoded: ptr AVFrame = nil
         for decoded in input.flushDecode(stream.index, decoder, frame):
-          let sourceFrame = int64(round(
-            decoded.time(stream.time_base) * float(tl.tb)))
+          let sourceFrame = int64(round((decoded.time(stream.time_base) -
+            float(input.startPts(stream) * stream.time_base)) * float(tl.tb)))
           if sourceFrame < span.srcStart:
             continue
           if sourceFrame >= span.srcEnd:

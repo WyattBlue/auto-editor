@@ -315,7 +315,8 @@ iterator channelPeaks*(processor: var AudioProcessor, container: InputContainer,
               frame.sample_rate)).int64
           let tb = audioStream.time_base
           let ts = bestPts(frame)
-          let pts = (if ts != AV_NOPTS_VALUE: ts else: 0'i64)
+          let pts = (if ts != AV_NOPTS_VALUE: ts - container.startPts(audioStream)
+            else: 0'i64)
           firstSamplePos = (pts * int64(frame.sample_rate) * int64(
               tb.num)) div int64(tb.den)
         processor.`iterator`.writeFrame(frame)
@@ -432,8 +433,8 @@ proc streamPeaks*(input: string, stream, samplesPerBucket: int,
     chunkDuration: samplesPerBucket.float64 / rate.float64)
   if startSample > 0:
     let tb = audioStream.time_base
-    container.seek((startSample * int64(tb.den)) div (int64(rate) * int64(tb.num)),
-      stream = audioStream)
+    container.seek((startSample * int64(tb.den)) div (int64(rate) * int64(tb.num)) +
+      container.startPts(audioStream), stream = audioStream)
     avcodec_flush_buffers(processor.codecCtx)
   let endSample = if lengthSamples < 0: int64.high else: startSample + lengthSamples
   for c in 0 ..< n:
