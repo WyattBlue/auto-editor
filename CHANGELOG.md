@@ -34,7 +34,8 @@
  - An `add:` overlay of another video no longer changes the output's color tags from one run to the next; they come from the base layer.
  - MPEG-TS sources no longer freeze, with silent audio, for their first 1.4 seconds and lose as much at the end. Source times count from the file's start, as in ffmpeg, which also drops the silence an MP3's encoder delay added at the end.
  - Subtitle matching (`--edit subtitle`, `word`) reads `\{` and `\}` as literal braces, as libass draws them.
- - `-c:v h264_videotoolbox` no longer fails with "Could not write packet" when cutting an H.264 source; it re-encodes instead of copying GOPs.
+ - `-c:v h264_videotoolbox` no longer fails with "Could not write packet" when cutting an H.264 source.
+ - Partial-lossless rendering no longer drops the first frame of a video that starts just after its audio, and no longer corrupts a copied GOP whose keyframe is between 256 and 511 bytes, which lost frames up to the next keyframe.
  - FFmpeg 9.0.2 is patched with 16 upstream crash fixes in the H.264 and AAC decoders, the MOV, Matroska and CAF demuxers, the MOV and Ogg muxers, and the VideoToolbox encoders.
  - `whisper :mic` on macOS no longer loses audio when reading stalls, as while the model loads. A gap that does occur is filled with silence and reported, so timestamps stay aligned.
 
