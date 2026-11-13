@@ -1,3 +1,5 @@
+import std/sequtils
+
 import ../ffmpeg
 import ./smart
 
@@ -118,6 +120,10 @@ proc annexBToHvcC*(data: ptr uint8, size: int): seq[uint8] =
   let sps = nals[1][0]
   if sps.len < 15:
     return
+  # hvcC stores NAL lengths and counts in sixteen bits.
+  for list in nals:
+    if list.len > 0xffff or list.anyIt(it.len > 0xffff):
+      return
 
   var r = BitReader()
   var zeros = 0

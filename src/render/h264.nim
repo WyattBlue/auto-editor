@@ -1,3 +1,5 @@
+import std/sequtils
+
 import ../ffmpeg
 import ./smart
 
@@ -82,6 +84,10 @@ proc annexBToAvcC*(data: ptr uint8, size: int): seq[uint8] =
     else: discard
     pos += n
   if sps.len == 0 or pps.len == 0 or sps[0].len < 4:
+    return @[]
+  # avcC counts SPSs in five bits, PPSs in eight and lengths in sixteen.
+  if sps.len > 31 or pps.len > 255 or
+      (sps & pps).anyIt(it.len > 0xffff):
     return @[]
   result = @[1'u8, sps[0][1], sps[0][2], sps[0][3], 0xff'u8,
     0xe0'u8 or uint8(sps.len)]
