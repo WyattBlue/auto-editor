@@ -6,7 +6,7 @@
 ## The looks follow Premiere Pro's transitions of the same names at their
 ## default settings.
 
-import std/[cpuinfo, typedthreads]
+import std/[atomics, cpuinfo, locks, typedthreads]
 from std/math import PI, arcsin, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt, tan
 
 import ../transitions
@@ -110,8 +110,8 @@ func fbm(x, y: float32, seed: uint32): float32 =
 func newImg(w, h: int): Img = Img(w: w, h: h, px: newSeq[uint8](w * h * 3))
 
 func get(im: Img, x, y: int): C {.inline.} =
-  let x = clamp(x, 0, im.w - 1)
-  let y = clamp(y, 0, im.h - 1)
+  let x = max(0, min(x, im.w - 1))
+  let y = max(0, min(y, im.h - 1))
   let i = (y * im.w + x) * 3
   (im.px[i].float32, im.px[i + 1].float32, im.px[i + 2].float32)
 
@@ -121,7 +121,7 @@ proc put(im: var Img, x, y: int, c: C) {.inline.} =
   im.px[i + 1] = uint8(clamp(c.g + 0.5'f32, 0, 255))
   im.px[i + 2] = uint8(clamp(c.b + 0.5'f32, 0, 255))
 
-func sample(im: Img, x, y: float32, wrap = false): C =
+func sample(im: Img, x, y: float32, wrap = false): C {.inline.} =
   ## Bilinear, at pixel coordinates (centers on .5); edges extend, or the
   ## picture repeats across with `wrap`.
   var fx = x - 0.5'f32
@@ -143,25 +143,77 @@ type
   RowsBody = proc (y0, y1: int) {.closure, gcsafe.}
   RowsJob = object
     body: ptr RowsBody
-    y0, y1: int
+    next: Atomic[int]
+    h, chunk: int
 
-proc rowsWorker(job: ptr RowsJob) {.thread.} =
-  job.body[](job.y0, job.y1)
+const maxHelpers = 15
+
+# Helpers start on first use and stay for the rest of the run, so a frame
+# costs no thread starts. On wasm each start takes a worker from a pool sized
+# to the core count, which FFmpeg's threads also draw from.
+var
+  poolLock, callLock: Lock
+  poolWake, poolDone: Cond
+  poolJob: ptr RowsJob
+  poolGen, poolBusy, poolSize: int
+  poolThreads: array[maxHelpers, Thread[void]]
+  inRows {.threadvar.}: bool
+
+initLock(poolLock)
+initLock(callLock)
+initCond(poolWake)
+initCond(poolDone)
+
+proc drain(job: ptr RowsJob) =
+  while true:
+    let y0 = job.next.fetchAdd(job.chunk, moRelaxed)
+    if y0 >= job.h: break
+    job.body[](y0, min(y0 + job.chunk, job.h))
+
+proc rowsHelper() {.thread.} =
+  inRows = true
+  var seen = 0
+  while true:
+    acquire(poolLock)
+    while poolGen == seen: wait(poolWake, poolLock)
+    seen = poolGen
+    let job = poolJob
+    release(poolLock)
+    drain(job)
+    acquire(poolLock)
+    dec poolBusy
+    if poolBusy == 0: signal(poolDone)
+    release(poolLock)
 
 proc eachRows(h: int, body: RowsBody) =
-  ## `body` over bands of the rows, on every core. Each band writes only its
-  ## own rows, and all of them finish before this returns.
-  let n = clamp(min(countProcessors(), h div 16), 1, 16)
-  if n == 1:
+  ## `body` over runs of the rows, on every core. Each run writes only its
+  ## own rows, and all of them finish before this returns. Threads take runs
+  ## as they free up, since a core can be slower than the rest and some rows
+  ## cost more than others. A call from inside `body`, or while another
+  ## thread's call runs, does its rows alone.
+  let n = clamp(min(countProcessors(), h div 16), 1, maxHelpers + 1)
+  if n == 1 or inRows or not tryAcquire(callLock):
     body(0, h)
     return
+  defer: release(callLock)
+  if poolSize == 0:
+    poolSize = clamp(countProcessors() - 1, 1, maxHelpers)
+    for i in 0 ..< poolSize:
+      createThread(poolThreads[i], rowsHelper)
   var b = body
-  var jobs = newSeq[RowsJob](n)
-  var threads = newSeq[Thread[ptr RowsJob]](n)
-  for i in 0 ..< n:
-    jobs[i] = RowsJob(body: addr b, y0: h * i div n, y1: h * (i + 1) div n)
-    createThread(threads[i], rowsWorker, addr jobs[i])
-  joinThreads(threads)
+  var job = RowsJob(body: addr b, h: h, chunk: max(1, h div (n * 8)))
+  acquire(poolLock)
+  poolJob = addr job
+  poolBusy = poolSize
+  inc poolGen
+  broadcast(poolWake)
+  release(poolLock)
+  inRows = true
+  drain(addr job)
+  inRows = false
+  acquire(poolLock)
+  while poolBusy > 0: wait(poolDone, poolLock)
+  release(poolLock)
 
 template eachPixel(res: var Img, w, h: int, body: untyped) =
   ## `body` sets `c` for the pixel at `x`, `y`, whose center is `u`, `v` as a
