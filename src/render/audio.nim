@@ -511,7 +511,7 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
   ## `rampTempo`, when given, is a tempo for each block of `rampBlock` input
   ## samples, which the chain's last stretch follows.
   let channels = layout.nb_channels
-  var processedData = data
+  var processedData: seq[int16]
 
   block:
     let samples = data.len div channels
@@ -659,7 +659,7 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
 
 # Returns seq[int16] where channel data is interleaved:
 # [ch0, ch1, ..., ch0, ch1, ...] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr,
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: sink seq[int16], sourceSr,
     targetSr: cint, layout: ref AVChannelLayout, fps: float): seq[int16] =
   if data.len == 0:
     return @[]
@@ -1132,7 +1132,9 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let effectGroup = tl.effects[clip.effects]
         let (startSample, durSamples) =
           audioSampleSpan(clip.start, clip.dur, sr, tb)
-        let (processedData, srcLayout) = loadClip(clip, startSample, durSamples)
+        let loaded = loadClip(clip, startSample, durSamples)
+        let processedData {.cursor.} = loaded[0]
+        let srcLayout = loaded[1]
         if processedData.len > 0:
           let sourceChannels = srcLayout.nb_channels
           let numSamples = processedData.len div sourceChannels
