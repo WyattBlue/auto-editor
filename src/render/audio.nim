@@ -958,11 +958,6 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
   # A low note sums thousands of harmonics per table point, and a timeline can
   # hold hundreds of tone clips (one per kept section), so build each table once.
   var toneTables = initTable[(Waveform, uint8), seq[float32]]()
-  proc tableFor(act: Action): seq[float32] =
-    let key = (act.wave, act.note)
-    if key notin toneTables:
-      toneTables[key] = toneTable(act.wave, noteFreq(act.note), sr)
-    toneTables[key]
 
   # Calculate total duration across specified layers
   var totalDuration: int64 = 0
@@ -1000,7 +995,10 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         return (@[], srcLayout)
       # Match the source path's speed-scaled span, so a chained `atempo`
       # lands back on `dur` instead of leaving a gap.
-      srcData = synthTone(tableFor(tone), noteFreq(tone.note), startSample,
+      let key = (tone.wave, tone.note)
+      if key notin toneTables:
+        toneTables[key] = toneTable(tone.wave, noteFreq(tone.note), sr)
+      srcData = synthTone(toneTables[key], noteFreq(tone.note), startSample,
         int(round(durSamples.float64 * speed)), targetChannels, sr)
     else:
       let key = (clip.src, clip.stream)
