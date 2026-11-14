@@ -8,7 +8,7 @@ type
     ## empty seq is no path at all.
     taps: seq[seq[seq[float32]]]
 
-  Spectra = object
+  Spectra = ref object # shared with the cache, which every clip reads
     n: int     # FFT size
     blockLen: int # input samples per FFT, so a block plus the IR tail fits in n
     h: seq[seq[seq[AVComplexFloat]]]
@@ -134,8 +134,7 @@ proc spectraFor(path: string, sr: cint, channels: int): Spectra =
     for t in row: taps = max(taps, t.len)
   var n = 256
   while n < 2 * taps: n *= 2
-  result.n = n
-  result.blockLen = n - taps + 1
+  result = Spectra(n: n, blockLen: n - taps + 1)
 
   var (fwd, fwdFn) = newTx(false, n, 1.0'f32)
   defer: av_tx_uninit(addr fwd)
@@ -191,7 +190,7 @@ proc applyConvolve*(data: var seq[int16], path: string, channels: int, sr: cint)
       for b in 0 ..< bins: acc[b] = AVComplexFloat()
       var any = false
       for i in 0 ..< channels:
-        let h = sp.h[o][i]
+        let h {.cursor.} = sp.h[o][i]
         if h.len == 0: continue
         any = true
         for b in 0 ..< bins:
