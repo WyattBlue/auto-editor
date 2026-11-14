@@ -832,8 +832,15 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
         continue
 
       let (subDir, subName, subExt) = agSplitFile(sibling)
-      makeAlteredSubtitle(sibling, (subDir / subName) & "_ALTERED" & subExt,
-        inputLayer, tlV3.tb)
+      var altered = (subDir / subName) & "_ALTERED" & subExt
+      if args.output != "":
+        let (outDir, outName, _) = agSplitFile(output)
+        altered =
+          if args.inputs.len == 1: (outDir / outName) & subName[inputName.len .. ^1] & subExt
+          else: (outDir / subName) & "_ALTERED" & subExt
+        if altered == sibling:
+          altered = (subDir / subName) & "_ALTERED" & subExt
+      makeAlteredSubtitle(sibling, altered, inputLayer, tlV3.tb)
 
   bar.destroy()
 
