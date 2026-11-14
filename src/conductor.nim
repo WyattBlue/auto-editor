@@ -415,8 +415,9 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
       except ActionParseError as e:
         error e.msg
     let src = interner.intern(spec.path)
+    let mi = initMediaInfo(spec.path)
     var track: seq[Clip]
-    if spec.followCuts:
+    if spec.followCuts and not mi.isStill:
       # The base's sections, speeds included, so the layer stays in step
       # with the source it's laid over.
       var groups: Table[uint32, uint32]
@@ -440,7 +441,6 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
       track.add Clip(src: src, start: first, dur: last - first, offset: first,
         effects: tl.group(effectIndex, own))
 
-    let mi = initMediaInfo(spec.path)
     if mi.v.len > 0:
       tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
       tl.v.add track
