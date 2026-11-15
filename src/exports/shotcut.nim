@@ -1,4 +1,4 @@
-import std/[strformat, strutils]
+import std/[sequtils, strformat, strutils]
 
 import ./mlt
 import ../util/xml
@@ -224,14 +224,17 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
   var clipTagNames: seq[string] = @[]
 
-  var layer: seq[Clip]
+  var base: seq[Clip]
   var transitions: seq[Transition]
   if tl.v.len > 0:
-    layer = tl.v[0]
+    base = tl.v[0]
     if tl.vt.len > 0: transitions = tl.vt[0]
   elif tl.a.len > 0:
-    layer = tl.a[0]
+    base = tl.a[0]
     if tl.at.len > 0: transitions = tl.at[0]
+  # A clip without a source file becomes a blank, so the background shows.
+  transitions = sourcedTransitions(base, transitions)
+  let layer = base.filterIt(it.src != nil)
   let plan = transitionPlan(layer, transitions)
 
   # A centered dissolve becomes a Shotcut same-track transition: the entries of
@@ -336,7 +339,13 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   main_playlist.addProp("shotcut:video", "1")
   main_playlist.addProp("shotcut:name", "V1")
 
+  var cursor = 0'i64
   for i, clip in layer:
+    if clip.start > cursor:
+      let blank = newElement("blank")
+      blank.attrs = {"length": tc(clip.start - cursor, tb)}.toXmlAttributes()
+      main_playlist.add(blank)
+    cursor = clip.start + clip.dur
     if plans[i].entryOut >= plans[i].entryIn:
       let playlist_entry = newElement("entry")
       playlist_entry.attrs = {

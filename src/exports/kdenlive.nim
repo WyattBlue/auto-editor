@@ -1,4 +1,4 @@
-import std/[json, os, tables, strformat, sysrand, strutils]
+import std/[json, os, sequtils, tables, strformat, sysrand, strutils]
 import ./mlt
 import ../util/xml
 import ../[action, media, timeline]
@@ -91,14 +91,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   mlt.add(producer)
 
-  # Get all clips
-  var clips: seq[Clip]
-  if tl.v.len > 0:
-    clips = tl.v[0]
-  elif tl.a.len > 0:
-    clips = tl.a[0]
-  else:
-    clips = @[]
+  # A clip without a source file is left as a blank, so the background shows.
+  let base = if tl.v.len > 0: tl.v[0] elif tl.a.len > 0: tl.a[0] else: @[]
+  let clips = base.filterIt(it.src != nil)
 
   # Collect unique source paths in order of first appearance
   var uniquePaths: seq[string] = @[]
@@ -575,6 +570,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
       if tl.at.len > 0: chTransitions = tl.at[0]
     else:
       if tl.vt.len > 0: chTransitions = tl.vt[0]
+    chTransitions = sourcedTransitions(base, chTransitions)
     let chPlan = transitionPlan(clips, chTransitions)
     var parity = 0
     var cursors: array[2, int64]

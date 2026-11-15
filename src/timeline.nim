@@ -439,6 +439,19 @@ func transitionPlan*(clips: seq[Clip], transitions: seq[Transition]):
         transitions[outCursor].alignment != taStart:
       result[i].outgoing = outCursor.int32
 
+func sourcedTransitions*(clips: seq[Clip], transitions: seq[Transition]):
+    seq[Transition] =
+  ## `transitions` without those joining a clip that has no source file, for
+  ## exports that can only reference files.
+  let plan = transitionPlan(clips, transitions)
+  var dropped = newSeq[bool](transitions.len)
+  for i, clip in clips:
+    if clip.src == nil:
+      for t in [plan[i].incoming, plan[i].outgoing]:
+        if t >= 0: dropped[t] = true
+  for i, t in transitions:
+    if not dropped[i]: result.add t
+
 proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
     minCut: int64 = 0) =
   ## Add start/center/end aligned transitions to primary A/V tracks: `kind` on
