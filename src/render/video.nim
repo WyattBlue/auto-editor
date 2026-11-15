@@ -976,6 +976,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var pix_fmt = AV_PIX_FMT_YUV420P
   let targetFps = tl.tb
 
+  for layer in tl.v:
+    for clip in layer:
+      if clip.src != nil and myCache.getContainer(clip.src).video.len == 0:
+        error &"{clip.src[]} has no video stream"
+
   for src in tl.uniqueSources:
     # getContainer turns a missing/unreadable source (e.g. `add:gone.mp4`)
     # into a clean error instead of an unhandled IOError.
