@@ -576,7 +576,7 @@ proc burn*(b: var SubBurner, frame: ptr AVFrame, burn: Action, secs: float,
     var (img, i) = (images, 0)
     while img != nil:
       if i == drawn[].len: drawn[].add Drawn()
-      let n = int(img.h * img.stride)
+      let n = (if img.h > 0 and img.w > 0: int((img.h - 1) * img.stride + img.w) else: 0)
       # libass makes some bitmaps, like a box's, anew each frame, so a change
       # it reports can still leave an image the same.
       template same(e: Drawn): bool =
