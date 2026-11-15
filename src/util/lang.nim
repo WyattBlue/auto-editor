@@ -76,3 +76,9 @@ func toLang*(a: string): Lang =
     let i = iso639_2b.binarySearch(code, cmpKey)
     if i >= 0: code = iso639_2b[i][1]
   for i in 0 ..< 3: result[i] = code[i]
+
+iterator iso639_1Codes*(lang: Lang): string =
+  ## The ISO 639-1 codes for `lang`, deprecated ones like "iw" included.
+  let code = $lang
+  for (two, three) in iso639_1:
+    if three == code: yield two

@@ -1,5 +1,6 @@
 import std/[os, json, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
+import ./util/lang
 
 type
   WhisperCtx = pointer
@@ -148,6 +149,9 @@ void ae_parakeet_free(void *ctx) {
     maxLen: cint, onSegment: WhisperSegmentCb, user: pointer):
     cint {.importc, nodecl, cdecl.}
   proc ae_whisper_free(ctx: WhisperCtx) {.importc, nodecl, cdecl.}
+  proc whisper_lang_max_id(): cint {.importc, nodecl, cdecl.}
+  proc whisper_lang_str(id: cint): cstring {.importc, nodecl, cdecl.}
+  proc whisper_lang_str_full(id: cint): cstring {.importc, nodecl, cdecl.}
   proc ae_parakeet_init(modelPath: cstring, useGpu,
       verbose: cint): WhisperCtx {.importc, nodecl, cdecl.}
   proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
@@ -160,6 +164,9 @@ else:
     language: cstring, translate: cint, nThreads: cint, initialPrompt: cstring,
     maxLen: cint, onSegment: WhisperSegmentCb, user: pointer): cint = -1
   proc ae_whisper_free(ctx: WhisperCtx) = discard
+  proc whisper_lang_max_id(): cint = -1
+  proc whisper_lang_str(id: cint): cstring = nil
+  proc whisper_lang_str_full(id: cint): cstring = nil
   proc ae_parakeet_init(modelPath: cstring, useGpu, verbose: cint): WhisperCtx = nil
   proc ae_parakeet_run(ctx: WhisperCtx, samples: ptr float32, nSamples: cint,
     nThreads, splitWords: cint, onSegment: WhisperSegmentCb,
@@ -169,6 +176,22 @@ else:
 # Whisper and parakeet GGUFs share the same ggml magic, and a failed
 # whisper_init on a parakeet file leaks Metal buffers, so probing is not an
 # option — go by the conventional model file name (ggml-parakeet-*).
+proc whisperLanguage*(language: string): string =
+  ## `language` as whisper names it: "auto", an ISO 639-1 code like "fr", or
+  ## an English name like "french". ISO 639-2 codes and tags like "fr-CA"
+  ## become the ISO 639-1 code.
+  # whisper ignores a language it doesn't know and detects one instead.
+  let lang = language.toLowerAscii
+  if lang == "auto": return lang
+  var known: seq[string]
+  for id in 0.cint .. whisper_lang_max_id():
+    known.add $whisper_lang_str(id)
+    known.add $whisper_lang_str_full(id)
+  if lang in known: return lang
+  for two in toLang(lang).iso639_1Codes:
+    if two in known: return two
+  error &"Unknown language: {language}"
+
 func isParakeetModel*(model: string): bool =
   "parakeet" in model.extractFilename.toLowerAscii
 
@@ -285,6 +308,7 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
   ## been read, for a progress display.
   let useApple = model == "apple"
   let useParakeet = not useApple and isParakeetModel(model)
+  var language = language
   var wctx: WhisperCtx
   if useApple:
     when defined(appleSpeech):
@@ -306,6 +330,7 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
       else:
         error "This build of auto-editor has no whisper support"
   else:
+    language = whisperLanguage(language)
     wctx = ae_whisper_init(model.cstring, 1, (if debug: 1.cint else: 0.cint))
     if wctx == nil:
       when defined(whisper):

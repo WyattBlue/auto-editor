@@ -107,7 +107,7 @@ const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: coSplitWords,
     help: "Output one word per cue instead of full segments"),
   OptDef(names: "-l, --language", datum: coLanguage, metavar: "LANG",
-    help: "Set the language instead of using \"auto\". Examples: en, ja"),
+    help: "Set the language instead of using \"auto\": a code like en, eng, or en-US, or a name like english. With the apple model, a locale like en_US"),
   OptDef(names: "-f, --format", datum: coFormat, metavar: "FORMAT",
     help: "Output in a specific format {text|srt|json} (default text)"),
   OptDef(names: "-o, --output", datum: coOutput, metavar: "FILE",
