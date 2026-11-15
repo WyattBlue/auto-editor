@@ -151,7 +151,7 @@ Transcribe speech, then cut on the words. First make subtitles, then edit with
 them:
 
 ```sh
-auto-editor whisper video.mp4 ggml-medium.en.bin --format srt -o video.srt
+auto-editor whisper video.mp4 ggml-medium.en.bin -o video.srt
 auto-editor video.mp4 --edit subtitle
 ```
 

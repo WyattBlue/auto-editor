@@ -30,15 +30,17 @@ text prints to stdout by default.
 
 ```bash
 auto-editor whisper example.mp4 ggml-medium.en.bin                      # plain text → stdout
-auto-editor whisper example.mp4 ggml-medium.en.bin --format srt -o out.srt
+auto-editor whisper example.mp4 ggml-medium.en.bin -o out.srt           # .srt → SRT
 auto-editor whisper example.mp4 ggml-parakeet-tdt-0.6b-v3-q8_0.bin      # parakeet backend
 auto-editor whisper example.mp4 apple --language en_US                  # macOS 26+
 ```
 
-Options: `--format text|srt|json`, `-o/--output FILE`, `-l/--language en`
-(default auto), `-tr/--translate` (→ English), `-sw/--split-words` (one word per
-cue), `--queue SECS` (default 30), `--prompt TEXT`, `--threads N` (default 4),
-and `-t/--threshold THRES` (default 0.04).
+Options: `--format text|srt|json`, `-o/--output FILE`, `-l/--language LANG`
+(default auto; a code like `en`, `eng`, or `en-US`, or a name like `english`;
+an unknown language is an error), `-tr/--translate` (→ English),
+`-sw/--split-words` (one word per cue), `--queue SECS` (default 30),
+`--prompt TEXT`, `--threads N` (default 4), and `-t/--threshold THRES`
+(default 0.04).
 
 `--split-words` works with on all backends. Parakeet is the most accurate.
 
@@ -108,7 +110,7 @@ input — for `talk.mp4`, auto-editor auto-loads `talk.srt` (then `talk.ass`) wh
 the requested subtitle stream isn't embedded:
 
 ```bash
-auto-editor whisper talk.mp4 ggml-medium.en.bin --format srt -o talk.srt
+auto-editor whisper talk.mp4 ggml-medium.en.bin -o talk.srt
 auto-editor talk.mp4 --edit word:question        # picks up talk.srt automatically
 ```
 
