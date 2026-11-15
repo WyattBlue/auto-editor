@@ -706,14 +706,21 @@ func rgbaStr*(c: uint32): string =
 const alignNames*: array[1 .. 9, string] = ["bottom-left", "bottom",
   "bottom-right", "left", "center", "right", "top-left", "top", "top-right"]
 
+const subsKeys = ["file", "font", "size", "color", "outline", "bg", "align"]
+
+func textPart(text: string): string =
+  result = escapeText(text)
+  let eq = text.find('=')
+  let head = if eq > 0: text[0 ..< eq] else: text
+  if head in subsKeys or head in ["vertical", "ass"]: result = "\\" & result
+
 proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionParseError].} =
   # The subtitle file comes first, unnamed, then key=value overrides. A part
   # that isn't one goes back onto what came before it, so the colon of a
   # Windows drive stays in a path.
   let name = parts[0]
-  const keys = ["file", "font", "size", "color", "outline", "bg", "align"]
-  var given: array[keys.len, string]
-  var seen: array[keys.len, bool]
+  var given: array[subsKeys.len, string]
+  var seen: array[subsKeys.len, bool]
   var vertical, ass = false
   var cur = 0
   for part in parts[1 .. ^1]:
@@ -721,17 +728,17 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
       if kind != actText:
         raise newException(ActionParseError, &"{name}: {part} only applies to text")
       if part == "vertical": vertical = true else: ass = true
-      continue
-    let eq = part.find('=')
-    let key = if eq > 0: keys.find(part[0 ..< eq]) else: -1
-    if key > 0 or key == 0 and kind == actBurn:
-      if seen[key]:
-        raise newException(ActionParseError, &"{name}: {keys[key]} given twice")
-      (cur, seen[key], given[key]) = (key, true, part[eq + 1 .. ^1])
-    elif seen[cur] or cur == 0 and given[0].len > 0:
-      given[cur] &= ":" & part
     else:
-      (seen[cur], given[cur]) = (true, part)
+      let eq = part.find('=')
+      let key = if eq > 0: subsKeys.find(part[0 ..< eq]) else: -1
+      if key > 0 or key == 0 and kind == actBurn:
+        if seen[key]:
+          raise newException(ActionParseError, &"{name}: {subsKeys[key]} given twice")
+        (cur, seen[key], given[key]) = (key, true, part[eq + 1 .. ^1])
+      elif seen[cur] or cur == 0 and given[0].len > 0:
+        given[cur] &= ":" & part
+      else:
+        (seen[cur], given[cur]) = (true, part)
   if kind == actText: given[0] = decodeString(given[0])
   if kind == actText and given[0].len == 0:
     raise newException(ActionParseError, "text needs something to say")
@@ -747,7 +754,7 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
   for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
     if seen[k]:
       result.burnSet.incl part
-      result.burnColors[part] = parseRgba(given[k], &"{name} {keys[k]}")
+      result.burnColors[part] = parseRgba(given[k], &"{name} {subsKeys[k]}")
   if seen[6]:
     let a = alignNames.find(given[6])
     if a < 0:
@@ -1424,7 +1431,7 @@ when not defined(nimscript):
       if act.tUniform: &"scale:{act.tScaleW}" else: &"scale:{act.tScaleW}:{act.tScaleH}"
     of actTurn: &"turn:{act.tDeg}"
     of actBurn, actText:
-      var s = if act.kind == actText: "text:" & escapeText(act.burnFile)
+      var s = if act.kind == actText: "text:" & textPart(act.burnFile)
               elif act.burnFile.len > 0: "burn:" & act.burnFile
               else: "burn"
       if act.burnFont.len > 0: s &= ":font=" & act.burnFont

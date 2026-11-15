@@ -97,35 +97,40 @@ func assText(text: string): string =
     else: result.add c
 
 func eventText(text: string, ass: bool): string =
-  if not ass: return assText(text)
-  for c in text:
-    if c == '\n': result.add "\\N" else: result.add c
+  if ass:
+    for c in text:
+      if c == '\n': result.add "\\N" else: result.add c
+  else:
+    result = assText(text)
 
 func cellLines(text: string, ass: bool): seq[seq[string]] =
   if not ass:
     for line in text.splitLines():
       result.add @[]
       for ch in line.runes: result[^1].add assText($ch)
-    return
-  result = @[newSeq[string]()]
-  var tags = ""
-  var i = 0
-  while i < text.len:
-    let close = (if text[i] == '{': text.find('}', i + 1) else: -1)
-    if close >= 0:
-      tags &= text[i .. close]
-      i = close + 1
-    elif text[i] == '\n' or text[i] == '\\' and i + 1 < text.len and text[i + 1] in {'N', 'n'}:
-      result.add @[]
-      tags = ""
-      i += (if text[i] == '\n': 1 else: 2)
-    elif text[i] == '\\' and i + 1 < text.len and text[i + 1] == 'h':
-      result[^1].add tags & "\\h"
-      i += 2
-    else:
-      let n = max(text.runeLenAt(i), 1)
-      result[^1].add tags & text[i ..< min(i + n, text.len)]
-      i += n
+  else:
+    result = @[newSeq[string]()]
+    var tags = ""
+    var i = 0
+    while i < text.len:
+      let close = (if text[i] == '{': text.find('}', i + 1) else: -1)
+      if close >= 0:
+        tags &= text[i .. close].replace("\n", "\\N")
+        i = close + 1
+      elif text[i] == '\n' or
+          text[i] == '\\' and i + 1 < text.len and text[i + 1] in {'N', 'n'}:
+        result.add @[]
+        tags = ""
+        i += (if text[i] == '\n': 1 else: 2)
+      elif text[i] == '\\' and i + 1 < text.len and text[i + 1] == 'h':
+        result[^1].add tags & "\\h"
+        i += 2
+      else:
+        var n = 1
+        while n < text.runeLenAt(i) and i + n < text.len and text[i + n].ord in 0x80..0xbf:
+          inc n
+        result[^1].add tags & text[i ..< i + n]
+        i += n
 
 func tagLang*(tag: string): string =
   ## The ISO 639-1 code libass's line breaking knows for a stream's language
@@ -200,7 +205,8 @@ func textScript(text: Action, w, h: cint): string =
       let fontsize = (if text.burnSize > 0: text.burnSize.float * h.float / 100 else: size)
       verticalEvents(text.burnFile, text.burnAss, fontsize * 1.15, w.float, h.float, text.burnAlign)
     else:
-      &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{eventText(text.burnFile, text.burnAss)}\n"
+      &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,," &
+        &"{eventText(text.burnFile, text.burnAss)}\n"
   &"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {w}
