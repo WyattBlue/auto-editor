@@ -96,6 +96,37 @@ func assText(text: string): string =
     of '{', '}': result.add "\\" & c
     else: result.add c
 
+func eventText(text: string, ass: bool): string =
+  if not ass: return assText(text)
+  for c in text:
+    if c == '\n': result.add "\\N" else: result.add c
+
+func cellLines(text: string, ass: bool): seq[seq[string]] =
+  if not ass:
+    for line in text.splitLines():
+      result.add @[]
+      for ch in line.runes: result[^1].add assText($ch)
+    return
+  result = @[newSeq[string]()]
+  var tags = ""
+  var i = 0
+  while i < text.len:
+    let close = (if text[i] == '{': text.find('}', i + 1) else: -1)
+    if close >= 0:
+      tags &= text[i .. close]
+      i = close + 1
+    elif text[i] == '\n' or text[i] == '\\' and i + 1 < text.len and text[i + 1] in {'N', 'n'}:
+      result.add @[]
+      tags = ""
+      i += (if text[i] == '\n': 1 else: 2)
+    elif text[i] == '\\' and i + 1 < text.len and text[i + 1] == 'h':
+      result[^1].add tags & "\\h"
+      i += 2
+    else:
+      let n = max(text.runeLenAt(i), 1)
+      result[^1].add tags & text[i ..< min(i + n, text.len)]
+      i += n
+
 func tagLang*(tag: string): string =
   ## The ISO 639-1 code libass's line breaking knows for a stream's language
   ## tag, which containers store as ISO 639-2; "" for other languages.
@@ -137,10 +168,10 @@ func vertAlignParts(align: uint8): tuple[h, v: string] =
   let v = (if "top" in name: "top" elif "bottom" in name: "bottom" else: "middle")
   (h, v)
 
-func verticalEvents(text: string, cell, w, h: float, align: uint8): string =
-  let lines = text.splitLines()
+func verticalEvents(text: string, ass: bool, cell, w, h: float, align: uint8): string =
+  let lines = cellLines(text, ass)
   var maxChars = 0
-  for line in lines: maxChars = max(maxChars, line.runeLen)
+  for line in lines: maxChars = max(maxChars, line.len)
   let totalW = lines.len.float * cell
   let totalH = maxChars.float * cell
   let (mx, my) = (w * 0.05, h * 0.05)
@@ -154,13 +185,11 @@ func verticalEvents(text: string, cell, w, h: float, align: uint8): string =
     of "bottom": h - my - totalH
     else: (h - totalH) / 2
   for i, line in lines:
-    var j = 0
-    for ch in line.runes:
+    for j, glyph in line:
       let cx = x0 + totalW - cell * (i.float + 1) + cell / 2
       let cy = y0 + cell * j.float + cell / 2
       result &= &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,," &
-        &"{{\\an5\\pos({cx:.2f},{cy:.2f})}}{assText($ch)}\n"
-      inc j
+        &"{{\\an5\\pos({cx:.2f},{cy:.2f})}}{glyph}\n"
 
 func textScript(text: Action, w, h: cint): string =
   let size = h.float * 0.08
@@ -169,9 +198,9 @@ func textScript(text: Action, w, h: cint): string =
   let events =
     if text.burnVertical:
       let fontsize = (if text.burnSize > 0: text.burnSize.float * h.float / 100 else: size)
-      verticalEvents(text.burnFile, fontsize * 1.15, w.float, h.float, text.burnAlign)
+      verticalEvents(text.burnFile, text.burnAss, fontsize * 1.15, w.float, h.float, text.burnAlign)
     else:
-      &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{assText(text.burnFile)}\n"
+      &"Dialogue: 0,0:00:00.00,9:59:59.99,Default,,0,0,0,,{eventText(text.burnFile, text.burnAss)}\n"
   &"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {w}

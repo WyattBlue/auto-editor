@@ -83,6 +83,7 @@ type
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
       burnAlign*: uint8
       burnVertical*: bool
+      burnAss*: bool
     of actSpin:
       sStart*: Unorm16       # circular [0, 360) start angle
       sRate*: float32        # spin rate in degrees/second (continuous)
@@ -183,6 +184,7 @@ const
   easeFlag = 0x80'u8  # high bit of an animated action's atf-8 header byte
   varispeedFlag = 0x80'u8  # same bit on a speed action's header byte
   verticalFlag = 0x80'u8
+  assFlag = 0x80'u8
   schemeMask = 0x07'u8
   originMask = 0x03'u8
   originShift = 3
@@ -292,8 +294,8 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     argSpec: "[file][:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
     help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
-    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical]",
-    help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
+    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical][:ass]",
+    help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. Append `:ass` to write the text as ASS event text: override blocks like `{\\b1}` and escapes like `\\N` and `\\h` reach libass as written, so part of a text can be bold, italic, or another color. In an action, each of those backslashes doubles: `text:plain {\\\\b1}bold{\\\\b0}:ass`. Without `:ass`, braces and backslashes show as they are. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
@@ -712,13 +714,13 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
   const keys = ["file", "font", "size", "color", "outline", "bg", "align"]
   var given: array[keys.len, string]
   var seen: array[keys.len, bool]
-  var vertical = false
+  var vertical, ass = false
   var cur = 0
   for part in parts[1 .. ^1]:
-    if part == "vertical":
+    if part in ["vertical", "ass"]:
       if kind != actText:
-        raise newException(ActionParseError, &"{name}: vertical only applies to text")
-      vertical = true
+        raise newException(ActionParseError, &"{name}: {part} only applies to text")
+      if part == "vertical": vertical = true else: ass = true
       continue
     let eq = part.find('=')
     let key = if eq > 0: keys.find(part[0 ..< eq]) else: -1
@@ -752,6 +754,7 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
       raise newException(ActionParseError, &"{name}: unknown align: {given[6]}")
     result.burnAlign = uint8(a + 1)
   result.burnVertical = vertical
+  result.burnAss = ass
 
 proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     name: string): Action {.raises: [ActionParseError].} =
@@ -1430,6 +1433,7 @@ when not defined(nimscript):
         if part in act.burnSet: s &= &":{key}={rgbaStr(act.burnColors[part])}"
       if act.burnAlign in 1'u8 .. 9'u8: s &= ":align=" & alignNames[act.burnAlign]
       if act.burnVertical: s &= ":vertical"
+      if act.burnAss: s &= ":ass"
       s
     of actLuv:
       var parts: seq[string]
@@ -1687,7 +1691,8 @@ when not defined(nimscript):
         pos += 2 + n.int
       copyMem(addr act.burnSize, addr base[pos], sizeof(float32))
       act.burnSet = cast[set[BurnPart]](base[pos + 4])
-      act.burnAlign = base[pos + 5]
+      act.burnAlign = base[pos + 5] and not assFlag
+      act.burnAss = (base[pos + 5] and assFlag) != 0'u8
       copyMem(addr act.burnColors, addr base[pos + 6], 12)
       result = act
       i = pos + 18
@@ -1993,7 +1998,7 @@ when not defined(nimscript):
           pos += 2 + path.len
         base.writeAt(pos, 0, a.burnSize)
         base[pos + 4] = cast[uint8](a.burnSet)
-        base[pos + 5] = a.burnAlign
+        base[pos + 5] = a.burnAlign or (if a.burnAss: assFlag else: 0'u8)
         var colors = a.burnColors
         copyMem(addr base[pos + 6], addr colors, 12)
         i = pos + 18
