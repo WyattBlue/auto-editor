@@ -78,12 +78,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
     let metadata = cast[ptr AVDictionary](stream.metadata)
     let entry = av_dict_get(metadata, "language", nil, 0)
 
-    var lang: Lang
-    if entry == nil:
-      lang = ['u', 'n', 'd', '\0']
-    else:
-      for i in 0 ..< min(entry.value.len, 4):
-        lang[i] = entry.value[i]
+    let lang = toLang(if entry == nil: "" else: $entry.value)
 
     var duration: float64
     if stream.duration == AV_NOPTS_VALUE:
