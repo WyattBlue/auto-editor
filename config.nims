@@ -192,7 +192,9 @@ if not defined(dynamic) and enableWhisper:
   elif hostOS != "windows" and not defined(emscripten):
     # Windows builds use llvm-mingw (no libgomp); ggml is built with
     # GGML_OPENMP=OFF there and uses its own threadpool.
-    switch("passL", "-lgomp")
+    # Minimal Linux installs, like Ubuntu 24.04, lack libgomp.so.1, so the
+    # release links GCC's static copy.
+    switch("passL", when defined(linux): "-l:libgomp.a" else: "-lgomp")
 
 if not defined(dynamic):
   if enableHevc or enableWhisper or defined(linux):
