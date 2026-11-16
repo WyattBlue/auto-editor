@@ -321,6 +321,9 @@ proc parseEdit*(source: string, filename = "--edit"): EditExpr =
     error "Should never happen"
   toExpr(expr, parser.lexer.sourceText)
 
+func frameCount(container: InputContainer, tb: AVRational): int =
+  round((mediaLength(container) * tb).float64).int
+
 proc evalEdit(e: EditExpr, container: InputContainer, input: string,
     tb: AVRational, bar: Bar): seq[bool] =
   ## Which frames of `input` at `tb` `e` marks active.
@@ -347,6 +350,11 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
         let audioStream = container.audio[i]
         resolveAudioChannelOrDefault(addr audioStream.codecpar.ch_layout, m.channel)
 
+      if container.audio.len == 0:
+        # A file with no audio, like a still image, is as quiet as silent
+        # footage, so it follows the same cut or keep rules.
+        debug &"audio: {input} has no audio stream, treating it as silent"
+        return newSeq[bool](frameCount(container, tb))
       if m.stream == -1:
         var matched = false
         var undecodable = 0
@@ -407,9 +415,7 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
         return val2
       return val
     of ekNone:
-      let length = mediaLength(container)
-      let tbLength = (round((length * tb).float64)).int
-      return newSeqWith(tbLength, true)
+      return newSeqWith(frameCount(container, tb), true)
     of ekAll:
       return @[]
 
