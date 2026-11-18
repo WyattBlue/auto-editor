@@ -3,6 +3,7 @@ import ./mlt
 import ../util/xml
 import ../[action, media, timeline]
 import ../util/[color, fun, rational]
+import ../lib/dnorm16
 
 proc genUuid*(): string =
   var bytes: array[16, byte]
