@@ -97,7 +97,7 @@ proc clipEffects(r: var Reader, n: XmlNode, inSecs: float64, dur: int64,
     case c.tag
     of "timeMap":
       let speed = r.speedOf(c, inSecs, dur, offset)
-      if speed.val != 1.0 or speed.sKf.len > 0: acts.add speed
+      if speed.val != 1.0'f32 or speed.sKf.len > 0: acts.add speed
     of "adjust-volume":
       let amount = c.attr("amount")
       if amount.endsWith("dB"):

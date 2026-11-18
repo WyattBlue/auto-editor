@@ -13,7 +13,7 @@ proc addProp*(parent: XmlNode, name, value: string) =
   parent.add(prop)
 
 func gainToDb*(gain: float32): string =
-  let db = (if gain <= 0.0: -100.0 else: max(-100.0, 20.0 * log10(gain.float64)))
+  let db = (if gain <= 0.0'f32: -100.0 else: max(-100.0, 20.0 * log10(gain.float64)))
   $db
 
 func isAnimated*(a: Action): bool =

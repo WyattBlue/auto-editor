@@ -63,7 +63,7 @@ func dissolveCurve*(p, easeIn, easeOut: float32): float32 =
 
 func easeInOut(t: float32): float32 {.inline.} =
   let t = clamp01(t)
-  if t < 0.5: 4 * t * t * t else: 1 - pow(-2 * t + 2, 3) / 2
+  if t < 0.5'f32: 4 * t * t * t else: 1 - pow(-2 * t + 2, 3) / 2
 func easeIn(t: float32): float32 {.inline.} = clamp01(t) * clamp01(t) * clamp01(t)
 func easeOut(t: float32): float32 {.inline.} = 1 - pow(1 - clamp01(t), 3)
 func easeInBack(t: float32): float32 =
@@ -304,7 +304,7 @@ proc motion(im: Img, bx, by: float32): Img =
 proc zoomBlur(im: Img, cx, cy, strength: float32): Img =
   ## Streaks toward (`cx`, `cy`) (fractions of the frame), each `strength`
   ## of the way there.
-  if strength < 0.002: return im
+  if strength < 0.002'f32: return im
   if im.w > 480: return im.halve.zoomBlur(cx, cy, strength).grow(im.w, im.h)
   # The closure would copy the frame it captures; it ends before `im` does.
   let im {.cursor.} = im
@@ -321,7 +321,7 @@ proc zoomBlur(im: Img, cx, cy, strength: float32): Img =
 
 proc spinBlur(im: Img, angle: float32): Img =
   ## Arcs around the center through `angle` radians.
-  if abs(angle) < 0.002: return im
+  if abs(angle) < 0.002'f32: return im
   if im.w > 480: return im.halve.spinBlur(angle).grow(im.w, im.h)
   # The closure would copy the frame it captures; it ends before `im` does.
   let im {.cursor.} = im
@@ -547,21 +547,21 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     result = mixImg(a.blur(r), b.blur(r), smooth(0.25, 0.75, p))
 
   of tkBurnAlpha:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let q = (if first: 2 * p else: 2 * p - 1)
     result.eachPixel(w, h):
       let src = (if first: a.get(x, y) else: b.get(x, y))
       let l = luma(src)
       let edge = (if first: q else: 1 - q)
-      let k = (if first: smooth(edge - 0.08, edge + 0.08, l)
-               else: smooth(edge - 0.08, edge + 0.08, l))
+      let k = (if first: smooth(edge - 0.08'f64, edge + 0.08'f64, l)
+               else: smooth(edge - 0.08'f64, edge + 0.08'f64, l))
       let glow = clamp01(1 - abs(l - edge) / 0.08'f32) * bell(p)
       c = mix(under.get(x, y), src, k) + (255'f32, 130'f32, 40'f32) * (glow * 0.7'f32)
 
   of tkDipToBlack, tkDipToWhite, tkDipToColor:
     let dip = (if kind == tkDipToBlack: black elif kind == tkDipToWhite: white
                else: color)
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let k = (if first: smooth(0, 1, 2 * p) else: 1 - smooth(0, 1, 2 * p - 1))
     let near {.cursor.} = (if first: a else: b)
     let src = near.blur(
@@ -650,7 +650,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         if cover > 0: c = cc
 
   of tkPopMotion:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let s = (if first: 1 - easeInBack(2 * p) else: easeOutBack(2 * p - 1))
     let src = (if first: a.unsafeAddr else: b.unsafeAddr)
     result.eachPixel(w, h):
@@ -658,7 +658,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
            else: under.get(x, y))
 
   of tkPullMotion, tkZoomBlur, tkCrossZoom:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let grow = (if kind == tkPullMotion: 1.5'f32 else: 0.6'f32)
     let s = 1 + q * grow
@@ -674,7 +674,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       c = mix(streaked.get(x, y), white, flash)
 
   of tkSpinMotion:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let angle = (if first: q else: -q) * PI.float32
     let src = (if first: a.unsafeAddr else: b.unsafeAddr)
@@ -760,7 +760,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
 
   of tkFlicker:
     let r = hashi(frame, 0, seed)
-    let showB = r < smooth(0.15, 0.85, p) or p > 0.85
+    let showB = r < smooth(0.15, 0.85, p) or p > 0.85'f32
     let flash = 1 + bell(p) * (hashi(frame, 1, seed) - 0.3'f32) * 0.9'f32
     let src = (if showB: b.unsafeAddr else: a.unsafeAddr)
     result.eachPixel(w, h):
@@ -878,7 +878,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         c = mix(a.sample(xx, yy), b.sample(xx, yy), smooth(0.3, 0.7, p))
 
   of tkTvPower:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let src = (if first: a.unsafeAddr else: b.unsafeAddr)
     let sy = max(0.004'f32, 1 - clamp01(q / 0.6'f32))
@@ -1083,7 +1083,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       else: c = b.sample((u - edge) / max(1 - edge, 1e-3) * fw, y.float32 + 0.5'f32)
 
   of tkMotionCamera:
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let src = (if first: a.unsafeAddr else: b.unsafeAddr)
     let angle = (if first: 1'f32 else: -1'f32) * q * 0.12'f32
@@ -1151,8 +1151,8 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let border = fh * 0.025'f32
     let sMin = 0.72'f32
     let (scale, slide) =
-      if p < 0.3: (1 - (1 - sMin) * easeInOut(p / 0.3'f32), 0'f32)
-      elif p < 0.7: (sMin, easeInOut((p - 0.3'f32) / 0.4'f32))
+      if p < 0.3'f32: (1 - (1 - sMin) * easeInOut(p / 0.3'f32), 0'f32)
+      elif p < 0.7'f64: (sMin, easeInOut((p - 0.3'f32) / 0.4'f32))
       else: (sMin + (1 - sMin) * easeInOut((p - 0.7'f32) / 0.3'f32), 1'f32)
     let pitch = fw * scale + fw * 0.08'f32
     result.eachPixel(w, h):
@@ -1337,7 +1337,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   # their wipes have hard edges.
   of tkDipToBlackLegacy, tkDipToWhiteLegacy:
     let dip = (if kind == tkDipToBlackLegacy: black else: white)
-    let first = p < 0.5
+    let first = p < 0.5'f32
     let src = (if first: a.unsafeAddr else: b.unsafeAddr)
     let k = (if first: 2 * p else: 2 - 2 * p)
     result.eachPixel(w, h):
@@ -1426,7 +1426,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkCrossZoomLegacy:
     # Zooms into the outgoing picture, then out of the incoming one.
     let z = 1 + 3 * (1 - abs(2 * p - 1))
-    let src = (if p < 0.5: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if p < 0.5'f32: a.unsafeAddr else: b.unsafeAddr)
     var zoomed: Img
     zoomed.eachPixel(w, h):
       c = src[].sample((x.float32 + 0.5'f32 - fw / 2) / z + fw / 2,

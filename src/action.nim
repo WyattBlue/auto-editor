@@ -941,9 +941,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var n = 4.0'f32
     if parts.len >= 2: hz = pFloat(parts[1])
     if parts.len == 3: n = pFloat(parts[2])
-    if not (hz >= 20.0 and hz <= 1000.0):
+    if not (hz >= 20.0'f32 and hz <= 1000.0'f32):
       raise newException(ActionParseError, "dehum must be in [20, 1000] Hz")
-    if not (n >= 1.0 and n <= 16.0 and n == round(n)):
+    if not (n >= 1.0'f32 and n <= 16.0'f32 and n == round(n)):
       raise newException(ActionParseError, "dehum harmonics must be a whole number in [1, 16]")
     return Action(kind: actDehum, humHz: uint16(round(hz)), humHarmonics: uint8(n))
 
@@ -973,7 +973,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     for idx in 1 ..< parts.len:
       k[idx - 1] = pFloat(parts[idx])
     for v in k:
-      if v < -1.0 or v > 1.0:
+      if v < -1.0'f32 or v > 1.0'f32:
         raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
     return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
 
@@ -984,7 +984,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     let n = pFloat(parts[1])
     # `not (a and b)` so NaN fails the check too; uint8(NaN) is UB. Whole notes
     # only: a fraction would round away silently and stop round-tripping.
-    if not (n >= 0.0 and n <= 127.0 and n == round(n)):
+    if not (n >= 0.0'f32 and n <= 127.0'f32 and n == round(n)):
       raise newException(ActionParseError, "tone must be a whole MIDI note in [0, 127]")
     var wave = wSine
     if parts.len == 3:
@@ -1323,19 +1323,19 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         varispeed: effectType == "varispeed")
     of "pitch":
       # `not (a and b)` so NaN fails the check too; int16(NaN) is UB.
-      if not (effectVal >= -24.0 and effectVal <= 24.0):
+      if not (effectVal >= -24.0'f32 and effectVal <= 24.0'f32):
         raise newException(ActionParseError, "pitch must be in [-24.0, 24.0] semitones")
       return Action(kind: actPitch, pCents: int16(round(effectVal * 100.0'f32)))
     of "brighthue":
       return Action(kind: actLuv, brighthue: effectVal, contrast: luvContrastId,
         saturation: luvSaturationId)
     of "contrast":
-      if effectVal < -2.0 or effectVal > 2.0:
+      if effectVal < -2.0'f32 or effectVal > 2.0'f32:
         raise newException(ActionParseError, "contrast must be in [-2.0, 2.0]")
       return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: effectVal,
         saturation: luvSaturationId)
     of "saturation":
-      if effectVal < 0.0 or effectVal > 3.0:
+      if effectVal < 0.0'f32 or effectVal > 3.0'f32:
         raise newException(ActionParseError, "saturation must be in [0.0, 3.0]")
       return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: luvContrastId,
         saturation: effectVal)

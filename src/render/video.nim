@@ -1484,7 +1484,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             frame = fitted
       of actZoom:
         let z = sample(effect, effect.kf, effect.kt)
-        if z == 1.0:
+        if z == 1.0'f32:
           continue
         let origW = frame.width
         let origH = frame.height
@@ -1547,7 +1547,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actBlur:
         let sigma = sample(effect, effect.kf, effect.kt)
-        if sigma <= 0.0:
+        if sigma <= 0.0'f32:
           continue
         runFx(fxId(actBlur, frame, f0 = sigma)):
           let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))

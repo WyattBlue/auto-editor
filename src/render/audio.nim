@@ -394,7 +394,7 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
     case effect.kind
     of actSpeed:
       if at < 0: at = filters.len
-      if effect.varispeed: rate *= max(0.2, min(100.0, effect.val))
+      if effect.varispeed: rate *= max(0.2'f64, min(100.0'f64, effect.val))
       else: tempo *= effect.val
     of actPitch:
       if at < 0: at = filters.len
@@ -800,7 +800,7 @@ proc chunkToFltpFrame(chunk: seq[int16], layout: ref AVChannelLayout, sr: cint,
   for ch in 0 ..< channels:
     let channelData = frame.planeAs(ch, cfloat)
     for i in 0 ..< nFrames:
-      channelData[i] = chunk[i * channels + ch].cfloat / 32768.0
+      channelData[i] = chunk[i * channels + ch].cfloat / 32768.0'f32
   return frame
 
 # Convert a loudnorm output frame (one of several sample formats) to an
@@ -1043,17 +1043,17 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
             # A clip running into the start contributes from there on.
             if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
               let fadeIn = (
-                if fadeInEdge and i < fadeSamples: (i.float32 + 0.5) /
-                    fadeSamples.float32
-                else: 1.0'f32
+                if fadeInEdge and i < fadeSamples: (i.float64 + 0.5'f64) /
+                    fadeSamples.float64
+                else: 1.0'f64
               )
               let tailDist = max(0, n - 1 - i)
               let fadeOut = (
-                if fadeOutEdge and tailDist < fadeSamples: (tailDist.float32 + 0.5) /
-                    fadeSamples.float32
-                else: 1.0'f32
+                if fadeOutEdge and tailDist < fadeSamples: (tailDist.float64 + 0.5'f64) /
+                    fadeSamples.float64
+                else: 1.0'f64
               )
-              let gain = min(1.0'f32, min(fadeIn, fadeOut))
+              let gain = min(1.0'f64, min(fadeIn, fadeOut))
               let baseIndex = (outputSampleIndex - bufStart) * targetChannels
               let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
               for ch in 0 ..< min(targetChannels, sourceChannels):
@@ -1152,7 +1152,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let produce = newTimelineProducer()
         for chunk in produce():
           for s in chunk:
-            let amplitude = abs(s.float32 / 32768.0)
+            let amplitude = abs(s.float64 / 32768.0'f64)
             if amplitude > 0.0:
               let peakLevel = 20.0 * log10(amplitude)
               if peakLevel > maxPeakLevel:
@@ -1160,15 +1160,15 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       let peakAdjustment = norm.t - maxPeakLevel
       debug &"current peak level: {maxPeakLevel}"
       debug &"peak adjustment: {peakAdjustment:.3f}dB"
-      let gainLinear = pow(10.0, peakAdjustment / 20.0)
+      let gainLinear = pow(10.0'f64, peakAdjustment / 20.0'f64)
 
       # Pass 2: stream the timeline again, applying the gain.
       let produce2 = newTimelineProducer()
       for chunk in produce2():
         var c = chunk
-        if peakAdjustment != 0.0:
+        if peakAdjustment != 0.0'f32:
           for k in 0 ..< c.len:
-            c[k] = int16(max(-32768.0, min(32767.0, c[k].float32 * gainLinear)))
+            c[k] = int16(max(-32768.0'f64, min(32767.0'f64, c[k].float64 * gainLinear)))
         for fr in emitChunk(c):
           yield fr
 
