@@ -2,10 +2,6 @@ import std/[algorithm, hashes, math, sequtils, strformat, strutils, options]
 import ./util/[color, suggest]
 import ./lib/[dnorm16, escape]
 
-template writeAt(baseBuffer: auto, index: int, offset: int, val: untyped) =
-  var temp = val
-  copyMem(addr baseBuffer[index + offset], addr temp, sizeof(temp))
-
 type
   # The order is part of the API
   ActionKind* = enum
@@ -1497,84 +1493,240 @@ when not defined(nimscript):
         (if act.cSeed == 0'u16: "" else: &":seed={act.cSeed}") &
         (if act.cShimmer: "" else: ":no-shimmer")
 
-  func easeBytes(a: Action): int = (if a.hasEase: 6 else: 0)
+  # atf-8's layout, one description per kind: `code` walks an action's fields
+  # in their packed order, and the codec's mode sizes, writes, or reads them,
+  # so the three can't disagree. Sizing and writing only read the action. The
+  # mode is static, so each is compiled without the others' branches.
+  type
+    CodecMode = enum cmSize, cmWrite, cmRead
+    Codec[M: static CodecMode] = object
+      base: ptr UncheckedArray[uint8]
+      head, pos: int            # the action's header byte, and the next field
+      tooMany, unpaired: bool   # ramps that can't be packed, found when sizing
+    KfStore = enum ksF32, ksUnorm16, ksSnorm16, ksPixel
 
-  # A timed ramp is marked by a zero before its keyframe count, and is followed
-  # by each keyframe's unit and time. An untimed ramp's count is never zero: an
-  # empty ramp takes the mark too, with no times.
-  func marked(n: int, kt: seq[KfTime]): bool = kt.len > 0 or n == 0
+  proc raw[M, T](c: var Codec[M], v: var T) =
+    case M
+    of cmSize: discard
+    of cmWrite: copyMem(addr c.base[c.pos], addr v, sizeof(T))
+    of cmRead: copyMem(addr v, addr c.base[c.pos], sizeof(T))
+    c.pos += sizeof(T)
 
-  func timeBytes(n: int, kt: seq[KfTime]): int =
-    (if marked(n, kt): 1 else: 0) + kt.len * 5
+  proc byte8[M; T: enum](c: var Codec[M], v: var T) =
+    # A bare Nim enum is int-sized, so it's narrowed to a byte.
+    var b = uint8(ord(v))
+    c.raw(b)
+    if M == cmRead: v = T(b)
 
-  func timeBytes(a: Action): int =
+  proc bit[M](c: var Codec[M], at: int, v: var bool, mask: uint8) =
+    ## `v` as the `mask` bit of the byte at `at`, which holds another field.
+    case M
+    of cmSize: discard
+    of cmWrite:
+      if v: c.base[at] = c.base[at] or mask
+    of cmRead: v = (c.base[at] and mask) != 0'u8
+
+  proc bits[M](c: var Codec[M], fields: openArray[(ptr bool, uint8)]) =
+    ## Bools in a byte of their own, each its mask's bit.
+    var b = 0'u8
+    if M == cmWrite:
+      for (f, m) in fields:
+        if f[]: b = b or m
+    c.raw(b)
+    if M == cmRead:
+      for (f, m) in fields: f[] = (b and m) != 0'u8
+
+  proc str16[M](c: var Codec[M], s: var string) =
+    var n = uint16(s.len)
+    c.raw(n)
+    if M == cmRead: s = newString(n.int)
+    if n > 0:
+      case M
+      of cmSize: discard
+      of cmWrite: copyMem(addr c.base[c.pos], addr s[0], n.int)
+      of cmRead: copyMem(addr s[0], addr c.base[c.pos], n.int)
+    c.pos += n.int
+
+  proc rgb[M](c: var Codec[M], col: var RGBColor) =
+    c.bit(c.head, col.yuv, yuvFlag)
+    c.raw(col.red)
+    c.raw(col.green)
+    c.raw(col.blue)
+
+  proc ease[M](c: var Codec[M], a: var Action) =
+    ## An animated action's easing, flagged in its header.
+    c.bit(c.head, a.hasEase, easeFlag)
+    if a.hasEase:
+      c.byte8(a.easeCurve)
+      c.byte8(a.easeDurUnit)
+      c.raw(a.easeDur)
+
+  proc ramp[M](c: var Codec[M], kf: var seq[float32], kt: var seq[KfTime],
+      store: KfStore) =
+    ## Keyframes behind a one-byte count. A timed ramp is marked by a zero
+    ## before its count, and is followed by each keyframe's unit and time. An
+    ## untimed ramp's count is never zero: an empty ramp takes the mark too,
+    ## with no times.
+    if M == cmSize:
+      c.tooMany = c.tooMany or kf.len > 255
+      c.unpaired = c.unpaired or kt.len notin [0, kf.len]
+    let timed =
+      if M == cmRead: c.base[c.pos] == 0'u8
+      else: kt.len > 0 or kf.len == 0
+    if timed:
+      var mark = 0'u8
+      c.raw(mark)
+    var n = uint8(min(kf.len, 255))
+    c.raw(n)
+    if M == cmRead:
+      kf.setLen(n.int)
+      if timed: kt.setLen(n.int)
+    for v in kf.mitems:
+      case store
+      of ksF32: c.raw(v)
+      of ksUnorm16:
+        var u = toUnorm16(v)
+        c.raw(u)
+        if M == cmRead: v = u.toFloat32
+      of ksSnorm16:
+        var s = toSnorm16(v)
+        c.raw(s)
+        if M == cmRead: v = s.toFloat32
+      of ksPixel:
+        var u = pixCode(v)
+        c.raw(u)
+        if M == cmRead: v = u.float32
+    for t in kt.mitems:
+      c.byte8(t.unit)
+      c.raw(t.at)
+
+  proc code[M](c: var Codec[M], a: var Action) =
     case a.kind
-    of actPos: timeBytes(a.pxKf.len, a.pxKt) + timeBytes(a.pyKf.len, a.pyKt) +
-      timeBytes(a.pscaleKf.len, a.pscaleKt)
-    of actPixelate: timeBytes(a.pixWKf.len, a.pixWKt) + timeBytes(a.pixHKf.len, a.pixHKt)
-    of actZoom, actBlur, actOpacity, actBrightness, actVolume: timeBytes(a.kf.len, a.kt)
-    else: 0
-
-  proc packCount(base: ptr UncheckedArray[uint8], pos: var int, n: int,
-      kt: seq[KfTime]) =
-    if marked(n, kt):
-      base[pos] = 0'u8
-      pos += 1
-    base[pos] = uint8(n)
-    pos += 1
-
-  proc packTimes(base: ptr UncheckedArray[uint8], pos: var int, kt: seq[KfTime]) =
-    for t in kt:
-      base[pos] = uint8(ord(t.unit))
-      var at = t.at
-      copyMem(addr base[pos + 1], addr at, sizeof(float32))
-      pos += 5
-
-  proc unpackCount(base: ptr UncheckedArray[uint8], pos: var int): (int, bool) =
-    ## The keyframe count, and whether times follow the keyframes.
-    let timed = base[pos] == 0'u8
-    if timed: pos += 1
-    result = (base[pos].int, timed)
-    pos += 1
-
-  proc unpackTimes(base: ptr UncheckedArray[uint8], pos: var int,
-      n: int): seq[KfTime] =
-    result = newSeq[KfTime](n)
-    for c in 0 ..< n:
-      result[c].unit = KfUnit(base[pos].int)
-      copyMem(addr result[c].at, addr base[pos + 1], sizeof(float32))
-      pos += 5
-
-  func actionByteSize(a: Action): int =
-    case a.kind
-    of actInvert, actHflip, actVflip, actLoop, actErosion: 1
-    of actChoke: 2
-    of actRotate, actPitch, actTone, actHighpass, actLowpass: 3
-    of actDehum: 4
-    of actLens: 5
+    of actInvert, actHflip, actVflip, actLoop, actErosion: discard
+    of actChoke: c.raw(a.chokeN)
+    of actRotate: c.raw(a.rStart)
+    of actScale:
+      c.raw(a.tScaleW)
+      c.raw(a.tScaleH)
+      c.bits([(addr a.tUniform, 1'u8)])
+    of actTurn: c.raw(a.tDeg)
+    of actPitch: c.raw(a.pCents)
+    of actTone:
+      c.raw(a.note)
+      c.byte8(a.wave)
+    of actLens:
+      c.raw(a.k1)
+      c.raw(a.k2)
     of actSpeed:
-      if a.sKf.len == 0: 5
-      else: 5 + 1 + (if a.hasEase: 1 else: 0) + 1 + timeBytes(a.sKf.len, a.sKt) +
-        a.sKf.len * 4
-    of actDeesser, actSpin: 7
-    of actColorKey, actChromaKey, actAberration: 8
-    of actScale: 10
-    of actTurn: 5
-    # header, the file and font each a uint16 length + bytes, float32 size,
-    # set byte, align byte, three uint32 colors
-    of actBurn, actText: 1 + 2 + a.burnFile.len + 2 + a.burnFont.len + 4 + 1 + 1 + 12
-    of actDuck: 9
-    of actConvolve: 3 + a.irPath.len  # header + uint16 length + bytes
-    of actConfetti: 10
-    of actLuv: 11
-    of actDrawbox: 20
-    of actMask, actConfine: 23  # header + flags + feather + 5x int32 (x,y,w,h,radius)
-    of actMaskPoly, actConfinePoly: 5 + a.mPolyXs.len * 8
-    of actPos: 4 + easeBytes(a) + timeBytes(a) +
-      (a.pxKf.len + a.pyKf.len + a.pscaleKf.len) * 4
-    of actPixelate: 3 + easeBytes(a) + timeBytes(a) + (a.pixWKf.len + a.pixHKf.len) * 2
-    of actBrightness, actOpacity: 2 + easeBytes(a) + timeBytes(a) + a.kf.len * 2
-    of actBlur, actZoom, actVolume: 2 + easeBytes(a) + timeBytes(a) + a.kf.len * 4
+      c.bit(c.head, a.varispeed, varispeedFlag)
+      if M == cmSize and a.sKf.len == 0:
+        c.unpaired = c.unpaired or a.sKt.len > 0
+      # A ramp stores its mean negated, then its easing and keyframes.
+      var v = (if a.sKf.len > 0: -a.val else: a.val)
+      c.raw(v)
+      if M == cmRead: a.val = (if v < 0: -v else: v)
+      if (if M == cmRead: v < 0 else: a.sKf.len > 0):
+        c.bits([(addr a.hasEase, 1'u8)])
+        if a.hasEase: c.byte8(a.easeCurve)
+        c.ramp(a.sKf, a.sKt, ksF32)
+    of actDeesser:
+      c.raw(a.intensity)
+      c.raw(a.maxd)
+      c.raw(a.freq)
+    of actHighpass, actLowpass: c.raw(a.cutoff)
+    of actDehum:
+      c.raw(a.humHz)
+      c.raw(a.humHarmonics)
+    of actDuck:
+      c.raw(a.duckAmount)
+      c.raw(a.duckThresh)
+      c.raw(a.duckAttack)
+      c.raw(a.duckRelease)
+    of actConvolve: c.str16(a.irPath)
+    of actBurn, actText:
+      c.bit(c.head, a.burnVertical, verticalFlag)
+      c.str16(a.burnFile)
+      c.str16(a.burnFont)
+      c.raw(a.burnSize)
+      c.raw(a.burnSet)
+      let alignAt = c.pos
+      c.raw(a.burnAlign)
+      c.bit(alignAt, a.burnAss, assFlag)
+      if M == cmRead: a.burnAlign = a.burnAlign and not assFlag
+      c.raw(a.burnColors)
+    of actSpin:
+      c.raw(a.sStart)
+      c.raw(a.sRate)
+    of actColorKey, actChromaKey:
+      c.rgb(a.color)
+      c.raw(a.similar)
+      c.raw(a.blend)
+    of actMask, actConfine:
+      c.bits([(addr a.mInvert, 0x1'u8), (addr a.mReset, 0x2'u8)])
+      c.raw(a.mFeather)
+      c.raw(a.mX)
+      c.raw(a.mY)
+      c.raw(a.mW)
+      c.raw(a.mH)
+      c.raw(a.mRadius)
+    of actMaskPoly, actConfinePoly:
+      c.bits([(addr a.mInvert, 0x1'u8)])
+      c.raw(a.mFeather)
+      var n = uint16(a.mPolyXs.len)
+      c.raw(n)
+      if M == cmRead:
+        a.mPolyXs.setLen(n.int)
+        a.mPolyYs.setLen(n.int)
+      for k in 0 ..< n.int:
+        c.raw(a.mPolyXs[k])
+        c.raw(a.mPolyYs[k])
+    of actPixelate:
+      c.ease(a)
+      c.ramp(a.pixWKf, a.pixWKt, ksPixel)
+      c.ramp(a.pixHKf, a.pixHKt, ksPixel)
+    of actConfetti:
+      c.raw(a.cCount)
+      c.raw(a.cGravity)
+      var flags = uint8(ord(a.cScheme)) or (uint8(ord(a.cOrigin)) shl originShift) or
+        (if a.cShimmer: shimmerFlag else: 0'u8)
+      c.raw(flags)
+      if M == cmRead:
+        a.cScheme = ConfettiScheme((flags and schemeMask).int)
+        a.cOrigin = ConfettiOrigin(((flags shr originShift) and originMask).int)
+        a.cShimmer = (flags and shimmerFlag) != 0'u8
+      c.raw(a.cSeed)
+    of actAberration:
+      c.raw(a.abRh)
+      c.raw(a.abRv)
+      c.raw(a.abGh)
+      c.raw(a.abGv)
+      c.raw(a.abBh)
+      c.raw(a.abBv)
+      c.bits([(addr a.abWrap, 1'u8)])
+    of actLuv:
+      c.raw(a.brighthue)
+      c.raw(a.contrast)
+      c.raw(a.saturation)
+    of actPos:
+      c.ease(a)
+      c.ramp(a.pxKf, a.pxKt, ksF32)
+      c.ramp(a.pyKf, a.pyKt, ksF32)
+      c.ramp(a.pscaleKf, a.pscaleKt, ksF32)
+    of actDrawbox:
+      c.raw(a.dbX)
+      c.raw(a.dbY)
+      c.raw(a.dbW)
+      c.raw(a.dbH)
+      c.rgb(a.dbColor)
+    of actZoom, actBlur, actVolume:
+      c.ease(a)
+      c.ramp(a.kf, a.kt, ksF32)
+    of actOpacity:
+      c.ease(a)
+      c.ramp(a.kf, a.kt, ksUnorm16)
+    of actBrightness:
+      c.ease(a)
+      c.ramp(a.kf, a.kt, ksSnorm16)
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -1594,274 +1746,10 @@ when not defined(nimscript):
     {.push warning[HoleEnumConv]: off.}
     let kind = ActionKind((base[i] and 0x7f'u8).int)
     {.pop.}
-    case kind
-    of actInvert, actHflip, actVflip, actLoop, actErosion:
-      result = Action(kind: kind)
-      i += 1
-    of actRotate:
-      var st: Unorm16
-      copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
-      result = Action(kind: actRotate, rStart: st)
-      i += 3
-    of actScale:
-      var w, h: float32
-      copyMem(addr w, addr base[i + 1], sizeof(float32))
-      copyMem(addr h, addr base[i + 5], sizeof(float32))
-      result = Action(kind: actScale, tScaleW: w, tScaleH: h, tUniform: base[i + 9] != 0)
-      i += 10
-    of actTurn:
-      var v: float32
-      copyMem(addr v, addr base[i + 1], sizeof(float32))
-      result = Action(kind: actTurn, tDeg: v)
-      i += 5
-    of actPitch:
-      var cents: int16
-      copyMem(addr cents, addr base[i + 1], sizeof(int16))
-      result = Action(kind: actPitch, pCents: cents)
-      i += 3
-    of actTone:
-      result = Action(kind: actTone, note: base[i + 1],
-        wave: Waveform(base[i + 2].int))
-      i += 3
-    of actLens:
-      var k1v, k2v: Snorm16
-      copyMem(addr k1v, addr base[i + 1], sizeof(Snorm16))
-      copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
-      result = Action(kind: actLens, k1: k1v, k2: k2v)
-      i += 5
-    of actSpeed:
-      var v: float32
-      copyMem(addr v, addr base[i + 1], sizeof(float32))
-      var act = Action(kind: actSpeed, val: v,
-        varispeed: (base[i] and varispeedFlag) != 0'u8)
-      var pos = i + 5
-      # A ramp stores its mean negated, then its easing and keyframes.
-      if v < 0:
-        act.val = -v
-        act.hasEase = base[pos] != 0'u8
-        pos += 1
-        if act.hasEase:
-          act.easeCurve = Easing(base[pos].int)
-          pos += 1
-        let (count, timed) = unpackCount(base, pos)
-        act.sKf = newSeq[float32](count)
-        for c in 0 ..< count:
-          copyMem(addr act.sKf[c], addr base[pos], sizeof(float32))
-          pos += 4
-        if timed: act.sKt = unpackTimes(base, pos, count)
-      result = act
-      i = pos
-    of actDeesser:
-      var iu, mu, fu: Unorm16
-      copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
-      copyMem(addr mu, addr base[i + 3], sizeof(Unorm16))
-      copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
-      result = Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
-      i += 7
-    of actHighpass, actLowpass:
-      var hz: uint16
-      copyMem(addr hz, addr base[i + 1], sizeof(uint16))
-      result = (if kind == actHighpass: Action(kind: actHighpass, cutoff: hz)
-        else: Action(kind: actLowpass, cutoff: hz))
-      i += 3
-    of actDehum:
-      var hz: uint16
-      copyMem(addr hz, addr base[i + 1], sizeof(uint16))
-      result = Action(kind: actDehum, humHz: hz, humHarmonics: base[i + 3])
-      i += 4
-    of actDuck:
-      var amt, thr: Unorm16
-      var atk, rel: uint16
-      copyMem(addr amt, addr base[i + 1], sizeof(Unorm16))
-      copyMem(addr thr, addr base[i + 3], sizeof(Unorm16))
-      copyMem(addr atk, addr base[i + 5], sizeof(uint16))
-      copyMem(addr rel, addr base[i + 7], sizeof(uint16))
-      result = Action(kind: actDuck, duckAmount: amt, duckThresh: thr,
-        duckAttack: atk, duckRelease: rel)
-      i += 9
-    of actConvolve:
-      var n: uint16
-      copyMem(addr n, addr base[i + 1], sizeof(uint16))
-      var path = newString(n.int)
-      if n > 0: copyMem(addr path[0], addr base[i + 3], n.int)
-      result = Action(kind: actConvolve, irPath: path)
-      i += 3 + n.int
-    of actBurn, actText:
-      var act = if kind == actText: Action(kind: actText) else: Action(kind: actBurn)
-      act.burnVertical = (base[i] and verticalFlag) != 0'u8
-      var pos = i + 1
-      for path in [addr act.burnFile, addr act.burnFont]:
-        var n: uint16
-        copyMem(addr n, addr base[pos], sizeof(uint16))
-        path[] = newString(n.int)
-        if n > 0: copyMem(addr path[][0], addr base[pos + 2], n.int)
-        pos += 2 + n.int
-      copyMem(addr act.burnSize, addr base[pos], sizeof(float32))
-      act.burnSet = cast[set[BurnPart]](base[pos + 4])
-      act.burnAlign = base[pos + 5] and not assFlag
-      act.burnAss = (base[pos + 5] and assFlag) != 0'u8
-      copyMem(addr act.burnColors, addr base[pos + 6], 12)
-      result = act
-      i = pos + 18
-    of actSpin:
-      var st: Unorm16
-      var rate: float32
-      copyMem(addr st, addr base[i + 1], sizeof(Unorm16))
-      copyMem(addr rate, addr base[i + 3], sizeof(float32))
-      result = Action(kind: actSpin, sStart: st, sRate: rate)
-      i += 7
-    of actColorKey, actChromaKey:
-      let col = RGBColor(red: base[i + 1], green: base[i + 2], blue: base[i + 3],
-        yuv: (base[i] and yuvFlag) != 0'u8)
-      var sim, blend: Unorm16
-      copyMem(addr sim, addr base[i + 4], sizeof(Unorm16))
-      copyMem(addr blend, addr base[i + 6], sizeof(Unorm16))
-      result = Action(kind: kind, color: col, similar: sim, blend: blend)
-      i += 8
-    of actChoke:
-      result = Action(kind: actChoke, chokeN: base[i + 1])
-      i += 2
-    of actMask, actConfine:
-      let flags = base[i + 1]
-      let feather = base[i + 2]
-      var x, y, w, h, radius: int32
-      copyMem(addr x, addr base[i + 3], sizeof(int32))
-      copyMem(addr y, addr base[i + 7], sizeof(int32))
-      copyMem(addr w, addr base[i + 11], sizeof(int32))
-      copyMem(addr h, addr base[i + 15], sizeof(int32))
-      copyMem(addr radius, addr base[i + 19], sizeof(int32))
-      result = Action(kind: kind, mRadius: radius,
-        mReset: (flags and 0x2'u8) != 0, mInvert: (flags and 0x1'u8) != 0,
-        mFeather: feather, mX: x, mY: y, mW: w, mH: h)
-      i += 23
-    of actMaskPoly, actConfinePoly:
-      let invert = (base[i + 1] and 0x1'u8) != 0'u8
-      let feather = base[i + 2]
-      var n: uint16
-      copyMem(addr n, addr base[i + 3], sizeof(uint16))
-      var xs = newSeq[int32](n.int)
-      var ys = newSeq[int32](n.int)
-      var pos = i + 5
-      for k in 0 ..< n.int:
-        copyMem(addr xs[k], addr base[pos], sizeof(int32))
-        copyMem(addr ys[k], addr base[pos + 4], sizeof(int32))
-        pos += 8
-      result = Action(kind: kind, mFeather: feather, mInvert: invert,
-        mPolyXs: xs, mPolyYs: ys)
-      i = pos
-    of actPixelate:
-      let hasEase = (base[i] and easeFlag) != 0'u8
-      var pos = i + 1
-      var act = Action(kind: actPixelate, hasEase: hasEase)
-      if hasEase:
-        act.easeCurve = Easing(base[pos].int)
-        act.easeDurUnit = DurUnit(base[pos + 1].int)
-        copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
-        pos += 6
-      for which in 0 .. 1:  # width, then height keyframes
-        let (count, timed) = unpackCount(base, pos)
-        var sizes = newSeq[float32](count)
-        for c in 0 ..< count:
-          var v: uint16
-          copyMem(addr v, addr base[pos], sizeof(uint16))
-          sizes[c] = v.float32
-          pos += 2
-        let times = (if timed: unpackTimes(base, pos, count) else: @[])
-        if which == 0: (act.pixWKf, act.pixWKt) = (sizes, times)
-        else: (act.pixHKf, act.pixHKt) = (sizes, times)
-      result = act
-      i = pos
-    of actConfetti:
-      var count, seed: uint16
-      var gravity: float32
-      copyMem(addr count, addr base[i + 1], sizeof(uint16))
-      copyMem(addr gravity, addr base[i + 3], sizeof(float32))
-      copyMem(addr seed, addr base[i + 8], sizeof(uint16))
-      let flags = base[i + 7]
-      result = Action(kind: actConfetti, cCount: count, cGravity: gravity,
-        cScheme: ConfettiScheme((flags and schemeMask).int),
-        cShimmer: (flags and shimmerFlag) != 0'u8,
-        cOrigin: ConfettiOrigin(((flags shr originShift) and originMask).int),
-        cSeed: seed)
-      i += 10
-    of actAberration:
-      result = Action(kind: actAberration,
-        abRh: cast[int8](base[i + 1]), abRv: cast[int8](base[i + 2]),
-        abGh: cast[int8](base[i + 3]), abGv: cast[int8](base[i + 4]),
-        abBh: cast[int8](base[i + 5]), abBv: cast[int8](base[i + 6]),
-        abWrap: base[i + 7] != 0'u8)
-      i += 8
-    of actLuv:
-      var bh: Snorm16
-      var c, s: float32
-      copyMem(addr bh, addr base[i + 1], sizeof(Snorm16))
-      copyMem(addr c, addr base[i + 3], sizeof(float32))
-      copyMem(addr s, addr base[i + 7], sizeof(float32))
-      result = Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
-      i += 11
-    of actPos:
-      let hasEase = (base[i] and easeFlag) != 0'u8
-      var pos = i + 1
-      var act = Action(kind: actPos, hasEase: hasEase)
-      if hasEase:
-        act.easeCurve = Easing(base[pos].int)
-        act.easeDurUnit = DurUnit(base[pos + 1].int)
-        copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
-        pos += 6
-      for which in 0 .. 2:  # x, y, scale keyframe seqs in order
-        let (count, timed) = unpackCount(base, pos)
-        var s = newSeq[float32](count)
-        for c in 0 ..< count:
-          copyMem(addr s[c], addr base[pos], sizeof(float32))
-          pos += 4
-        let times = (if timed: unpackTimes(base, pos, count) else: @[])
-        case which
-        of 0: (act.pxKf, act.pxKt) = (s, times)
-        of 1: (act.pyKf, act.pyKt) = (s, times)
-        else: (act.pscaleKf, act.pscaleKt) = (s, times)
-      result = act
-      i = pos
-    of actDrawbox:
-      var x, y, w, h: int32
-      copyMem(addr x, addr base[i + 1], sizeof(int32))
-      copyMem(addr y, addr base[i + 5], sizeof(int32))
-      copyMem(addr w, addr base[i + 9], sizeof(int32))
-      copyMem(addr h, addr base[i + 13], sizeof(int32))
-      let col = RGBColor(red: base[i + 17], green: base[i + 18], blue: base[i + 19],
-        yuv: (base[i] and yuvFlag) != 0'u8)
-      result = Action(kind: actDrawbox, dbX: x, dbY: y, dbW: w, dbH: h, dbColor: col)
-      i += 20
-    of actZoom, actBlur, actOpacity, actBrightness, actVolume:
-      let hasEase = (base[i] and easeFlag) != 0'u8
-      var pos = i + 1
-      var act = Action(kind: kind)
-      act.hasEase = hasEase
-      if hasEase:
-        act.easeCurve = Easing(base[pos].int)
-        act.easeDurUnit = DurUnit(base[pos + 1].int)
-        copyMem(addr act.easeDur, addr base[pos + 2], sizeof(float32))
-        pos += 6
-      let (count, timed) = unpackCount(base, pos)
-      act.kf = newSeq[float32](count)
-      for c in 0 ..< count:
-        if kind in {actZoom, actBlur, actVolume}:
-          var v: float32
-          copyMem(addr v, addr base[pos], sizeof(float32))
-          act.kf[c] = v
-          pos += 4
-        elif kind == actOpacity:
-          var u: Unorm16
-          copyMem(addr u, addr base[pos], sizeof(Unorm16))
-          act.kf[c] = u.toFloat32
-          pos += 2
-        else:
-          var s: Snorm16
-          copyMem(addr s, addr base[pos], sizeof(Snorm16))
-          act.kf[c] = s.toFloat32
-          pos += 2
-      if timed: act.kt = unpackTimes(base, pos, count)
-      result = act
-      i = pos
+    result = Action(kind: kind)
+    var c = Codec[cmRead](base: base, head: i, pos: i + 1)
+    c.code(result)
+    i = c.pos
 
   iterator items*(a: Actions): Action =
     if int(a) > 1:
@@ -1895,29 +1783,17 @@ when not defined(nimscript):
     if list.len == 0: return aNil
     var total = 0
     for a in list:
+      # Sizing only reads the action, so it goes by address, not a copy.
+      var c = Codec[cmSize](pos: 1)
+      c.code((unsafeAddr a)[])
       # Keyframe counts are packed into one byte; a wrapped count would
       # misalign every later field on decode.
-      let maxKf = case a.kind
-        of actPos: max(a.pxKf.len, max(a.pyKf.len, a.pscaleKf.len))
-        of actPixelate: max(a.pixWKf.len, a.pixHKf.len)
-        of actZoom, actBlur, actOpacity, actBrightness, actVolume: a.kf.len
-        of actSpeed: a.sKf.len
-        else: 0
-      if maxKf > 255:
+      if c.tooMany:
         raise newException(ActionParseError, "Too many keyframes (max 255)")
       # Times pair with keyframes one to one; packing trusts that.
-      let paired = case a.kind
-        of actPos: (a.pxKt.len in [0, a.pxKf.len]) and
-          (a.pyKt.len in [0, a.pyKf.len]) and (a.pscaleKt.len in [0, a.pscaleKf.len])
-        of actPixelate: (a.pixWKt.len in [0, a.pixWKf.len]) and
-          (a.pixHKt.len in [0, a.pixHKf.len])
-        of actZoom, actBlur, actOpacity, actBrightness, actVolume:
-          a.kt.len in [0, a.kf.len]
-        of actSpeed: a.sKt.len in [0, a.sKf.len]
-        else: true
-      if not paired:
+      if c.unpaired:
         raise newException(ActionParseError, "Keyframe times don't match the keyframes")
-      total += actionByteSize(a)
+      total += c.pos
     if total > 65535:
       raise newException(ActionParseError, "atf-8 buffer overflow: too many actions")
     let p = alloc(sizeof(uint16) + total)
@@ -1926,218 +1802,9 @@ when not defined(nimscript):
     var i = 0
     for a in list:
       base[i] = uint8(ord(a.kind))
-      case a.kind
-      of actInvert, actHflip, actVflip, actLoop, actErosion:
-        i += 1
-      of actRotate:
-        base.writeAt(i, 1, a.rStart)
-        i += 3
-      of actScale:
-        base.writeAt(i, 1, a.tScaleW)
-        base.writeAt(i, 5, a.tScaleH)
-        base[i + 9] = (if a.tUniform: 1'u8 else: 0'u8)
-        i += 10
-      of actTurn:
-        base.writeAt(i, 1, a.tDeg)
-        i += 5
-      of actPitch:
-        base.writeAt(i, 1, a.pCents)
-        i += 3
-      of actTone:
-        base[i + 1] = a.note
-        # A bare Nim enum is int-sized, so narrow explicitly like easeCurve.
-        base[i + 2] = uint8(ord(a.wave))
-        i += 3
-      of actLens:
-        base.writeAt(i, 1, a.k1)
-        base.writeAt(i, 3, a.k2)
-        i += 5
-      of actSpeed:
-        if a.varispeed: base[i] = base[i] or varispeedFlag
-        if a.sKf.len == 0:
-          base.writeAt(i, 1, a.val)
-          i += 5
-        else:
-          base.writeAt(i, 1, -a.val)
-          var pos = i + 5
-          base[pos] = (if a.hasEase: 1'u8 else: 0'u8)
-          pos += 1
-          if a.hasEase:
-            base[pos] = uint8(ord(a.easeCurve))
-            pos += 1
-          packCount(base, pos, a.sKf.len, a.sKt)
-          for v in a.sKf:
-            var vv = v
-            copyMem(addr base[pos], addr vv, sizeof(float32))
-            pos += 4
-          packTimes(base, pos, a.sKt)
-          i = pos
-      of actDeesser:
-        base.writeAt(i, 1, a.intensity)
-        base.writeAt(i, 3, a.maxd)
-        base.writeAt(i, 5, a.freq)
-        i += 7
-      of actHighpass, actLowpass:
-        base.writeAt(i, 1, a.cutoff)
-        i += 3
-      of actDehum:
-        base.writeAt(i, 1, a.humHz)
-        base[i + 3] = a.humHarmonics
-        i += 4
-      of actDuck:
-        base.writeAt(i, 1, a.duckAmount)
-        base.writeAt(i, 3, a.duckThresh)
-        base.writeAt(i, 5, a.duckAttack)
-        base.writeAt(i, 7, a.duckRelease)
-        i += 9
-      of actConvolve:
-        base.writeAt(i, 1, uint16(a.irPath.len))
-        if a.irPath.len > 0:
-          copyMem(addr base[i + 3], unsafeAddr a.irPath[0], a.irPath.len)
-        i += 3 + a.irPath.len
-      of actBurn, actText:
-        if a.burnVertical: base[i] = base[i] or verticalFlag
-        var pos = i + 1
-        for path in [a.burnFile, a.burnFont]:
-          base.writeAt(pos, 0, uint16(path.len))
-          if path.len > 0:
-            copyMem(addr base[pos + 2], unsafeAddr path[0], path.len)
-          pos += 2 + path.len
-        base.writeAt(pos, 0, a.burnSize)
-        base[pos + 4] = cast[uint8](a.burnSet)
-        base[pos + 5] = a.burnAlign or (if a.burnAss: assFlag else: 0'u8)
-        var colors = a.burnColors
-        copyMem(addr base[pos + 6], addr colors, 12)
-        i = pos + 18
-      of actSpin:
-        base.writeAt(i, 1, a.sStart)
-        base.writeAt(i, 3, a.sRate)
-        i += 7
-      of actColorKey, actChromaKey:
-        if a.color.yuv: base[i] = base[i] or yuvFlag
-        base[i + 1] = a.color.red
-        base[i + 2] = a.color.green
-        base[i + 3] = a.color.blue
-        base.writeAt(i, 4, a.similar)
-        base.writeAt(i, 6, a.blend)
-        i += 8
-      of actChoke:
-        base[i + 1] = a.chokeN
-        i += 2
-      of actMask, actConfine:
-        base[i + 1] = (if a.mInvert: 0x1'u8 else: 0'u8) or
-          (if a.mReset: 0x2'u8 else: 0'u8)
-        base[i + 2] = a.mFeather
-        base.writeAt(i, 3, a.mX)
-        base.writeAt(i, 7, a.mY)
-        base.writeAt(i, 11, a.mW)
-        base.writeAt(i, 15, a.mH)
-        base.writeAt(i, 19, a.mRadius)
-        i += 23
-      of actMaskPoly, actConfinePoly:
-        base[i + 1] = (if a.mInvert: 0x1'u8 else: 0'u8)
-        base[i + 2] = a.mFeather
-        base.writeAt(i, 3, uint16(a.mPolyXs.len))
-        var pos = i + 5
-        for k in 0 ..< a.mPolyXs.len:
-          base.writeAt(pos, 0, a.mPolyXs[k])
-          base.writeAt(pos, 4, a.mPolyYs[k])
-          pos += 8
-        i = pos
-      of actPixelate:
-        if a.hasEase: base[i] = base[i] or easeFlag
-        var pos = i + 1
-        if a.hasEase:
-          base[pos] = uint8(ord(a.easeCurve))
-          base[pos + 1] = uint8(ord(a.easeDurUnit))
-          var d = a.easeDur
-          copyMem(addr base[pos + 2], addr d, sizeof(float32))
-          pos += 6
-        for (sizes, times) in [(a.pixWKf, a.pixWKt), (a.pixHKf, a.pixHKt)]:
-          packCount(base, pos, sizes.len, times)
-          for v in sizes:
-            var vv = pixCode(v)
-            copyMem(addr base[pos], addr vv, sizeof(uint16))
-            pos += 2
-          packTimes(base, pos, times)
-        i = pos
-      of actConfetti:
-        base.writeAt(i, 1, a.cCount)
-        base.writeAt(i, 3, a.cGravity)
-        # A bare Nim enum is int-sized, so narrow explicitly like easeCurve.
-        base[i + 7] = uint8(ord(a.cScheme)) or
-          (uint8(ord(a.cOrigin)) shl originShift) or
-          (if a.cShimmer: shimmerFlag else: 0'u8)
-        base.writeAt(i, 8, a.cSeed)
-        i += 10
-      of actAberration:
-        base.writeAt(i, 1, a.abRh)
-        base.writeAt(i, 2, a.abRv)
-        base.writeAt(i, 3, a.abGh)
-        base.writeAt(i, 4, a.abGv)
-        base.writeAt(i, 5, a.abBh)
-        base.writeAt(i, 6, a.abBv)
-        base[i + 7] = (if a.abWrap: 1'u8 else: 0'u8)
-        i += 8
-      of actLuv:
-        base.writeAt(i, 1, a.brighthue)
-        base.writeAt(i, 3, a.contrast)
-        base.writeAt(i, 7, a.saturation)
-        i += 11
-      of actPos:
-        if a.hasEase: base[i] = base[i] or easeFlag
-        var pos = i + 1
-        if a.hasEase:
-          base[pos] = uint8(ord(a.easeCurve))
-          base[pos + 1] = uint8(ord(a.easeDurUnit))
-          var d = a.easeDur
-          copyMem(addr base[pos + 2], addr d, sizeof(float32))
-          pos += 6
-        for (s, times) in [(a.pxKf, a.pxKt), (a.pyKf, a.pyKt),
-            (a.pscaleKf, a.pscaleKt)]:
-          packCount(base, pos, s.len, times)
-          for v in s:
-            var vv = v
-            copyMem(addr base[pos], addr vv, sizeof(float32))
-            pos += 4
-          packTimes(base, pos, times)
-        i = pos
-      of actDrawbox:
-        base.writeAt(i, 1, a.dbX)
-        base.writeAt(i, 5, a.dbY)
-        base.writeAt(i, 9, a.dbW)
-        base.writeAt(i, 13, a.dbH)
-        if a.dbColor.yuv: base[i] = base[i] or yuvFlag
-        base[i + 17] = a.dbColor.red
-        base[i + 18] = a.dbColor.green
-        base[i + 19] = a.dbColor.blue
-        i += 20
-      of actZoom, actBlur, actOpacity, actBrightness, actVolume:
-        if a.hasEase: base[i] = base[i] or easeFlag
-        var pos = i + 1
-        if a.hasEase:
-          base[pos] = uint8(ord(a.easeCurve))
-          base[pos + 1] = uint8(ord(a.easeDurUnit))
-          var d = a.easeDur
-          copyMem(addr base[pos + 2], addr d, sizeof(float32))
-          pos += 6
-        packCount(base, pos, a.kf.len, a.kt)
-        for v in a.kf:
-          if a.kind in {actZoom, actBlur, actVolume}:
-            var vv = v
-            copyMem(addr base[pos], addr vv, sizeof(float32))
-            pos += 4
-          elif a.kind == actOpacity:
-            var u = toUnorm16(v)
-            copyMem(addr base[pos], addr u, sizeof(Unorm16))
-            pos += 2
-          else:
-            var s = toSnorm16(v)
-            copyMem(addr base[pos], addr s, sizeof(Snorm16))
-            pos += 2
-        packTimes(base, pos, a.kt)
-        i = pos
-
+      var c = Codec[cmWrite](base: base, head: i, pos: i + 1)
+      c.code((unsafeAddr a)[])
+      i = c.pos
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
