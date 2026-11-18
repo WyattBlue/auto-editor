@@ -909,3 +909,12 @@ proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
     header: "<libswscale/swscale.h>".}
 proc sws_scale_frame*(c: ptr SwsContext, dst, src: ptr AVFrame): cint {.importc,
     header: "<libswscale/swscale.h>".}
+
+template planeAs*(frame: ptr AVFrame, plane: int, T: typedesc): ptr UncheckedArray[T] =
+  ## A frame's data plane as an array of `T`.
+  cast[ptr UncheckedArray[T]](frame.data[plane])
+
+func planeRow*(frame: ptr AVFrame, plane, y: int): ptr UncheckedArray[uint8] {.inline.} =
+  ## Row `y` of a picture's plane.
+  cast[ptr UncheckedArray[uint8]](cast[int](frame.data[plane]) +
+    y * frame.linesize[plane].int)

@@ -483,8 +483,7 @@ when defined(libass):
       for i in 1 .. 2: result[i] += 0.5
 
   proc at(frame: ptr AVFrame, c: AVComponentDescriptor, x, y: int): pointer =
-    cast[pointer](cast[int](frame.data[c.plane]) + y * frame.linesize[c.plane].int +
-      x * c.step.int + c.offset.int)
+    addr frame.planeRow(c.plane.int, y)[x * c.step.int + c.offset.int]
 
   proc load(p: pointer, wide: bool): int =
     if wide: cast[ptr uint16](p)[].int else: cast[ptr uint8](p)[].int

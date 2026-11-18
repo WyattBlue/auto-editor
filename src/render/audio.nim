@@ -115,6 +115,51 @@ const
   toneTableLen = 2048  # one cycle; lerp error at this size is below -110 dBFS
   tonePeak = 8191.0    # -12 dBFS, so four stacked layers sum without clipping
 
+proc toInt16(frame: ptr AVFrame, srcStart, count: int, dst: var seq[int16],
+    dstStart, dstChannels: int): bool =
+  ## Frame samples [srcStart, srcStart + count) into `dst` as interleaved
+  ## int16, `dstChannels` to a sample from sample `dstStart` on; channels past
+  ## those are dropped. False for a sample format it doesn't read.
+  let frameChannels = frame.ch_layout.nb_channels.int
+  let fmt = frame.format
+  let planar = fmt in [AV_SAMPLE_FMT_S16P.cint, AV_SAMPLE_FMT_S32P.cint,
+    AV_SAMPLE_FMT_FLTP.cint]
+  template convert(T: typedesc, sample: untyped) =
+    for ch in 0 ..< min(frameChannels, dstChannels):
+      let plane = (if planar: ch else: 0)
+      if frame.data[plane] == nil: continue
+      let src = frame.planeAs(plane, T)
+      let (first, step) =
+        if planar: (srcStart, 1)
+        else: (srcStart * frameChannels + ch, frameChannels)
+      for i in 0 ..< count:
+        let x {.inject.} = src[first + i * step]
+        dst[(dstStart + i) * dstChannels + ch] = sample
+  if fmt == AV_SAMPLE_FMT_S16.cint and frameChannels == dstChannels:
+    if count > 0:
+      copyMem(addr dst[dstStart * dstChannels],
+        addr frame.planeAs(0, int16)[srcStart * frameChannels],
+        count * frameChannels * sizeof(int16))
+  elif fmt in [AV_SAMPLE_FMT_S16.cint, AV_SAMPLE_FMT_S16P.cint]:
+    convert(int16, x)
+  elif fmt in [AV_SAMPLE_FMT_S32.cint, AV_SAMPLE_FMT_S32P.cint]:
+    convert(int32, int16(ashr(x, 16)))
+  elif fmt in [AV_SAMPLE_FMT_FLT.cint, AV_SAMPLE_FMT_FLTP.cint]:
+    convert(cfloat, int16(max(-1.0, min(1.0, x.float64)) * 32767.0))
+  elif fmt == AV_SAMPLE_FMT_DBL.cint:
+    convert(cdouble, int16(max(-1.0, min(1.0, x)) * 32767.0))
+  else:
+    return false
+  true
+
+proc fromInt16(frame: ptr AVFrame, data: openArray[int16], channels: int) =
+  ## Interleaved `data` into an S16P frame's planes, silence past its end.
+  for ch in 0 ..< channels:
+    let plane = frame.planeAs(ch, int16)
+    for i in 0 ..< frame.nb_samples.int:
+      let k = i * channels + ch
+      plane[i] = (if k < data.len: data[k] else: 0)
+
 func noteFreq(note: uint8): float = 440.0 * pow(2.0, (note.float - 69.0) / 12.0)
 
 func toneTable(wave: Waveform, freq: float, sr: cint): seq[float32] =
@@ -268,70 +313,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     let samplesInFrame = samples - samplesSkippedInFrame
     let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
 
-    # Process audio samples based on format
-    if frame.format == AV_SAMPLE_FMT_S16.cint:
-      # Interleaved 16-bit
-      let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
-      let sourceOffset = samplesSkippedInFrame * channels
-      let destOffset = totalSamples * channels
-      let bytesToCopy = samplesToProcess * channels * sizeof(int16)
-      copyMem(addr result[destOffset], addr audioData[sourceOffset], bytesToCopy)
-
-    elif frame.format == AV_SAMPLE_FMT_S16P.cint:
-      # Planar 16-bit
-      for i in 0..<samplesToProcess:
-        let frameIndex = samplesSkippedInFrame + i
-        let resultIndex = (totalSamples + i) * channels
-        for ch in 0 ..< channels:
-          if frame.data[ch] != nil:
-            let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-            result[resultIndex + ch] = channelData[frameIndex]
-
-    elif frame.format == AV_SAMPLE_FMT_FLT.cint:
-      # Interleaved float
-      let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
-      for i in 0..<samplesToProcess:
-        let frameIndex = samplesSkippedInFrame + i
-        let resultIndex = (totalSamples + i) * channels
-        for ch in 0 ..< channels:
-          # Convert float to 16-bit int with proper clamping
-          let floatSample = audioData[frameIndex * channels + ch]
-          let clampedSample = max(-1.0, min(1.0, floatSample))
-          result[resultIndex + ch] = int16(clampedSample * 32767.0)
-
-    elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
-      # Planar float
-      for i in 0..<samplesToProcess:
-        let frameIndex = samplesSkippedInFrame + i
-        let resultIndex = (totalSamples + i) * channels
-        for ch in 0 ..< channels:
-          if frame.data[ch] != nil:
-            let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
-            # Convert float to 16-bit int with proper clamping
-            let floatSample = channelData[frameIndex]
-            let clampedSample = max(-1.0, min(1.0, floatSample))
-            result[resultIndex + ch] = int16(clampedSample * 32767.0)
-
-    elif frame.format == AV_SAMPLE_FMT_S32.cint:
-      # Interleaved 32-bit
-      let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
-      for i in 0..<samplesToProcess:
-        let frameIndex = samplesSkippedInFrame + i
-        let resultIndex = (totalSamples + i) * channels
-        for ch in 0 ..< channels:
-          result[resultIndex + ch] =
-            int16(ashr(audioData[frameIndex * channels + ch], 16))
-
-    elif frame.format == AV_SAMPLE_FMT_S32P.cint:
-      # Planar 32-bit
-      for i in 0..<samplesToProcess:
-        let frameIndex = samplesSkippedInFrame + i
-        let resultIndex = (totalSamples + i) * channels
-        for ch in 0 ..< channels:
-          if frame.data[ch] != nil:
-            let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
-            result[resultIndex + ch] = int16(ashr(channelData[frameIndex], 16))
-    else:
+    if not frame.toInt16(samplesSkippedInFrame, samplesToProcess, result,
+        totalSamples, channels):
       error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
 
     totalSamples += samplesToProcess
@@ -543,15 +526,7 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
     if av_frame_get_buffer(inputFrame, 0) < 0:
       error "Could not allocate input audio frame buffer"
 
-    # Copy input data to frame (convert from interleaved to planar format)
-    for ch in 0..<channels:
-      let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
-      for i in 0..<samples:
-        let srcIndex = i * channels + ch
-        if srcIndex < data.len:
-          channelData[i] = data[srcIndex]
-        else:
-          channelData[i] = 0
+    inputFrame.fromInt16(data, channels)
 
     # Process through filter graph
     var outputFrames: seq[ptr AVFrame] = @[]
@@ -592,8 +567,8 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
         if av_frame_get_buffer(blk, 0) < 0:
           error "Could not allocate input audio frame buffer"
         for ch in 0 ..< channels:
-          copyMem(blk.data[ch], addr cast[ptr UncheckedArray[int16]](
-            inputFrame.data[ch])[lo], n * sizeof(int16))
+          copyMem(blk.data[ch], addr inputFrame.planeAs(ch, int16)[lo],
+            n * sizeof(int16))
         let ret = av_buffersrc_write_frame(bufferSrc, blk)
         av_frame_free(addr blk)
         if ret < 0:
@@ -615,47 +590,9 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
 
       var sampleOffset = 0
       for frame in outputFrames:
-        let frameSamples = frame.nb_samples.int
-        let frameChannels = frame.ch_layout.nb_channels
-
-        if frame.format == AV_SAMPLE_FMT_S16P.cint:
-          # Convert from planar to interleaved
-          for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * channels
-            for ch in 0..<min(frameChannels, channels):
-              if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
-                let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-                processedData[interleavedIndex + ch] = channelData[i]
-        elif frame.format == AV_SAMPLE_FMT_S16.cint:
-          # Already interleaved, just copy
-          let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
-          for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * channels
-            for ch in 0..<min(frameChannels, channels):
-              if interleavedIndex + ch < processedData.len:
-                processedData[interleavedIndex + ch] = audioData[i * frameChannels + ch]
-        elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
-          # Planar float - convert to int16
-          for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * channels
-            for ch in 0..<min(frameChannels, channels):
-              if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
-                let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
-                let floatSample = channelData[i]
-                let clampedSample = max(-1.0, min(1.0, floatSample))
-                processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
-        elif frame.format == AV_SAMPLE_FMT_FLT.cint:
-          # Interleaved float - convert to int16
-          let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
-          for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * channels
-            for ch in 0..<min(frameChannels, channels):
-              if interleavedIndex + ch < processedData.len:
-                let floatSample = audioData[i * frameChannels + ch]
-                let clampedSample = max(-1.0, min(1.0, floatSample))
-                processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
-
-        sampleOffset += frameSamples
+        discard frame.toInt16(0, frame.nb_samples.int, processedData,
+          sampleOffset, channels)
+        sampleOffset += frame.nb_samples.int
 
   return processedData
 
@@ -777,46 +714,21 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: sink seq[int16], sourc
   if av_frame_get_buffer(inputFrame, 0) < 0:
     error "Could not allocate input frame buffer for resampling"
 
-  # Copy data to input frame (convert from interleaved to planar)
-  for ch in 0..<channels:
-    let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
-    for i in 0..<samples:
-      let srcIndex = i * channels + ch
-      if srcIndex < processedData.len:
-        channelData[i] = processedData[srcIndex]
-      else:
-        channelData[i] = 0
+  inputFrame.fromInt16(processedData, channels)
 
+  # Back to interleaved; the resampler gives S16P.
   let outputFrames = resampler.resample(inputFrame)
-
-  # Convert back to interleaved seq[int16]
-  var tempChannelData = newSeq[seq[int16]](channels)
-
+  var totalSamples = 0
   for frame in outputFrames:
-    let frameSamples = frame.nb_samples.int
-    let frameChannels = frame.ch_layout.nb_channels
-
-    # Extend temp arrays
-    let currentLen = tempChannelData[0].len
-    for ch in 0..<channels:
-      tempChannelData[ch].setLen(currentLen + frameSamples)
-
-    # Copy frame data
-    if frame.format == AV_SAMPLE_FMT_S16P:
-      for ch in 0..<min(frameChannels, channels):
-        if frame.data[ch] != nil:
-          let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-          for i in 0..<frameSamples:
-            tempChannelData[ch][currentLen + i] = channelData[i]
-
-    av_frame_free(addr frame)
-
-  # Convert from channel-separated to interleaved format
-  let totalSamples = tempChannelData[0].len
+    totalSamples += frame.nb_samples.int
   result = newSeq[int16](totalSamples * channels)
-  for i in 0..<totalSamples:
-    for ch in 0..<channels:
-      result[i * channels + ch] = tempChannelData[ch][i]
+  var offset = 0
+  for frame in outputFrames:
+    if frame.format == AV_SAMPLE_FMT_S16P.cint:
+      discard frame.toInt16(0, frame.nb_samples.int, result, offset, channels)
+    offset += frame.nb_samples.int
+    var f = frame
+    av_frame_free(addr f)
 
 
 # Micro-fade applied at every real clip edge to kill cut pops. A splice between
@@ -886,7 +798,7 @@ proc chunkToFltpFrame(chunk: seq[int16], layout: ref AVChannelLayout, sr: cint,
   if av_frame_get_buffer(frame, 0) < 0:
     error "Could not allocate loudnorm input frame buffer"
   for ch in 0 ..< channels:
-    let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
+    let channelData = frame.planeAs(ch, cfloat)
     for i in 0 ..< nFrames:
       channelData[i] = chunk[i * channels + ch].cfloat / 32768.0
   return frame
@@ -894,35 +806,8 @@ proc chunkToFltpFrame(chunk: seq[int16], layout: ref AVChannelLayout, sr: cint,
 # Convert a loudnorm output frame (one of several sample formats) to an
 # interleaved int16 chunk.
 proc loudnormOutToChunk(outF: ptr AVFrame, channels: int): seq[int16] =
-  let frameSamples = outF.nb_samples.int
-  let frameChannels = min(outF.ch_layout.nb_channels.int, channels)
-  result = newSeq[int16](frameSamples * channels)
-  if outF.format == AV_SAMPLE_FMT_DBL.cint:
-    let audioData = cast[ptr UncheckedArray[cdouble]](outF.data[0])
-    for i in 0 ..< frameSamples:
-      for ch in 0 ..< frameChannels:
-        let s = max(-1.0, min(1.0, audioData[i * frameChannels + ch]))
-        result[i * channels + ch] = int16(s * 32767.0)
-  elif outF.format == AV_SAMPLE_FMT_FLT.cint:
-    let audioData = cast[ptr UncheckedArray[cfloat]](outF.data[0])
-    for i in 0 ..< frameSamples:
-      for ch in 0 ..< frameChannels:
-        let s = max(-1.0'f32, min(1.0'f32, audioData[i * frameChannels + ch]))
-        result[i * channels + ch] = int16(s * 32767.0)
-  elif outF.format == AV_SAMPLE_FMT_FLTP.cint:
-    for i in 0 ..< frameSamples:
-      for ch in 0 ..< frameChannels:
-        if outF.data[ch] != nil:
-          let channelData = cast[ptr UncheckedArray[cfloat]](outF.data[ch])
-          let s = max(-1.0'f32, min(1.0'f32, channelData[i]))
-          result[i * channels + ch] = int16(s * 32767.0)
-  elif outF.format == AV_SAMPLE_FMT_S16P.cint:
-    for i in 0 ..< frameSamples:
-      for ch in 0 ..< frameChannels:
-        if outF.data[ch] != nil:
-          let channelData = cast[ptr UncheckedArray[int16]](outF.data[ch])
-          result[i * channels + ch] = channelData[i]
-  else:
+  result = newSeq[int16](outF.nb_samples.int * channels)
+  if not outF.toInt16(0, outF.nb_samples.int, result, 0, channels):
     error &"Unexpected output format from loudnorm: {outF.format}"
 
 proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
@@ -1211,10 +1096,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
     frame.time_base = AVRational(num: 1, den: sr)
     if av_frame_get_buffer(frame, 0) < 0:
       error "Could not allocate audio frame buffer"
-    for ch in 0 ..< targetChannels:
-      let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-      for i in 0 ..< chunkFrames:
-        channelData[i] = chunk[i * targetChannels + ch]
+    frame.fromInt16(chunk, targetChannels)
     for newFrame in resampler.resample(frame):
       result.add (newFrame, frameIndex)
       frameIndex += 1

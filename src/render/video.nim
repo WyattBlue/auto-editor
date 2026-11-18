@@ -148,10 +148,7 @@ proc buildPolyMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
   if av_frame_get_buffer(frame, 32) < 0: error "Bad buffer"
   if av_frame_make_writable(frame) < 0: error "Can't make frame writable"
   let outside = (if effect.mInvert: 255'u8 else: 0'u8)
-  let data = frame.data[0]
-  let stride = frame.linesize[0].int
-  template row(y: int): ptr UncheckedArray[uint8] =
-    cast[ptr UncheckedArray[uint8]](cast[int](data) + y * stride)
+  template row(y: int): ptr UncheckedArray[uint8] = frame.planeRow(0, y)
   for y in 0 ..< h.int:
     let r = row(y)
     for x in 0 ..< w.int: r[x] = outside
@@ -515,16 +512,13 @@ proc fillBox(frame: ptr AVFrame, x, y, w, h: int32, color: RGBColor) =
   let y1 = clamp(y.int + h.int, 0, frame.height.int)
   if x0 >= x1 or y0 >= y1:
     return
-  for row in y0 ..< y1:
-    let p = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[0]) + row * frame.linesize[0].int)
+  for y in y0 ..< y1:
+    let p = frame.planeRow(0, y)
     for col in x0 ..< x1:
       p[col] = yv
-  for row in (y0 div 2) .. ((y1 - 1) div 2):
-    let u = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[1]) + row * frame.linesize[1].int)
-    let v = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[2]) + row * frame.linesize[2].int)
+  for y in (y0 div 2) .. ((y1 - 1) div 2):
+    let u = frame.planeRow(1, y)
+    let v = frame.planeRow(2, y)
     for col in (x0 div 2) .. ((x1 - 1) div 2):
       u[col] = uv
       v[col] = vv
@@ -715,8 +709,7 @@ proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
         for sub in 0 ..< 4:
           addSpan(poly, float32(y) + (float32(sub) + 0.5'f32) * 0.25'f32,
             x0, n, 0.25'f32, cov[half])
-      let row = cast[ptr UncheckedArray[uint8]](
-        cast[int](frame.data[0]) + y * frame.linesize[0].int)
+      let row = frame.planeRow(0, y)
       for k in 0 ..< n:
         let c = cov[half][k]
         if c <= 0.002'f32:
@@ -742,10 +735,8 @@ proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
       continue
     # Chroma is half resolution, so one sample stands for a 2x2 luma block. Take
     # the block's strongest coverage, or a thin sliver would lose its color.
-    let uRow = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[1]) + cy * frame.linesize[1].int)
-    let vRow = cast[ptr UncheckedArray[uint8]](
-      cast[int](frame.data[2]) + cy * frame.linesize[2].int)
+    let uRow = frame.planeRow(1, cy)
+    let vRow = frame.planeRow(2, cy)
     for cx in (x0 div 2) .. ((x1 - 1) div 2):
       var c = 0.0'f32
       for k in (cx * 2 - x0) .. (cx * 2 + 1 - x0):
@@ -2026,12 +2017,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     dst.pts = src.pts
     dst.time_base = src.time_base
     if av_frame_get_buffer(dst, 32) < 0: error "subpixelShift: bad buffer"
-    let sStride = src.linesize[0].int
-    let dStride = dst.linesize[0].int
-    let sBase = cast[int](src.data[0])
-    let dBase = cast[int](dst.data[0])
     for y in 0 ..< h:
-      let dRow = cast[ptr UncheckedArray[uint8]](dBase + y * dStride)
+      let dRow = dst.planeRow(0, y)
       let syf = y.float32 - dy
       let y0 = floor(syf).int
       let wy = syf - y0.float32
@@ -2043,8 +2030,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           template px(xx, yy: int): float32 =
             if xx < 0 or xx >= w or yy < 0 or yy >= h: 0.0'f32
             else:
-              cast[ptr UncheckedArray[uint8]](
-                sBase + yy * sStride)[xx * 4 + c].float32
+              src.planeRow(0, yy)[xx * 4 + c].float32
           let t = px(x0, y0) * (1 - wx) + px(x0 + 1, y0) * wx
           let b = px(x0, y0 + 1) * (1 - wx) + px(x0 + 1, y0 + 1) * wx
           dRow[x * 4 + c] = uint8(clamp(t * (1 - wy) + b * wy + 0.5'f32, 0, 255))
