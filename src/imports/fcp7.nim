@@ -175,7 +175,7 @@ proc resolveFile(fileNode: XmlNode, files: var Table[string, FileInfo],
     interner: var StringInterner): FileInfo =
   ## A file is described once; later clips refer to it by id alone.
   let fileId = fileNode.attr("id")
-  if fileId in files:
+  if fileId != "" and fileId in files:
     return files[fileId]
   for fc in fileNode:
     if fc.kind != xnElement: continue
@@ -189,7 +189,7 @@ proc resolveFile(fileNode: XmlNode, files: var Table[string, FileInfo],
           if a.kind == xnElement and a.tag == "channelcount":
             channels = int(xmlInt(a, 1, 64))
         result.channels.add channels
-  if result.src != nil:
+  if result.src != nil and fileId != "":
     files[fileId] = result
 
 func streamOf(file: FileInfo, trackIndex: int64): tuple[stream: int16, firstChannel: bool] =
