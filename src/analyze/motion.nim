@@ -292,9 +292,10 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
       (cx and hmask, cy and vmask, max(cw and hmask, 1), max(ch and vmask, 1))
     else:
       (0.cint, 0.cint, 0.cint, 0.cint)
+  let videoStream = processor.formatCtx.streams[processor.videoIndex]
+  let startPts = processor.formatCtx.startPts(videoStream)
   for filteredFrame in processor.videoPipeline(filter, crop):
-    let frameTime = (filteredFrame.pts * processor.formatCtx.streams[
-        processor.videoIndex].time_base).float64
+    let frameTime = ((filteredFrame.pts - startPts) * videoStream.time_base).float64
     let index = round(frameTime * processor.tb.float64).int64
 
     let pixels = filteredFrame.width.int * filteredFrame.height.int

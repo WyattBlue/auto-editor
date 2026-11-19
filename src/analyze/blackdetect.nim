@@ -80,9 +80,10 @@ iterator blackness*(processor: var VideoProcessor, pixelBlack: float32): Unorm16
   let direct = lumaMax != -2
 
   let filter = (if direct: "format=" & $fmt else: "format=gray")
+  let videoStream = processor.formatCtx.streams[processor.videoIndex]
+  let startPts = processor.formatCtx.startPts(videoStream)
   for frame in processor.videoPipeline(filter):
-    let frameTime = (frame.pts * processor.formatCtx.streams[
-        processor.videoIndex].time_base).float64
+    let frameTime = ((frame.pts - startPts) * videoStream.time_base).float64
     let index = round(frameTime * processor.tb.float64).int64
 
     if direct and frame.color_range != lumaRange:
