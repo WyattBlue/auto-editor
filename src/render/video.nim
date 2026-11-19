@@ -2375,8 +2375,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # As Premiere: the first frame is all the outgoing picture.
           let p = float32(local.float / w.dur.float)
           let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
-          let dip: tuple[r, g, b: float32] = (tl.bg.red.float32, tl.bg.green.float32,
-            tl.bg.blue.float32)
+          let dip: tuple[r, g, b: float32] = (bgRgb.red.float32, bgRgb.green.float32,
+            bgRgb.blue.float32)
           let img = render(w.kind, fromF.toImg, toF.toImg, below.toImg, p,
             local.int, w.dur.int, seed, dip, w.easeIn, w.easeOut)
           acc = img.fromImg(fromF)
