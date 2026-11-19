@@ -381,15 +381,42 @@ proc download(package: Package) =
     echo &"Expected: {package.sha256}\nGot: {hash}"
     quit(1)
 
+proc dropBuilds(name: string) =
+  ## Remove every target's build of `name`, so nothing is built or skipped
+  ## because of objects from an older source tree.
+  for root in [nativeBuildPath, winBuildPath, winArmBuildPath, armv7BuildPath,
+      wasmBuildPath, wa64BuildPath]:
+    rmDir(root / "pkg" / name)
+    if name == "x265":
+      rmDir(root / "pkg" / "x265_8bit")
+      rmDir(root / "pkg" / "x265_10bit")
+      rmFile(root / "lib" / "pkgconfig" / "x265.pc")
+
 proc extract(package: Package) =
-  if not dirExists(package.name):
-    let tarArgs = (if package.location.endsWith("bz2"): "xjf" else: "xf")
-    exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
-    let patchFile = &"../patches/{package.name}.patch"
-    if fileExists(patchFile):
-      let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
-      echo "Applying patch: ", cmd
-      exec cmd
+  ## Extract and patch `package` unless its tree came from this tarball and
+  ## patch, as recorded in the tree's stamp file.
+  let patchFile = &"../patches/{package.name}.patch"
+  var stamp = &"sha256 {package.sha256}\n"
+  if fileExists(patchFile):
+    stamp &= &"patch {getFileHash(absolutePath(patchFile))}\n"
+  let stampFile = package.name / ".ae-extracted"
+  if dirExists(package.name) and
+      (not fileExists(stampFile) or readFile(stampFile) != stamp):
+    echo &"{package.name}: tarball or patch changed, extracting again"
+    rmDir(package.name)
+  if dirExists(package.name):
+    return
+
+  dropBuilds(package.name)
+  # -m: the files get the time of extraction, not the tarball's, so make and
+  # ninja can't take an older version's objects as newer than them.
+  let tarArgs = (if package.location.endsWith("bz2"): "xjmf" else: "xmf")
+  exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
+  if fileExists(patchFile):
+    let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
+    echo "Applying patch: ", cmd
+    exec cmd
+  writeFile(stampFile, stamp)
 
 proc makeInstall =
   when defined(macosx):
@@ -470,7 +497,7 @@ proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
     for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
       let srcFile = libDir / libFile
       let dstFile = libDir / ("lib" & libFile)
-      if fileExists(srcFile) and not fileExists(dstFile):
+      if fileExists(srcFile):
         echo &"Renaming {srcFile} to {dstFile}"
         exec &"mv \"{srcFile}\" \"{dstFile}\""
 
@@ -563,13 +590,12 @@ proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm3
     for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
       let srcFile = libDir / libFile
       let dstFile = libDir / ("lib" & libFile)
-      if fileExists(srcFile) and not fileExists(dstFile):
+      if fileExists(srcFile):
         exec &"mv \"{srcFile}\" \"{dstFile}\""
     let ggmlBaseDst = libDir / "libggml-base.a"
-    if not fileExists(ggmlBaseDst):
-      let ggmlBaseSrc = cmakeBuildDir / "ggml/src/ggml-base.a"
-      if fileExists(ggmlBaseSrc):
-        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
+    let ggmlBaseSrc = cmakeBuildDir / "ggml/src/ggml-base.a"
+    if fileExists(ggmlBaseSrc):
+      exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
     writeFile(libDir / "pkgconfig" / "whisper.pc", &"""prefix={buildPath}
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib
