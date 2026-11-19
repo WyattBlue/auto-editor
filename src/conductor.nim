@@ -1,4 +1,4 @@
-import std/[options, os, sets, sequtils, strformat, strutils, tables, terminal, times]
+import std/[algorithm, options, os, sets, sequtils, strformat, strutils, tables, terminal, times]
 when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
@@ -817,7 +817,12 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
     if inputLayer.len == 0:
       continue
 
-    for sibling in walkFiles((inputDir / inputName) & ".*"):
+    var siblings: seq[string]
+    for kind, name in walkDir(if inputDir == "": "." else: inputDir, relative = true):
+      if kind in {pcFile, pcLinkToFile} and name.startsWith(inputName & "."):
+        siblings.add inputDir / name
+    siblings.sort()
+    for sibling in siblings:
       if sibling == input:
         continue
       var sidecar: InputContainer
