@@ -106,6 +106,8 @@ proc clipEffects(r: var Reader, n: XmlNode, inSecs: float64, dur: int64,
           db = parseFloat(amount[0 ..< ^2])
         except ValueError:
           error &"Invalid adjust-volume amount: '{amount}'"
+        if db.isNaN:
+          error &"Invalid adjust-volume amount: '{amount}'"
         let gain = clamp(pow(10.0, db / 20.0), 0.0, 3.98109)
         if gain != 1.0:
           acts.add Action(kind: actVolume, kf: @[gain.float32])
@@ -289,7 +291,11 @@ proc parseSampleRate(s: string): cint =
     rate = parseFloat(s.strip(leading = false, chars = {'k'}))
   except ValueError:
     error &"Invalid audioRate: '{s}'"
-  cint(round(rate * (if s.endsWith('k'): 1000.0 else: 1.0)))
+  let hz = round(rate * (if s.endsWith('k'): 1000.0 else: 1.0))
+  # `not (a and b)` so NaN fails too.
+  if not (hz >= 1.0 and hz <= high(cint).float64):
+    error &"Invalid audioRate: '{s}'"
+  cint(hz)
 
 proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
   ## Read a .fcpxml file, or the Info.fcpxml in a .fcpxmld bundle.
@@ -323,10 +329,14 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
   if fdNum <= 0 or fdDen <= 0:
     error &"Invalid frameDuration: '{fd}'"
   let g = gcd(fdNum, fdDen)
+  if fdNum div g > high(cint) or fdDen div g > high(cint):
+    error &"Invalid frameDuration: '{fd}'"
   r.tb = AVRational(num: cint(fdDen div g), den: cint(fdNum div g))
 
   let w = (try: parseInt(format.attr("width")) except ValueError: 1920)
   let h = (try: parseInt(format.attr("height")) except ValueError: 1080)
+  if w < 1 or w > high(int32) or h < 1 or h > high(int32):
+    error &"Invalid format size: {w}x{h}"
 
   var spine: XmlNode = nil
   for c in sequence:

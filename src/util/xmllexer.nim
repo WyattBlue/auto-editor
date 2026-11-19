@@ -229,12 +229,14 @@ proc parseEntity(L: var XmlLexer, dest: var string) =
         of 'a'..'f': r = (r shl 4) or (ord(L.buf[pos]) - ord('a') + 10)
         of 'A'..'F': r = (r shl 4) or (ord(L.buf[pos]) - ord('A') + 10)
         else: break
+        r = min(r, 0x110000)
         inc pos
     else:
       while L.buf[pos] in {'0'..'9'}:
-        r = r * 10 + (ord(L.buf[pos]) - ord('0'))
+        r = min(r * 10 + (ord(L.buf[pos]) - ord('0')), 0x110000)
         inc pos
-    dest.add toUTF8(Rune(r))
+    # Nothing is past U+10FFFF; the replacement character stands in.
+    dest.add toUTF8(Rune(if r > 0x10FFFF: 0xFFFD else: r))
   elif L.buf[pos] == 'l' and L.buf[pos + 1] == 't' and L.buf[pos + 2] == ';':
     dest.add '<'
     inc(pos, 2)

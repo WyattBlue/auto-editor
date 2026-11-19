@@ -1,5 +1,5 @@
 import std/[algorithm, sequtils, strformat, strutils, tables]
-from std/math import round
+from std/math import classify, fcInf, fcNan, fcNegInf, round
 
 import ../[action, ffmpeg, log, timeline]
 import ../util/[color, fun, rational, xml]
@@ -22,6 +22,10 @@ func readTbNtsc(tb: int, ntsc: bool): AVRational =
     return tb.int64 * AVRational(num: 1000, den: 1001)
   return AVRational(num: tb.cint, den: 1)
 
+# Frame counts past this (thousands of years) are garbage; capping them lets
+# start, in, and extensions be summed without overflow.
+const maxFrames = 1'i64 shl 40
+
 proc xmlInt(node: XmlNode, lo = low(int64), hi = high(int64)): int64 =
   let s = node.innerText.strip()
   result = try: parseBiggestInt(s)
@@ -33,7 +37,9 @@ func num(s: string): (bool, float) =
   case s.strip()
   of "TRUE": return (true, 1.0)
   of "FALSE": return (true, 0.0)
-  try: (true, parseFloat(s.strip()))
+  try:
+    let v = parseFloat(s.strip())
+    if v.classify in {fcNan, fcInf, fcNegInf}: (false, 0.0) else: (true, v)
   except ValueError: (false, 0.0)
 
 func readParam(parmNode: XmlNode): (string, seq[(float, float)]) =
@@ -203,8 +209,8 @@ proc readTransition(node: XmlNode, audio: bool): Transition =
   for c in node:
     if c.kind != xnElement: continue
     case c.tag
-    of "start": startVal = xmlInt(c, lo = 0)
-    of "end": endVal = xmlInt(c, lo = 0)
+    of "start": startVal = xmlInt(c, 0, maxFrames)
+    of "end": endVal = xmlInt(c, 0, maxFrames)
     of "effect":
       # An unknown transition plays as a dissolve.
       for f in c:
@@ -311,10 +317,10 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       if ci.kind != xnElement: continue
       case ci.tag
       # -1 marks a start or end inside a transition.
-      of "start": startVal = xmlInt(ci, lo = -1)
-      of "end": endVal = xmlInt(ci, lo = -1)
-      of "in": inVal = xmlInt(ci, lo = 0)
-      of "out": outVal = xmlInt(ci, lo = -1)
+      of "start": startVal = xmlInt(ci, -1, maxFrames)
+      of "end": endVal = xmlInt(ci, -1, maxFrames)
+      of "in": inVal = xmlInt(ci, 0, maxFrames)
+      of "out": outVal = xmlInt(ci, -1, maxFrames)
       of "pproTicksIn": ticksIn = xmlInt(ci, lo = 0)
       of "pproTicksOut": ticksOut = xmlInt(ci, lo = 0)
       of "file": fileNode = ci
