@@ -2118,6 +2118,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     result = g.pull()
     g.cleanup()
 
+  proc scaleProxyFrame(f: ptr AVFrame): ptr AVFrame =
+    if scaleCtx == nil or f == nil or
+        (f.width == targetWidth and f.height == targetHeight):
+      return f
+    f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
+
   proc finalizeFrame(f: ptr AVFrame; index: int64): ptr AVFrame =
     var frame = f
     if frame != nil and (frame.width <= 0 or frame.height <= 0):
@@ -2128,6 +2134,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         else: av_frame_clone(nullFrame)
       if frame == nil:
         error &"Failed to create fallback frame at {index}tb"
+      let scaled = scaleProxyFrame(frame)
+      if scaled != frame:
+        av_frame_free(addr frame)
+        frame = scaled
     if args.videoHook != nil:
       frame = args.videoHook(frame, args.videoHookData)
     let reformatted = frame.reformat(pix_fmt, ctx = reformatCtx)
@@ -2138,12 +2148,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     frame.time_base = av_inv_q(tl.tb)
     frame.duration = 1
     result = frame
-
-  proc scaleProxyFrame(f: ptr AVFrame): ptr AVFrame =
-    if scaleCtx == nil or f == nil or
-        (f.width == targetWidth and f.height == targetHeight):
-      return f
-    f.reformat(AVPixelFormat(f.format), targetWidth, targetHeight, scaleCtx)
 
   proc baseFrame(o: VideoFrame): ptr AVFrame =
     ## The bottom layer's picture: fit to the canvas over the background.
@@ -2430,10 +2434,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           # the last frame for RGB8 palette persistence) and drop the fallback.
           av_frame_free(addr decoded)
 
-      let scaledFrame = scaleProxyFrame(frame)
-      if scaledFrame != frame:
-        av_frame_free(addr frame)
-        frame = scaledFrame
+      # Effects take canvas pixels, so they run at the canvas size and the
+      # proxy scale comes after, as when compositing. A clip with no frame
+      # here leaves the proxy-sized nullFrame.
+      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0 and
+          (frame.width.int32, frame.height.int32) != tl.res:
+        let oldFrame = frame
+        frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
+        av_frame_free(addr oldFrame)
 
       # Cache the pre-effects frame: effects are per-timeline-frame (animated
       # via `local`) and would compound when a source frame repeats.
@@ -2445,6 +2453,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
         frame = applyEffects(frame, objList[0].effects, objList[0].local,
           objList[0].dur, src = objList[0].src, srcSecs = objList[0].srcSecs)
+
+      let scaledFrame = scaleProxyFrame(frame)
+      if scaledFrame != frame:
+        av_frame_free(addr frame)
+        frame = scaledFrame
 
       frame = finalizeFrame(frame, index)
 
