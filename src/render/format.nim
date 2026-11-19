@@ -564,7 +564,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   # Process subtitle streams
   if includeSubtitle:
     for i in 0..<subtitleStreams.len:
-      remuxSubtitles(tl.s[i], subtitleStreams[i], output, tl.tb)
+      remuxSubtitles(tl.s[i], tl.effects, subtitleStreams[i], output, tl.tb)
     for (i, stream, ctx) in captionStreams:
       writeCaptions(tl.c[i], ctx, stream, output, tl.tb)
   for (_, _, ctx) in captionStreams:

@@ -54,6 +54,16 @@ func mediaAt*(m: SpeedMap, t: float64): float64 =
   let f = (if span > 0: (t - m.tau[i]) / span else: 0.0)
   (i.float64 + f) / speedSteps
 
+func timeAt*(m: SpeedMap, u: float64): float64 =
+  ## The inverse of `mediaAt`: how far through the clip's time (as a fraction)
+  ## it is when `u` of the way through its media.
+  if not m.ramp: return u
+  if u <= 0: return u / (m.first * m.scale)
+  if u >= 1: return 1 + (u - 1) / (m.last * m.scale)
+  let x = u * speedSteps
+  let i = min(int(x), speedSteps - 1)
+  m.tau[i] + (m.tau[i + 1] - m.tau[i]) * (x - i.float64)
+
 func mediaAt(points: seq[(float64, float64)], time: float64): float64 =
   ## A time map's media time at a clip time, straight between its points and
   ## at the last slope past them.

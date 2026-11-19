@@ -1,6 +1,7 @@
-import std/[strformat, strutils]
+import std/[math, strformat, strutils]
 
-import ../[av, log, ffmpeg, timeline]
+import ../[action, av, log, ffmpeg, timeline]
+import ../lib/speedmap
 import ../util/rational
 
 # Remux subtitle packets from each clip's source onto the cut timeline,
@@ -9,8 +10,17 @@ import ../util/rational
 # a cut-out is shortened, so subtitles stay in sync with the edited video
 # instead of dropping or bleeding over. Works for text subs (SRT/ASS/WebVTT);
 # bitmap subs (DVD/PGS) pass through with adjusted timing only.
-proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
-    output: var OutputContainer, timelineTb: AVRational) =
+proc toTimeline(clip: Clip, map: SpeedMap, media: float64): int64 =
+  ## The timeline frame showing `media`, a position in the clip's source as
+  ## timeline frames from the source's start.
+  let local = media / map.mean - clip.offset.float64
+  let t = (if map.ramp and clip.dur > 0:
+    clip.dur.float64 * map.timeAt(local / clip.dur.float64) else: local)
+  clip.start + int64(round(t))
+
+proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
+    outputStream: ptr AVStream, output: var OutputContainer,
+    timelineTb: AVRational) =
   ## Packets can't be converted here, so a clip whose stream isn't the
   ## output's codec is left out, with a warning once per file.
   if layer.len == 0:
@@ -48,12 +58,17 @@ proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
           $avcodec_get_name(outputStream.codecpar.codec_id) & "; left out"
       continue
     var srcTb = stream.time_base
+    let srcStart = srcContainer.startPts(stream)
+    # `offset` and `dur` count speed-scaled frames; the media they cover is
+    # `mean` times longer.
+    let map = initSpeedMap(effects[clip.effects])
+    let ticksPerFrame = frameTb.float64 / srcTb.float64
 
     # The clip selects source interval [clipStartSrc, clipEndSrc) in source ticks.
-    let clipStartSrc = av_rescale_q(clip.offset, frameTb, srcTb) +
-      srcContainer.startPts(stream)
-    let clipEndSrc = av_rescale_q(clip.offset + clip.dur, frameTb, srcTb) +
-      srcContainer.startPts(stream)
+    let clipStartSrc = srcStart +
+      int64(round(clip.offset.float64 * map.mean * ticksPerFrame))
+    let clipEndSrc = srcStart +
+      int64(round((clip.offset + clip.dur).float64 * map.mean * ticksPerFrame))
 
     # Seek backward so a cue already on screen at the cut-in is read too.
     # A later clip needs the seek even at source position 0, since the
@@ -102,8 +117,8 @@ proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
 
       # Intersect cue with the window, then map source -> timeline frames -> output.
       let visStart = max(cueStart, clipStartSrc)
-      let startFrame = clip.start +
-        av_rescale_q(visStart - clipStartSrc, srcTb, frameTb)
+      let startFrame = clip.toTimeline(map,
+        float64(visStart - srcStart) / ticksPerFrame)
       let newPts = av_rescale_q(startFrame, frameTb, outTb)
 
       var outPacket: AVPacket
@@ -115,7 +130,7 @@ proc remuxSubtitles*(layer: seq[Clip], outputStream: ptr AVStream,
       outPacket.dts = newPts # subtitle streams have no reordering; keep dts == pts
       if hasDur:
         let visEnd = min(cueEnd, clipEndSrc)
-        let endFrame = clip.start + av_rescale_q(visEnd - clipStartSrc, srcTb, frameTb)
+        let endFrame = clip.toTimeline(map, float64(visEnd - srcStart) / ticksPerFrame)
         outPacket.duration = max(1'i64, av_rescale_q(endFrame, frameTb, outTb) - newPts)
 
       output.mux(outPacket)
@@ -165,7 +180,7 @@ proc writeCaptions*(track: CaptionTrack, ctx: ptr AVCodecContext,
     av_packet_unref(addr packet)
 
 proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
-    timelineTb: AVRational) =
+    effects: seq[Actions], timelineTb: AVRational) =
   ## Write every subtitle stream in a sidecar file, retimed to `layer`.
   let source = (try: av.open(sourcePath) except IOError as e: error e.msg)
   defer: source.close()
@@ -184,6 +199,6 @@ proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
     for clip in subtitleLayer.mitems:
       clip.src = addr sidecar
       clip.stream = i.int16
-    remuxSubtitles(subtitleLayer, outputStream, output, timelineTb)
+    remuxSubtitles(subtitleLayer, effects, outputStream, output, timelineTb)
 
   output.close()

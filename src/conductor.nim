@@ -840,7 +840,7 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
           else: (outDir / subName) & "_ALTERED" & subExt
         if altered == sibling:
           altered = (subDir / subName) & "_ALTERED" & subExt
-      makeAlteredSubtitle(sibling, altered, inputLayer, tlV3.tb)
+      makeAlteredSubtitle(sibling, altered, inputLayer, tlV3.effects, tlV3.tb)
 
   bar.destroy()
 
