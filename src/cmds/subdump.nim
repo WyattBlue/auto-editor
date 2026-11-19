@@ -2,15 +2,20 @@ import std/[json, os, strutils]
 
 import ../[av, cli, ffmpeg, log]
 import ./help
+import ../util/rational
 
 assertArgumentOptions(subdumpOptions, {})
 
 iterator subtitleEvents(container: InputContainer, stream: cint):
     tuple[start, finish: float64, ass: string] =
   ## Each text event of subtitle `stream`, from where the demuxer is, with
-  ## its times in seconds.
+  ## its times in seconds from the container's start, as the editor counts.
   let formatCtx = container.formatContext
   let tbSeconds = formatCtx.streams[stream].time_base.toDouble
+  # Subtracted as integers: float seconds this large lose the low digits.
+  let startPts = container.startPts(formatCtx.streams[stream])
+  let startUs = av_rescale_q(startPts, formatCtx.streams[stream].time_base,
+    AVRational(num: 1, den: AV_TIME_BASE))
   var codecCtx = initDecoder(formatCtx.streams[stream].codecpar)
   defer: avcodec_free_context(addr codecCtx)
   var subtitle: AVSubtitle
@@ -28,8 +33,9 @@ iterator subtitleEvents(container: InputContainer, stream: cint):
     # that base; some codecs (e.g. mov_text) instead carry the duration on
     # the packet.
     let base =
-      if subtitle.pts != AV_NOPTS_VALUE: subtitle.pts.float / AV_TIME_BASE.float
-      elif pkt.pts != AV_NOPTS_VALUE: pkt.pts.float * tbSeconds
+      if subtitle.pts != AV_NOPTS_VALUE:
+        float(subtitle.pts - startUs) / AV_TIME_BASE.float
+      elif pkt.pts != AV_NOPTS_VALUE: float(pkt.pts - startPts) * tbSeconds
       else: 0.0
     let start = base + subtitle.start_display_time.float / 1000.0
     let finish =
