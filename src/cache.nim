@@ -33,6 +33,8 @@ proc procTag(path: AbsPath, tb: AVRational, kind, args: string): string =
 # is simply recomputed rather than misread.
 proc saveCache[T](filename: string, data: seq[T]) =
   let fs = newFileStream(filename, fmWrite)
+  if fs == nil:
+    raise newException(IOError, "cannot open " & filename)
   defer: fs.close()
 
   fs.write(uint8(codecOf(T)))
@@ -114,9 +116,16 @@ proc writeCache*[T](data: seq[T], tb: AVRational, path, kind, args: string) =
   except OSError:
     discard
 
+  # The cache is optional: a failed write costs only the next run's analysis.
+  var filename = ""
   try:
-    saveCache(cacheFilePath(path.absPath, tb, kind, args), data)
-  except Exception as e:
-    error &"Cache write failed: {e.msg}"
+    filename = cacheFilePath(path.absPath, tb, kind, args)
+    saveCache(filename, data)
+  except CatchableError as e:
+    warning &"Cache write failed: {e.msg}"
+    # A partial file would only fail to load later; don't leave it.
+    if filename != "":
+      try: removeFile(filename)
+      except OSError: discard
 
   pruneCache(workdir)
