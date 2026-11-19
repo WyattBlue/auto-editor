@@ -153,8 +153,8 @@ let alsa = Package(
 )
 let libvpl = Package(
   name: "libvpl",
-  sourceUrl: "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
-  sha256: "d60931937426130ddad9f1975c010543f0da99e67edb1c6070656b7947f633b6",
+  sourceUrl: "https://github.com/intel/libvpl/archive/refs/tags/v2.17.0.tar.gz",
+  sha256: "4de3e2faf1e8307fb282e4a43f443191810f6a6b0a484fffa7995ba1c814c6ec",
   buildSystem: "cmake",
   buildArguments: @[
     "-DINSTALL_LIB=ON",
@@ -328,7 +328,7 @@ func dirName(package: Package): string =
   if package.name == "libvpx":
     return "libvpx-1.17.0"
   if package.name == "libvpl":
-    return "libvpl-2.16.0"
+    return "libvpl-2.17.0"
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "amf-headers":
