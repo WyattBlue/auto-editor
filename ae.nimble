@@ -243,7 +243,7 @@ let x265 = Package(
 )
 let zlib = Package(
   name: "zlib",
-  sourceUrl: "https://zlib.net/zlib-1.4.tar.gz",
+  sourceUrl: "https://zlib.net/fossils/zlib-1.4.tar.gz",
   sha256: "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
   ffFlag: "--enable-zlib",
 )
