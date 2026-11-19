@@ -396,7 +396,9 @@ proc extract(package: Package) =
   ## Extract and patch `package` unless its tree came from this tarball and
   ## patch, as recorded in the tree's stamp file.
   let patchFile = &"../patches/{package.name}.patch"
-  var stamp = &"sha256 {package.sha256}\n"
+  # The first line marks how the tree was extracted. Trees from `tar -m`, whose
+  # equal mtimes make autotools regenerate configure, lack it.
+  var stamp = &"extract 2\nsha256 {package.sha256}\n"
   if fileExists(patchFile):
     stamp &= &"patch {getFileHash(absolutePath(patchFile))}\n"
   let stampFile = package.name / ".ae-extracted"
@@ -408,9 +410,9 @@ proc extract(package: Package) =
     return
 
   dropBuilds(package.name)
-  # -m: the files get the time of extraction, not the tarball's, so make and
-  # ninja can't take an older version's objects as newer than them.
-  let tarArgs = (if package.location.endsWith("bz2"): "xjmf" else: "xmf")
+  # Keep the tarball's mtimes: autotools packages ship generated files newer
+  # than their inputs. dropBuilds already removed any older version's objects.
+  let tarArgs = (if package.location.endsWith("bz2"): "xjf" else: "xf")
   exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
   if fileExists(patchFile):
     let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
