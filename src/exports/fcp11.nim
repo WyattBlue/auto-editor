@@ -174,15 +174,15 @@ proc anchorCaptions(asset: XmlNode, tl: v3, orders: seq[CueOrder], clip: Clip,
       asset.add caption
 
 proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
-    ptrToIdx: Table[ptr string, int], projName: string, srcDur: int,
-    clip: Clip): (XmlNode, int64) =
+    ptrToIdx: Table[ptr string, int], clip: Clip): (XmlNode, int64) =
   ## The clip's element, and its media's start point.
   let i = ptrToIdx.getOrDefault(clip.src)
   let startPoint = parseSMPTE(sources[i].timecode, tl.tb)
+  let srcDur = int(sources[i].duration * tl.tb)
 
   let asset = newElement("asset-clip")
   asset.attrs = {
-    "name": projName,
+    "name": agSplitFile(sources[i].path).name,
     "ref": "r" & $(i * 2 + 2),
     "offset": fraction(clip.start, tl.tb),
     "duration": fraction(clip.dur, tl.tb),
@@ -251,7 +251,6 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
   let resources = newElement("resources")
   fcpxml.add(resources)
 
-  var srcDur = 0
   var projName: string
   var ptrToIdx = initTable[ptr string, int]()
 
@@ -269,7 +268,6 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
 
     if i == 0:
       projName = agSplitFile(mi.path).name
-      srcDur = assetDur
 
     let id = "r" & $(i * 2 + 1)
     let width = $tl.res[0]
@@ -335,7 +333,7 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
     for i in countdown(tl.a.len - 1, 1):
       for clip in tl.a[i]:
         if clip.src != nil:
-          discard spine.makeClip(tl, sources, ptrToIdx, projName, srcDur, clip)
+          discard spine.makeClip(tl, sources, ptrToIdx, clip)
 
   let plan = transitionPlan(clips, transitions)
   let orders = cueOrders(tl)
@@ -347,8 +345,7 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
       if plan[i].incoming >= 0 and
           transitions[plan[i].incoming].alignment == taStart:
         spine.addTransition(tl, dissolveId, transitions[plan[i].incoming])
-      let (asset, startPoint) = spine.makeClip(tl, sources, ptrToIdx, projName,
-        srcDur, clip)
+      let (asset, startPoint) = spine.makeClip(tl, sources, ptrToIdx, clip)
       # Cues up to the next clip with media belong to this one: a gap writes
       # no element, and cues before the first clip or after the last are
       # those clips' too.
