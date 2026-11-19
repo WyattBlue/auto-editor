@@ -132,6 +132,11 @@ pc += num;
 #define REL(at, to) (to - at - 2)
 #define EMIT(at, byte) (code ? (code[at] = byte) : at)
 #define PC (prog->unilen)
+/* Caps the code size so counting it can't overflow an int. */
+#define MAX_CODE (1 << 20)
+/* re_pikevm keeps its thread lists on the stack; the wasm build's is 1 MiB. */
+#define MAX_MATCH_STACK (256 * 1024)
+#define ALT_MAX 4096
 
 static int re_classmatch(const int *pc, int c, int insensitive)
 {
@@ -217,8 +222,8 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
   int *code = sizecode ? NULL : prog->insts;
   int start = PC, term = PC;
   int alt_label = 0, c;
-  int alt_stack[4096], altc = 0;
-  int cap_stack[4096 * 5], capc = 0;
+  int alt_stack[ALT_MAX], altc = 0;
+  int cap_stack[ALT_MAX * 5], capc = 0;
   int n, ch;
 
   while (*re) {
@@ -323,6 +328,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
         EMIT(PC++, SAVE);
         EMIT(PC++, sub);
       }
+      if (capc + 5 > ALT_MAX * 5) return -1;
       cap_stack[capc++] = capture;
       cap_stack[capc++] = term;
       cap_stack[capc++] = alt_label;
@@ -385,6 +391,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       // {0}, {0,}, {0,2}
       // {1}, {1,}, {1,3}
       for (int i = 0; i < mincnt - 1; i++) {
+        if (PC > MAX_CODE) return -1;
         if (code)
           memcpy(&code[PC], &code[term], size*sizeof(int));
         PC += size;
@@ -397,6 +404,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       else if (maxcnt > 0) {
         int diff = mincnt == 0 ? 1 : 0;
         for (int i = maxcnt - mincnt - diff; i > 0; i--) {
+          if (PC > MAX_CODE) return -1;
           EMIT(PC++, split);
           EMIT(PC++, REL(PC, PC+((size+2)*i)));
           if (code)
@@ -439,8 +447,10 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       break;
     case '|':
-      if (alt_label)
+      if (alt_label) {
+        if (altc >= ALT_MAX) return -1;
         alt_stack[altc++] = alt_label;
+      }
       INSERT_CODE(start, 2, PC);
       EMIT(PC++, JMP);
       alt_label = PC++;
@@ -453,6 +463,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       break;
     }
+    if (PC > MAX_CODE) return -1;
     c = uc_len(re, utf8); re += c;
   }
   if (code && alt_label) {
@@ -515,7 +526,11 @@ int re_comp(rcode *prog, const char *re, int nsubs, int utf8)
   prog->splits = (scnt - SPLIT) / 2;
   prog->len = icnt + 2;
   prog->presub = sizeof(rsub)+(sizeof(char*) * (nsubs + 1) * 2);
-  prog->sub = prog->presub * (prog->len - prog->splits + 3);
+  long long subsz = (long long)prog->presub * (prog->len - prog->splits + 3);
+  long long stack = subsz + (long long)prog->splits * (sizeof(int*) + sizeof(rsub*)) +
+    (long long)scnt * sizeof(unsigned int) + 2LL * prog->len * sizeof(rthread);
+  if (stack > MAX_MATCH_STACK) return -1;
+  prog->sub = (int)subsz;
   prog->sparsesz = scnt;
   return 0;
 }
