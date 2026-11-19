@@ -195,6 +195,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       if snapped != tl.sr:
         debug &"opus: snapping sample rate {tl.sr} -> {snapped}"
         tl.sr = snapped
+        renderTl.sr = snapped
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
