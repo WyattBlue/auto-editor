@@ -35,12 +35,24 @@ proc saveCache[T](filename: string, data: seq[T]) =
   let fs = newFileStream(filename, fmWrite)
   if fs == nil:
     raise newException(IOError, "cannot open " & filename)
-  defer: fs.close()
 
-  fs.write(uint8(codecOf(T)))
-  fs.write(data.len.int32)
-  if data.len > 0:
-    fs.writeData(unsafeAddr data[0], data.len * sizeof(T))
+  try:
+    fs.write(uint8(codecOf(T)))
+    fs.write(data.len.int32)
+    if data.len > 0:
+      fs.writeData(unsafeAddr data[0], data.len * sizeof(T))
+    fs.close()
+    # close ignores fclose's result, so the last buffered chunk can be lost
+    # to a full disk without an error; only the size shows it.
+    if getFileSize(filename) != 5 + data.len * sizeof(T):
+      raise newException(IOError, "short write")
+  except CatchableError:
+    fs.close() # a no-op if already closed
+    # Only a file this call opened: a failed open may be another run's entry.
+    # A partial one would only fail to load later.
+    try: removeFile(filename)
+    except OSError: discard
+    raise
 
 proc loadCache[T](filename: string): seq[T] =
   var f: File
@@ -117,15 +129,9 @@ proc writeCache*[T](data: seq[T], tb: AVRational, path, kind, args: string) =
     discard
 
   # The cache is optional: a failed write costs only the next run's analysis.
-  var filename = ""
   try:
-    filename = cacheFilePath(path.absPath, tb, kind, args)
-    saveCache(filename, data)
+    saveCache(cacheFilePath(path.absPath, tb, kind, args), data)
   except CatchableError as e:
     warning &"Cache write failed: {e.msg}"
-    # A partial file would only fail to load later; don't leave it.
-    if filename != "":
-      try: removeFile(filename)
-      except OSError: discard
 
   pruneCache(workdir)
