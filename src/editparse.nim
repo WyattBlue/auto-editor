@@ -25,6 +25,9 @@ proc bindEditArgs*(expressions: openArray[Expr], text: string,
     if expr.kind == ExprList and expr.elements.len > 0 and
         expr.elements[0].symbolEquals(text, "="):
       let node = expr.elements
+      if node.len != 3:
+        raise newException(ValueError,
+          &"{name}: a keyword argument takes a key and a value")
       sawKeyword = true
       position = -1
       for i, name in argOrder:
