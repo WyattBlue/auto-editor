@@ -91,7 +91,7 @@ proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
   if vals.len == 1:
     vals.add vals[0]
   if vals.len != 2:
-    error &"--{opt} has too many arguments."
+    error &"{opt} has too many arguments."
   if "end" in vals:
     error "Invalid number: 'end'"
   if "start" in vals:
@@ -118,9 +118,9 @@ proc parseTransition(val: string): (TransitionKind, PackedInt, PackedInt) =
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len < 2:
-    error &"--{opt} has too few arguments"
+    error &"{opt} has too few arguments"
   if vals.len > 2:
-    error &"--{opt} has too many arguments"
+    error &"{opt} has too many arguments"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
 proc parseNum(val, opt: string): float64 =
@@ -130,22 +130,22 @@ proc parseNum(val, opt: string): float64 =
   elif unit == "":
     result = num
   else:
-    error &"--{opt} has unknown unit: {unit}"
+    error &"{opt} has unknown unit: {unit}"
 
 proc parseResolution(val, opt: string): (int32, int32) =
   let vals = val.strip().split(",")
   if len(vals) != 2:
-    error &"'{val}': --{opt} takes two numbers"
+    error &"'{val}': {opt} takes two numbers"
 
   var a, b: int
   let s0 = vals[0].strip()
   let s1 = vals[1].strip()
   if parseSaturatedNatural(s0, a) != s0.len or parseSaturatedNatural(s1, b) != s1.len:
-    error &"'{val}': --{opt} takes two numbers"
+    error &"'{val}': {opt} takes two numbers"
   if a < 2 or b < 2 or ((a or b) and 1) != 0:
-    error &"--{opt} must be even and >= 2"
+    error &"{opt} must be even and >= 2"
   if a > high(int32) or b > high(int32):
-    error &"--{opt} got an invalid/too high number"
+    error &"{opt} got an invalid/too high number"
   return (a.int32, b.int32)
 
 proc parseSampleRate(val: string): cint =
@@ -363,7 +363,7 @@ proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   if vals.len > 3:
     error "--set-speed has too many arguments"
 
-  let speed = parseSpeed(vals[0], "set-speed")
+  let speed = parseSpeed(vals[0], "--set-speed")
   let action = actionFromUserSpeed(speed)
   return (action, parseTime(vals[1]), parseTime(vals[2]))
 
@@ -453,6 +453,8 @@ judge making cuts.
   var audio = AudioSettings()
   var showVersion: bool = false
   var expecting = coNone
+  # The option as typed, for messages: `expecting` can't tell -c:v from --vcodec.
+  var expectingKey = ""
   # Label for a pending "edit"/"when" value (plain --edit => 1).
   var expectingLabel: int = 1
   var parseOptions = true
@@ -480,8 +482,10 @@ judge making cuts.
         if lf.matched:
           expecting = lf.kind
           expectingLabel = lf.label
+          expectingKey = key
           continue
         if genCliMacro(key, args, mainOptions):
+          expectingKey = key
           continue
         if key in ["-h", "--help"]:
           printHelp()
@@ -491,7 +495,7 @@ judge making cuts.
       printHelp()
     elif key.startsWith("--") or isKnownOption(key) or
         parseLabeledFlag(key).matched:
-      error &"--{expecting} needs argument, got option: {key}"
+      error &"{expectingKey} needs argument, got option: {key}"
     case expecting
     of coNone:
       args.inputs.add key
@@ -522,17 +526,17 @@ judge making cuts.
         replaceAction(args.whenActive, parseActions(rest))
     of coSilentSpeed:
       replaceAction(args.whenInactive,
-        actionFromUserSpeed(parseSpeed(key, $expecting)))
+        actionFromUserSpeed(parseSpeed(key, expectingKey)))
     of coVideoSpeed:
       replaceAction(args.whenActive,
-        actionFromUserSpeed(parseSpeed(key, $expecting)))
+        actionFromUserSpeed(parseSpeed(key, expectingKey)))
     of coAddIn:
       block:
-        let span = parseTimeRange(key, $expecting)
+        let span = parseTimeRange(key, expectingKey)
         args.setAction.add (aNil, span[0], span[1])
     of coCutOut:
       block:
-        let span = parseTimeRange(key, $expecting)
+        let span = parseTimeRange(key, expectingKey)
         args.setAction.add (aCut, span[0], span[1])
     of coSetSpeed:
       args.setAction.add parseSpeedRange(key)
@@ -545,12 +549,12 @@ judge making cuts.
     of coYtDlpExtras:
       args.ytDlpExtras = key
     of coScale:
-      video.scale = parseNum(key, $expecting)
+      video.scale = parseNum(key, expectingKey)
       video.scaleSet = true
     of coFont:
       fallbackFont = key
     of coResolution:
-      args.resolution = parseResolution(key, $expecting)
+      args.resolution = parseResolution(key, expectingKey)
       args.resolutionSet = true
     of coBackground:
       try: args.background = some(parseColor(key))
@@ -594,9 +598,9 @@ judge making cuts.
       except ValueError:
         error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
     of coMargin:
-      args.margin = parseTwoLengths(key, $expecting)
+      args.margin = parseTwoLengths(key, expectingKey)
     of coSmooth:
-      args.smooth = parseTwoLengths(key, $expecting)
+      args.smooth = parseTwoLengths(key, expectingKey)
     of coTransition:
       (args.transitionKind, args.transition, args.transitionMinCut) =
         parseTransition(key)
@@ -608,7 +612,7 @@ judge making cuts.
     expectingLabel = 1
 
   if expecting != coNone:
-    error &"--{expecting} needs argument."
+    error &"{expectingKey} needs argument."
 
   if showVersion:
     echo version

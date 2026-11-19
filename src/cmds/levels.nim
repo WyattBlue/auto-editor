@@ -237,7 +237,7 @@ proc main*(strArgs: seq[string]) =
     expecting = coNone
 
   if expecting != coNone:
-    error &"--{expecting} needs argument."
+    error &"{expectingKey} needs argument."
 
   if display notin ["float", "d16"]:
     error &"Unknown display format: {display}"

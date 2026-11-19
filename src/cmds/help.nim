@@ -43,6 +43,7 @@ template parseArgs*(args: seq[string], opts: seq[OptDef], usage: string,
   ## what marks an unrecognized argument as a mistyped option rather than a
   ## positional; subcommands whose positionals never start with `-` pass "-".
   var expecting {.inject.} = coNone
+  var expectingKey {.inject.} = "" # the option as typed, for messages
   var parseOptions = true
   for key {.inject.} in args:
     if parseOptions and expecting == coNone and key == "--":
@@ -50,6 +51,7 @@ template parseArgs*(args: seq[string], opts: seq[OptDef], usage: string,
       continue
     if parseOptions:
       if genCliMacro(key, args, opts):
+        expectingKey = key
         continue
       if key in ["-h", "--help"]:
         printHelp(usage, opts)
