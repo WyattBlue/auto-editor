@@ -880,6 +880,16 @@ proc parsePolyMask(parts: seq[string], kind: ActionKind,
   result.mFeather = feather
   result.mInvert = inv
 
+func checkSpeed(name: string, v: float32) {.raises: [ActionParseError].} =
+  # `not (a and b)` instead of `<= or >=` so NaN fails the check too;
+  # speed <= 0 makes the renderer's atempo decomposition loop forever.
+  if name == "varispeed":
+    # The renderer's asetrate holds varispeed to this range.
+    if not (v >= 0.2'f32 and v <= 100.0'f32):
+      raise newException(ActionParseError, "varispeed must be in range [0.2, 100.0]")
+  elif not (v > 0.0'f32 and v < 99999.0'f32):
+    raise newException(ActionParseError, &"{name} must be in range (0, 99999)")
+
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
     return Action(kind: actInvert)
@@ -1288,11 +1298,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       (".." in parts[1] or '@' in parts[1] or parts.len > 2):
     # A ramp across the section's media: speed:1..8, speed:1@0%..4@50%..1
     let (kf, kt) = parseRamp(parts[1])
-    let hi = (if parts[0] == "varispeed": 100.0'f32 else: 99999.0'f32)
-    let lo = (if parts[0] == "varispeed": 0.2'f32 else: 0.0'f32)
     for v in kf:
-      if not (v > lo and v < hi) and not (parts[0] == "varispeed" and v == lo):
-        raise newException(ActionParseError, &"{parts[0]} must be in range ({lo}, {hi})")
+      checkSpeed(parts[0], v)
     for t in kt:
       if t.unit notin {kuAuto, kuPercent}:
         raise newException(ActionParseError,
@@ -1315,10 +1322,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     let effectVal = pFloat(parts[1])
     case effectType
     of "speed", "varispeed":
-      # `not (a and b)` instead of `<= or >=` so NaN fails the check too;
-      # speed <= 0 makes the renderer's atempo decomposition loop forever.
-      if not (effectVal > 0.0 and effectVal < 99999.0):
-        raise newException(ActionParseError, &"{effectType} must be in range (0, 99999)")
+      checkSpeed(effectType, effectVal)
       return Action(kind: actSpeed, val: effectVal,
         varispeed: effectType == "varispeed")
     of "pitch":
