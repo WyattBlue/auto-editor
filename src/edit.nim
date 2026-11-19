@@ -417,7 +417,7 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
     of ekNone:
       return newSeqWith(frameCount(container, tb), true)
     of ekAll:
-      return @[]
+      return newSeq[bool](frameCount(container, tb))
 
 proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
     tb: AVRational, bar: Bar): seq[uint8] =
