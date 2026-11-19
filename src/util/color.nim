@@ -70,7 +70,9 @@ func findColor(name: string): RGBColor {.raises: [ValueError].} =
 func parseColor*(hexString: string): RGBColor {.raises: [ValueError].} =
   if hexString.toLowerAscii.startsWith("yuv#"):
     let hexValue = hexString.substr(4)
-    if hexValue.len != 6 or parseHex[uint8](hexValue[0..1], result.red) != 2 or
+    # parseHex skips '_', so it can't reject one on its own.
+    if hexValue.len != 6 or not hexValue.allCharsInSet(HexDigits) or
+        parseHex[uint8](hexValue[0..1], result.red) != 2 or
         parseHex[uint8](hexValue[2..3], result.green) != 2 or
         parseHex[uint8](hexValue[4..5], result.blue) != 2:
       raise newException(ValueError, &"Invalid YUV color: {hexString}. Expected yuv#YYUUVV format.")
@@ -84,6 +86,8 @@ func parseColor*(hexString: string): RGBColor {.raises: [ValueError].} =
       raise newException(ValueError, "Unknown color name: " & hexString)
 
   let hexValue = hexString.substr(1)
+  if not hexValue.allCharsInSet(HexDigits):
+    raise newException(ValueError, &"Invalid hex color: {hexString}")
   case hexValue.len
   of 3:
     if parseHex(hexValue[0] & hexValue[0], result.red) != 2 or
