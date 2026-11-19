@@ -2151,8 +2151,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   proc baseFrame(o: VideoFrame): ptr AVFrame =
     ## The bottom layer's picture: fit to the canvas over the background.
-    var (acc, didDecode) = decodeClipFrame(o)
-    if didDecode and (acc.width.int32, acc.height.int32) != tl.res:
+    # Canvas-sized even with no frame decoded: the stand-in nullFrame is
+    # proxy-sized, and transitions blend it with canvas-sized frames.
+    var (acc, _) = decodeClipFrame(o)
+    if acc != nil and acc.width > 0 and acc.height > 0 and
+        (acc.width.int32, acc.height.int32) != tl.res:
       let oldAcc = acc
       acc = scaleWithPad(acc, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
       av_frame_free(addr oldAcc)
