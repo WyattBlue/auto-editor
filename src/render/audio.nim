@@ -736,6 +736,13 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: sink seq[int16], sourc
 # to/from zero over a few ms removes the discontinuity. ~3 ms is inaudible.
 const audioFadeMs = 3.0
 
+func sourceChannel(srcCh, ch: int): int =
+  ## The source channel that output channel `ch` plays, or -1 for none. A
+  ## mono source is copied to the first two, the front left and right.
+  if srcCh == 1: (if ch < 2: 0 else: -1)
+  elif ch < srcCh: ch
+  else: -1
+
 func clipSpeed(effs: seq[Actions], clip: Clip): float64 =
   result = 1.0
   for e in effs[clip.effects]:
@@ -939,8 +946,10 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           let local = o - cStart
           if local >= avail: break
           let dst = (o - startSample) * targetChannels
-          for ch in 0 ..< min(targetChannels, srcCh):
-            result[dst + ch] += int32(processed[local * srcCh + ch])
+          for ch in 0 ..< targetChannels:
+            let sc = sourceChannel(srcCh, ch)
+            if sc >= 0:
+              result[dst + ch] += int32(processed[local * srcCh + sc])
 
   # Re-runnable streaming producer: yields the assembled, mixed, fade-applied
   # timeline as interleaved int16 chunks of up to `frameSize` sample-frames, in
@@ -1056,8 +1065,10 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
               let gain = min(1.0'f64, min(fadeIn, fadeOut))
               let baseIndex = (outputSampleIndex - bufStart) * targetChannels
               let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
-              for ch in 0 ..< min(targetChannels, sourceChannels):
-                let sourceIndex = i * sourceChannels + ch
+              for ch in 0 ..< targetChannels:
+                let sc = sourceChannel(sourceChannels, ch)
+                if sc < 0: continue
+                let sourceIndex = i * sourceChannels + sc
                 if sourceIndex < processedData.len:
                   acc[baseIndex + ch] += int32(round(processedData[
                       sourceIndex].float32 * gain * dg))
