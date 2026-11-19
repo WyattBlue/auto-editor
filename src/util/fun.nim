@@ -218,6 +218,10 @@ func aspectRatio*(width, height: int, sarNum = 1, sarDen = 1): tuple[w, h: int] 
         bestDrift = drift
         result = (a, b)
 
+const
+  minSampleRate* = 100
+  maxSampleRate* = 768_000 ## the highest PCM rate in use
+
 proc splitNumStr*(val: string): (float64, string) =
   var index = 0
   for char in val:

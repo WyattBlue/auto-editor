@@ -293,7 +293,7 @@ proc parseSampleRate(s: string): cint =
     error &"Invalid audioRate: '{s}'"
   let hz = round(rate * (if s.endsWith('k'): 1000.0 else: 1.0))
   # `not (a and b)` so NaN fails too.
-  if not (hz >= 1.0 and hz <= high(cint).float64):
+  if not (hz >= minSampleRate.float64 and hz <= maxSampleRate.float64):
     error &"Invalid audioRate: '{s}'"
   cint(hz)
 

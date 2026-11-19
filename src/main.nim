@@ -150,14 +150,15 @@ proc parseResolution(val, opt: string): (int32, int32) =
 
 proc parseSampleRate(val: string): cint =
   let (num, unit) = splitNumStr(val)
+  var hz = num
   if unit == "kHz" or unit == "KHz":
-    result = cint(num * 1000)
+    hz = num * 1000
   elif unit notin ["", "Hz"]:
     error &"Unknown unit: '{unit}'"
-  else:
-    result = cint(num)
-  if result < 1:
-    error "Samplerate must be positive"
+  # Checked as a float: converting to cint first would wrap a huge rate.
+  if not (hz >= minSampleRate.float64 and hz <= maxSampleRate.float64):
+    error &"Samplerate must be in range [{minSampleRate}, {maxSampleRate}]: '{val}'"
+  result = cint(hz)
 
 proc frameRateArg(val: string): AVRational =
   result = (try: parseFrameRate(val) except ValueError as e: error e.msg)

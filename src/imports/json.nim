@@ -1,7 +1,7 @@
 import std/[json, strformat]
 
 import ../[action, av, ffmpeg, media, log, timeline]
-import ../util/[color, lang, rational]
+import ../util/[color, fun, lang, rational]
 
 proc parseActionOrErr(val: string): Action {.raises: [AutoEditorError].} =
   try: parseAction(val)
@@ -90,7 +90,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
     error "Invalid timebase json value"
 
   let srVal = jsonNode{"samplerate"}.getInt(0)
-  if srVal > high(cint) or srVal < 100:
+  if srVal < minSampleRate or srVal > maxSampleRate:
     error "Invalid samplerate json value"
   result.sr = srVal.cint
 

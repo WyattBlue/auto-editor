@@ -508,7 +508,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
               for sc in fc:
                 if sc.kind != xnElement: continue
                 if sc.tag == "samplerate":
-                  sr = xmlInt(sc, 1, high(cint)).cint
+                  sr = xmlInt(sc, minSampleRate, maxSampleRate).cint
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
