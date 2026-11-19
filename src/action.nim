@@ -1212,8 +1212,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           nums.add pInt(p, "aberration value")
       if nums.len > 2:
         raise newException(ActionParseError, "aberration takes at most h:v positional shifts")
-      let h = (if nums.len >= 1: nums[0] else: 5)
-      let v = (if nums.len >= 2: nums[1] else: 0)
+      # Range-checked before negating, which overflows on low(int).
+      let h = int(chk(if nums.len >= 1: nums[0] else: 5))
+      let v = int(chk(if nums.len >= 2: nums[1] else: 0))
       rh = h; bh = -h; rv = v; bv = -v
     else:
       for idx in 1 ..< parts.len:
@@ -1272,8 +1273,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     case parts[0]
     of "zoom":
       for v in kf:
-        if v <= 0.0:
-          raise newException(ActionParseError, "zoom value must be greater than 0.0")
+        if v <= 0.0 or v > 100.0:
+          raise newException(ActionParseError, "zoom must be in (0.0, 100.0]")
     of "opacity":
       for v in kf:
         if v < 0.0 or v > 1.0:
@@ -1282,7 +1283,12 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       for v in kf:
         if v < -1.0 or v > 1.0:
           raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
-    else: discard  # blur: any value
+    of "blur":
+      # gblur's sigma tops out at 1024.
+      for v in kf:
+        if v < 0.0 or v > 1024.0:
+          raise newException(ActionParseError, "blur must be in [0.0, 1024.0]")
+    else: discard
 
     result = case parts[0]
       of "zoom": Action(kind: actZoom, kf: kf, kt: kt)
