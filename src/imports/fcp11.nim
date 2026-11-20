@@ -157,6 +157,9 @@ proc place(r: var Reader, n: XmlNode, start: int64): (bool, Placed) =
     r.frames(n.attrSeconds("offset"))
   if dur <= 0 or not (asset.hasVideo or asset.hasAudio):
     return
+  if start < 0:
+    r.dropped.inc "clip before the timeline start"
+    return
   var offset = r.frames(mediaSecs) - r.frames(asset.start)
   let effects = r.clipEffects(n, mediaSecs, dur, offset)
   if offset < 0:
@@ -355,13 +358,15 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
     let start = r.frames(n.attrSeconds("offset") - tcStart)
     case n.tag
     of "asset-clip", "clip":
+      var item = StoryItem(kind: skGap)
       if n.attr("enabled") != "0":
         let (ok, placed) = r.place(n, start)
         if ok:
           if placed.video: video.add placed.clip
           if placed.audio: audio.add placed.clip
-          story.add StoryItem(kind: skClip, start: start,
+          item = StoryItem(kind: skClip, start: start,
             stop: start + placed.clip.dur)
+      story.add item
       r.readConnected(n, start)
     of "gap":
       story.add StoryItem(kind: skGap)
@@ -378,6 +383,9 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
         transition: kind)
     else:
       r.dropped.inc uiName(n.tag)
+      # It still holds its place: a transition beside it isn't beside the
+      # clip before it.
+      story.add StoryItem(kind: skGap)
 
   # A transition sits between the story items it joins; where it starts
   # against their edit point gives its alignment.
