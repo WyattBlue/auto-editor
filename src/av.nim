@@ -865,6 +865,10 @@ proc initLayout*(layout: string): ref AVChannelLayout =
   new(result)
   if av_channel_layout_from_string(addr result[], layout.cstring) < 0:
     error "Invalid layout"
+  # A bare channel count ("2 channels", as WAV gives) names no speakers, and
+  # encoders like aac refuse to open without them.
+  if result.order == 0:
+    av_channel_layout_default(addr result[], result.nb_channels)
 
 proc channelNames*(layout: string): seq[string] =
   var parsed, defaulted: AVChannelLayout
