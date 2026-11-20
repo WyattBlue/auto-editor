@@ -256,16 +256,18 @@ proc parseBitrate*(input: string): int =
     return -1
 
   let (val, unit) = splitNumStr(input)
-  if unit.toLowerAscii() == "k":
-    return int(val * 1000)
-  if unit == "M":
-    return int(val * 1_000_000)
-  if unit == "G":
-    return int(val * 1_000_000_000)
-  if unit == "":
-    return int(val)
-
-  error &"Unknown bitrate: {input}"
+  let scale =
+    if unit.toLowerAscii() == "k": 1000.0
+    elif unit == "M": 1_000_000.0
+    elif unit == "G": 1_000_000_000.0
+    elif unit == "": 1.0
+    else: error &"Unknown bitrate: {input}"
+  let bits = val * scale
+  # float -> int is unchecked: out of range or NaN, it's garbage. `not (a and
+  # b)` so NaN fails too. A negative one would read as "auto".
+  if not (bits >= 0 and bits < high(int).float64):
+    error &"Bitrate out of range: {input}"
+  int(bits)
 
 # A PackedInt holds 62 bits and a sign; "end" is the largest.
 const packedSpan = float64(1'i64 shl 62)
