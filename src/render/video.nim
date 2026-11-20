@@ -1779,10 +1779,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         result = ss.decoders[0]
     result.usedAt = frameNo
 
-  proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
-    ## Decode one clip's frame at its native resolution (after any static
-    ## rotation), maintaining per-source seek state. Still images decode once
-    ## and return clones. Caller owns the returned frame.
+  proc decodeRawFrame(obj: VideoFrame): (ptr AVFrame, bool) =
+    ## Decode one clip's frame at its native resolution, maintaining per-source
+    ## seek state. Still images decode once and return clones. Caller owns the
+    ## returned frame.
     if obj.gen: # generator overlay: a clear canvas for its action to paint
       return (makeClear(tl.res[0].cint, tl.res[1].cint), true)
     if obj.src == nil: # synthesized background base (audio-only `add`)
@@ -1936,7 +1936,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             lastGood = nil
             didDecode = true
           else:
-            frame = av_frame_clone(st.held) # already rotated
+            frame = av_frame_clone(st.held)
             fromHeld = true
           break
 
@@ -1954,29 +1954,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         hasSeekFrame = false
 
     if didDecode:
-      # Cache the raw frame (before per-clip static rotation) so another layer
-      # sharing this (src, index) reuses it this timeline frame.
+      # Another layer sharing this (src, index) reuses it this timeline frame.
       decodedCache[cacheKey] = av_frame_clone(frame)
-
-      var rotStatic = 0.0'f32
-      for effect in obj.effects:
-        if effect.kind == actRotate:
-          rotStatic = rotDeg(effect.rStart)
-          break
-      if rotStatic != 0.0'f32:
-        let rad = rotStatic * 3.14159265358979'f32 / 180.0'f32
-        let rk = fxId(actRotate, frame, f0 = rad)
-        if rotKey != rk:
-          if rotGraph != nil: rotGraph.cleanup()
-          rotGraph = newGraph()
-          let bsrc = rotGraph.add("buffer", bufArgsOf(frame))
-          let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
-          let bsink = rotGraph.add("buffersink")
-          rotGraph.linkNodes(bsrc, filt, bsink).configure()
-          rotKey = rk
-        rotGraph.push(frame)
-        av_frame_free(addr frame)
-        frame = rotGraph.pull()
 
     if lastGood != nil: av_frame_free(addr lastGood)
     st.frameIndex = frameIndex
@@ -1986,7 +1965,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     st.loopBase = loopBase
     st.lastReqIndex = obj.index
     if didDecode:
-      # Hold the final (post-rotation) frame so a later monotonic-forward request
+      # Hold the frame so a later monotonic-forward request
       # that the overshooting decoder has already passed can reuse it (see the
       # reuse check at the top) instead of seeking backward.
       if st.held != nil:
@@ -1994,6 +1973,33 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr old)
       st.held = av_frame_clone(frame)
     return (frame, didDecode or fromHeld)
+
+  proc decodeClipFrame(obj: VideoFrame): (ptr AVFrame, bool) =
+    ## `decodeRawFrame`, after the clip's static rotation. The frames it keeps
+    ## (still, held, shared) stay unrotated, since layers of one source can
+    ## each have their own angle.
+    result = decodeRawFrame(obj)
+    if not result[1] or obj.gen or obj.src == nil: return
+    var deg = 0.0'f32
+    for effect in obj.effects:
+      if effect.kind == actRotate:
+        deg = rotDeg(effect.rStart)
+        break
+    if deg == 0.0'f32: return
+    let rad = deg * 3.14159265358979'f32 / 180.0'f32
+    var frame = result[0]
+    let rk = fxId(actRotate, frame, f0 = rad)
+    if rotKey != rk:
+      if rotGraph != nil: rotGraph.cleanup()
+      rotGraph = newGraph()
+      let bsrc = rotGraph.add("buffer", bufArgsOf(frame))
+      let filt = rotGraph.add("rotate", &"a={rad}:ow=rotw({rad}):oh=roth({rad}):c={bg}")
+      let bsink = rotGraph.add("buffersink")
+      rotGraph.linkNodes(bsrc, filt, bsink).configure()
+      rotKey = rk
+    rotGraph.push(frame)
+    av_frame_free(addr frame)
+    result[0] = rotGraph.pull()
 
   # Output colorspace/range for overlays, from the encoder (stable). Declaring
   # these on the base buffer keeps the composite yuv420p (not gbrp) and makes the
