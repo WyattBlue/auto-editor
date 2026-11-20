@@ -27,10 +27,10 @@ Your audio contributes to size too, if you use the AAC encoder, it should always
 | Encoder               | Type             | Quality   | Speed     |
 |-----------------------|------------------|-----------|-----------|
 | opus (libopus)        | Software         | best      | fast      |
-| aac (ffmpeg 9+)       | Software         | excellent | fast      |
+| aac (ffmpeg 9.1+)     | Software         | excellent | fast      |
 | fdk_aac               | Software         | great     | fast      |
 | aac_at (AudioToolBox) | Hardware (Apple) | good      | very fast |
-| aac (ffmpeg <9)       | Software         | meh       | fast      |
+| aac (ffmpeg <9.1)     | Software         | meh       | fast      |
 
 ## Using Better Video Encoders
 Your file size depends on the encoder used. h264 is great but not the best. hevc (also known as h265) can achieve much smaller sizes with about the same quality. One trade-off is that various software, such as media players and NLEs, doesn't understand next-gen encoders.
