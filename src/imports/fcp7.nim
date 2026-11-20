@@ -33,6 +33,17 @@ proc xmlInt(node: XmlNode, lo = low(int64), hi = high(int64)): int64 =
   if result < lo or result > hi:
     error &"Invalid <{node.tag}> value: '{s}'"
 
+proc readRate(rateNode: XmlNode): AVRational =
+  var timebase = 30
+  var ntsc = false
+  for rc in rateNode:
+    if rc.kind != xnElement: continue
+    if rc.tag == "timebase":
+      timebase = xmlInt(rc, 1, high(cint)).int
+    elif rc.tag == "ntsc":
+      ntsc = rc.innerText.strip() == "TRUE"
+  readTbNtsc(timebase, ntsc)
+
 func num(s: string): (bool, float) =
   case s.strip()
   of "TRUE": return (true, 1.0)
@@ -310,6 +321,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     var nested = false
     var enabled = true
     var trackIndex = 1'i64
+    var clipTb = tb
     var acts: seq[Action]
     var filterNodes: seq[XmlNode]
 
@@ -328,6 +340,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       of "sequence": nested = true
       of "enabled": enabled = ci.innerText.strip() != "FALSE"
       of "filter": filterNodes.add ci
+      of "rate": clipTb = readRate(ci)
       of "sourcetrack":
         for st in ci:
           if st.kind == xnElement and st.tag == "trackindex":
@@ -335,6 +348,17 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       else: discard
 
     if not enabled: continue
+    # <in>, <out> and the filters' keyframes count frames at the clip's own
+    # rate, which can differ from the sequence's (Premiere's ticks show it).
+    let scale = tb.float64 / clipTb.float64
+    proc toSeqFrames(v: int64): int64 =
+      let f = round(v.float64 * scale)
+      if not (f <= maxFrames.float64):
+        error "Invalid clipitem: <in> or <out> is too far into its media"
+      int64(f)
+    if scale != 1.0:
+      inVal = toSeqFrames(inVal)
+      if outVal >= 0: outVal = toSeqFrames(outVal)
     var fill: RGBColor
     var file: FileInfo
     if generator:
@@ -378,7 +402,9 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     if outVal <= inVal: outVal = inVal + dur + inExt + outExt
     var remap = Remap()
     for fn in filterNodes:
-      readFilters(fn, acts, remap, inVal.float, outVal.float)
+      readFilters(fn, acts, remap, inVal.float / scale, outVal.float / scale)
+    for point in remap.graph.mitems:
+      point = (point[0] * scale, point[1] * scale)
     let ticksPerFrame = pproTicksPerSecond.float / tb.float
     var speed = remap.speed
     if remap.freeze:
@@ -446,15 +472,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
     if child.kind != xnElement: continue
     case child.tag
     of "rate":
-      var timebase = 30
-      var ntsc = false
-      for rc in child:
-        if rc.kind != xnElement: continue
-        if rc.tag == "timebase":
-          timebase = xmlInt(rc, 1, high(cint)).int
-        elif rc.tag == "ntsc":
-          ntsc = rc.innerText.strip() == "TRUE"
-      tb = readTbNtsc(timebase, ntsc)
+      tb = readRate(child)
     of "media":
       mediaNode = child
     else: discard
