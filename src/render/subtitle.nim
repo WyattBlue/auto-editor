@@ -35,6 +35,11 @@ proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
   defer:
     if openPath != "": srcContainer.close()
   var leftOut: seq[string]
+  # An ASS packet's first field is its read order, by which libass drops
+  # repeats; a cue kept on both sides of a cut, or two sources' cues, would
+  # share one.
+  let renumber = outputStream.codecpar.codec_id == ID_ASS
+  var readOrder = 0
 
   for clipIdx, clip in layer:
     if clip.src == nil:
@@ -122,7 +127,19 @@ proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
       let newPts = av_rescale_q(startFrame, frameTb, outTb)
 
       var outPacket: AVPacket
-      if av_packet_ref(addr outPacket, packet) < 0:
+      var line = ""
+      if renumber and packet.size > 0:
+        line = newString(packet.size)
+        copyMem(addr line[0], packet.data, packet.size)
+      let comma = line.find(',')
+      if comma >= 0:
+        line = $readOrder & line[comma .. ^1]
+        inc readOrder
+        if av_new_packet(addr outPacket, line.len.cint) < 0:
+          error "Could not allocate subtitle packet"
+        copyMem(outPacket.data, addr line[0], line.len)
+        outPacket.flags = packet.flags
+      elif av_packet_ref(addr outPacket, packet) < 0:
         error "Failed to reference subtitle packet"
       outPacket.stream_index = outputStream.index
       outPacket.time_base = outTb
