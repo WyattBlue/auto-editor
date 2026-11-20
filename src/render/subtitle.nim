@@ -142,13 +142,14 @@ proc writeCaptions*(track: CaptionTrack, ctx: ptr AVCodecContext,
   ## encoder from `addCaptionStream`.
   let frameTb = av_inv_q(timelineTb)
   var buf = newSeq[uint8](1 shl 16)
-  for cue in track.cues:
+  for i, cue in track.cues:
     let pts = av_rescale_q(cue.start, frameTb, ctx.time_base)
     let dur = max(1'i64,
       av_rescale_q(cue.start + cue.dur, frameTb, ctx.time_base) - pts)
 
-    # A dialogue line without its timing, which the packet carries.
-    let line = "0,0,Default,,0,0,0,," &
+    # A dialogue line without its timing, which the packet carries. Its first
+    # field is the read order, by which libass tells repeats apart.
+    let line = $i & ",0,Default,,0,0,0,," &
       cue.text.replace("\r\n", "\n").replace("\n", "\\N")
     var rect: AVSubtitleRect
     rect.`type` = SUBTITLE_ASS
