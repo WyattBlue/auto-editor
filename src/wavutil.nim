@@ -102,7 +102,8 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
     error "Could not allocate audio FIFO"
 
 proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
-  return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
+  # extended_data, not data: planar audio keeps only its first 8 channels there.
+  return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](frame.extended_data),
       frame.nb_samples)
 
 proc readSamplesFromBuffer(buffer: var AudioBuffer, outputFrame: ptr AVFrame): bool =
@@ -113,7 +114,7 @@ proc readSamplesFromBuffer(buffer: var AudioBuffer, outputFrame: ptr AVFrame): b
     error "Could not make frame writable"
 
   let samplesRead = av_audio_fifo_read(buffer.fifo, cast[ptr pointer](
-      addr outputFrame.data[0]), buffer.frameSize)
+      outputFrame.extended_data), buffer.frameSize)
   if samplesRead != buffer.frameSize:
     return false
 
@@ -342,7 +343,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
     if av_frame_get_buffer(tailFrame, 0) < 0:
       error "Could not allocate frame buffer"
     if av_audio_fifo_read(audioBuffer.fifo,
-        cast[ptr pointer](addr tailFrame.data[0]),
+        cast[ptr pointer](tailFrame.extended_data),
         remainingSamples) != remainingSamples:
       error "Could not read final samples"
     tailFrame.pts = currentPts
