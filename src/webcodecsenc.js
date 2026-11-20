@@ -298,9 +298,17 @@ addToLibrary({
           config.hevc = { format: 'hevc' };
         }
       }
-      const support = kind === 2
-        ? await AudioEncoder.isConfigSupported(config)
-        : await VideoEncoder.isConfigSupported(config);
+      // A config the browser finds malformed rejects rather than reporting
+      // unsupported. Uncaught, that aborts the run; 0 falls back to software.
+      let support;
+      try {
+        support = kind === 2
+          ? await AudioEncoder.isConfigSupported(config)
+          : await VideoEncoder.isConfigSupported(config);
+      } catch (error) {
+        console.error('auto-editor WebCodecs encoder configuration:', error);
+        return 0;
+      }
       if (!support.supported) return 0;
 
       const handle = AEWebEncoders.nextHandle++;

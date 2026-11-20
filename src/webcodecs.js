@@ -326,9 +326,17 @@ addToLibrary({
             optimizeForLatency: true,
           }
         : { codec, sampleRate, numberOfChannels: channels, description };
-      const supported = kind === 2
-        ? await AudioDecoder.isConfigSupported(config)
-        : await VideoDecoder.isConfigSupported(config);
+      // A config the browser finds malformed rejects rather than reporting
+      // unsupported. Uncaught, that aborts the run; 0 falls back to software.
+      let supported;
+      try {
+        supported = kind === 2
+          ? await AudioDecoder.isConfigSupported(config)
+          : await VideoDecoder.isConfigSupported(config);
+      } catch (error) {
+        console.error('auto-editor WebCodecs configuration:', error);
+        return 0;
+      }
       if (!supported.supported) {
         return 0;
       }
