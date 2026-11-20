@@ -398,7 +398,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
 
         template yieldCopied(p: ptr AVPacket) =
           let orderTs = if p.dts != AV_NOPTS_VALUE: p.dts else: p.pts
-          yield (p, max(0'i64, frameAt(orderTs, stream.time_base, tl.tb)))
+          # In the packet's time base: HEVC's are retimed to frames by now.
+          yield (p, max(0'i64, frameAt(orderTs, p.time_base, tl.tb)))
 
         template flushUndated(nextDts: int64) =
           fillLeadingDts(undated, nextDts, frameDuration)
