@@ -144,6 +144,12 @@ type
   AVInputFormat* {.importc, header: "<libavformat/avformat.h>".} = object
     name*: cstring
 
+  AVChapter* {.importc, header: "<libavformat/avformat.h>".} = object
+    id*: int64
+    time_base*: AVRational
+    start*, `end`*: int64
+    metadata*: ptr AVDictionary
+
   AVFormatContext* {.importc, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
     iformat*: ptr AVInputFormat
@@ -165,6 +171,8 @@ type
     max_analyze_duration: int64
     metadata*: ptr AVDictionary
     max_interleave_delta*: int64
+    nb_chapters*: cuint
+    chapters*: ptr UncheckedArray[ptr AVChapter]
 
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>".} = object
     buf*: pointer
@@ -654,6 +662,8 @@ proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint, nb_channel
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 proc av_mallocz*(size: csize_t): pointer {.importc, header: "<libavutil/mem.h>".}
+proc av_realloc_array*(`ptr`: pointer, nmemb, size: csize_t): pointer {.importc,
+  header: "<libavutil/mem.h>".}
 
 type SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
 

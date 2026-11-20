@@ -556,6 +556,28 @@ proc openWrite*(file: string): OutputContainer =
   result.formatCtx = formatCtx
   result.packet = av_packet_alloc()
 
+proc addChapter*(self: var OutputContainer, start, stop: int64,
+    timeBase: AVRational, title: string) =
+  ## A chapter of the output over [start, stop) in `timeBase`. Only before
+  ## encoding starts: the muxer writes chapters with its header.
+  let ctx = self.formatCtx
+  let chapter = cast[ptr AVChapter](av_mallocz(csize_t(sizeof(AVChapter))))
+  if chapter == nil:
+    error "Could not allocate chapter"
+  let grown = av_realloc_array(ctx.chapters, csize_t(ctx.nb_chapters + 1),
+    csize_t(sizeof(pointer)))
+  if grown == nil:
+    av_freep(addr chapter)
+    error "Could not allocate chapter"
+  ctx.chapters = cast[ptr UncheckedArray[ptr AVChapter]](grown)
+  chapter.id = int64(ctx.nb_chapters) + 1
+  chapter.time_base = timeBase
+  chapter.start = start
+  chapter.`end` = stop
+  discard av_dict_set(addr chapter.metadata, "title", title.cstring, 0)
+  ctx.chapters[ctx.nb_chapters] = chapter
+  inc ctx.nb_chapters
+
 proc addStreamFromTemplate*(self: var OutputContainer,
     streamT: ptr AVStream): ptr AVStream =
   let format = self.formatCtx

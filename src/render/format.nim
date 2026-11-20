@@ -1,4 +1,4 @@
-import std/[heapqueue, options, sequtils, sets, strformat, strutils]
+import std/[algorithm, heapqueue, options, sequtils, sets, strformat, strutils]
 from std/math import round
 
 import ../[action, av, ffmpeg, license, log, media, timeline, throttle]
@@ -389,6 +389,18 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
         if strm.metadata != nil:
           discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
         imageStreams.add((outStrm, addr strm.attached_pic))
+
+  if args.chapters:
+    # A named marker starts a chapter that runs for its span or, being a
+    # point, up to the next chapter: players expect chapters end to end.
+    var named = tl.markers.filterIt(it.name != "")
+    named.sort(proc (a, b: Marker): int = cmp(a.start, b.start))
+    for i, m in named:
+      let stop =
+        if m.dur > 0: m.start + m.dur
+        elif i + 1 < named.len: named[i + 1].start
+        else: tl.len
+      output.addChapter(m.start, max(m.start, stop), av_inv_q(tl.tb), m.name)
 
   output.startEncoding()
 

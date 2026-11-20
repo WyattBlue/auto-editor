@@ -43,7 +43,7 @@ type CliOption* = enum
     coVideoSpeed, coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
-    coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coVcodec,
+    coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coChapters, coVcodec,
     coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coFont, coNoSeek,
     coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
     coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
@@ -265,6 +265,8 @@ Examples:
     help: &"Use {fragmented} mp4/mov to allow playback before video is complete."),
   OptDef(names: "--no-fragmented", c: cCon, kind: Flag, datum: coNoFragmented,
     help: "Do not use fragmented mp4/mov for better compatibility (default)"),
+  OptDef(names: "--chapters", c: cCon, kind: Flag, datum: coChapters,
+    help: "Write each named marker as a chapter, running for its span or else up to the next one"),
 
   OptDef(names: "-c:v, -vcodec, --video-codec", c: cVid, datum: coVcodec,
     metavar: "ENCODER", help: "Set video codec for output media"),
@@ -470,7 +472,7 @@ macro genCmdCases*(keyIdent: untyped): untyped =
 
 const argsFlagOptions = {
   coPreview, coVn, coAn, coSn, coDn, coFaststart, coNoFaststart, coFragmented,
-  coNoFragmented, coNoSeek, coNoPartialLossless, coMixAudioStreams, coOpen,
+  coNoFragmented, coChapters, coNoSeek, coNoPartialLossless, coMixAudioStreams, coOpen,
   coNoOpen, coWebCodecs,
 }
 
