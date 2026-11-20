@@ -387,7 +387,7 @@ proc resetDiscards*(container: InputContainer) =
   for i in 0 ..< container.formatContext.nb_streams.int:
     container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
 
-var decodeErrors*: int
+var decodeErrors* {.threadvar.}: int ## per thread, as a job's hooks are
 
 proc noteDecodeError*(msg: string) {.raises: [].} =
   inc decodeErrors

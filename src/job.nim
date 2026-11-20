@@ -20,7 +20,7 @@ template withJob*(hooks: JobHooks, body: untyped) =
   progressHook = hooks.progress
   logHook = hooks.log
   cancelFlag = hooks.cancel
-  # Global and cumulative in the CLI, where each process runs one job.
+  # Cumulative in the CLI, where each process runs one job.
   decodeErrors = 0
   try:
     body
