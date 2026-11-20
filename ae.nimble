@@ -290,8 +290,8 @@ let libass = Package(
 )
 let ffmpeg = Package(
   name: "ffmpeg",
-  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
-  sha256: "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-9.1.tar.xz",
+  sha256: "1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433",
 )
 
 proc selectPackages(kind: CrossKind = native): seq[Package] =
