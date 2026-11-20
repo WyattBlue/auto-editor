@@ -3,7 +3,7 @@ from std/math import round
 
 import ../[action, av, ffmpeg, license, log, media, timeline, throttle]
 import ../util/[bar, rules, rational]
-import ./[video, audio, subtitle, partialplan]
+import ./[asyncenc, video, audio, subtitle, partialplan]
 
 type Priority = object
   index: float64
@@ -416,11 +416,43 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
     title &= encoderTitles.join("\e[0m+") & "\e[0m"
   bar.start(tl.len.float64, title)
 
+  # Priority queue for ordered frames by time_base.
+  var frameQueue = initHeapQueue[Priority]()
+  defer: # packets an error left waiting; the loop empties it otherwise
+    while frameQueue.len > 0:
+      var item = frameQueue.pop()
+      if item.packet != nil:
+        av_packet_free(addr item.packet)
+
+  # Each audio stream encodes on a thread of its own, beside the video and the
+  # other streams, fed ahead of the video so it has work while the video does.
+  # Its packets wait in `frameQueue` for their turn, as frames do, so the muxer
+  # gets everything in the same order. PCM is only a copy, not worth a thread.
+  # The web build encodes inline: its threads come from a fixed pool.
+  var asyncAudio = newSeq[AsyncEncoder](audioEncoders.len)
+  var audioDone = newSeq[bool](audioEncoders.len) # every frame was sent
+  var audioSent = newSeq[int64](audioEncoders.len) # the last one's index
+  let asyncAhead = int64(round(60.0 * tl.tb.float64)) # one minute
+  when not defined(emscripten):
+    defer: # before the encoders are freed
+      for e in asyncAudio: e.close()
+    for i, aEncCtx in audioEncoders:
+      if not ($aEncCtx.codec.name).startsWith("pcm_"):
+        asyncAudio[i] = newAsyncEncoder(aEncCtx, depth = 64)
+
+  template queueAudioPacket(i: int, pkt: ptr AVPacket) =
+    let encCtx = audioEncoders[i]
+    pkt.stream_index = audioStreams[i].index
+    pkt.time_base = encCtx.time_base
+    # Unrounded: the heap doesn't keep equal indices in order, and a stream's
+    # packets must reach the muxer in theirs.
+    let at = (if pkt.pts != AV_NOPTS_VALUE: pkt.pts else: pkt.dts)
+    frameQueue.push(Priority(index: float(at) * float(encCtx.time_base) *
+      float(tl.tb), packet: pkt, stream: audioStreams[i]))
+
   var shouldGetAudio: seq[bool] = newSeq[bool](audioFrameIters.len)
   const MAX_AUDIO_AHEAD = 30 # In timebase, how far audio can be ahead of video.
 
-  # Priority queue for ordered frames by time_base.
-  var frameQueue = initHeapQueue[Priority]()
   var earliestVideoIndex = none(int64)
   var latestAudioIndices: seq[float64] = @[]
   for i in 0..<audioFrameIters.len:
@@ -437,6 +469,8 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
         shouldGetAudio[i] = true
     else:
       for i in 0..<shouldGetAudio.len:
+        if asyncAudio[i] != nil:
+          continue # paced by its own feed
         for item in frameQueue:
           if item.stream == audioStreams[i]:
             latestAudioIndices[i] = max(latestAudioIndices[i], item.index.float64)
@@ -465,7 +499,30 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
             stream: vOutStream))
 
     for i in 0..<audioFrameIters.len:
-      if finished(audioFrameIters[i]):
+      if asyncAudio[i] != nil:
+        audioFrames[i] = nil
+        let e = asyncAudio[i]
+        let videoDone = videoFrame == nil and videoPacket == nil
+        let videoAt = earliestVideoIndex.get(0)
+        let limit = videoAt + asyncAhead
+        # Never wait on it while the video has work, unless the video is ahead:
+        # the muxer holds all of the video that the audio hasn't reached. After,
+        # one frame a pass, to collect packets in between.
+        while not audioDone[i] and (videoDone or audioSent[i] < videoAt or
+            (e.hasRoom and audioSent[i] <= limit)):
+          let (f, _) = (if finished(audioFrameIters[i]): (nil, 0'i64)
+                        else: audioFrameIters[i]())
+          if f == nil:
+            audioDone[i] = true
+            break
+          audioSent[i] = int64(round(f.time(audioEncoders[i].time_base) * tl.tb))
+          e.send(f) # it frees the frame
+          if videoDone:
+            index = max(index, audioSent[i])
+            break
+        for pkt in e.ready():
+          queueAudioPacket(i, pkt)
+      elif finished(audioFrameIters[i]):
         audioFrames[i] = nil
       elif shouldGetAudio[i]:
         (audioFrames[i], _) = audioFrameIters[i]()
@@ -481,8 +538,20 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       if audioFrame != nil:
         hasFrames = true
         break
+    for i, e in asyncAudio:
+      if e != nil and not audioDone[i]:
+        hasFrames = true
     if not hasFrames:
-      break
+      # The threaded encoders' last packets, then everything still queued.
+      var flushing = false
+      for i, e in asyncAudio:
+        if e != nil and not e.flushed:
+          for pkt in e.flush():
+            queueAudioPacket(i, pkt)
+          flushing = true
+      if not flushing:
+        break
+      index = int64.high
 
     # Add audio frames to queue
     for i in 0..<audioFrameIters.len:
@@ -498,7 +567,8 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       let outputStream = item.stream
       if item.packet != nil:
         let packet = item.packet
-        if packet.pts != AV_NOPTS_VALUE:
+        if packet.pts != AV_NOPTS_VALUE and
+            (outputStream == vOutStream or vOutStream == nil):
           let time = float(packet.pts) * float(packet.time_base)
           bar.tick(round(time * tl.tb))
           throttle.checkpoint(time)
@@ -547,6 +617,8 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       av_packet_unref(outPacket)
 
   for i, aEncCtx in audioEncoders:
+    if asyncAudio[i] != nil:
+      continue # flushed above
     for outPacket in aEncCtx.encode(nil, outPacket):
       outPacket.stream_index = audioStreams[i].index
       av_packet_rescale_ts(outPacket, aEncCtx.time_base, audioStreams[i].time_base)
