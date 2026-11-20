@@ -249,6 +249,7 @@ proc initDecoder*(codecpar: ptr AVCodecParameters,
 
   let ret = avcodec_parameters_to_context(result, codecpar)
   if ret < 0:
+    avcodec_free_context(addr result)
     error &"Failed to copy codec parameters: {av_err2str(ret)}"
 
   if avcodec_open2(result, codec, nil) < 0:
@@ -266,6 +267,7 @@ proc initDecoder*(codecpar: ptr AVCodecParameters,
             if avcodec_parameters_to_context(result, codecpar) >= 0 and
                 avcodec_open2(result, codec, nil) >= 0:
               return
+    avcodec_free_context(addr result)
     error "Could not open codec"
 
 type InputContainer* = object
@@ -621,9 +623,12 @@ proc addCaptionStream*(self: var OutputContainer, codecId: AVCodecID,
     let formatName = if format.oformat.name != nil: $format.oformat.name else: "unknown"
     error &"Format '{formatName}' does not support codec '{codec.name}'"
 
-  let ctx = avcodec_alloc_context3(codec)
+  var ctx = avcodec_alloc_context3(codec)
   if ctx == nil:
     error "Could not allocate codec context"
+  var returned = false
+  defer: # the caller's only once it has it
+    if not returned: avcodec_free_context(addr ctx)
   ctx.time_base = AVRational(num: 1, den: 1000)
   # avcodec_free_context frees the header, so it must be its own allocation.
   ctx.subtitle_header = cast[ptr uint8](av_strdup(assHeader.cstring))
@@ -642,6 +647,7 @@ proc addCaptionStream*(self: var OutputContainer, codecId: AVCodecID,
     error "Could not set ctx parameters"
   if $lang != "und":
     discard av_dict_set(addr stream.metadata, "language", cstring($lang), 0)
+  returned = true
   return (stream, ctx)
 
 proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational,
@@ -663,9 +669,12 @@ width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (
   if stream == nil:
     error "Could not allocate new stream"
   self.streams.add stream
-  let ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
+  var ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
   if ctx == nil:
     error "Could not allocate encoder context"
+  var returned = false
+  defer: # the caller's only once it has it
+    if not returned: avcodec_free_context(addr ctx)
 
   # Some sane video defaults
   if codec.`type` == AVMEDIA_TYPE_VIDEO:
@@ -700,6 +709,7 @@ width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (
     error "Could not set ctx parameters"
 
   discard av_dict_set(addr stream.metadata, "language", ($lang).cstring, 0)
+  returned = true
   return (stream, ctx)
 
 proc startEncoding*(self: var OutputContainer) =
@@ -829,12 +839,11 @@ iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame,
 
 proc close*(outputCtx: ptr AVFormatContext) =
   let ret = av_write_trailer(outputCtx)
-  if ret < 0:
-    error &"Could not finalize output (disk full?): {av_err2str(ret)}"
-
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
     discard avio_closep(addr outputCtx.pb)
   avformat_free_context(outputCtx)
+  if ret < 0:
+    error &"Could not finalize output (disk full?): {av_err2str(ret)}"
 
 proc close*(self: OutputContainer) =
   if self.packet != nil:
