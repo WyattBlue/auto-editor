@@ -184,9 +184,6 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
         if layer.len > 0:
           audCodec = $avcodec_get_name(resolveAudioCodec(layer, rules, cache))
           break
-      when defined(macosx):
-        if audCodec == "aac" and avcodec_find_encoder_by_name("aac_at") != nil:
-          audCodec = "aac_at"
     else:
       audCodec = audio.codec
 
