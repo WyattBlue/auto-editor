@@ -28,6 +28,11 @@ type VideoFrame = object
   fit: bool      # no explicit `pos`: fit-and-center to the canvas like the base
   incoming: bool # in its window, the clip coming in rather than going out
 
+func staticRotDeg(effects: Actions): float32 =
+  ## The clip's `rotate` angle, which `decodeClipFrame` applies.
+  for effect in effects:
+    if effect.kind == actRotate: return rotDeg(effect.rStart)
+
 # Identity of a configured effect filter graph: everything that determines the
 # graph's topology and arguments, as a flat value so the per-frame reuse check
 # is a field compare instead of string formatting. Run-constants (bg color,
@@ -1225,7 +1230,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
   var burner = SubBurner()
-  var lastFrameIndex = -1
+  # What the cached single-layer frame was decoded from: (src, index, rotate).
+  var lastDecoded: (ptr string, int, float32) = (nil, -1, 0.0'f32)
   let isLinear = tl.isLinear
 
   debug &"isLinear: {isLinear}"
@@ -1980,11 +1986,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## each have their own angle.
     result = decodeRawFrame(obj)
     if not result[1] or obj.gen or obj.src == nil: return
-    var deg = 0.0'f32
-    for effect in obj.effects:
-      if effect.kind == actRotate:
-        deg = rotDeg(effect.rStart)
-        break
+    let deg = staticRotDeg(obj.effects)
     if deg == 0.0'f32: return
     let rad = deg * 3.14159265358979'f32 / 180.0'f32
     var frame = result[0]
@@ -2403,7 +2405,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         frame = finalizeFrame(acc, index)
         av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
-        lastFrameIndex = -1 # compositing bypasses the single-layer reuse cache
+        lastDecoded[1] = -1 # compositing bypasses the single-layer reuse cache
         yield (frame, index)
         continue
 
@@ -2422,7 +2424,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       for obj in objList:
         # Reuse the decoded frame from the previous timeline iteration when
         # this frame maps to the same source frame.
-        if obj.index == lastFrameIndex and lastProcessedFrame != nil:
+        if (obj.src, obj.index, staticRotDeg(obj.effects)) == lastDecoded and
+            lastProcessedFrame != nil:
           av_frame_free(addr frame)
           frame = av_frame_clone(lastProcessedFrame)
           continue
@@ -2457,7 +2460,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       if objList.len > 0:
         av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
-        lastFrameIndex = objList[0].index
+        let o = objList[0]
+        lastDecoded = (o.src, o.index, staticRotDeg(o.effects))
 
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
         frame = applyEffects(frame, objList[0].effects, objList[0].local,
