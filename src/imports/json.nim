@@ -181,6 +181,27 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 {.raises: [A
         track.cues.add cue
       result.c.add track
 
+  let markersNode = jsonNode{"markers"}
+  if markersNode != nil:
+    if markersNode.kind != JArray: error "'markers' must be an array"
+    var unknownColors = 0
+    for m in markersNode:
+      if m.kind != JObject: error "'markers' entries must be objects"
+      var marker = Marker(start: m{"start"}.getBiggestInt(-1),
+        dur: m{"dur"}.getBiggestInt(0), name: m{"name"}.getStr(""),
+        note: m{"note"}.getStr(""))
+      if marker.start < 0:
+        error "Invalid marker start json value"
+      if marker.dur < 0:
+        error "Invalid marker dur json value"
+      # One odd color shouldn't fail a whole file; it gets the default.
+      let colorNode = m{"color"}
+      if colorNode != nil and not toMarkerColor(colorNode.getStr(""), marker.color):
+        inc unknownColors
+      result.markers.add marker
+    if unknownColors > 0:
+      warning &"{unknownColors} marker(s) with an unknown color made {mcBlue}"
+
   let langsNode = jsonNode{"langs"}
   if langsNode != nil and langsNode.kind == JArray:
     for trackNode in langsNode:

@@ -123,6 +123,21 @@ proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
     error &"{opt} has too many arguments"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
+proc parseMarker(val: string): SourceMarker =
+  ## TIME[..END][,NAME[,COLOR[,NOTE]]]; the note keeps any further commas.
+  let parts = val.split(",", maxsplit = 3)
+  let times = parts[0].strip().split("..")
+  if times.len > 2 or times[0] == "":
+    error &"--marker needs TIME or START..END, got '{parts[0]}'"
+  result.start = parseTime(times[0])
+  result.stop = (if times.len == 2: parseTime(times[1]) else: result.start)
+  if parts.len > 1: result.name = parts[1]
+  if parts.len > 2 and parts[2].strip() != "" and
+      not toMarkerColor(parts[2].strip().toLowerAscii, result.color):
+    error &"--marker color must be one of: " & MarkerColor.toSeq.join(", ") &
+      &"; got '{parts[2]}'"
+  if parts.len > 3: result.note = parts[3]
+
 proc parseNum(val, opt: string): float64 =
   let (num, unit) = splitNumStr(val)
   if unit == "%":
@@ -425,7 +440,7 @@ proc setLabeledEdit(args: var mainArgs, label: int, expr: EditExpr) =
 
 const mainArgumentOptions = {
   coEdit, coWhenActive, coWhenInactive, coMargin, coSmooth, coTransition,
-  coOutput, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
+  coOutput, coCutOut, coAddIn, coSetSpeed, coSetAction, coMarker, coSilentSpeed,
   coVideoSpeed, coExport, coFrameRate, coSampleRate, coResolution, coBackground,
   coYtDlpLocation, coOutputFormat, coYtDlpExtras, coProgress, coVcodec,
   coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coFont, coAcodec,
@@ -542,6 +557,8 @@ judge making cuts.
       args.setAction.add parseSpeedRange(key)
     of coSetAction:
       args.setAction.add parseActionAndRange(key, args)
+    of coMarker:
+      args.markers.add parseMarker(key)
     of coYtDlpLocation:
       args.ytDlpLocation = key
     of coOutputFormat:

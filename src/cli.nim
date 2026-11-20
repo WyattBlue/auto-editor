@@ -39,7 +39,7 @@ type CliOption* = enum
   coNone, coIsDebug, coSplitWords, coLanguage, coFormat, coOutput, coTranslate, coQueue,
     coPrompt, coThreads, coThreshold, coIsJson, coEncoders, coDecoders, coCodecs, coEdit,
     coTimebase, coDisplay, coNoCache, coAsJson, coShell, coWhenActive, coWhenInactive, coMargin,
-    coSmooth, coTransition, coCutOut, coAddIn, coSetSpeed, coSetAction, coSilentSpeed,
+    coSmooth, coTransition, coCutOut, coAddIn, coSetSpeed, coSetAction, coMarker, coSilentSpeed,
     coVideoSpeed, coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
@@ -197,6 +197,13 @@ Add linked video/audio transitions at cuts and at the timeline ends. KIND is dis
 Examples:
   --set-action nil,0,5sec
   --set-action speed:1.5,varispeed:1.5,30sec,end"""),
+  OptDef(names: "--marker", c: cEdit, datum: coMarker,
+    metavar: "TIME[..END][,NAME[,COLOR[,NOTE]]]",
+    help: """Mark a point, or a span to END, in the input's time; it lands where the edit puts that time
+COLOR is one of: blue (default), red, orange, yellow, green, cyan, purple, pink, white. NOTE may hold commas
+Examples:
+  --marker 30sec,Intro
+  --marker 60sec..90sec,Q&A,green,Questions, then answers"""),
   OptDef(names: "--silent-speed", c: cEdit, datum: coSilentSpeed, metavar: "NUM",
     hidden: true,
     help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),

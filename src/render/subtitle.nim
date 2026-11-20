@@ -10,14 +10,6 @@ import ../util/rational
 # a cut-out is shortened, so subtitles stay in sync with the edited video
 # instead of dropping or bleeding over. Works for text subs (SRT/ASS/WebVTT);
 # bitmap subs (DVD/PGS) pass through with adjusted timing only.
-proc toTimeline(clip: Clip, map: SpeedMap, media: float64): int64 =
-  ## The timeline frame showing `media`, a position in the clip's source as
-  ## timeline frames from the source's start.
-  let local = media / map.mean - clip.offset.float64
-  let t = (if map.ramp and clip.dur > 0:
-    clip.dur.float64 * map.timeAt(local / clip.dur.float64) else: local)
-  clip.start + int64(round(t))
-
 proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
     outputStream: ptr AVStream, output: var OutputContainer,
     timelineTb: AVRational) =
@@ -122,7 +114,7 @@ proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
 
       # Intersect cue with the window, then map source -> timeline frames -> output.
       let visStart = max(cueStart, clipStartSrc)
-      let startFrame = clip.toTimeline(map,
+      let startFrame = clip.clipFrameAt(map,
         float64(visStart - srcStart) / ticksPerFrame)
       let newPts = av_rescale_q(startFrame, frameTb, outTb)
 
@@ -147,7 +139,7 @@ proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
       outPacket.dts = newPts # subtitle streams have no reordering; keep dts == pts
       if hasDur:
         let visEnd = min(cueEnd, clipEndSrc)
-        let endFrame = clip.toTimeline(map, float64(visEnd - srcStart) / ticksPerFrame)
+        let endFrame = clip.clipFrameAt(map, float64(visEnd - srcStart) / ticksPerFrame)
         outPacket.duration = max(1'i64, av_rescale_q(endFrame, frameTb, outTb) - newPts)
 
       output.mux(outPacket)

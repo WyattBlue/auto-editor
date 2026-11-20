@@ -37,6 +37,12 @@ func captionsToJson(tracks: seq[CaptionTrack]): JsonNode {.raises: [].} =
       cues.add %*{"start": cue.start, "dur": cue.dur, "text": cue.text}
     result.add %*{"lang": $track.lang, "cues": cues}
 
+func markersToJson(markers: seq[Marker]): JsonNode {.raises: [].} =
+  result = newJArray()
+  for m in markers:
+    result.add %*{"start": m.start, "dur": m.dur, "name": m.name,
+      "color": $m.color, "note": m.note}
+
 func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
   result = newJArray()
   for track in tracks:
@@ -91,6 +97,8 @@ func `%`*(self: v3): JsonNode {.raises: [].} =
     "a": tracksToJson(self.a, self.effects),
     "sidecar": tracksToJson(self.s, self.effects),
   }
+  if self.markers.len > 0:
+    result["markers"] = markersToJson(self.markers)
   if self.vt.len > 0 or self.at.len > 0:
     result["transitions"] = %*{
       "v": transitionsToJson(self.vt),

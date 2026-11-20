@@ -139,6 +139,32 @@ type AudioSettings* = object
 
 type VideoHook* = proc (frame: ptr AVFrame, data: pointer): ptr AVFrame {.nimcall, gcsafe.}
 
+type
+  MarkerColor* = enum
+    ## Names every editor's palette has a near match for. Blue, the first,
+    ## is what a marker with none, or one not in the list, gets.
+    mcBlue = "blue", mcRed = "red", mcOrange = "orange", mcYellow = "yellow",
+    mcGreen = "green", mcCyan = "cyan", mcPurple = "purple", mcPink = "pink",
+    mcWhite = "white"
+  Marker* = object
+    ## A named point (`dur` 0) or span on the timeline, in timeline frames.
+    start*, dur*: int64
+    name*, note*: string
+    color*: MarkerColor
+  SourceMarker* = object
+    ## A marker in the inputs' time, laid end to end, placed on the timeline
+    ## through the cuts. `stop` equal to `start` makes it a point.
+    start*, stop*: PackedInt
+    name*, note*: string
+    color*: MarkerColor
+
+func toMarkerColor*(s: string, color: var MarkerColor): bool {.raises: [].} =
+  ## Whether `s` names a marker color, setting `color` to it if so.
+  for c in MarkerColor:
+    if s == $c:
+      color = c
+      return true
+
 type mainArgs* = object
   inputs*: seq[string]
   videoHook*: VideoHook
@@ -156,6 +182,7 @@ type mainArgs* = object
     kind: exAuto, name: "Auto-Editor Media Group", version: 11)
   output*: string = ""
   setAction*: seq[(Actions, PackedInt, PackedInt)]
+  markers*: seq[SourceMarker] # in the inputs' frames end to end, like setActionConcat
   adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
   layers*: seq[LayerSpec]                         # library-only overlays
   transition*: PackedInt = pack(false, 0) # 0 disables; otherwise its duration

@@ -465,6 +465,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
   var tlV3: v3
   var usePath = ""
   var mi: MediaInfo
+  var markersPlaced = false
   if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
@@ -607,6 +608,8 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
         # As an editor's plan lays the inputs out (planEdit): by their analysis.
         concatOffset += labels.len
 
+      tlV3.mapMarkers(args.markers)
+      markersPlaced = true
       applyAdds(tlV3, args, interner)
       applyLayers(tlV3, args, interner)
       tlV3.applyArgs(args, audio)
@@ -617,6 +620,8 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       elif args.placedTransitions.len > 0:
         tlV3.placeTransitions(args.placedTransitions)
 
+  if args.markers.len > 0 and not markersPlaced:
+    warning "Markers in source time only apply to media inputs; left out"
   BuiltTimeline(tl: tlV3, usePath: usePath, mi: mi)
 
 type EditPlan* = object
@@ -627,6 +632,7 @@ type EditPlan* = object
     ## cut. `actions` is the section's chain as auto-editor writes it, e.g.
     ## @["speed:2.0", "volume:0.5"], @["cut"], or empty to leave it as is.
   sourceFrames*: seq[int64] ## each input's length, in that order
+  markers*: seq[Marker] ## `args.markers` placed on the timeline, in its frames
 
 proc planEdit*(args: var mainArgs): EditPlan =
   ## Decide every cut without rendering anything. Layers and placed
@@ -641,7 +647,7 @@ proc planEdit*(args: var mainArgs): EditPlan =
   defer: freeActions(args, built.tl)
   if not built.tl.isLinear:
     error "This edit can't be shown as a simple list of cuts"
-  result = EditPlan(tb: built.tl.tb)
+  result = EditPlan(tb: built.tl.tb, markers: built.tl.markers)
   # Each input's chunks count from its own frame 0; lay them end to end so
   # the inputs share one frame space.
   var offset, prevEnd = 0'i64

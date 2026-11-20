@@ -129,6 +129,8 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
     for track in tl.c:
       if track.cues.len > 0: inc captions
     if captions > 0: result.add plural(captions, "caption track")
+  # No editor export carries markers yet.
+  if tl.markers.len > 0: result.add plural(tl.markers.len, "marker")
 
 proc warnDrops*(tl: v3, kind: ExportKind) {.raises: [].} =
   let drops = exportDrops(tl, kind)

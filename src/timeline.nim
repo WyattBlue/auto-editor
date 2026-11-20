@@ -71,6 +71,7 @@ type v3* = object
   a*: seq[seq[Clip]]
   s*: seq[seq[Clip]] # Sources' subtitle streams carried through the cuts.
   c*: seq[CaptionTrack] # Inline captions, rendered as a subtitle stream each.
+  markers*: seq[Marker]
   langs*: seq[Lang]   # Video, Audio (flattened).
   effects*: seq[Actions]
   numberOfSrc*: int
@@ -88,6 +89,14 @@ func len*(self: v3): int64 {.raises: [].} =
   for clips in self.a:
     if len(clips) > 0:
       result = max(result, clips[^1].start + clips[^1].dur)
+
+func clipFrameAt*(clip: Clip, map: SpeedMap, media: float64): int64 =
+  ## The timeline frame showing `media`, a position in the clip's source as
+  ## timeline frames from the source's start. `map` is the clip's speed map.
+  let local = media / map.mean - clip.offset.float64
+  let t = (if map.ramp and clip.dur > 0:
+    clip.dur.float64 * map.timeAt(local / clip.dur.float64) else: local)
+  clip.start + int64(round(t))
 
 func firstSource*(self: v3): ptr string {.raises: [].} =
   for vlayer in self.v:
@@ -320,6 +329,82 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo,
       subtitleClip.stream = i.int16
       tl.s[i].add subtitleClip
   tl.updateNumberOfSrc()
+
+proc mapMarkers*(tl: var v3, markers: openArray[SourceMarker]) =
+  ## Place `markers`, in the inputs' frames laid end to end, on a linear
+  ## `tl` through its cuts. A marker edge in a cut-out stretch moves to the
+  ## next kept frame; a marker with none after it is left out.
+  if markers.len == 0: return
+  type Span = object
+    lo, hi: int64 # the inputs' frames end to end
+    inputStart: int64
+    kept: bool
+    clip: Clip
+    map: SpeedMap
+  # The chunks as linearClips turned them into clips: each input's count
+  # from its own frame 0, and a kept chunk is a clip unless it rounds to
+  # nothing.
+  var spans: seq[Span]
+  var offset, prevEnd, timelineStart = 0'i64
+  for chunk in tl.clips2:
+    if chunk.start == 0 and prevEnd > 0:
+      offset += prevEnd
+    prevEnd = chunk.`end`
+    var span = Span(lo: chunk.start + offset, hi: chunk.`end` + offset,
+      inputStart: offset)
+    let group = tl.effects[chunk.effect]
+    if not group.isCut:
+      var speed = 1.0
+      for a in group:
+        if a.kind == actSpeed: speed *= a.val
+      let (clipOffset, dur) = clipBounds(chunk.start, chunk.`end`, speed)
+      if dur > 0:
+        span.kept = true
+        span.clip = Clip(start: timelineStart, dur: dur, offset: clipOffset,
+          effects: chunk.effect)
+        span.map = initSpeedMap(group)
+        timelineStart += dur
+    spans.add span
+
+  # The timeline frame showing input frame `u`, or the next kept one; -1 when
+  # nothing is kept from there on. `moved` tells which.
+  proc place(u: int64, moved: var bool): int64 =
+    for k, sp in spans:
+      if u >= sp.hi: continue
+      if sp.kept and u >= sp.lo:
+        let f = sp.clip.clipFrameAt(sp.map, float64(u - sp.inputStart))
+        return clamp(f, sp.clip.start, sp.clip.start + sp.clip.dur - 1)
+      moved = true
+      for later in spans.toOpenArray(k, spans.high):
+        if later.kept: return later.clip.start
+      return -1
+    moved = true
+    -1
+
+  let tbf = tl.tb.float64
+  var movedCount, leftOut = 0
+  for m in markers:
+    let start = toTb(m.start, tbf).int64
+    let stop = max(start, toTb(m.stop, tbf).int64)
+    var moved = false
+    let at = place(start, moved)
+    if at < 0:
+      inc leftOut
+      continue
+    if moved: inc movedCount
+    var dur = 0'i64
+    if stop > start:
+      # Its end point, the frame after it: in a cut, that's the cut's place
+      # on the timeline; past every kept frame, the timeline's end.
+      var endMoved = false
+      let endAt = place(stop, endMoved)
+      dur = (if endAt >= 0: endAt else: timelineStart) - at
+    tl.markers.add Marker(start: at, dur: max(0'i64, dur), name: m.name,
+      note: m.note, color: m.color)
+  if movedCount > 0:
+    warning &"{movedCount} marker(s) in cut-out sections moved to the next kept frame"
+  if leftOut > 0:
+    warning &"{leftOut} marker(s) after the last kept frame left out"
 
 proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
     clips2: seq[Clip2], effects: seq[Actions]): v3 =
