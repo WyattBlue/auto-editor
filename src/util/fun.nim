@@ -267,21 +267,31 @@ proc parseBitrate*(input: string): int =
 
   error &"Unknown bitrate: {input}"
 
+# A PackedInt holds 62 bits and a sign; "end" is the largest.
+const packedSpan = float64(1'i64 shl 62)
+
 proc parseTimeSimple*(val: string): PackedInt =
   const tb = 1000.0
   let (num, unit) = splitNumStr(val)
+  # float -> int is unchecked: out of range or NaN, it's garbage. `not (a and
+  # b)` so NaN fails too.
+  template packed(flag: bool, x: float64): PackedInt =
+    let f = x
+    if not (f > -packedSpan and f < packedSpan):
+      error &"'{val}': Time is out of range"
+    pack(flag, f.int64)
   if unit in ["s", "sec", "secs", "second", "seconds"]:
-    return pack(true, round(num * tb).int64)
+    return packed(true, round(num * tb))
   if unit in ["min", "mins", "minute", "minutes"]:
-    return pack(true, round(num * tb * 60).int64)
+    return packed(true, round(num * tb * 60))
   if unit == "hour":
-    return pack(true, round(num * tb * 3600).int64)
+    return packed(true, round(num * tb * 3600))
   if unit != "":
     error &"'{val}': Time format got unknown unit: `{unit}`"
 
   if num != trunc(num):
     error &"'{val}': Time format expects an integer"
-  return pack(false, num.int64)
+  return packed(false, num)
 
 proc parseTime*(val: string): PackedInt =
   if val == "start":
@@ -292,5 +302,9 @@ proc parseTime*(val: string): PackedInt =
 
 func toTb*(val: PackedInt, tb: float64): int =
   if val.getFlag:
-    return round(val.getNumber.float64 / 1000.0 * tb).int
+    # A time that far out is past "end" anyway; it saturates.
+    let f = round(val.getNumber.float64 / 1000.0 * tb)
+    if not (f > low(int).float64 and f < high(int).float64):
+      return (if f < 0: low(int) else: high(int))
+    return f.int
   return int(val.getNumber)
