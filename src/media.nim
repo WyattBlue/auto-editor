@@ -147,7 +147,8 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
   if result.duration <= 0 and result.v.len > 0 and result.a.len == 0:
     for i in 0 ..< formatContext.nb_streams.int:
       let stream = formatContext.streams[i]
-      if stream.codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
+      if stream.codecpar.codec_type == AVMEDIA_TYPE_VIDEO and
+          (stream.disposition and AV_DISPOSITION_ATTACHED_PIC) == 0:
         discard av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
         result.duration = scanVideoLength(formatContext, stream).float64
         discard av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD)
@@ -164,17 +165,12 @@ func makeSaneTimebase*(tb: AVRational): AVRational {.raises: [].} =
   if not tb.isValid:
     return AVRational(num: 30, den: 1)
   let tbFloat = round(tb.float64, 2)
-
-  let ntsc60 = AVRational(num: 60000, den: 1001)
-  let ntsc = AVRational(num: 30000, den: 1001)
-  let filmNtsc = AVRational(num: 24000, den: 1001)
-
-  if tbFloat == round(ntsc60.float64, 2):
-    return ntsc60
-  if tbFloat == round(ntsc.float64, 2):
-    return ntsc
-  if tbFloat == round(filmNtsc.float64, 2):
-    return filmNtsc
+  # NTSC rates, n x 1000/1001, which the rounding would otherwise turn into a
+  # rate that drifts from the source's.
+  for n in [15, 24, 30, 48, 60, 120, 240]:
+    let ntsc = AVRational(num: cint(n * 1000), den: 1001)
+    if tbFloat == round(ntsc.float64, 2):
+      return ntsc
   return av_d2q(tbFloat, 1000000)
 
 func isStill*(duration: float64, rate: AVRational): bool {.raises: [].} =
