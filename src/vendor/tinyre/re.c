@@ -661,7 +661,8 @@ if (spc > JMP) { \
   npc += 2 + npc[1]; \
   goto rec##nn; \
 } else { \
-  if (_sp != s) { \
+  /* BOL. A restart (cont set) begins mid-string, so it isn't the start. */ \
+  if (_sp != s || cont) { \
     if (!si && !clistidx) \
       return 0; \
     deccheck(nn) \

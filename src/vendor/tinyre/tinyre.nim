@@ -212,7 +212,6 @@ proc escapeRe*(s: string): string {.raises: [].} =
     of '\n': result.add "\\n"
     of '\r': result.add "\\r"
     of '\t': result.add "\\t"
-    of '\b': result.add "\\b"
     of '\f': result.add "\\f"
     of '\v': result.add "\\v"
     of '^', '$', '(', ')', '.', '[', ']', '{', '}', '*', '+', '?', '|', '\\':
