@@ -107,6 +107,7 @@ type
     # Brings every decoded frame to `layout`: a stream can switch channel
     # configurations mid-way (AAC), and `get` fills a buffer sized by `layout`.
     resampler: AudioResampler
+    carry: seq[int16] ## decoded past the last `get`'s end, for a sequential one
 
 func clamp16(v: int32): int16 {.inline.} =
   int16(max(-32768'i32, min(32767'i32, v)))
@@ -239,8 +240,11 @@ proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
   getter.container.close()
 
-proc get(getter: Getter, start, endSample: int): seq[int16] =
-  # start/end is in samples
+proc get(getter: Getter, start, endSample: int, sequential = false): seq[int16] =
+  ## Source samples [start, endSample), interleaved. A `sequential` read
+  ## carries on from where the last one stopped instead of seeking to `start`,
+  ## so a long span can be taken in parts: decoding from a seek isn't exact for
+  ## a lossy codec's first frames, which would mark every part's start.
   let container = getter.container
   let stream = getter.stream
   let decoderCtx = getter.decoderCtx
@@ -262,15 +266,25 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   let startPts = int64(startTimeInSeconds * timeBase.den.float /
     timeBase.num.float) + startOffset
 
-  # Seek to the approximate position
-  if av_seek_frame(container.formatContext, stream.index, startPts,
-      AVSEEK_FLAG_BACKWARD) < 0:
-    # If seeking fails, fall back to reading from beginning
-    discard av_seek_frame(container.formatContext, stream.index, 0,
-      AVSEEK_FLAG_BACKWARD)
+  var totalSamples = 0
+  if sequential:
+    let ch = getter.channels.int
+    let held = min(targetSamples, getter.carry.len div ch)
+    if held > 0:
+      copyMem(addr result[0], addr getter.carry[0], held * ch * sizeof(int16))
+      getter.carry.delete(0 ..< held * ch)
+    totalSamples = held
+  else:
+    getter.carry.setLen(0)
+    # Seek to the approximate position
+    if av_seek_frame(container.formatContext, stream.index, startPts,
+        AVSEEK_FLAG_BACKWARD) < 0:
+      # If seeking fails, fall back to reading from beginning
+      discard av_seek_frame(container.formatContext, stream.index, 0,
+        AVSEEK_FLAG_BACKWARD)
 
-  # Flush decoder after seeking
-  avcodec_flush_buffers(decoderCtx)
+    # Flush decoder after seeking
+    avcodec_flush_buffers(decoderCtx)
 
   var packet = av_packet_alloc()
   if packet == nil:
@@ -283,7 +297,6 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
     av_packet_free(addr packet)
     av_frame_free(addr frame)
 
-  var totalSamples = 0
   var samplesProcessed = 0
 
   # Shared by the demux loop and the end-of-stream decoder drain below.
@@ -303,19 +316,28 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
       else:
         samplesProcessed.int64
 
-    # If this frame is before our target start, skip it
-    if frameSamplePos + samples.int64 <= start.int64:
+    # If this frame is before our target start, skip it. A sequential read
+    # is already in place, and takes every frame whole.
+    if not sequential and frameSamplePos + samples.int64 <= start.int64:
       samplesProcessed += samples
       continue
 
     # Calculate how many samples to skip in this frame
-    let samplesSkippedInFrame = max(0, start - frameSamplePos.int)
+    let samplesSkippedInFrame =
+      if sequential: 0 else: max(0, start - frameSamplePos.int)
     let samplesInFrame = samples - samplesSkippedInFrame
     let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
 
     if not frame.toInt16(samplesSkippedInFrame, samplesToProcess, result,
         totalSamples, channels):
       error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
+
+    let left = samplesInFrame - samplesToProcess
+    if left > 0:
+      let at = getter.carry.len div channels
+      getter.carry.setLen((at + left) * channels)
+      discard frame.toInt16(samplesSkippedInFrame + samplesToProcess, left,
+        getter.carry, at, channels)
 
     totalSamples += samplesToProcess
     samplesProcessed += samples
@@ -329,22 +351,26 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
       var f = f
       av_frame_free(addr f)
 
-  while av_read_frame(container.formatContext, packet) >= 0 and
-      totalSamples < targetSamples:
+  # The end is checked before each read, so that nothing is taken from the
+  # demuxer or decoder and then dropped: a sequential read comes back for it.
+  template drain() =
+    while totalSamples < targetSamples and
+        avcodec_receive_frame(decoderCtx, frame) >= 0:
+      processDecoded()
+
+  drain() # what the decoder held when the last read stopped
+  while totalSamples < targetSamples and
+      av_read_frame(container.formatContext, packet) >= 0:
     defer: av_packet_unref(packet)
 
     if packet.stream_index == stream.index:
       if avcodec_send_packet(decoderCtx, packet) >= 0:
-        while avcodec_receive_frame(decoderCtx, frame) >= 0 and
-            totalSamples < targetSamples:
-          processDecoded()
+        drain()
 
   # Flush the decoder: CAP_DELAY decoders may hold the tail frames.
   if totalSamples < targetSamples:
     discard avcodec_send_packet(decoderCtx, nil)
-    while avcodec_receive_frame(decoderCtx, frame) >= 0 and
-        totalSamples < targetSamples:
-      processDecoded()
+    drain()
 
 func atempoChain(speed: float): seq[string] =
   ## atempo only behaves over a limited factor range, so a big tempo change is
@@ -743,6 +769,38 @@ func sourceChannel(srcCh, ch: int): int =
   elif ch < srcCh: ch
   else: -1
 
+proc mixClipPart(acc: var seq[int32], data: openArray[int16],
+    duckEnv: openArray[float32], first, last, n, startSample, bufStart,
+    totalSamples, fadeSamples, targetChannels, sourceChannels: int,
+    fadeInEdge, fadeOutEdge: bool) =
+  ## Add a clip's samples [first, last) of its `n`, which `data` holds from
+  ## `first` on, to `acc`, whose first sample is the output's `bufStart`.
+  for i in first ..< last:
+    let outputSampleIndex = startSample + i
+    # A clip running into the start contributes from there on.
+    if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
+      let fadeIn = (
+        if fadeInEdge and i < fadeSamples: (i.float64 + 0.5'f64) /
+            fadeSamples.float64
+        else: 1.0'f64
+      )
+      let tailDist = max(0, n - 1 - i)
+      let fadeOut = (
+        if fadeOutEdge and tailDist < fadeSamples: (tailDist.float64 + 0.5'f64) /
+            fadeSamples.float64
+        else: 1.0'f64
+      )
+      let gain = min(1.0'f64, min(fadeIn, fadeOut))
+      let baseIndex = (outputSampleIndex - bufStart) * targetChannels
+      let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
+      for ch in 0 ..< targetChannels:
+        let sc = sourceChannel(sourceChannels, ch)
+        if sc < 0: continue
+        let sourceIndex = (i - first) * sourceChannels + sc
+        if sourceIndex < data.len:
+          acc[baseIndex + ch] += int32(round(data[
+              sourceIndex].float32 * gain * dg))
+
 func clipSpeed(effs: seq[Actions], clip: Clip): float64 =
   result = 1.0
   for e in effs[clip.effects]:
@@ -831,6 +889,7 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
   let tb = tl.tb
   let sr = tl.sr
   let fadeSamples = max(1, int(audioFadeMs / 1000.0 * sr.float64))
+  let partSamples = 10 * sr.int
 
   if not tb.isValid:
     error "Invalid timeline timebase"
@@ -1026,16 +1085,32 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         let effectGroup = tl.effects[clip.effects]
         let (startSample, durSamples) =
           audioSampleSpan(clip.start, clip.dur, sr, tb)
-        let loaded = loadClip(clip, startSample, durSamples)
-        let processedData {.cursor.} = loaded[0]
-        let srcLayout = loaded[1]
-        if processedData.len > 0:
-          let sourceChannels = srcLayout.nb_channels
-          let numSamples = processedData.len div sourceChannels
-          let n = min(durSamples, numSamples)
+
+        # A long clip that plays its source as it is gets read a part at a
+        # time, each mixed and emitted before the next: whole, an hour of it
+        # is gigabytes. Effects work on the whole clip, as does resampling.
+        var parts: Getter = nil
+        var partsFrom = 0 # the clip's first source sample
+        var whole: seq[int16]
+        var sourceChannels = targetChannels.int
+        var n = 0 # the clip's length in output samples
+        var duckEnv: seq[float32]
+        if durSamples > partSamples and clip.src != nil and
+            (clip.src, clip.stream) in samples and
+            samples[(clip.src, clip.stream)].stream.codecpar.sample_rate == sr and
+            not effectGroup.anyIt(it.kind < actInvert):
+          parts = samples[(clip.src, clip.stream)]
+          partsFrom = int(clip.offset.float64 * sr.float64 / tb)
+          let partsTo = int(float64(clip.offset + clip.dur) * sr.float64 / tb)
+          sourceChannels = parts.channels.int
+          n = min(durSamples, max(0, partsTo - partsFrom))
+        else:
+          var loaded = loadClip(clip, startSample, durSamples)
+          whole = move loaded[0]
+          sourceChannels = loaded[1].nb_channels.int
+          n = min(durSamples, whole.len div sourceChannels)
           # Autoduck: scale this clip by the sidechain (active layers above it).
-          var duckEnv: seq[float32]
-          block:
+          if n > 0:
             for e in effectGroup:
               if e.kind == actDuck:
                 let above = activeLayers.filterIt(it > bestLi)
@@ -1044,44 +1119,44 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
                     mixRangeDucked(above, startSample, n), n, e, sr,
                     targetChannels)
                 break
-          let neededFrames = startSample + n - bufStart
+
+        if parts != nil:
+          # A clip starting under this one holds back everything after its
+          # start until this one is mixed, so make room for all of that once
+          # rather than a part at a time.
+          var held = false
+          for li in activeLayers:
+            if cursors[li] < tl.a[li].len and startOf(li) < startSample + n:
+              held = true
+          if held and (startSample + n - bufStart) * targetChannels > acc.len:
+            acc.setLen((startSample + n - bufStart) * targetChannels)
+
+        var first = 0 # of the clip's samples, the next to mix
+        while true:
+          let last = (if parts != nil: min(n, first + partSamples) else: n)
+          if parts != nil:
+            whole = parts.get(partsFrom + first, partsFrom + last,
+              sequential = first > 0)
+          let neededFrames = startSample + last - bufStart
           if neededFrames * targetChannels > acc.len:
             acc.setLen(neededFrames * targetChannels)
-          for i in 0 ..< n:
-            let outputSampleIndex = startSample + i
-            # A clip running into the start contributes from there on.
-            if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
-              let fadeIn = (
-                if fadeInEdge and i < fadeSamples: (i.float64 + 0.5'f64) /
-                    fadeSamples.float64
-                else: 1.0'f64
-              )
-              let tailDist = max(0, n - 1 - i)
-              let fadeOut = (
-                if fadeOutEdge and tailDist < fadeSamples: (tailDist.float64 + 0.5'f64) /
-                    fadeSamples.float64
-                else: 1.0'f64
-              )
-              let gain = min(1.0'f64, min(fadeIn, fadeOut))
-              let baseIndex = (outputSampleIndex - bufStart) * targetChannels
-              let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
-              for ch in 0 ..< targetChannels:
-                let sc = sourceChannel(sourceChannels, ch)
-                if sc < 0: continue
-                let sourceIndex = i * sourceChannels + sc
-                if sourceIndex < processedData.len:
-                  acc[baseIndex + ch] += int32(round(processedData[
-                      sourceIndex].float32 * gain * dg))
+          mixClipPart(acc, whole, duckEnv, first, last, n, startSample, bufStart,
+            totalSamples, fadeSamples, targetChannels.int, sourceChannels,
+            fadeInEdge, fadeOutEdge)
+          first = last
 
-        # Everything below the next clip's start can receive no further writes.
-        var hasRemaining = false
-        var safeBoundary = totalSamples
-        for li in activeLayers:
-          if cursors[li] < tl.a[li].len:
-            hasRemaining = true
-            safeBoundary = min(safeBoundary, startOf(li))
-        if hasRemaining:
-          flushUpTo(safeBoundary, final = false)
+          # Everything below the next clip's start, and below what's left of
+          # this one, can receive no further writes.
+          var hasRemaining = first < n
+          var safeBoundary = (if first < n: startSample + first else: totalSamples)
+          for li in activeLayers:
+            if cursors[li] < tl.a[li].len:
+              hasRemaining = true
+              safeBoundary = min(safeBoundary, startOf(li))
+          if hasRemaining:
+            flushUpTo(safeBoundary, final = false)
+          if first >= n:
+            break
 
       flushUpTo(totalSamples, final = true)
 
