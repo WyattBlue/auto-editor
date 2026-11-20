@@ -208,7 +208,10 @@ proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
       timemap.add p
     point(0, 0.0, "smooth2")
     if not map.ramp:
-      point(int64(srcDur.float / map.mean), srcDur.float, "smooth2")
+      # A whole frame for the time, so the value follows from it: rounding
+      # the time alone would change the slope, which is the speed.
+      let t = max(1'i64, int64(srcDur.float / map.mean))
+      point(t, t.float * map.mean, "smooth2")
     else:
       # Straight lines between frames along the ramp follow it closely;
       # before and after the clip the media plays at its end speeds.
