@@ -729,6 +729,15 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
   media.add audio
   sequence.add media
+  # A sequence's markers come after its media. `out` is -1 for a point; the
+  # format has no place for a color.
+  for m in tl.markers:
+    let marker = newElement("marker")
+    marker.add elem("comment", m.note)
+    marker.add elem("name", m.name)
+    marker.add elem("in", $m.start)
+    marker.add elem("out", (if m.dur > 0: $(m.start + m.dur) else: "-1"))
+    sequence.add marker
   xmeml.add sequence
 
   writeXml(xmeml, output)

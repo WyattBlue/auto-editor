@@ -222,6 +222,23 @@ proc edlWrite*(name, output: string, tl: v3) =
         events.add ev
   events.sort(proc (a, b: Event): int = cmp(a.order, b.order))
 
+  # A marker is a locator comment, at its record time, under the last event
+  # that has begun by then. Locators take Avid's colors and have no length.
+  for m in tl.markers:
+    var at = -1
+    for i, ev in events:
+      if ev.order[0] > m.start: break
+      at = i
+    if at < 0:
+      if events.len == 0: break
+      at = 0
+    let color = case m.color
+      of mcOrange: "YELLOW"
+      of mcPurple, mcPink: "MAGENTA"
+      else: toUpperAscii($m.color)
+    events[at].comments.add strip("LOC: " & formatTimecode(m.start, base, drop) &
+      " " & alignLeft(color, 7) & " " & m.name.replace('\n', ' '))
+
   var text = "TITLE: " & name & "\n"
   text.add (if drop: "FCM: DROP FRAME\n" else: "FCM: NON-DROP FRAME\n")
   for i, ev in events:

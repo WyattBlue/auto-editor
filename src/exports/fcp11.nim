@@ -173,6 +173,25 @@ proc anchorCaptions(asset: XmlNode, tl: v3, orders: seq[CueOrder], clip: Clip,
       caption.add def
       asset.add caption
 
+proc addMarkers(asset: XmlNode, tl: v3, clip: Clip, startPoint: int64,
+    lo, hi: int64) {.raises: [].} =
+  ## The markers starting in timeline frames [lo, hi), on `asset`, the clip
+  ## they start during: FCPXML keeps markers on clips, in the clip's own
+  ## time, and has no place for a color.
+  for m in tl.markers:
+    if m.start < lo or m.start >= hi: continue
+    let marker = newElement("marker")
+    var attrs = @{
+      "start": fraction(clip.offset + startPoint + m.start - clip.start, tl.tb),
+      # A span ends with its clip: nothing can carry it across the cut.
+      "duration": fraction(max(1'i64,
+        min(m.dur, clip.start + clip.dur - m.start)), tl.tb),
+      "value": m.name,
+    }
+    if m.note != "": attrs.add ("note", m.note)
+    marker.attrs = attrs.toXmlAttributes
+    asset.add marker
+
 proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
     ptrToIdx: Table[ptr string, int], clip: Clip): (XmlNode, int64) =
   ## The clip's element, and its media's start point.
@@ -359,6 +378,7 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
           hi = clips[j].start
           break
       asset.anchorCaptions(tl, orders, clip, startPoint, lo, hi, styleId)
+      asset.addMarkers(tl, clip, startPoint, lo, hi)
       if plan[i].outgoing >= 0:
         spine.addTransition(tl, dissolveId, transitions[plan[i].outgoing])
 

@@ -1,4 +1,4 @@
-import std/[json, os, sets, tables]
+import std/[json, os, sets, strutils, tables]
 from std/math import round, hypot, ceil, sin, cos, PI
 
 import ../[action, ffmpeg, log, media, timeline]
@@ -23,6 +23,24 @@ const POS = -10800000.0
 
 proc rationalTime(rate, value: float): JsonNode =
   %*{"OTIO_SCHEMA": "RationalTime.1", "rate": rate, "value": value}
+
+proc markerNodes(tl: v3, rate: float): JsonNode =
+  ## The timeline's markers, for its top-level stack: OTIO has every one of
+  ## the marker colors by name, and a zero duration for a point.
+  result = newJArray()
+  for m in tl.markers:
+    result.add %*{
+      "OTIO_SCHEMA": "Marker.2",
+      "metadata": newJObject(),
+      "name": m.name,
+      "color": toUpperAscii($m.color),
+      "marked_range": {
+        "OTIO_SCHEMA": "TimeRange.1",
+        "duration": rationalTime(rate, m.dur.float),
+        "start_time": rationalTime(rate, m.start.float)
+      },
+      "comment": m.note
+    }
 
 proc center(): JsonNode = %*{"X": 0.5, "Y": 0.5}
 
@@ -624,7 +642,7 @@ proc otioWrite*(name, output: string, tl: v3) =
     "name": name,
     "source_range": nil,
     "effects": newJArray(),
-    "markers": newJArray(),
+    "markers": markerNodes(tl, rate),
     "enabled": true,
     "children": children
   }

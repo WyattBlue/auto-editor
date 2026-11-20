@@ -2,7 +2,7 @@ import std/[sequtils, strformat, strutils]
 
 import ./mlt
 import ../util/xml
-import ../[action, ffmpeg, timeline]
+import ../[action, ffmpeg, log, timeline]
 import ../util/[color, fun, rational]
 import ../lib/dnorm16
 
@@ -378,6 +378,21 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
 
   tractor.addProp("shotcut", "1")
   tractor.addProp("shotcut:projectAudioChannels", "2")
+
+  # Shotcut's markers: a list of numbered property sets, each a text, a color
+  # and clock times that are equal for a point. It has no place for a note.
+  if tl.markers.len > 0:
+    let markers = newElement("properties")
+    markers.attrs = {"name": "shotcut:markers"}.toXmlAttributes()
+    for i, m in tl.markers:
+      let marker = newElement("properties")
+      marker.attrs = {"name": $i}.toXmlAttributes()
+      marker.addProp("text", m.name)
+      marker.addProp("start", tc(m.start, tl.tb))
+      marker.addProp("end", tc(m.start + m.dur, tl.tb))
+      marker.addProp("color", m.color.hex)
+      markers.add marker
+    tractor.add markers
 
   let bg_track = newElement("track")
   bg_track.attrs = {"producer": "background"}.toXmlAttributes()

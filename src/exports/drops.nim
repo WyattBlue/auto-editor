@@ -129,8 +129,16 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
     for track in tl.c:
       if track.cues.len > 0: inc captions
     if captions > 0: result.add plural(captions, "caption track")
-  # No editor export carries markers yet.
-  if tl.markers.len > 0: result.add plural(tl.markers.len, "marker")
+  # Every editor export carries markers, but not every part of one: OTIO
+  # alone has a place for all of it.
+  if tl.markers.len > 0:
+    if kind in {exFinalCutPro, exResolve, exPremiere, exResolveFcp7} and
+        tl.markers.anyIt(it.color != mcBlue):
+      result.add "marker colors"
+    if kind in {exEdl, exShotcut, exKdenlive} and tl.markers.anyIt(it.note != ""):
+      result.add "marker notes"
+    if kind == exEdl and tl.markers.anyIt(it.dur > 0):
+      result.add "marker spans"
 
 proc warnDrops*(tl: v3, kind: ExportKind) {.raises: [].} =
   let drops = exportDrops(tl, kind)

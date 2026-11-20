@@ -1,7 +1,7 @@
 import std/[json, os, sequtils, tables, strformat, sysrand, strutils]
 import ./mlt
 import ../util/xml
-import ../[action, media, timeline]
+import ../[action, log, media, timeline]
 import ../util/[color, fun, rational]
 import ../lib/dnorm16
 
@@ -343,23 +343,45 @@ proc placeClips(k: var Kdenlive, tl: v3, c: int, base, clips: seq[Clip],
     groupChildren[ci].add(%*{
       "data": &"{c}:{tlStart}", "leaf": "clip", "type": "Leaf"})
 
-proc addSequence(k: var Kdenlive, seqId: string, groups: seq[JsonNode]) =
+proc addSequence(k: var Kdenlive, seqId: string, groups: seq[JsonNode],
+    markers: seq[Marker]) =
   ## The default sequence's tractor: the black track, then every track.
   let sequence = element("tractor", {"id": seqId, "in": zeroTc, "out": zeroTc})
   sequence.addProps({"kdenlive:uuid": seqId, "kdenlive:clipname": "Sequence 1"})
   let groupsProp = element("property", {"name": "kdenlive:sequenceproperties.groups"})
   groupsProp.add(newVerbatimText(pretty(%groups, indent = 4)))
   sequence.add(groupsProp)
+  # Markers are the sequence's guides, in frames. A guide's `type` is its
+  # category, which gives it a color: `addBin` defines one per marker color.
+  # A guide has one text, so the note is left out.
+  if markers.len > 0:
+    var guides = newJArray()
+    for m in markers:
+      guides.add %*{"pos": m.start, "comment": m.name, "type": ord(m.color),
+        "duration": m.dur}
+    let guidesProp = element("property", {"name": "kdenlive:sequenceproperties.guides"})
+    # Verbatim keeps the JSON's quotes as they are; a name's markup can't be.
+    guidesProp.add(newVerbatimText(pretty(guides, indent = 4).multiReplace(
+      ("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"))))
+    sequence.add(guidesProp)
   sequence.add(element("track", {"producer": "producer0"}))
   for i in 0 ..< k.nch:
     sequence.add(element("track", {"producer": &"tractor{i}"}))
   k.mlt.add(sequence)
 
-proc addBin(k: var Kdenlive, seqId: string) =
+proc addBin(k: var Kdenlive, seqId: string, hasMarkers: bool) =
   ## The main bin: the sequence, then one bin chain per source.
   let playlistBin = element("playlist", {"id": "main_bin"})
   playlistBin.addProps({"kdenlive:docproperties.uuid": seqId,
     "kdenlive:docproperties.version": "1.1", "xml_retain": "1"})
+  if hasMarkers:
+    var categories = newJArray()
+    for c in MarkerColor:
+      categories.add %*{"color": toLowerAscii(c.hex),
+        "comment": capitalizeAscii($c), "index": ord(c)}
+    let prop = element("property", {"name": "kdenlive:docproperties.guidesCategories"})
+    prop.add(newVerbatimText(pretty(categories, indent = 4)))
+    playlistBin.add(prop)
   playlistBin.add(element("entry", {"producer": seqId, "in": zeroTc, "out": zeroTc}))
   for path in k.uniquePaths:
     playlistBin.add(element("entry", {"producer": &"chain{k.binChainOf[path]}",
@@ -424,8 +446,8 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var groups: seq[JsonNode] = @[]
   for children in groupChildren:
     groups.add(%*{"children": children, "type": "Normal"})
-  k.addSequence(seqId, groups)
-  k.addBin(seqId)
+  k.addSequence(seqId, groups, tl.markers)
+  k.addBin(seqId, tl.markers.len > 0)
 
   # The reserved last tractor, for the project.
   let tractor = element("tractor", {"id": &"tractor{k.nch}", "in": zeroTc,

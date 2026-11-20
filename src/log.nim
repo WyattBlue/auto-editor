@@ -158,6 +158,19 @@ type
     name*, note*: string
     color*: MarkerColor
 
+func hex*(c: MarkerColor): string {.raises: [].} =
+  ## The color as "#RRGGBB", for the formats that take any color.
+  case c
+  of mcBlue: "#2D7FF9"
+  of mcRed: "#E53935"
+  of mcOrange: "#FB8C00"
+  of mcYellow: "#FDD835"
+  of mcGreen: "#43A047"
+  of mcCyan: "#00ACC1"
+  of mcPurple: "#8E24AA"
+  of mcPink: "#EC407A"
+  of mcWhite: "#FFFFFF"
+
 func toMarkerColor*(s: string, color: var MarkerColor): bool {.raises: [].} =
   ## Whether `s` names a marker color, setting `color` to it if so.
   for c in MarkerColor:
