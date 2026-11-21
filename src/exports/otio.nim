@@ -29,9 +29,13 @@ proc markerNodes(tl: v3, rate: float): JsonNode =
   ## the marker colors by name, and a zero duration for a point.
   result = newJArray()
   for m in tl.markers:
+    # Premiere reads the note from `comment`; Resolve from its own metadata.
+    let metadata =
+      if m.note == "": newJObject()
+      else: %*{"Resolve_OTIO": {"Note": m.note}}
     result.add %*{
       "OTIO_SCHEMA": "Marker.2",
-      "metadata": newJObject(),
+      "metadata": metadata,
       "name": m.name,
       "color": toUpperAscii($m.color),
       "marked_range": {
