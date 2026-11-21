@@ -296,15 +296,65 @@ proc boxBlur(im: Img, rx, ry: int): Img =
             s += src.px[min(y + ry + 1, h - 1) * w * 3 + col].int -
               src.px[max(y - ry, 0) * w * 3 + col].int)
 
+template pixels(im: Img): ptr UncheckedArray[uint8] =
+  cast[ptr UncheckedArray[uint8]](im.px[0].unsafeAddr)
+
 proc halve(im: Img): Img =
-  # The closure would copy the frame it captures; it ends before `im` does.
-  let im {.cursor.} = im
-  result.eachPixel(max(1, im.w div 2), max(1, im.h div 2)):
-    c = (im.get(2 * x, 2 * y) + im.get(2 * x + 1, 2 * y) +
-      im.get(2 * x, 2 * y + 1) + im.get(2 * x + 1, 2 * y + 1)) * 0.25'f32
+  ## Each pixel the average of a 2x2 block. The sum of four bytes times 0.25
+  ## is exact in float32, so rounding it as `put` does is `(sum + 2) shr 2`.
+  let (w, h) = (max(1, im.w div 2), max(1, im.h div 2))
+  if im.w < 2 or im.h < 2:
+    # The closure would copy the frame it captures; it ends before `im` does.
+    let im {.cursor.} = im
+    result.eachPixel(w, h):
+      c = (im.get(2 * x, 2 * y) + im.get(2 * x + 1, 2 * y) +
+        im.get(2 * x, 2 * y + 1) + im.get(2 * x + 1, 2 * y + 1)) * 0.25'f32
+    return
+  result = newImgUninit(w, h)
+  let (sp, dp, sw) = (im.pixels, result.pixels, im.w * 3)
+  eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
+    let (sp, dp, sw, w) = (sp, dp, sw, w)
+    for y in y0 ..< y1:
+      let (r0, r1, o) = (2 * y * sw, (2 * y + 1) * sw, y * w * 3)
+      for x in 0 ..< w:
+        for ch in 0 .. 2:
+          let j = 6 * x + ch
+          dp[o + 3 * x + ch] = uint8((sp[r0 + j].int + sp[r0 + j + 3].int +
+            sp[r1 + j].int + sp[r1 + j + 3].int + 2) shr 2))
+
+func growTaps(n, x: int): tuple[a, b, wa, wb: int] =
+  ## The two source pixels behind `x` of a doubled line `n` long, and their
+  ## weights in quarters: an even `x` falls a quarter before a source pixel's
+  ## center, an odd one a quarter after, clamped at the ends as `get` is.
+  let j = x div 2
+  if x mod 2 == 0: (max(j - 1, 0), j, 1, 3)
+  else: (j, min(j + 1, n - 1), 3, 1)
 
 proc grow(im: Img, w, h: int): Img =
   ## `im` scaled up to `w` by `h`.
+  if w == 2 * im.w and h == 2 * im.h:
+    # Doubling samples at quarter positions, where bilinear weights are
+    # 1/4 and 3/4 and every step is exact in float32, so the same bytes come
+    # from whole numbers: sixteenths, rounded as `put` does.
+    result = newImgUninit(w, h)
+    let (sp, dp, sw) = (im.pixels, result.pixels, im.w * 3)
+    var cols = newSeq[tuple[a, b, wa, wb: int]](w)
+    for x in 0 ..< w: cols[x] = growTaps(im.w, x)
+    let ih = im.h
+    eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
+      let (sp, dp, sw, w, ih) = (sp, dp, sw, w, ih)
+      let cp = cast[ptr UncheckedArray[tuple[a, b, wa, wb: int]]](cols[0].unsafeAddr)
+      for y in y0 ..< y1:
+        let t = growTaps(ih, y)
+        let (ra, rb, o) = (t.a * sw, t.b * sw, y * w * 3)
+        for x in 0 ..< w:
+          let c = cp[x]
+          for ch in 0 .. 2:
+            let (ia, ib) = (3 * c.a + ch, 3 * c.b + ch)
+            let top = c.wa * sp[ra + ia].int + c.wb * sp[ra + ib].int
+            let bot = c.wa * sp[rb + ia].int + c.wb * sp[rb + ib].int
+            dp[o + 3 * x + ch] = uint8((t.wa * top + t.wb * bot + 8) shr 4))
+    return
   # The closure would copy the frame it captures; it ends before `im` does.
   let im {.cursor.} = im
   let kx = im.w.float32 / w.float32
