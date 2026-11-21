@@ -108,6 +108,9 @@ func fbm(x, y: float32, seed: uint32): float32 =
   result /= 0.9375
 
 func newImg(w, h: int): Img = Img(w: w, h: h, px: newSeq[uint8](w * h * 3))
+func newImgUninit(w, h: int): Img =
+  ## For a picture whose every pixel is about to be written.
+  Img(w: w, h: h, px: newSeqUninit[uint8](w * h * 3))
 
 func get(im: Img, x, y: int): C {.inline.} =
   let x = max(0, min(x, im.w - 1))
@@ -218,7 +221,7 @@ proc eachRows(h: int, body: RowsBody) =
 template eachPixel(res: var Img, w, h: int, body: untyped) =
   ## `body` sets `c` for the pixel at `x`, `y`, whose center is `u`, `v` as a
   ## fraction of the frame.
-  res = newImg(w, h)
+  res = newImgUninit(w, h)
   let dst = addr res
   eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
     for y {.inject.} in y0 ..< y1:
@@ -238,11 +241,14 @@ proc mixImg(a, b: Img, t: float32): Img =
 
 proc boxBlur(im: Img, rx, ry: int): Img =
   ## A box blur `rx` pixels across and `ry` down, by running sums.
-  result = im
+  if rx == 0 and ry == 0:
+    return im
   let (w, h) = (im.w, im.h)
+  var across: Img
+  var src = unsafeAddr im
   if rx > 0:
-    var tmp = newImg(w, h)
-    let (src, dst) = (addr result, addr tmp)
+    across = newImgUninit(w, h)
+    let dst = addr across
     let n = 2 * rx + 1
     eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
       for y in y0 ..< y1:
@@ -254,10 +260,12 @@ proc boxBlur(im: Img, rx, ry: int): Img =
             dst.px[row + x * 3 + ch] = uint8((s + n div 2) div n)
             s += src.px[row + min(x + rx + 1, w - 1) * 3 + ch].int -
               src.px[row + max(x - rx, 0) * 3 + ch].int)
-    result = tmp
-  if ry > 0:
-    var tmp = newImg(w, h)
-    let (src, dst) = (addr result, addr tmp)
+    src = addr across
+  if ry == 0:
+    return move across
+  result = newImgUninit(w, h)
+  block:
+    let dst = addr result
     let n = 2 * ry + 1
     # Bands of columns, so each writes only its own.
     eachRows(w, proc (x0, x1: int) {.closure, gcsafe.} =
@@ -270,7 +278,6 @@ proc boxBlur(im: Img, rx, ry: int): Img =
             dst.px[y * w * 3 + col] = uint8((s + n div 2) div n)
             s += src.px[min(y + ry + 1, h - 1) * w * 3 + col].int -
               src.px[max(y - ry, 0) * w * 3 + col].int)
-    result = tmp
 
 proc halve(im: Img): Img =
   # The closure would copy the frame it captures; it ends before `im` does.
@@ -701,17 +708,41 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
                  else: bell(p) * fw * 0.25'f32)
     let shift = -(if kind == tkPush: smooth(0, 1, p) else: e) * fw
     let dip = (if kind == tkTravelMotion: 1 - 0.12'f32 * bell(p) else: 1'f32)
-    let am = a.motion(speed, 0)
-    let bm = b.motion(speed, 0)
-    result.eachPixel(w, h):
-      let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
-      let yy = (y.float32 + 0.5'f32 - fh / 2) / dip + fh / 2
-      if yy < 0 or yy >= fh:
-        c = under.get(x, y)
-      elif xx - shift < fw:
-        c = am.sample(xx - shift, yy)
-      else:
-        c = bm.sample(xx - shift - fw, yy)
+    # Without blur the pictures are used as they are, not copied.
+    var amOwn, bmOwn: Img
+    let blurred = int(abs(speed) / 2) > 0
+    if blurred:
+      amOwn = a.motion(speed, 0)
+      bmOwn = b.motion(speed, 0)
+    let am = (if blurred: addr amOwn else: a.unsafeAddr)
+    let bm = (if blurred: addr bmOwn else: b.unsafeAddr)
+    if dip == 1:
+      # Each row samples at its own center, so the vertical half of
+      # `sample` mixes by 0 and only the source column varies, which a
+      # table per column gives once per frame.
+      var cols = newSeq[tuple[im: ptr Img, x0, x1: int, tx: float32]](w)
+      for x in 0 ..< w:
+        let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
+        let (im, sx) =
+          if xx - shift < fw: (am, xx - shift)
+          else: (bm, xx - shift - fw)
+        let fx = sx - 0.5'f32
+        let x0 = floor(fx).int
+        cols[x] = (im, clamp(x0, 0, w - 1), clamp(x0 + 1, 0, w - 1),
+          fx - x0.float32)
+      result.eachPixel(w, h):
+        let col = cols[x]
+        c = mix(col.im[].get(col.x0, y), col.im[].get(col.x1, y), col.tx)
+    else:
+      result.eachPixel(w, h):
+        let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
+        let yy = (y.float32 + 0.5'f32 - fh / 2) / dip + fh / 2
+        if yy < 0 or yy >= fh:
+          c = under.get(x, y)
+        elif xx - shift < fw:
+          c = am[].sample(xx - shift, yy)
+        else:
+          c = bm[].sample(xx - shift - fw, yy)
 
   of tkChaos, tkGlitch, tkVhsDamage:
     let amp = bell(p)
