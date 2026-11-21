@@ -250,7 +250,7 @@ proc mixImg(a, b: Img, t: float32): Img =
 
 proc boxBlur(im: Img, rx, ry: int): Img =
   ## A box blur `rx` pixels across and `ry` down, by running sums.
-  if rx == 0 and ry == 0:
+  if rx <= 0 and ry <= 0:
     return im
   let (w, h) = (im.w, im.h)
   var across: Img
@@ -270,7 +270,7 @@ proc boxBlur(im: Img, rx, ry: int): Img =
             s += src.px[row + min(x + rx + 1, w - 1) * 3 + ch].int -
               src.px[row + max(x - rx, 0) * 3 + ch].int)
     src = addr across
-  if ry == 0:
+  if ry <= 0:
     return move across
   result = newImgUninit(w, h)
   block:
@@ -537,6 +537,10 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   let b {.cursor.} = b
   let under {.cursor.} = under
   let (w, h) = (a.w, a.h)
+  # Some kinds read the pictures by index without clamping, so a smaller one
+  # would be read past its end.
+  doAssert b.w == w and b.h == h and under.w == w and under.h == h,
+    "transition pictures differ in size"
   let (fw, fh) = (w.float32, h.float32)
   let e = easeInOut(p)
   let fseed = seed + uint32(frame) * 7919'u32
