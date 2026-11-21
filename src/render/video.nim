@@ -346,6 +346,13 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: float,
 func toInt(r: AVRational): int =
   (r.num div r.den).int
 
+proc newSwsCtx(): ptr SwsContext =
+  result = sws_alloc_context()
+  if result == nil:
+    error "Failed to allocate sws context"
+  # sws_alloc_context defaults to a single thread.
+  discard av_opt_set_int(result, "threads", 0, 0)
+
 proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     height: cint = 0, ctx: ptr SwsContext = nil): ptr AVFrame =
   if frame == nil:
@@ -395,14 +402,9 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   var ownedCtx: ptr SwsContext = nil
   let swsCtx =
-    if ctx != nil:
-      ctx
+    if ctx != nil: ctx
     else:
-      ownedCtx = sws_alloc_context()
-      if ownedCtx == nil:
-        error "Failed to allocate sws context"
-      # sws_alloc_context defaults to a single thread.
-      discard av_opt_set_int(ownedCtx, "threads", 0, 0)
+      ownedCtx = newSwsCtx()
       ownedCtx
 
   ret = sws_scale_frame(swsCtx, newFrame, frame)
@@ -415,8 +417,8 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   return newFrame
 
-proc toImg(frame: ptr AVFrame): Img =
-  let rgb = frame.reformat(AV_PIX_FMT_RGB24)
+proc toImg(frame: ptr AVFrame, ctx: ptr SwsContext): Img =
+  let rgb = frame.reformat(AV_PIX_FMT_RGB24, ctx = ctx)
   result = Img(w: rgb.width.int, h: rgb.height.int)
   result.px = newSeq[uint8](result.w * result.h * 3)
   for y in 0 ..< result.h:
@@ -426,7 +428,7 @@ proc toImg(frame: ptr AVFrame): Img =
     var f = rgb
     av_frame_free(addr f)
 
-proc fromImg(im: Img, like: ptr AVFrame): ptr AVFrame =
+proc fromImg(im: Img, like: ptr AVFrame, ctx: ptr SwsContext): ptr AVFrame =
   ## `im` in the format and color tags of `like`, so the round trip through
   ## RGB uses the same matrix both ways.
   var rgb = av_frame_alloc()
@@ -455,11 +457,7 @@ proc fromImg(im: Img, like: ptr AVFrame): ptr AVFrame =
   result.color_primaries = like.color_primaries
   result.color_trc = like.color_trc
   if av_frame_get_buffer(result, 32) < 0: error "Could not allocate a transition frame"
-  var ctx = sws_alloc_context()
-  if ctx == nil: error "Failed to allocate sws context"
-  discard av_opt_set_int(ctx, "threads", 0, 0)
   let ret = sws_scale_frame(ctx, result, rgb)
-  sws_free_context(addr ctx)
   av_frame_free(addr rgb)
   if ret < 0: error "Failed to convert a transition frame"
 
@@ -1219,6 +1217,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # Allocated on the first zoom; swscale rebuilds it itself when the geometry
   # changes, so a constant zoom pays the init cost once.
   var zoomCtx: ptr SwsContext = nil
+  # Likewise for per-frame conversions elsewhere, each kept to one direction
+  # so its geometry and formats stay put from frame to frame.
+  var fxConvCtx: ptr SwsContext = nil # an effect's format
+  var overlayCtx: ptr SwsContext = nil # a sub-pixel overlay's scale
+  var toRgbCtx: ptr SwsContext = nil # into a transition
+  var fromRgbCtx: ptr SwsContext = nil # out of a transition
+  template lazyCtx(c: var ptr SwsContext): ptr SwsContext =
+    (if c == nil: c = newSwsCtx(); c)
 
   var framesSaved = 0
   var frameNo = -1'i64 # the timeline frame being built
@@ -1724,7 +1730,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # writes yuv420p and rgba, so convert anything else first.
         let want = (if hasAlpha(AVPixelFormat(frame.format)): AV_PIX_FMT_RGBA
                     else: AV_PIX_FMT_YUV420P)
-        let conv = frame.reformat(want)
+        let conv = frame.reformat(want, ctx = lazyCtx(fxConvCtx))
         if conv != frame:
           av_frame_free(addr frame)
           frame = conv
@@ -1741,7 +1747,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         let fmt = AVPixelFormat(frame.format)
         let want = (if canBurn(fmt): fmt elif hasAlpha(fmt): AV_PIX_FMT_RGBA
                     else: AV_PIX_FMT_YUV420P)
-        let conv = frame.reformat(want)
+        let conv = frame.reformat(want, ctx = lazyCtx(fxConvCtx))
         if conv != frame:
           av_frame_free(addr frame)
           frame = conv
@@ -2089,7 +2095,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     else:
       # Sub-pixel placement: scale to rgba up front (so alpha survives), nudge it by
       # the fractional remainder, then overlay the prepared frame at the whole pixel.
-      let scaled = top.reformat(AV_PIX_FMT_RGBA, nw.cint, nh.cint)
+      let scaled = top.reformat(AV_PIX_FMT_RGBA, nw.cint, nh.cint,
+        lazyCtx(overlayCtx))
       let shifted = subpixelShift(scaled, fx, fy)
       shifted.pts = 0
       let b1 = g.add("buffer", bufArgsOf(shifted))
@@ -2388,9 +2395,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
           let dip: tuple[r, g, b: float32] = (bgRgb.red.float32, bgRgb.green.float32,
             bgRgb.blue.float32)
-          let img = render(w.kind, fromF.toImg, toF.toImg, below.toImg, p,
-            local.int, w.dur.int, seed, dip, w.easeIn, w.easeOut)
-          acc = img.fromImg(fromF)
+          let toRgb = lazyCtx(toRgbCtx)
+          let img = render(w.kind, fromF.toImg(toRgb), toF.toImg(toRgb),
+            below.toImg(toRgb), p, local.int, w.dur.int, seed, dip, w.easeIn,
+            w.easeOut)
+          acc = img.fromImg(fromF, lazyCtx(fromRgbCtx))
           av_frame_free(addr fromF)
           av_frame_free(addr toF)
           var b = below
@@ -2487,6 +2496,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     sws_free_context(addr padCtx)
     sws_free_context(addr reformatCtx)
     sws_free_context(addr zoomCtx)
+    sws_free_context(addr fxConvCtx)
+    sws_free_context(addr overlayCtx)
+    sws_free_context(addr toRgbCtx)
+    sws_free_context(addr fromRgbCtx)
     av_frame_free(addr frame)
     av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
