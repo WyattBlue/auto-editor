@@ -800,11 +800,12 @@ func sourceChannel(srcCh, ch: int): int =
   else: -1
 
 proc mixClipPart(acc: var seq[int32], data: openArray[int16],
-    duckEnv: openArray[float32], first, last, n, startSample, bufStart,
+    duckEnv: openArray[float32], first, last, n, startSample, bufStart, accStart,
     totalSamples, fadeSamples, targetChannels, sourceChannels: int,
     fadeInEdge, fadeOutEdge: bool) =
   ## Add a clip's samples [first, last) of its `n`, which `data` holds from
-  ## `first` on, to `acc`, whose first sample is the output's `bufStart`.
+  ## `first` on, to `acc`, whose first sample is the output's `accStart`.
+  ## Samples before `bufStart` have been sent and are left out.
   # A clip running into the start contributes from there on.
   let lo = max(first, bufStart - startSample)
   let hi = min(min(last, totalSamples - startSample),
@@ -826,7 +827,7 @@ proc mixClipPart(acc: var seq[int32], data: openArray[int16],
         else: 1.0'f64
       )
       let gain = min(1.0'f64, min(fadeIn, fadeOut))
-      let baseIndex = (startSample + i - bufStart) * targetChannels
+      let baseIndex = (startSample + i - accStart) * targetChannels
       let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
       for ch in 0 ..< targetChannels:
         let sc = sourceChannel(sourceChannels, ch)
@@ -846,13 +847,13 @@ proc mixClipPart(acc: var seq[int32], data: openArray[int16],
   for i in lo ..< a:
     mixScaled(i)
   if sourceChannels == targetChannels:
-    let dst = (startSample + a - bufStart) * targetChannels
+    let dst = (startSample + a - accStart) * targetChannels
     let src = (a - first) * sourceChannels
     for k in 0 ..< (b - a) * targetChannels:
       acc[dst + k] += int32(data[src + k])
   else:
     for i in a ..< b:
-      let baseIndex = (startSample + i - bufStart) * targetChannels
+      let baseIndex = (startSample + i - accStart) * targetChannels
       for ch in 0 ..< targetChannels:
         let sc = sourceChannel(sourceChannels, ch)
         if sc >= 0:
@@ -1078,8 +1079,9 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
     return iterator(): seq[int16] =
       var cursors = newSeq[int](tl.a.len)
 
-      var acc: seq[int32] = @[] # interleaved accumulator over [bufStart, ...)
-      var bufStart = fromSample # output sample-frame index mapped to acc[0]
+      var acc: seq[int32] = @[] # interleaved accumulator over [accStart, ...)
+      var accStart = fromSample # output sample-frame index mapped to acc[0]
+      var bufStart = fromSample # the first sample-frame not yet sent
 
       template startOf(li: int): int =
         int(tl.a[li][cursors[li]].start * sr.int64 * tb.den div tb.num)
@@ -1088,28 +1090,33 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       # (the whole remainder when `final`), then drop them from `acc`.
       template flushUpTo(boundaryArg: int, final: bool) =
         let boundary = min(boundaryArg, totalSamples)
-        if (boundary - bufStart) * targetChannels > acc.len:
-          acc.setLen((boundary - bufStart) * targetChannels)
+        if (boundary - accStart) * targetChannels > acc.len:
+          acc.setLen((boundary - accStart) * targetChannels)
         var emitFrames = 0
         if final:
           emitFrames = max(0, boundary - bufStart)
         else:
           while bufStart + emitFrames + frameSize <= boundary:
             emitFrames += frameSize
-        var off = 0
-        while off < emitFrames:
-          let cf = min(frameSize, emitFrames - off)
+        var off = bufStart - accStart
+        let emitEnd = off + emitFrames
+        while off < emitEnd:
+          let cf = min(frameSize, emitEnd - off)
           var chunk = newSeq[int16](cf * targetChannels)
           for k in 0 ..< cf * targetChannels:
             chunk[k] = clamp16(acc[off * targetChannels + k])
           off += cf
           yield chunk
-        if emitFrames > 0:
-          acc =
-            if emitFrames * targetChannels < acc.len:
-              acc[emitFrames * targetChannels .. ^1]
-            else: @[]
-          bufStart += emitFrames
+        bufStart += emitFrames
+        # Dropping sent samples moves all the unsent ones, which under a long
+        # clip is the rest of it, so do it only once half of `acc` is spent.
+        let spent = (bufStart - accStart) * targetChannels
+        if spent > 0 and spent * 2 >= acc.len:
+          let keep = acc.len - spent
+          if keep > 0:
+            moveMem(addr acc[0], addr acc[spent], keep * sizeof(int32))
+          acc.setLen(keep)
+          accStart = bufStart
 
       # Clips over before the start are never read.
       for li in activeLayers:
@@ -1193,8 +1200,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           for li in activeLayers:
             if cursors[li] < tl.a[li].len and startOf(li) < startSample + n:
               held = true
-          if held and (startSample + n - bufStart) * targetChannels > acc.len:
-            acc.setLen((startSample + n - bufStart) * targetChannels)
+          if held and (startSample + n - accStart) * targetChannels > acc.len:
+            acc.setLen((startSample + n - accStart) * targetChannels)
 
         var first = 0 # of the clip's samples, the next to mix
         while true:
@@ -1211,11 +1218,11 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
               if srcAt == srcTo:
                 feed.finish()
             whole = feed.take(last - first)
-          let neededFrames = startSample + last - bufStart
+          let neededFrames = startSample + last - accStart
           if neededFrames * targetChannels > acc.len:
             acc.setLen(neededFrames * targetChannels)
           mixClipPart(acc, whole, duckEnv, first, last, n, startSample, bufStart,
-            totalSamples, fadeSamples, targetChannels.int, sourceChannels,
+            accStart, totalSamples, fadeSamples, targetChannels.int, sourceChannels,
             fadeInEdge, fadeOutEdge)
           first = last
 
