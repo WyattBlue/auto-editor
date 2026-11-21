@@ -273,7 +273,10 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
     if currentFrame != nil:
       dealloc(currentFrame)
 
-  let filter = &"scale={width}:-1,format=gray,gblur=sigma={blur}"
+  # gblur still runs every pass at sigma 0, so leave it out.
+  let filter =
+    if blur == 0: &"scale={width}:-1,format=gray"
+    else: &"scale={width}:-1,format=gray,gblur=sigma={blur}"
   let crop =
     if x != 0.0 or y != 0.0 or w != 1.0 or h != 1.0:
       # Crop before scaling so the analyzed region gets the full `width` resolution.
