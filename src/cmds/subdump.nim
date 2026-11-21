@@ -124,7 +124,7 @@ proc main*(args: seq[string]) =
           if text.len > 0:
             cues.add( %* {"start": start, "end": finish, "text": text})
         else:
-          echo ass
+          stdout.write(ass, "\n")
 
       if asJson:
         streamsJson.add( %* {"stream": i, "codec": codecName, "cues": cues})

@@ -278,13 +278,16 @@ proc main*(strArgs: seq[string]) =
     if ret != -1:
       error &"Subtitle stream out of range: {ret}"
     for value in values:
-      echo (if value: "1" else: "0")
+      stdout.write(if value: "1\n" else: "0\n")
+    stdout.flushFile()
     return
 
   let (data, errs) = computeLevels(job)
   for u in data:
-    if display == "d16": echo uint16(u) else: echo u
-  echo ""
+    if display == "d16": stdout.write($uint16(u), "\n")
+    else: stdout.write($u, "\n")
+  stdout.write("\n")
+  stdout.flushFile()
 
   if errs > 0:
     error &"Could not decode {errs} packet(s); levels are incomplete."
