@@ -233,11 +233,20 @@ template eachPixel(res: var Img, w, h: int, body: untyped) =
         dst[].put(x, y, c))
 
 proc mixImg(a, b: Img, t: float32): Img =
-  # The closure would copy every frame it captures; it ends before they do.
-  let a {.cursor.} = a
-  let b {.cursor.} = b
-  result.eachPixel(a.w, a.h):
-    c = mix(a.get(x, y), b.get(x, y), t)
+  # At the ends the mix rounds back to one picture exactly.
+  if t == 0 or a.px.len == 0: return a
+  if t == 1: return b
+  result = Img(w: a.w, h: a.h, px: newSeqUninit[uint8](a.px.len))
+  let pa = cast[ptr UncheckedArray[uint8]](a.px[0].unsafeAddr)
+  let pb = cast[ptr UncheckedArray[uint8]](b.px[0].unsafeAddr)
+  let pd = cast[ptr UncheckedArray[uint8]](result.px[0].addr)
+  let rowBytes = a.w * 3
+  # Byte by byte, as `mix` and `put` do per channel, in a flat loop the
+  # compiler can vectorize.
+  eachRows(a.h, proc (y0, y1: int) {.closure, gcsafe.} =
+    for i in y0 * rowBytes ..< y1 * rowBytes:
+      let x = pa[i].float32
+      pd[i] = uint8(clamp(x + (pb[i].float32 - x) * t + 0.5'f32, 0, 255)))
 
 proc boxBlur(im: Img, rx, ry: int): Img =
   ## A box blur `rx` pixels across and `ry` down, by running sums.
