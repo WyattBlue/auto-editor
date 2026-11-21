@@ -112,6 +112,9 @@ func newImgUninit(w, h: int): Img =
   ## For a picture whose every pixel is about to be written.
   Img(w: w, h: h, px: newSeqUninit[uint8](w * h * 3))
 
+template pixels(im: Img): ptr UncheckedArray[uint8] =
+  cast[ptr UncheckedArray[uint8]](im.px[0].unsafeAddr)
+
 func get(im: Img, x, y: int): C {.inline.} =
   let x = max(0, min(x, im.w - 1))
   let y = max(0, min(y, im.h - 1))
@@ -281,23 +284,33 @@ proc boxBlur(im: Img, rx, ry: int): Img =
   if ry <= 0:
     return move across
   result = newImgUninit(w, h)
-  block:
-    let dst = addr result
-    let n = 2 * ry + 1
-    # Bands of columns, so each writes only its own.
-    eachRows(w, proc (x0, x1: int) {.closure, gcsafe.} =
-      for x in x0 ..< x1:
-        for ch in 0 .. 2:
-          let col = x * 3 + ch
-          var s = 0
-          for k in -ry .. ry: s += src.px[clamp(k, 0, h - 1) * w * 3 + col].int
-          for y in 0 ..< h:
-            dst.px[y * w * 3 + col] = uint8((s + n div 2) div n)
-            s += src.px[min(y + ry + 1, h - 1) * w * 3 + col].int -
-              src.px[max(y - ry, 0) * w * 3 + col].int)
-
-template pixels(im: Img): ptr UncheckedArray[uint8] =
-  cast[ptr UncheckedArray[uint8]](im.px[0].unsafeAddr)
+  let (sp, dp, stride) = (src[].pixels, result.pixels, w * 3)
+  let n = 2 * ry + 1
+  let half = n div 2
+  # Up to 128 taps, a multiply by ceil(2^22 / n) and a shift gives the
+  # rounded quotient exactly and stays within 32 bits, so the loop can
+  # vectorize where a divide can't.
+  let m = (if n <= 128: ((1'u32 shl 22) + n.uint32 - 1) div n.uint32 else: 0'u32)
+  # Bands of columns, so each writes only its own. Each band keeps a running
+  # sum per byte and goes down a row at a time, so reads and writes run
+  # along memory instead of striding down columns.
+  eachRows(w, proc (x0, x1: int) {.closure, gcsafe.} =
+    let (sp, dp, stride, h, ry, n, half, m) = (sp, dp, stride, h, ry, n, half, m)
+    let (lo, len) = (x0 * 3, (x1 - x0) * 3)
+    var sums = newSeq[int32](len)
+    for k in -ry .. ry:
+      let r = clamp(k, 0, h - 1) * stride + lo
+      for i in 0 ..< len: sums[i] += sp[r + i].int32
+    for y in 0 ..< h:
+      let o = y * stride + lo
+      if m != 0:
+        for i in 0 ..< len:
+          dp[o + i] = uint8((uint32(sums[i] + half.int32) * m) shr 22)
+      else:
+        for i in 0 ..< len: dp[o + i] = uint8((sums[i].int + half) div n)
+      let add = min(y + ry + 1, h - 1) * stride + lo
+      let sub = max(y - ry, 0) * stride + lo
+      for i in 0 ..< len: sums[i] += sp[add + i].int32 - sp[sub + i].int32)
 
 proc halve(im: Img): Img =
   ## Each pixel the average of a 2x2 block. The sum of four bytes times 0.25
