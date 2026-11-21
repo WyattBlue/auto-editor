@@ -387,7 +387,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
           discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
         imageStreams.add((outStrm, addr strm.attached_pic))
 
-  if args.chapters:
+  if not args.noChapters:
     # A named marker starts a chapter that runs for its span or, being a
     # point, up to the next chapter: players expect chapters end to end.
     var named = tl.markers.filterIt(it.name != "")

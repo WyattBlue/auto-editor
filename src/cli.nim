@@ -43,9 +43,9 @@ type CliOption* = enum
     coVideoSpeed, coPremiere, coResolve, coFinalCutPro, coShotcut, coKdenlive, coExport,
     coFrameRate, coSampleRate, coResolution, coBackground, coYtDlpLocation,
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
-    coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coChapters, coVcodec,
-    coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt, coScale, coFont, coNoSeek,
-    coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
+    coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coChapters,
+    coNoChapters, coVcodec, coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt,
+    coScale, coFont, coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
     coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
 
 type OptDef* = object
@@ -266,7 +266,9 @@ Examples:
   OptDef(names: "--no-fragmented", c: cCon, kind: Flag, datum: coNoFragmented,
     help: "Do not use fragmented mp4/mov for better compatibility (default)"),
   OptDef(names: "--chapters", c: cCon, kind: Flag, datum: coChapters,
-    help: "Write each named marker as a chapter, running for its span or else up to the next one"),
+    help: "Write each named marker as a chapter, running for its span or else up to the next one (default)"),
+  OptDef(names: "--no-chapters", c: cCon, kind: Flag, datum: coNoChapters,
+    help: "Do not write named markers as chapters"),
 
   OptDef(names: "-c:v, -vcodec, --video-codec", c: cVid, datum: coVcodec,
     metavar: "ENCODER", help: "Set video codec for output media"),
@@ -472,8 +474,8 @@ macro genCmdCases*(keyIdent: untyped): untyped =
 
 const argsFlagOptions = {
   coPreview, coVn, coAn, coSn, coDn, coFaststart, coNoFaststart, coFragmented,
-  coNoFragmented, coChapters, coNoSeek, coNoPartialLossless, coMixAudioStreams, coOpen,
-  coNoOpen, coWebCodecs,
+  coNoFragmented, coChapters, coNoChapters, coNoSeek, coNoPartialLossless,
+  coMixAudioStreams, coOpen, coNoOpen, coWebCodecs,
 }
 
 func flagTarget(opt: CliOption): string {.compileTime.} =
