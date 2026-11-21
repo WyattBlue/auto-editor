@@ -4,7 +4,7 @@ from std/math import ceil, round
 when defined(windows):
   import std/strutils
 
-import ../[action, ffmpeg, media, timeline]
+import ../[action, ffmpeg, log, media, timeline]
 import ../util/[fun, rational]
 import ../lib/speedmap
 
@@ -729,14 +729,26 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
   media.add audio
   sequence.add media
-  # A sequence's markers come after its media. `out` is -1 for a point; the
-  # format has no place for a color.
+  # A sequence's markers come after its media. `out` is -1 for a point. The
+  # format has no place for a color; Premiere adds its own, as 0xAABBGGRR.
   for m in tl.markers:
     let marker = newElement("marker")
     marker.add elem("comment", m.note)
     marker.add elem("name", m.name)
     marker.add elem("in", $m.start)
     marker.add elem("out", (if m.dur > 0: $(m.start + m.dur) else: "-1"))
+    if not resolve:
+      # The eight colors Premiere gives a marker; it has no pink.
+      let color = case m.color
+        of mcBlue: 0xFFFC8D42'u32
+        of mcRed: 0xFF362CD2'u32
+        of mcOrange: 0xFF246FE9'u32
+        of mcYellow: 0xFF2BA1D0'u32
+        of mcGreen: 0xFF378671'u32
+        of mcCyan: 0xFFD6F419'u32
+        of mcPurple, mcPink: 0xFFB18BAF'u32
+        of mcWhite: 0xFFFFFFFF'u32
+      marker.add elem("pproColor", $color)
     sequence.add marker
   xmeml.add sequence
 

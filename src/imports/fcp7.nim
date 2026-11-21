@@ -13,7 +13,8 @@ const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",
   "effectid", "effecttype", "parameter", "parameterid", "value", "valuemin",
   "valuemax", "keyframe", "when", "rate", "timebase", "ntsc", "duration",
   "pathurl", "masterclipid", "pproTicksIn", "pproTicksOut", "alphatype",
-  "pixelaspectratio", "anamorphic", "logginginfo", "colorinfo", "comments"]
+  "pixelaspectratio", "anamorphic", "logginginfo", "colorinfo", "comments",
+  "marker", "comment", "pproColor"]
 
 func readTbNtsc(tb: int, ntsc: bool): AVRational =
   if ntsc:
@@ -289,13 +290,47 @@ proc generatorColor(effect: XmlNode): (bool, RGBColor) =
     return (true, color)
   (false, color)
 
+func fromPproColor(value: int64): MarkerColor =
+  ## The marker color nearest Premiere's, which it writes as 0xAABBGGRR.
+  const premiere = [(mcBlue, 0x428DFC), (mcRed, 0xD22C36), (mcOrange, 0xE96F24),
+    (mcYellow, 0xD0A12B), (mcGreen, 0x718637), (mcCyan, 0x19F4D6),
+    (mcPurple, 0xAF8BB1), (mcWhite, 0xFFFFFF)]
+  let (r, g, b) = (value and 0xFF, (value shr 8) and 0xFF, (value shr 16) and 0xFF)
+  var best = high(int64)
+  for (color, rgb) in premiere:
+    let (dr, dg, db) = (r - (rgb shr 16), g - ((rgb shr 8) and 0xFF), b - (rgb and 0xFF))
+    let dist = dr * dr + dg * dg + db * db
+    if dist < best:
+      best = dist
+      result = color
+
+proc readMarker(node: XmlNode): (bool, Marker) =
+  ## A marker, in its sequence's or its clip's frames. `<out>` is -1 for a
+  ## point.
+  var marker: Marker
+  var stop = -1'i64
+  marker.start = -1
+  for c in node:
+    if c.kind != xnElement: continue
+    case c.tag
+    of "name": marker.name = c.innerText.strip()
+    of "comment": marker.note = c.innerText.strip()
+    of "in": marker.start = xmlInt(c, -1, maxFrames)
+    of "out": stop = xmlInt(c, -1, maxFrames)
+    of "pproColor": marker.color = fromPproColor(xmlInt(c, 0, high(uint32).int64))
+    else: discard
+  marker.dur = max(0'i64, stop - marker.start)
+  (marker.start >= 0, marker)
+
 proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     effects: var seq[Actions], effectIndex: var EffectIndex,
     interner: var StringInterner, audio: bool, res: (int32, int32),
     tb: AVRational, dropped: var CountTable[string]):
-    tuple[clips: seq[Clip], transitions: seq[Transition], laterChannels: bool] =
+    tuple[clips: seq[Clip], transitions: seq[Transition], laterChannels: bool,
+      markers: seq[Marker]] =
   ## `laterChannels` is set when every audio clip names a channel past the
   ## first of its stream, as on the per-channel tracks resolve-fcp7 writes.
+  ## `markers` are the clips' own, placed on the timeline.
   result.laterChannels = audio
   var items: seq[XmlNode]
   for c in trackNode:
@@ -323,7 +358,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
     var trackIndex = 1'i64
     var clipTb = tb
     var acts: seq[Action]
-    var filterNodes: seq[XmlNode]
+    var filterNodes, markerNodes: seq[XmlNode]
 
     for ci in trackChild:
       if ci.kind != xnElement: continue
@@ -340,6 +375,7 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       of "sequence": nested = true
       of "enabled": enabled = ci.innerText.strip() != "FALSE"
       of "filter": filterNodes.add ci
+      of "marker": markerNodes.add ci
       of "rate": clipTb = readRate(ci)
       of "sourcetrack":
         for st in ci:
@@ -441,6 +477,18 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       elif inExt > 0: max(0'i64, outVal - outExt - dur)
       elif ticksIn >= 0: int64(round(ticksIn.float / ticksPerFrame / speed))
       else: inVal
+    # A clip carries all of its media's markers, in the media's frames:
+    # those in the part it plays show on the timeline. A ramp or a reversed
+    # clip moves through its media unevenly, so theirs are left out.
+    if rampOffset < 0 and not remap.ramp and not remap.reverse and speed > 0.0:
+      for mn in markerNodes:
+        let (ok, m) = readMarker(mn)
+        if not ok: continue
+        let at = startVal + int64(round(m.start.float64 * scale / speed)) - offset
+        if at < startVal or at >= endVal: continue
+        let span = int64(round(m.dur.float64 * scale / speed))
+        result.markers.add Marker(start: at, dur: min(span, endVal - at),
+          name: m.name, note: m.note, color: m.color)
     let e = effectIndex.intern(effects, newActions(acts))
     var stream = 0'i16
     if audio:
@@ -467,6 +515,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
 
   var tb = AVRational(num: 30, den: 1)
   var mediaNode: XmlNode = nil
+  var markers: seq[Marker]
 
   for child in seqNode:
     if child.kind != xnElement: continue
@@ -475,6 +524,9 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
       tb = readRate(child)
     of "media":
       mediaNode = child
+    of "marker":
+      let (ok, marker) = readMarker(child)
+      if ok: markers.add marker
     else: discard
 
   if mediaNode == nil:
@@ -509,8 +561,9 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
                 elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
               res = (w, h)
         of "track":
-          let (clips, transitions, _) = parseTrack(vidChild, files, effects,
-            effectIndex, interner, audio = false, res, tb, dropped)
+          let (clips, transitions, _, clipMarkers) = parseTrack(vidChild, files,
+            effects, effectIndex, interner, audio = false, res, tb, dropped)
+          markers.add clipMarkers
           if clips.len > 0:
             vobjs.add clips
             vtrans.add transitions
@@ -530,8 +583,10 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
         of "track":
           let idx = audChild.attr("currentExplodedTrackIndex")
           if idx != "" and idx != "0": continue
-          let (clips, transitions, laterChannels) = parseTrack(audChild, files,
-            effects, effectIndex, interner, audio = true, res, tb, dropped)
+          let (clips, transitions, laterChannels, clipMarkers) = parseTrack(
+            audChild, files, effects, effectIndex, interner, audio = true, res, tb,
+            dropped)
+          markers.add clipMarkers
           # Clips play whole streams, which the stream's first-channel track
           # already holds.
           if clips.len > 0 and not laterChannels:
@@ -546,6 +601,10 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
     result.vt = vtrans
     result.at = atrans
     result.validateTransitions()
+  # A clip's video and each of its audio channels repeat its markers.
+  markers.sort(proc (a, b: Marker): int = cmp(a.start, b.start))
+  for m in markers:
+    if m notin result.markers: result.markers.add m
   result.templateFile = result.firstSource
   result.updateNumberOfSrc()
   # The layout of the first audio clip's stream, as rendering its source would.

@@ -14,7 +14,7 @@ const fcp11Tags = ["fcpxml", "resources", "format", "asset", "media-rep",
   "clip", "video", "audio", "gap", "transition", "filter-video",
   "filter-audio", "param", "timeMap", "timept", "adjust-volume", "metadata",
   "md", "array", "string", "conform-rate", "audio-channel-source", "caption",
-  "text", "text-style", "text-style-def"]
+  "text", "text-style", "text-style-def", "marker", "chapter-marker"]
 
 type
   Asset = object
@@ -40,6 +40,7 @@ type
     effectIndex: EffectIndex
     lanes: Table[int, seq[Placed]] # connected clips by lane
     captions: seq[(string, CaptionTrack)] # by role, in order of appearance
+    markers: seq[Marker]
     dropped: CountTable[string]
 
 func uiName(tag: string): string =
@@ -217,6 +218,25 @@ proc readCaption(r: var Reader, n: XmlNode, start: int64) =
   r.captions.add (role, CaptionTrack(lang: langOfRole(role),
     cues: @[Caption(start: start, dur: dur, text: text)]))
 
+proc readMarkers(r: var Reader, n: XmlNode, start: int64) =
+  ## The markers on `n`, which starts at timeline frame `start`. They are in
+  ## its own time, and one outside the part of it that plays isn't shown.
+  let length = r.frames(n.attrSeconds("duration"))
+  for c in n:
+    if c.kind != xnElement or c.tag notin ["marker", "chapter-marker"]: continue
+    let local = r.frames(c.attrSeconds("start") - n.attrSeconds("start"))
+    if local < 0 or local >= length or start + local < 0: continue
+    # Final Cut Pro's markers are a frame long: only a longer one is a span.
+    let dur = r.frames(c.attrSeconds("duration"))
+    # A marker's kind is told apart by color in Final Cut Pro, so keep that.
+    let color =
+      if c.tag == "chapter-marker": mcOrange
+      elif c.attr("completed") == "0": mcRed
+      elif c.attr("completed") == "1": mcGreen
+      else: mcBlue
+    r.markers.add Marker(start: start + local, dur: (if dur > 1: dur else: 0),
+      name: c.attr("value"), note: c.attr("note"), color: color)
+
 proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =
   ## Clips connected to `parent`, which starts at timeline frame `parentStart`.
   ## Their offsets are in the parent's own time, which begins at its start.
@@ -231,8 +251,9 @@ proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =
     if c.tag == "spine":
       r.dropped.inc "connected storyline"
       continue
-    if c.attr("enabled") == "0": continue
     let start = parentStart + r.frames(c.attrSeconds("offset") - origin)
+    r.readMarkers(c, start)
+    if c.attr("enabled") == "0": continue
     if c.tag == "caption":
       r.readCaption(c, start)
       continue
@@ -356,6 +377,7 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
   for n in spine:
     if n.kind != xnElement: continue
     let start = r.frames(n.attrSeconds("offset") - tcStart)
+    if n.tag != "transition": r.readMarkers(n, start)
     case n.tag
     of "asset-clip", "clip":
       var item = StoryItem(kind: skGap)
@@ -455,6 +477,8 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
       for t in result.at[0].mitems: t.kind = tkDissolve
     result.validateTransitions()
 
+  r.markers.sort(proc(a, b: Marker): int = cmp(a.start, b.start))
+  result.markers = r.markers
   result.effects = r.effects
   result.templateFile = result.firstSource
   result.updateNumberOfSrc()

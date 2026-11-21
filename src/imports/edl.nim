@@ -1,7 +1,8 @@
 ## CMX 3600 edit decision lists: cut, dissolve and wipe events on V and
 ## A1 to A4, `M2` speed changes, and the `* FROM CLIP NAME`, `* TO CLIP NAME`,
 ## `* SOURCE FILE` and `* EFFECT NAME` comments that name the media and the
-## transitions.
+## transitions. Markers come from Avid's `* LOC:` comments and from the
+## events of a Resolve marker list.
 ##
 ## An EDL carries no frame rate. The one asked for with `--frame-rate` is
 ## used; otherwise the first video file's, or failing that one guessed from
@@ -34,9 +35,18 @@ type
     files: seq[string]
     m2: seq[(string, float64)] # reel, source frames a second
     drop: bool # the FCM in force
+    marks: bool # a Resolve marker list's event: a marker's place, not a clip
+
+  Loc = object # a marker, before the frame rate is known
+    tc: Timecode
+    drop: bool
+    dur: int64
+    name, note: string
+    color: MarkerColor
 
   Parsed = object
     events: seq[Event]
+    locs: seq[Loc]
     anyDrop: bool
     maxFrame: int64
 
@@ -101,6 +111,57 @@ func parseEventLine(text: string, line: var Line): bool =
     line.dur = numAt(1)
   true
 
+func locColor(word: string): (bool, MarkerColor) =
+  ## The marker color for an Avid locator's, or Resolve's with its
+  ## "ResolveColor" prefix taken off.
+  case word.toLowerAscii
+  of "blue": (true, mcBlue)
+  of "red": (true, mcRed)
+  of "yellow", "lemon": (true, mcYellow)
+  of "green", "mint": (true, mcGreen)
+  of "cyan", "sky": (true, mcCyan)
+  of "magenta", "pink", "fuchsia", "rose": (true, mcPink)
+  of "purple", "lavender": (true, mcPurple)
+  of "orange", "sand", "cocoa": (true, mcOrange)
+  of "white", "cream": (true, mcWhite)
+  of "black": (true, mcBlue)
+  else: (false, mcBlue)
+
+func parseLoc(text: string, drop: bool, loc: var Loc): bool =
+  ## `timecode COLOR name`, the color and the name each optional.
+  let toks = text.splitWhitespace(maxsplit = 1)
+  if toks.len == 0 or not parseTimecode(toks[0], loc.tc): return false
+  loc.drop = drop
+  if toks.len > 1:
+    let rest = toks[1].splitWhitespace(maxsplit = 1)
+    let (known, color) = locColor(rest[0])
+    if known:
+      loc.color = color
+      if rest.len > 1: loc.name = rest[1].strip()
+    else:
+      loc.name = toks[1].strip()
+  true
+
+func parseResolveMarker(l: string, loc: var Loc): bool =
+  ## `note |C:ResolveColorBlue |M:name |D:frames`, the line under each event
+  ## of the marker list Resolve exports.
+  let c = l.find("|C:")
+  if c < 0: return false
+  let m = l.find("|M:", c)
+  if m < 0: return false
+  let d = l.rfind("|D:")
+  if d < m: return false
+  var word = l[c + 3 ..< m].strip()
+  if word.startsWith("ResolveColor"): word = word[len("ResolveColor") .. ^1]
+  loc.color = locColor(word)[1]
+  loc.note = l[0 ..< c].strip()
+  loc.name = l[m + 3 ..< d].strip()
+  var frames: int64
+  # Resolve counts a point as one frame long.
+  if parseInt64(l[d + 3 .. ^1].strip(), frames) and frames > 1:
+    loc.dur = frames
+  true
+
 proc parse(text: string): Parsed =
   var drop = false
   var skipMetadata = false
@@ -113,6 +174,14 @@ proc parse(text: string): Parsed =
     if upper.startsWith("FCM:"):
       drop = "DROP" in upper and "NON" notin upper
       result.anyDrop = result.anyDrop or drop
+      continue
+    var mark: Loc
+    if parseResolveMarker(l, mark):
+      if result.events.len > 0 and not skipMetadata:
+        mark.tc = result.events[^1].lines[0].tcs[2]
+        mark.drop = result.events[^1].drop
+        result.locs.add mark
+        result.events[^1].marks = true
       continue
     if skipMetadata and (l[0] == '*' or upper.startsWith("M2") or
         upper.startsWith("AUD")):
@@ -130,6 +199,9 @@ proc parse(text: string): Parsed =
         result.events[^1].files.add value("SOURCE FILE:")
       elif cu.startsWith("EFFECT NAME:"):
         result.events[^1].effect = value("EFFECT NAME:")
+      elif cu.startsWith("LOC:"):
+        var loc: Loc
+        if parseLoc(value("LOC:"), drop, loc): result.locs.add loc
       continue
     if upper.startsWith("M2"):
       # `M2 REEL fps source-in`; a reel with spaces is joined back.
@@ -385,6 +457,8 @@ proc resolveSources(p: var Parsed, edlDir: string, interner: var StringInterner)
   ## Each line's media: its `SOURCE FILE`, else its clip name, else its reel,
   ## relative to the EDL.
   for ev in p.events.mitems:
+    # A marker list's events name no media.
+    if ev.marks and ev.fromClip == "" and ev.files.len == 0: continue
     for i, line in ev.lines.mpairs:
       if line.reel.toUpperAscii == "BL": continue
       let incoming = i > 0 and line.trans in {trDissolve, trWipe}
@@ -442,6 +516,13 @@ proc edlRead*(path: string, interner: var StringInterner,
 
   for ev in parsed.events:
     im.importEvent(ev)
+  var markers: seq[Marker]
+  for loc in parsed.locs:
+    let at = im.rec(loc.tc, loc.drop)
+    if at >= 0:
+      markers.add Marker(start: at, dur: loc.dur, name: loc.name, note: loc.note,
+        color: loc.color)
+  markers.sort(proc (a, b: Marker): int = cmp(a.start, b.start))
 
   result = v3(tb: tb, bg: RGBColor(red: 0, green: 0, blue: 0), sr: 48000,
     res: (1920'i32, 1080'i32), effects: im.effects)
@@ -452,6 +533,7 @@ proc edlRead*(path: string, interner: var StringInterner,
       result.a.add track.clips
   if result.v.len == 0 and result.a.len == 0:
     error "EDL places no clips"
+  result.markers = markers
   var layout = "stereo"
   for src in sources:
     let mi = probed[src]
