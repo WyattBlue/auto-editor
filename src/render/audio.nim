@@ -805,10 +805,15 @@ proc mixClipPart(acc: var seq[int32], data: openArray[int16],
     fadeInEdge, fadeOutEdge: bool) =
   ## Add a clip's samples [first, last) of its `n`, which `data` holds from
   ## `first` on, to `acc`, whose first sample is the output's `bufStart`.
-  for i in first ..< last:
-    let outputSampleIndex = startSample + i
-    # A clip running into the start contributes from there on.
-    if outputSampleIndex < totalSamples and outputSampleIndex >= bufStart:
+  # A clip running into the start contributes from there on.
+  let lo = max(first, bufStart - startSample)
+  let hi = min(min(last, totalSamples - startSample),
+    first + data.len div sourceChannels)
+  if hi <= lo:
+    return
+
+  template mixScaled(i: int) =
+    block:
       let fadeIn = (
         if fadeInEdge and i < fadeSamples: (i.float64 + 0.5'f64) /
             fadeSamples.float64
@@ -821,15 +826,39 @@ proc mixClipPart(acc: var seq[int32], data: openArray[int16],
         else: 1.0'f64
       )
       let gain = min(1.0'f64, min(fadeIn, fadeOut))
-      let baseIndex = (outputSampleIndex - bufStart) * targetChannels
+      let baseIndex = (startSample + i - bufStart) * targetChannels
       let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
       for ch in 0 ..< targetChannels:
         let sc = sourceChannel(sourceChannels, ch)
         if sc < 0: continue
-        let sourceIndex = (i - first) * sourceChannels + sc
-        if sourceIndex < data.len:
-          acc[baseIndex + ch] += int32(round(data[
-              sourceIndex].float32 * gain * dg))
+        acc[baseIndex + ch] += int32(round(data[
+            (i - first) * sourceChannels + sc].float32 * gain * dg))
+
+  if duckEnv.len > 0:
+    for i in lo ..< hi:
+      mixScaled(i)
+    return
+
+  # Between the fades the gain is exactly 1, so those samples skip the float
+  # math, which is most of a long clip's cost.
+  let a = (if fadeInEdge: max(lo, min(fadeSamples, hi)) else: lo)
+  let b = (if fadeOutEdge: max(a, min(hi, n - fadeSamples)) else: hi)
+  for i in lo ..< a:
+    mixScaled(i)
+  if sourceChannels == targetChannels:
+    let dst = (startSample + a - bufStart) * targetChannels
+    let src = (a - first) * sourceChannels
+    for k in 0 ..< (b - a) * targetChannels:
+      acc[dst + k] += int32(data[src + k])
+  else:
+    for i in a ..< b:
+      let baseIndex = (startSample + i - bufStart) * targetChannels
+      for ch in 0 ..< targetChannels:
+        let sc = sourceChannel(sourceChannels, ch)
+        if sc >= 0:
+          acc[baseIndex + ch] += int32(data[(i - first) * sourceChannels + sc])
+  for i in b ..< hi:
+    mixScaled(i)
 
 func clipSpeed(effs: seq[Actions], clip: Clip): float64 =
   result = 1.0
@@ -1220,14 +1249,17 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
       error "Could not allocate audio frame"
     defer: av_frame_free(addr frame)
     frame.nb_samples = chunkFrames.cint
-    frame.format = AV_SAMPLE_FMT_S16P.cint
+    # Interleaved like the chunk, so it is one copy, and an s16 encoder
+    # takes the frame as is.
+    frame.format = AV_SAMPLE_FMT_S16.cint
     discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
     frame.sample_rate = sr
     frame.pts = samplesYielded.int64
     frame.time_base = AVRational(num: 1, den: sr)
     if av_frame_get_buffer(frame, 0) < 0:
       error "Could not allocate audio frame buffer"
-    frame.fromInt16(chunk, targetChannels)
+    copyMem(frame.data[0], addr chunk[0], chunkFrames * targetChannels *
+      sizeof(int16))
     for newFrame in resampler.resample(frame):
       result.add (newFrame, frameIndex)
       frameIndex += 1
