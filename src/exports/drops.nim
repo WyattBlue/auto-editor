@@ -98,6 +98,28 @@ proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
           const name = "speed ramp (as its mean speed)"
           if name notin s.actions: s.actions.add name
 
+func shortensSpans(base: seq[Clip], markers: seq[Marker]): bool {.raises: [].} =
+  ## Whether a marker span runs past the clip it's written on. FCPXML keeps
+  ## a marker on the base layer's clip it starts during, as fcp11 does, so
+  ## the span ends with that clip.
+  for m in markers:
+    if m.dur <= 0: continue
+    for i, clip in base:
+      if clip.src == nil: continue
+      var hi = high(int64)
+      for j in i + 1 ..< base.len:
+        if base[j].src != nil:
+          hi = base[j].start
+          break
+      if m.start >= (if i == 0: 0'i64 else: clip.start) and m.start < hi:
+        if m.dur > clip.start + clip.dur - m.start: return true
+        break
+
+func fcpxmlShortensSpans(tl: v3): bool {.raises: [].} =
+  if tl.v.len > 0 and tl.v[0].len > 0: tl.v[0].shortensSpans(tl.markers)
+  elif tl.a.len > 0: tl.a[0].shortensSpans(tl.markers)
+  else: false
+
 proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   ## What exporting `tl` as `kind` leaves out: action names, then counts of
   ## video, audio, generated, subtitle and caption tracks. Empty when nothing
@@ -142,6 +164,8 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
       result.add "marker notes"
     if kind == exEdl and tl.markers.anyIt(it.dur > 0):
       result.add "marker spans"
+    if kind == exFinalCutPro and tl.fcpxmlShortensSpans:
+      result.add "marker spans (to their clip's end)"
 
 proc warnDrops*(tl: v3, kind: ExportKind) {.raises: [].} =
   let drops = exportDrops(tl, kind)
