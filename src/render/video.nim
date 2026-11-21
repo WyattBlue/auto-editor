@@ -1029,6 +1029,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+  # FFmpeg's default is one thread, which only encoders with their own
+  # default (libx264) override. The web build's workers come from a fixed
+  # pool, so it keeps the default.
+  when not defined(emscripten):
+    encoderCtx.thread_count = 0
 
   # Reference source for encoder config (color/pix_fmt/SAR): the first real,
   # non-still video in layer and clip order, so the base layer wins. Not from
