@@ -247,6 +247,9 @@ proc mixImg(a, b: Img, t: float32): Img =
   # Byte by byte, as `mix` and `put` do per channel, in a flat loop the
   # compiler can vectorize.
   eachRows(a.h, proc (y0, y1: int) {.closure, gcsafe.} =
+    # Locals, since a byte store could alias the captures and force each to
+    # be reloaded.
+    let (pa, pb, pd, t, rowBytes) = (pa, pb, pd, t, rowBytes)
     for i in y0 * rowBytes ..< y1 * rowBytes:
       let x = pa[i].float32
       pd[i] = uint8(clamp(x + (pb[i].float32 - x) * t + 0.5'f32, 0, 255)))
@@ -817,12 +820,29 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       # columns each is read at.
       if rx > 0 and lo[0] <= hi[0]: amOwn = blurAcross(a.unsafeAddr, rx, lo[0], hi[0])
       if rx > 0 and lo[1] <= hi[1]: bmOwn = blurAcross(b.unsafeAddr, rx, lo[1], hi[1])
-      let am = (if amOwn.px.len > 0: addr amOwn else: a.unsafeAddr)
-      let bm = (if bmOwn.px.len > 0: addr bmOwn else: b.unsafeAddr)
-      result.eachPixel(w, h):
+      let pa = (if amOwn.px.len > 0: amOwn.pixels else: a.pixels)
+      let pb = (if bmOwn.px.len > 0: bmOwn.pixels else: b.pixels)
+      type Tap = tuple[src: ptr UncheckedArray[uint8], o0, o1: int, tx: float32]
+      var taps = newSeq[Tap](w)
+      for x in 0 ..< w:
         let col = cols[x]
-        let im = (if col.fromB: bm else: am)
-        c = mix(im[].get(col.x0, y), im[].get(col.x1, y), col.tx)
+        taps[x] = ((if col.fromB: pb else: pa), col.x0 * 3, col.x1 * 3, col.tx)
+      result = newImgUninit(w, h)
+      let dp = result.pixels
+      # Straight from the bytes, with `mix` and `put`'s steps in their order.
+      eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
+        let (dp, w) = (dp, w)
+        let tp = cast[ptr UncheckedArray[Tap]](taps[0].unsafeAddr)
+        for y in y0 ..< y1:
+          let row = y * w * 3
+          for x in 0 ..< w:
+            let t = tp[x]
+            for ch in 0 .. 2:
+              let l = t.src[row + t.o0 + ch].float32
+              let r = t.src[row + t.o1 + ch].float32
+              let d = (r - l) * t.tx
+              let v = l + d
+              dp[row + x * 3 + ch] = uint8(clamp(v + 0.5'f32, 0, 255)))
     else:
       if rx > 0:
         amOwn = a.motion(speed, 0)
