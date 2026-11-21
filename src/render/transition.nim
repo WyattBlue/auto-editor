@@ -248,6 +248,26 @@ proc mixImg(a, b: Img, t: float32): Img =
       let x = pa[i].float32
       pd[i] = uint8(clamp(x + (pb[i].float32 - x) * t + 0.5'f32, 0, 255)))
 
+proc blurAcross(src: ptr Img, rx, xLo, xHi: int): Img =
+  ## `src` box blurred `rx` pixels across, written only in columns
+  ## [`xLo`, `xHi`]. The sums are whole numbers, so starting one partway
+  ## along a row gives what a run from the left edge would.
+  let (w, h) = (src.w, src.h)
+  result = newImgUninit(w, h)
+  let dst = addr result
+  let n = 2 * rx + 1
+  eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
+    for y in y0 ..< y1:
+      let row = y * w * 3
+      for ch in 0 .. 2:
+        var s = 0
+        for k in xLo - rx .. xLo + rx:
+          s += src.px[row + clamp(k, 0, w - 1) * 3 + ch].int
+        for x in xLo .. xHi:
+          dst.px[row + x * 3 + ch] = uint8((s + n div 2) div n)
+          s += src.px[row + min(x + rx + 1, w - 1) * 3 + ch].int -
+            src.px[row + max(x - rx, 0) * 3 + ch].int)
+
 proc boxBlur(im: Img, rx, ry: int): Img =
   ## A box blur `rx` pixels across and `ry` down, by running sums.
   if rx <= 0 and ry <= 0:
@@ -256,19 +276,7 @@ proc boxBlur(im: Img, rx, ry: int): Img =
   var across: Img
   var src = unsafeAddr im
   if rx > 0:
-    across = newImgUninit(w, h)
-    let dst = addr across
-    let n = 2 * rx + 1
-    eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
-      for y in y0 ..< y1:
-        let row = y * w * 3
-        for ch in 0 .. 2:
-          var s = 0
-          for k in -rx .. rx: s += src.px[row + clamp(k, 0, w - 1) * 3 + ch].int
-          for x in 0 ..< w:
-            dst.px[row + x * 3 + ch] = uint8((s + n div 2) div n)
-            s += src.px[row + min(x + rx + 1, w - 1) * 3 + ch].int -
-              src.px[row + max(x - rx, 0) * 3 + ch].int)
+    across = blurAcross(src, rx, 0, w - 1)
     src = addr across
   if ry <= 0:
     return move across
@@ -723,30 +731,41 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let dip = (if kind == tkTravelMotion: 1 - 0.12'f32 * bell(p) else: 1'f32)
     # Without blur the pictures are used as they are, not copied.
     var amOwn, bmOwn: Img
-    let blurred = int(abs(speed) / 2) > 0
-    if blurred:
-      amOwn = a.motion(speed, 0)
-      bmOwn = b.motion(speed, 0)
-    let am = (if blurred: addr amOwn else: a.unsafeAddr)
-    let bm = (if blurred: addr bmOwn else: b.unsafeAddr)
+    let rx = int(abs(speed) / 2)
     if dip == 1:
       # Each row samples at its own center, so the vertical half of
       # `sample` mixes by 0 and only the source column varies, which a
       # table per column gives once per frame.
-      var cols = newSeq[tuple[im: ptr Img, x0, x1: int, tx: float32]](w)
+      var cols = newSeq[tuple[fromB: bool, x0, x1: int, tx: float32]](w)
+      var lo = [w, w]
+      var hi = [-1, -1]
       for x in 0 ..< w:
         let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
-        let (im, sx) =
-          if xx - shift < fw: (am, xx - shift)
-          else: (bm, xx - shift - fw)
+        let (fromB, sx) =
+          if xx - shift < fw: (false, xx - shift)
+          else: (true, xx - shift - fw)
         let fx = sx - 0.5'f32
         let x0 = floor(fx).int
-        cols[x] = (im, clamp(x0, 0, w - 1), clamp(x0 + 1, 0, w - 1),
-          fx - x0.float32)
+        let (c0, c1) = (clamp(x0, 0, w - 1), clamp(x0 + 1, 0, w - 1))
+        cols[x] = (fromB, c0, c1, fx - x0.float32)
+        lo[ord(fromB)] = min(lo[ord(fromB)], c0)
+        hi[ord(fromB)] = max(hi[ord(fromB)], c1)
+      # Together the two pictures show one frame's width, so blur only the
+      # columns each is read at.
+      if rx > 0 and lo[0] <= hi[0]: amOwn = blurAcross(a.unsafeAddr, rx, lo[0], hi[0])
+      if rx > 0 and lo[1] <= hi[1]: bmOwn = blurAcross(b.unsafeAddr, rx, lo[1], hi[1])
+      let am = (if amOwn.px.len > 0: addr amOwn else: a.unsafeAddr)
+      let bm = (if bmOwn.px.len > 0: addr bmOwn else: b.unsafeAddr)
       result.eachPixel(w, h):
         let col = cols[x]
-        c = mix(col.im[].get(col.x0, y), col.im[].get(col.x1, y), col.tx)
+        let im = (if col.fromB: bm else: am)
+        c = mix(im[].get(col.x0, y), im[].get(col.x1, y), col.tx)
     else:
+      if rx > 0:
+        amOwn = a.motion(speed, 0)
+        bmOwn = b.motion(speed, 0)
+      let am = (if rx > 0: addr amOwn else: a.unsafeAddr)
+      let bm = (if rx > 0: addr bmOwn else: b.unsafeAddr)
       result.eachPixel(w, h):
         let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
         let yy = (y.float32 + 0.5'f32 - fh / 2) / dip + fh / 2
