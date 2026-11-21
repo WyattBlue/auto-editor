@@ -622,6 +622,66 @@ proc runFilterChain(data: seq[int16], acts: seq[Action], sourceSr: cint,
 
   return processedData
 
+type RateFeed = ref object
+  ## Resamples interleaved samples handed over in pieces as the one stream
+  ## they are, so a long span never has to be held whole.
+  resampler: AudioResampler
+  layout: ref AVChannelLayout
+  rate: cint ## of the samples pushed
+  held: seq[int16] ## resampled and not yet taken
+
+proc newRateFeed(layout: ref AVChannelLayout, sourceSr, targetSr: cint): RateFeed =
+  result = RateFeed(layout: layout, rate: sourceSr)
+  result.resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, layout, targetSr)
+
+proc hold(feed: RateFeed, frames: seq[ptr AVFrame]) =
+  let channels = feed.layout.nb_channels.int
+  for frame in frames:
+    if frame.format == AV_SAMPLE_FMT_S16P.cint:
+      let at = feed.held.len div channels
+      feed.held.setLen((at + frame.nb_samples.int) * channels)
+      discard frame.toInt16(0, frame.nb_samples.int, feed.held, at, channels)
+    var f = frame
+    av_frame_free(addr f)
+
+proc push(feed: RateFeed, data: openArray[int16]) =
+  # The resampler works in floats several times the size of what it is
+  # given, so hand it a little at a time.
+  const pieceSamples = 1 shl 16
+  let channels = feed.layout.nb_channels.int
+  let samples = data.len div channels
+  var at = 0
+  while at < samples:
+    let count = min(pieceSamples, samples - at)
+    var frame = av_frame_alloc()
+    if frame == nil:
+      error "Could not allocate input frame for resampling"
+    defer: av_frame_free(addr frame)
+    frame.nb_samples = count.cint
+    frame.format = AV_SAMPLE_FMT_S16P.cint
+    discard av_channel_layout_copy(addr frame.ch_layout, addr feed.layout[])
+    frame.sample_rate = feed.rate
+    frame.pts = AV_NOPTS_VALUE
+    if av_frame_get_buffer(frame, 0) < 0:
+      error "Could not allocate input frame buffer for resampling"
+    frame.fromInt16(data.toOpenArray(at * channels, (at + count) * channels - 1),
+      channels)
+    feed.hold(feed.resampler.resample(frame))
+    at += count
+
+proc finish(feed: RateFeed) =
+  ## Bring out what the resampler holds back while it waits for more.
+  feed.hold(feed.resampler.resample(nil))
+
+proc take(feed: RateFeed, samples: int): seq[int16] =
+  ## The next `samples` resampled, silence where they have run out.
+  let channels = feed.layout.nb_channels.int
+  result = newSeq[int16](samples * channels)
+  let count = min(result.len, feed.held.len)
+  if count > 0:
+    copyMem(addr result[0], addr feed.held[0], count * sizeof(int16))
+    feed.held.delete(0 ..< count)
+
 # Returns seq[int16] where channel data is interleaved:
 # [ch0, ch1, ..., ch0, ch1, ...] etc.
 proc processAudioClip(ef: seq[Actions], clip: Clip, data: sink seq[int16], sourceSr,
@@ -721,40 +781,10 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: sink seq[int16], sourc
     # Data is already in interleaved format
     return processedData
 
-  if processedData.len == 0:
-    return @[]
-
-  let samples = processedData.len div channels
-  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, layout, targetSr)
-  var inputFrame = av_frame_alloc()
-  if inputFrame == nil:
-    error "Could not allocate input frame for resampling"
-  defer: av_frame_free(addr inputFrame)
-
-  inputFrame.nb_samples = samples.cint
-  inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr layout[])
-  inputFrame.sample_rate = sourceSr
-  inputFrame.pts = AV_NOPTS_VALUE
-
-  if av_frame_get_buffer(inputFrame, 0) < 0:
-    error "Could not allocate input frame buffer for resampling"
-
-  inputFrame.fromInt16(processedData, channels)
-
-  # Back to interleaved; the resampler gives S16P.
-  let outputFrames = resampler.resample(inputFrame)
-  var totalSamples = 0
-  for frame in outputFrames:
-    totalSamples += frame.nb_samples.int
-  result = newSeq[int16](totalSamples * channels)
-  var offset = 0
-  for frame in outputFrames:
-    if frame.format == AV_SAMPLE_FMT_S16P.cint:
-      discard frame.toInt16(0, frame.nb_samples.int, result, offset, channels)
-    offset += frame.nb_samples.int
-    var f = frame
-    av_frame_free(addr f)
+  let feed = newRateFeed(layout, sourceSr, targetSr)
+  feed.push(processedData)
+  feed.finish()
+  move feed.held
 
 
 # Micro-fade applied at every real clip edge to kill cut pops. A splice between
@@ -1088,22 +1118,28 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
 
         # A long clip that plays its source as it is gets read a part at a
         # time, each mixed and emitted before the next: whole, an hour of it
-        # is gigabytes. Effects work on the whole clip, as does resampling.
+        # is gigabytes. Effects work on the whole clip.
         var parts: Getter = nil
-        var partsFrom = 0 # the clip's first source sample
+        var feed: RateFeed = nil # for a source at another rate than the output's
+        var srcFrom, srcTo, srcAt = 0 # the clip's source samples, and the next to read
+        var srcSr = sr
         var whole: seq[int16]
         var sourceChannels = targetChannels.int
         var n = 0 # the clip's length in output samples
         var duckEnv: seq[float32]
         if durSamples > partSamples and clip.src != nil and
             (clip.src, clip.stream) in samples and
-            samples[(clip.src, clip.stream)].stream.codecpar.sample_rate == sr and
             not effectGroup.anyIt(it.kind < actInvert):
           parts = samples[(clip.src, clip.stream)]
-          partsFrom = int(clip.offset.float64 * sr.float64 / tb)
-          let partsTo = int(float64(clip.offset + clip.dur) * sr.float64 / tb)
+          srcSr = parts.stream.codecpar.sample_rate
+          srcFrom = int(clip.offset.float64 * srcSr.float64 / tb)
+          srcTo = max(srcFrom,
+            int(float64(clip.offset + clip.dur) * srcSr.float64 / tb))
+          srcAt = srcFrom
           sourceChannels = parts.channels.int
-          n = min(durSamples, max(0, partsTo - partsFrom))
+          n = min(durSamples, int((srcTo - srcFrom).int64 * sr.int64 div srcSr.int64))
+          if srcSr != sr:
+            feed = newRateFeed(parts.layout, srcSr, sr)
         else:
           var loaded = loadClip(clip, startSample, durSamples)
           whole = move loaded[0]
@@ -1134,9 +1170,18 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
         var first = 0 # of the clip's samples, the next to mix
         while true:
           let last = (if parts != nil: min(n, first + partSamples) else: n)
-          if parts != nil:
-            whole = parts.get(partsFrom + first, partsFrom + last,
+          if parts != nil and feed == nil:
+            whole = parts.get(srcFrom + first, srcFrom + last,
               sequential = first > 0)
+          elif parts != nil:
+            # A second of source at a time, until this part has come out.
+            while feed.held.len div sourceChannels < last - first and srcAt < srcTo:
+              let upTo = min(srcTo, srcAt + srcSr.int)
+              feed.push(parts.get(srcAt, upTo, sequential = srcAt > srcFrom))
+              srcAt = upTo
+              if srcAt == srcTo:
+                feed.finish()
+            whole = feed.take(last - first)
           let neededFrames = startSample + last - bufStart
           if neededFrames * targetChannels > acc.len:
             acc.setLen(neededFrames * targetChannels)
