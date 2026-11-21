@@ -351,7 +351,7 @@ proc newSwsCtx(): ptr SwsContext =
   if result == nil:
     error "Failed to allocate sws context"
   # sws_alloc_context defaults to a single thread.
-  discard av_opt_set_int(result, "threads", 0, 0)
+  result.setOpt("threads", 0)
 
 proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     height: cint = 0, ctx: ptr SwsContext = nil): ptr AVFrame =
@@ -932,7 +932,7 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
       av_frame_free(addr view)
       av_frame_free(addr output)
       error "Could not allocate sws context in scaleWithPad"
-    discard av_opt_set_int(swsCtx, "threads", 0, 0)
+    swsCtx.setOpt("threads", 0)
   let scaleRet = sws_scale_frame(swsCtx, view, src)
   av_frame_free(addr view)
   if scaleRet < 0:
@@ -1146,15 +1146,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   codec = encoderCtx.codec
 
   if codec.id == ID_HEVC:
-    discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
+    encoderCtx.priv_data.setOpt("x265-params", "log-level=error")
   if codec.id == ID_VP9:
     # libvpx splits a frame among its threads by tile columns alone, a few
     # at most at HD sizes; row-mt lets them share the rows as well.
-    discard av_opt_set_int(encoderCtx.priv_data, "row-mt", 1, 0)
+    encoderCtx.priv_data.setOpt("row-mt", 1)
   if video.crf >= 0:
-    discard av_opt_set_int(encoderCtx.priv_data, "crf", video.crf.cint, 0)
+    encoderCtx.priv_data.setOpt("crf", video.crf)
   if video.preset != "":
-    discard av_opt_set(encoderCtx.priv_data, "preset", cstring(video.preset), 0)
+    encoderCtx.priv_data.setOpt("preset", video.preset)
 
   if video.gop >= 1:
     encoderCtx.gop_size = video.gop.cint
@@ -1212,7 +1212,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     scaleCtx = sws_alloc_context()
     if scaleCtx == nil:
       error "Failed to allocate proxy scale sws context"
-    discard av_opt_set_int(scaleCtx, "threads", 0, 0)
+    scaleCtx.setOpt("threads", 0)
 
   # One sws context for the per-frame pixel format conversion. It is kept
   # even when the stream's format matches the output: a decoder may still
@@ -1221,7 +1221,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var reformatCtx = sws_alloc_context()
   if reformatCtx == nil:
     error "Failed to allocate reformat sws context"
-  discard av_opt_set_int(reformatCtx, "threads", 0, 0)
+  reformatCtx.setOpt("threads", 0)
 
   # Allocated on the first zoom; swscale rebuilds it itself when the geometry
   # changes, so a constant zoom pays the init cost once.
@@ -1513,7 +1513,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           zoomCtx = sws_alloc_context()
           if zoomCtx == nil:
             error "Failed to allocate zoom sws context"
-          discard av_opt_set_int(zoomCtx, "threads", 0, 0)
+          zoomCtx.setOpt("threads", 0)
         let scaledW = max(cint(float(origW) * z), 2)
         let scaledH = max(cint(float(origH) * z), 2)
         if z > 1.0:

@@ -94,9 +94,9 @@ proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, video: VideoSettings)
   if video.bitrate >= 0:
     encoder.bit_rate = video.bitrate
   if video.crf >= 0:
-    discard av_opt_set_int(encoder.priv_data, "crf", video.crf.cint, 0)
+    encoder.priv_data.setOpt("crf", video.crf)
   if video.preset != "":
-    discard av_opt_set(encoder.priv_data, "preset", cstring(video.preset), 0)
+    encoder.priv_data.setOpt("preset", video.preset)
   if video.gop >= 1:
     encoder.gop_size = video.gop.cint
 

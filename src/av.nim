@@ -232,6 +232,14 @@ proc findDecoder*(codecId: AVCodecID): ptr AVCodec =
 proc canDecode*(codecId: AVCodecID): bool =
   findDecoder(codecId) != nil
 
+proc setOpt*(obj: pointer, name: cstring, value: int) {.inline.} =
+  ## Sets an FFmpeg option on `obj`, ignoring one it doesn't have, since some
+  ## encoders lack an option others take.
+  discard av_opt_set_int(obj, name, value.int64, 0)
+
+proc setOpt*(obj: pointer, name: cstring, value: string) {.inline.} =
+  discard av_opt_set(obj, name, value.cstring, 0)
+
 proc initDecoder*(codecpar: ptr AVCodecParameters,
     threads: cint = 0): ptr AVCodecContext =
   ## `threads` is FFmpeg's thread_count: 0 picks one per core.
