@@ -77,6 +77,9 @@ proc createFilterGraph(timeBase: AVRational, pixFmtName: string,
 
   if filterGraph == nil:
     error "Could not allocate filter graph"
+  # The frame-threaded decoder already uses every core on camera footage, so
+  # filter slice threads only add contention and handoff overhead.
+  filterGraph.nb_threads = 1
 
   # Create buffer source with proper arguments
   let bufferArgs = cstring(
