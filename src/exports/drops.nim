@@ -132,7 +132,10 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   # Every editor export carries markers, but not every part of one: OTIO
   # alone has a place for all of it.
   if tl.markers.len > 0:
-    if kind in {exFinalCutPro, exResolve, exResolveFcp7} and
+    # Resolve reads no markers from FCPXML, though the file has them.
+    if kind == exResolve:
+      result.add plural(tl.markers.len, "marker")
+    if kind in {exFinalCutPro, exResolveFcp7} and
         tl.markers.anyIt(it.color != mcBlue):
       result.add "marker colors"
     if kind in {exEdl, exShotcut, exKdenlive} and tl.markers.anyIt(it.note != ""):
