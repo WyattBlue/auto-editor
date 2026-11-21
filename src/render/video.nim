@@ -1147,6 +1147,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   if codec.id == ID_HEVC:
     discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
+  if codec.id == ID_VP9:
+    # libvpx splits a frame among its threads by tile columns alone, a few
+    # at most at HD sizes; row-mt lets them share the rows as well.
+    discard av_opt_set_int(encoderCtx.priv_data, "row-mt", 1, 0)
   if video.crf >= 0:
     discard av_opt_set_int(encoderCtx.priv_data, "crf", video.crf.cint, 0)
   if video.preset != "":
