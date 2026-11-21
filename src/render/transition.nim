@@ -287,10 +287,10 @@ proc boxBlur(im: Img, rx, ry: int): Img =
   let (sp, dp, stride) = (src[].pixels, result.pixels, w * 3)
   let n = 2 * ry + 1
   let half = n div 2
-  # Up to 128 taps, a multiply by ceil(2^22 / n) and a shift gives the
+  # Up to 255 taps, a multiply by ceil(2^24 / n) and a shift gives the
   # rounded quotient exactly and stays within 32 bits, so the loop can
   # vectorize where a divide can't.
-  let m = (if n <= 128: ((1'u32 shl 22) + n.uint32 - 1) div n.uint32 else: 0'u32)
+  let m = (if n <= 255: ((1'u32 shl 24) + n.uint32 - 1) div n.uint32 else: 0'u32)
   # Bands of columns, so each writes only its own. Each band keeps a running
   # sum per byte and goes down a row at a time, so reads and writes run
   # along memory instead of striding down columns.
@@ -305,7 +305,7 @@ proc boxBlur(im: Img, rx, ry: int): Img =
       let o = y * stride + lo
       if m != 0:
         for i in 0 ..< len:
-          dp[o + i] = uint8((uint32(sums[i] + half.int32) * m) shr 22)
+          dp[o + i] = uint8((uint32(sums[i] + half.int32) * m) shr 24)
       else:
         for i in 0 ..< len: dp[o + i] = uint8((sums[i].int + half) div n)
       let add = min(y + ry + 1, h - 1) * stride + lo
