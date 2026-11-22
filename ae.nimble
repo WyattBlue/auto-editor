@@ -1034,15 +1034,15 @@ func basicPcms(): seq[string] =
 proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string =
   let enableParsers = "aac,aac_latm,ac3,amr,av1,dca,dnxhd,dvbsub,dvdsub,ffv1,flac,gif,h263,h264,hdr,hevc,mjpeg,mlp,mpeg4video,mpegaudio,mpegvideo,opus,png,pnm,prores,prores_raw,vorbis,vp3,vp8,vp9,webp".split(",")
 
-  var enableEncoders = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,mjpeg,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,png,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
+  var enableEncoders = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,hdr,libmp3lame,libopus,libx264,libx264rgb,mjpeg,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,png,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
   enableEncoders &= basicPcms()
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
 
-  var enableMuxers = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
+  var enableMuxers = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,sox,flac,spdif,flv,obu,srt,gif,oga,w64,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
   let enableDemuxers = enableMuxers & @["aac", "loas", "image2", "png_pipe", "mpegts",
-    "image_webp_pipe", "webp_anim"]
+    "image_webp_pipe", "webp_anim", "h263"]
 
   var filters = "aformat,abuffer,abuffersink,alphamerge,aresample,asetrate,atempo,anull,anullsrc,chromakey,colorkey,drawbox,bwdif,deesser,erosion,format,gblur,geq,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,maskedmerge,negate,overlay,pad,pixelize,rgbashift,rotate,scale,vflip,volume".split(",")
 
