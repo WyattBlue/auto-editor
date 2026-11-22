@@ -3,7 +3,7 @@ from std/uri import decodeUrl
 from std/math import gcd, `mod`, round, trunc, pow
 
 import ../log
-import ../lib/dnorm16
+import ../lib/[dnorm16, timeunit]
 
 func b64urlDecode*(s: string): seq[byte] =
   var padded = s.replace('-', '+').replace('_', '/')
@@ -314,17 +314,17 @@ proc parseTimeSimple*(val: string): PackedInt =
     if not (f > -packedSpan and f < packedSpan):
       error &"'{val}': Time is out of range"
     pack(flag, f.int64)
-  if unit in ["s", "sec", "secs", "second", "seconds"]:
-    return packed(true, round(num * tb))
-  if unit in ["min", "mins", "minute", "minutes"]:
-    return packed(true, round(num * tb * 60))
-  if unit == "hour":
-    return packed(true, round(num * tb * 3600))
-  if unit != "":
+  var tu: TimeUnit
+  if not parseTimeUnit(unit, tu):
     error &"'{val}': Time format got unknown unit: `{unit}`"
+  if tu != tuFrames:
+    return packed(true, round(num * tb * tu.seconds))
 
   if num != trunc(num):
-    error &"'{val}': Time format expects an integer"
+    if unit == "":
+      error &"'{val}': A time without a unit is a frame count, so it must be " &
+        &"whole. For seconds, write '{val}s'"
+    error &"'{val}': A frame count must be whole"
   return packed(false, num)
 
 proc parseTime*(val: string): PackedInt =

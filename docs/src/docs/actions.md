@@ -529,7 +529,7 @@ auto-editor video.mp4 -w:1 zoom:1..1.5:ease=inout
 
 `:ease=curve[:duration]`
 - **curve** — `linear`, `in`, `out`, or `inout`
-- **duration** — optional; e.g. `2sec` or a bare frame count. Once it elapses,
+- **duration** — optional; e.g. `2sec`, `30f`, or a bare frame count. Once it elapses,
   the value holds at its end. Omitted, the animation spans the whole section.
 
 ```sh

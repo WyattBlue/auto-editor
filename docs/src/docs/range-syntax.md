@@ -54,7 +54,9 @@ The default unit is the timeline's timebase. Since specifying the range in this 
 # Cut out the first 10 seconds.
 auto-editor example.mp4 --cut start,10secs
 ```
-You can also use `s`, `sec`, `second`, or `seconds`, depending on your preference.
+You can also use `s`, `sec`, `secs`, `second`, or `seconds`, depending on your preference.
+
+To say frames outright, write `f`, `frame`, or `frames`: `--cut 0,30f` is the same as `--cut 0,30`.
 
 ## Negative Indexes
 Negative numbers can be used to count down starting from the end.

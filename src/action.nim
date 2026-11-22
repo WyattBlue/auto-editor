@@ -1,6 +1,6 @@
 import std/[algorithm, hashes, math, sequtils, strformat, strutils, options]
 import ./util/[color, suggest]
-import ./lib/[dnorm16, escape]
+import ./lib/[dnorm16, escape, timeunit]
 
 type
   # The order is part of the API
@@ -437,21 +437,17 @@ proc pInt(s: string, what = "integer value"): int {.raises: [ActionParseError].}
   except ValueError: raise newException(ActionParseError, &"Invalid {what}: {s}")
 
 proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError].} =
-  ## "2sec" -> (2, duSec); "30" or "30frames" -> (30, duFrames).
-  var s = spec
-  var unit = duFrames
-  for suf in ["seconds", "second", "sec"]:
-    if s.endsWith(suf):
-      unit = duSec
-      s = s[0 ..< s.len - suf.len]
-      break
-  if unit == duFrames:
-    for suf in ["frames", "frame", "f"]:
-      if s.endsWith(suf):
-        s = s[0 ..< s.len - suf.len]
-        break
-  try: (parseFloat(s).float32, unit)
-  except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
+  ## "2s" or "2sec" -> (2, duSec); "30", "30f" or "30frames" -> (30, duFrames).
+  ## The same units as times on the command line.
+  let (num, suffix) = splitTimeUnit(spec)
+  var tu: TimeUnit
+  if not parseTimeUnit(suffix, tu):
+    raise newException(ActionParseError, &"Invalid duration: {spec}")
+  let n =
+    try: parseFloat(num)
+    except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
+  if tu == tuFrames: (n.float32, duFrames)
+  else: (float32(n * tu.seconds), duSec)
 
 proc parseKfTime(spec: string): KfTime {.raises: [ActionParseError].} =
   ## "50%" -> percent of the section; otherwise a duration, as parseDuration.
