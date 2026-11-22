@@ -1018,6 +1018,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   let needsScaling = video.scale != 1.0
 
   debug &"Creating video stream with codec: {video.codec}"
+  let wanted = initCodec(video.codec)
+  if wanted != nil and wanted.`type` != AVMEDIA_TYPE_VIDEO:
+    error &"{video.codec} isn't a video encoder"
   var (outputStream, encoderCtx) = output.addStream(video.codec, targetFps,
       lang = tl.langs[0], width = targetWidth, height = targetHeight)
   var codec = encoderCtx.codec
