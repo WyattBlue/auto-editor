@@ -323,6 +323,33 @@ type CompileError = object
   kind: ReErrorKind
   pos: int
 
+func tooMuchMemory(ninstr: int): bool =
+  ## Whether a program of `ninstr` instructions is sure to need more memory
+  ## to match than maxMatchStack, as `compile` sizes it at the end: each
+  ## instruction costs at least this much whatever its kind or the groups.
+  # From compile's sum, with presub at least rsubSize + 2 pointers and every
+  # instruction a split at most; `len` counts two more for the match.
+  let len = ninstr + 2
+  let least = (if sizeof(pointer) == 8: 56 * len + 148 else: 32 * len + 100)
+  least > maxMatchStack
+
+func instructions(code: openArray[int], a, b: int): int =
+  ## The instructions in `code[a ..< b]` that the matcher sizes its memory by:
+  ## every one but the assertions.
+  var i = a
+  while i < b:
+    case code[i]
+    of opClass:
+      inc result
+      i += 3 + 2 * code[i + 2]
+    of opChar, opSave, opJmp, opSplit, opRsplit:
+      inc result
+      i += 2
+    of opAny:
+      inc result
+      inc i
+    else: inc i
+
 func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError): bool =
   ## Compile `re` into `prog.code`, false with `err` set on failure.
   template code: untyped = prog.code
@@ -331,13 +358,19 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
   template fail(k: ReErrorKind, where: int) =
     err = CompileError(kind: k, pos: where)
     return false
+  # Every insertion makes room for one jump or split.
   template insertCode(where, num: int) =
     for _ in 0 ..< num: code.insert(0, where)
+    inc ninstr
+  template emitOp(v: int) =
+    code.add v
+    inc ninstr
   template rel(a, b: int): int = b - a - 2
   # The C sizing pass, which made the size errors, counted from 3.
-  template tooLarge: bool = pc + 3 > maxCode
+  template tooLarge: bool = pc + 3 > maxCode or tooMuchMemory(ninstr)
 
   var i = 0
+  var ninstr = 0
   var start = pc
   var term = pc
   var altLabel = 0
@@ -360,10 +393,10 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
         term = pc
       of 'd', 'D', 's', 'S', 'w', 'W':
         term = pc
-        emit opClass; emit 1; emit 1; emit -1; emit ord(e)
+        emitOp opClass; emit 1; emit 1; emit -1; emit ord(e)
       of 'n', 'r', 't', 'f', 'v':
         term = pc
-        emit opChar
+        emitOp opChar
         emit(if e == 'n': ord('\n') elif e == 'r': ord('\r') elif e == 't': ord('\t')
              elif e == 'f': ord('\f') else: ord('\v'))
       of 'x', 'u', 'U':
@@ -372,18 +405,18 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
         let ch = hexCode(re, i, n)
         if ch < 0: fail(reeBadEscape, i - 1)
         i += n
-        emit opChar; emit ch
+        emitOp opChar; emit ch
       else:
         term = pc
-        emit opChar; emit ucCode(re, i, utf8)
+        emitOp opChar; emit ucCode(re, i, utf8)
     of '.':
       term = pc
-      emit opAny
+      emitOp opAny
     of '[':
       let setStart = i
       term = pc
       inc i
-      emit opClass
+      emitOp opClass
       let neg = re.at(i) == ord('^')
       emit(if neg: 0 else: 1)
       if neg: inc i
@@ -423,7 +456,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
         else: fail(reeUnsupportedGroup, groupStart)
       if capture:
         inc prog.nsubs
-        emit opSave; emit prog.nsubs
+        emitOp opSave; emit prog.nsubs
       if capStack.len + 5 > altMax * 5: fail(reeTooNested, groupStart)
       openStack.add groupStart
       capStack.add [(if capture: prog.nsubs else: 0), term, altLabel, start, altStack.len]
@@ -448,7 +481,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
       let group = capStack.pop
       if group != 0:
         # The end's slot follows every start's, so it waits on the group count.
-        emit opSave; emit -group
+        emitOp opSave; emit -group
     of '{':
       var maxcnt = 0
       var mincnt = 0
@@ -484,17 +517,19 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
       for _ in 0 ..< mincnt - 1:
         if tooLarge: fail(reeTooLarge, i)
         for k in 0 ..< size: emit code[term + k]
+        ninstr += instructions(code, term, term + size)
       if maxcnt < 0:
-        emit rsplit
+        emitOp rsplit
         emit rel(pc - 1, pc - 1 - size)
       elif maxcnt > 0:
         let diff = (if mincnt == 0: 1 else: 0)
         var k = maxcnt - mincnt - diff
         while k > 0:
           if tooLarge: fail(reeTooLarge, i)
-          emit split
+          emitOp split
           emit rel(pc, pc + (size + 2) * k)
           for m in 0 ..< size: emit code[term + m]
+          ninstr += instructions(code, term, term + size)
           dec k
       if mincnt == 0:
         insertCode(term, 2)
@@ -511,7 +546,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
     of '*':
       if pc == term: fail(reeNothingToRepeat, i)
       insertCode(term, 2)
-      emit opJmp
+      emitOp opJmp
       emit rel(pc - 1, term)
       code[term] = (if re.at(i+1) == ord('?'): opRsplit else: opSplit)
       if re.at(i+1) == ord('?'): inc i
@@ -519,7 +554,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
       term = pc
     of '+':
       if pc == term: fail(reeNothingToRepeat, i)
-      emit(if re.at(i+1) == ord('?'): opSplit else: opRsplit)
+      emitOp(if re.at(i+1) == ord('?'): opSplit else: opRsplit)
       if re.at(i+1) == ord('?'): inc i
       emit rel(pc - 1, term)
       term = pc
@@ -529,7 +564,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
         inc allAlts
         altStack.add altLabel
       insertCode(start, 2)
-      emit opJmp
+      emitOp opJmp
       altLabel = pc
       emit 0
       code[start] = opSplit
@@ -540,7 +575,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
       term = pc
     else:
       term = pc
-      emit opChar; emit ucCode(re, i, utf8)
+      emitOp opChar; emit ucCode(re, i, utf8)
     if tooLarge: fail(reeTooLarge, i)
     i += ucLen(re, i, utf8)
 
@@ -780,6 +815,7 @@ func pikevm(re: Re, s: string, start: int, caps: var seq[int], cont: int,
 
 iterator matchRaw(s: string, start: int, re: Re, global: ReGlobalKind, sub: bool
   ): Slice[int] {.closure.} =
+  let start = clamp(start, 0, s.len)
   var
     p = start
     lastEnd = -1
