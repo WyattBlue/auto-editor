@@ -126,8 +126,8 @@ proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorErro
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-func normalizeRange(span: (PackedInt, PackedInt), tb: float64,
-    arrayLen: int): (int, int) {.raises: [].} =
+proc normalizeRange(span: (TimeSpec, TimeSpec), tb: float64,
+    arrayLen: int): (int, int) {.raises: [AutoEditorError].} =
   var start = toTb(span[0], tb)
   var stop = toTb(span[1], tb)
   if start < 0:
@@ -136,7 +136,7 @@ func normalizeRange(span: (PackedInt, PackedInt), tb: float64,
     stop = max(0, arrayLen + stop)
   return (start, stop)
 
-proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
+proc applyToRange(actionIndex: var seq[int], span: (TimeSpec, TimeSpec), tb: float64,
     value: int, maxLen: int) {.raises: [AutoEditorError].} =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
@@ -165,7 +165,7 @@ proc appendIndices(actionMap: var seq[Actions], extra: Actions, sIdx: int,
       actionMap.add made.getOrDefault((sIdx, k))
       result[k] = actionMap.len - 1
 
-proc remapRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
+proc remapRange(actionIndex: var seq[int], span: (TimeSpec, TimeSpec), tb: float64,
     remap: seq[int], maxLen: int) {.raises: [AutoEditorError].} =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
@@ -580,7 +580,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
               let lo = max(toTb(span[0], tbf) - concatOffset, 0)
               let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
               if hi > lo:
-                remapRange(actionIndex, (pack(false, lo), pack(false, hi)), tbf, remap,
+                remapRange(actionIndex, (frames(lo), frames(hi)), tbf, remap,
                   getConLen())
             else:
               remapRange(actionIndex, span, tbf, remap, getConLen())
@@ -599,7 +599,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
             let lo = max(toTb(span[0], tbf) - concatOffset, 0)
             let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
             if hi > lo:
-              applyToRange(actionIndex, (pack(false, lo), pack(false, hi)), tbf, aIdx,
+              applyToRange(actionIndex, (frames(lo), frames(hi)), tbf, aIdx,
                 getConLen())
           else:
             applyToRange(actionIndex, span, tbf, aIdx, getConLen())
@@ -626,7 +626,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       applyAdds(tlV3, args, interner)
       applyLayers(tlV3, args, interner)
       tlV3.applyArgs(args, audio)
-      if args.transition.getNumber > 0:
+      if args.transition.sign > 0:
         tlV3.addTransitions(args.transitionKind,
           toTb(args.transition, tlV3.tb.float).int64,
           toTb(args.transitionMinCut, tlV3.tb.float).int64)

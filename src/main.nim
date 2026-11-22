@@ -86,7 +86,7 @@ proc printHelp() {.noreturn.} =
   echo ""
   quit(0)
 
-proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
+proc parseTwoLengths(val, opt: string): (TimeSpec, TimeSpec) =
   var vals = val.strip().split(",")
   if vals.len == 1:
     vals.add vals[0]
@@ -98,8 +98,8 @@ proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
     error "Invalid number: 'start'"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
-proc parseTransition(val: string): (TransitionKind, PackedInt, PackedInt) =
-  result[2] = pack(true, 1000) # default minimum cut: one second
+proc parseTransition(val: string): (TransitionKind, TimeSpec, TimeSpec) =
+  result[2] = millis(1000) # default minimum cut
   let parts = val.split(':')
   if parts.len notin [2, 3]:
     error "--transition expects KIND:DURATION[:MIN-CUT]"
@@ -108,14 +108,14 @@ proc parseTransition(val: string): (TransitionKind, PackedInt, PackedInt) =
     for info in transitionInfo: ids.add info.id
     error &"Unknown transition kind: '{parts[0]}'{didYouMean(parts[0], ids)}"
   result[1] = parseTimeSimple(parts[1])
-  if result[1].getNumber <= 0:
+  if result[1].sign <= 0:
     error "--transition duration must be greater than zero"
   if parts.len == 3:
     result[2] = parseTimeSimple(parts[2])
-    if result[2].getNumber < 0:
+    if result[2].sign < 0:
       error "--transition minimum cut duration cannot be negative"
 
-proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
+proc parseTimeRange(val, opt: string): (TimeSpec, TimeSpec) =
   var vals = val.strip().split(",")
   if vals.len < 2:
     error &"{opt} has too few arguments"
@@ -371,7 +371,7 @@ proc actionFromUserSpeed(val: float64): Actions =
   elif val <= 0.0 or val >= 99999.0: aCut
   else: newActions([Action(kind: actSpeed, val: val)])
 
-proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
+proc parseSpeedRange(val: string): (Actions, TimeSpec, TimeSpec) =
   let vals = val.strip().split(",")
   if vals.len < 3:
     error "--set-speed has too few arguments"
@@ -383,7 +383,7 @@ proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   return (action, parseTime(vals[1]), parseTime(vals[2]))
 
 proc parseActionAndRange(
-    val: string, args: var mainArgs): (Actions, PackedInt, PackedInt) =
+    val: string, args: var mainArgs): (Actions, TimeSpec, TimeSpec) =
   let parts = splitUnescaped(val.strip(), ',', textOnly = true)
   if parts.len < 3:
     error "--set-action has too few arguments"

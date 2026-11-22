@@ -1,9 +1,9 @@
 import std/[base64, os, strutils, strformat]
 from std/uri import decodeUrl
-from std/math import gcd, `mod`, round, trunc, pow
+from std/math import ceil, gcd, `mod`, round, trunc, pow
 
 import ../log
-import ../lib/[dnorm16, timeunit]
+import ../lib/[dnorm16, timecode, timeunit]
 
 func b64urlDecode*(s: string): seq[byte] =
   var padded = s.replace('-', '+').replace('_', '/')
@@ -301,44 +301,98 @@ proc parseBitrate*(input: string): int =
     error &"Bitrate out of range: {input}"
   int(bits)
 
-# A PackedInt holds 62 bits and a sign; "end" is the largest.
-const packedSpan = float64(1'i64 shl 62)
+# Times stay well inside int64 so arithmetic on them can't overflow; "end"
+# is the largest.
+const timeSpan = float64(1'i64 shl 62)
+const endFrames = 0x3FFFFFFFFFFFFFFF'i64
 
-proc parseTimeSimple*(val: string): PackedInt =
-  const tb = 1000.0
+proc parseTimeSimple*(val: string): TimeSpec =
   let (num, unit) = splitNumStr(val)
   # float -> int is unchecked: out of range or NaN, it's garbage. `not (a and
   # b)` so NaN fails too.
-  template packed(flag: bool, x: float64): PackedInt =
+  template checked(x: float64): int64 =
     let f = x
-    if not (f > -packedSpan and f < packedSpan):
+    if not (f > -timeSpan and f < timeSpan):
       error &"'{val}': Time is out of range"
-    pack(flag, f.int64)
+    f.int64
   var tu: TimeUnit
   if not parseTimeUnit(unit, tu):
     error &"'{val}': Time format got unknown unit: `{unit}`"
   if tu != tuFrames:
-    return packed(true, round(num * tb * tu.seconds))
+    return millis(checked(round(num * 1000 * tu.seconds)))
 
   if num != trunc(num):
     if unit == "":
       error &"'{val}': A time without a unit is a frame count, so it must be " &
         &"whole. For seconds, write '{val}s'"
     error &"'{val}': A frame count must be whole"
-  return packed(false, num)
+  return frames(checked(num))
 
-proc parseTime*(val: string): PackedInt =
+proc parseClock(val: string): TimeSpec =
+  ## `HH:MM:SS:FF` timecode (`;FF` for drop frame), or `MM:SS` and
+  ## `HH:MM:SS` clock time with optional decimal seconds. MM:SS:FF isn't
+  ## taken: it reads the same as HH:MM:SS.
+  let neg = val.startsWith("-")
+  let body = (if neg: val[1 .. ^1] else: val)
+  var seps = 0
+  for c in body:
+    if c in {':', ';'}: inc seps
+  if seps == 3:
+    let semi = body.find(';')
+    if '.' in body or ',' in body or semi >= 0 and semi < body.rfind(':'):
+      error &"'{val}': Timecode is HH:MM:SS:FF, or HH:MM:SS;FF for drop frame"
+    var tc: Timecode
+    if not parseTimecode(body, tc):
+      error &"'{val}': Timecode is HH:MM:SS:FF, or HH:MM:SS;FF for drop frame"
+    if tc.m >= 60 or tc.s >= 60:
+      error &"'{val}': Timecode minutes and seconds must be under 60"
+    return TimeSpec(kind: tkTimecode, tc: tc, neg: neg)
+  if seps notin 1..2 or ';' in body:
+    error &"'{val}': Write a time as MM:SS or HH:MM:SS, or timecode as HH:MM:SS:FF"
+  let parts = body.split(':')
+  var total = 0.0
+  for i, part in parts:
+    var dots = 0
+    for c in part:
+      if c == '.': inc dots
+      elif c notin Digits: dots = 2
+    if part.len == 0 or dots > 1 or dots == 1 and i < parts.high:
+      error &"'{val}': Write a time as MM:SS or HH:MM:SS, or timecode as HH:MM:SS:FF"
+    let x = (try: parseFloat(part) except ValueError: 0.0)
+    if i > 0 and x >= 60:
+      error &"'{val}': Minutes and seconds must be under 60"
+    total = total * 60 + x
+  let ms = round(total * 1000)
+  if not (ms < timeSpan):
+    error &"'{val}': Time is out of range"
+  millis(if neg: -ms.int64 else: ms.int64)
+
+proc parseTime*(val: string): TimeSpec =
   if val == "start":
-    return pack(false, 0)
+    return frames(0)
   if val == "end":
-    return pack(false, 0x3FFFFFFFFFFFFFFF)
+    return frames(endFrames)
+  if ':' in val or ';' in val:
+    return parseClock(val)
   return parseTimeSimple(val)
 
-func toTb*(val: PackedInt, tb: float64): int =
-  if val.getFlag:
+proc toTb*(val: TimeSpec, tb: float64): int =
+  case val.kind
+  of tkFrames:
+    int(val.n)
+  of tkMillis:
     # A time that far out is past "end" anyway; it saturates.
-    let f = round(val.getNumber.float64 / 1000.0 * tb)
+    let f = round(val.n.float64 / 1000.0 * tb)
     if not (f > low(int).float64 and f < high(int).float64):
       return (if f < 0: low(int) else: high(int))
-    return f.int
-  return int(val.getNumber)
+    f.int
+  of tkTimecode:
+    # Timecode counts whole frames a second: 30 for 29.97.
+    let base = max(1'i64, int64(ceil(tb - 1e-9)))
+    if val.tc.f >= base:
+      error &"Timecode frame {val.tc.f} is past the timeline's {base} frames a second"
+    let ntsc = base mod 30 == 0 and abs(tb - base.float64) > 1e-6
+    if val.tc.drop and not ntsc:
+      error "Drop-frame timecode (with ';') needs a 29.97 or 59.94 fps timeline"
+    let n = val.tc.toFrames(base, val.tc.drop)
+    int(if val.neg: -n else: n)

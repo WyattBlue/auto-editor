@@ -5,6 +5,7 @@ when not defined(emscripten):
 import ./[action, cli, editexpr, ffmpeg, transitions]
 export editexpr, transitions
 import ./util/[color, rational, term]
+import ./lib/timecode
 
 type
   AutoEditorError* = object of CatchableError
@@ -23,7 +24,17 @@ type
     name*: string
     version*: uint8
 
-  PackedInt* = distinct int64
+  TimeKind* = enum
+    tkFrames   ## whole frames at the timeline's rate
+    tkMillis   ## milliseconds
+    tkTimecode ## SMPTE timecode, counted at the timeline's rate
+  TimeSpec* = object
+    ## A time as written, made into frames once the timeline's rate is known.
+    case kind*: TimeKind
+    of tkFrames, tkMillis: n*: int64
+    of tkTimecode:
+      tc*: Timecode
+      neg*: bool
 
 func `$`*(kind: ExportKind): string {.raises: [].} =
   case kind
@@ -42,20 +53,19 @@ func `$`*(kind: ExportKind): string {.raises: [].} =
   of exPremiereOtio: "premiere-otio"
   of exEdl: "edl"
 
-func pack*(flag: bool, number: int64): PackedInt {.raises: [].} =
-  let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64
-  let flagBit = if flag: 0x8000000000000000'i64 else: 0'i64
-  PackedInt(flagBit or maskedNumber)
+func frames*(n: int64): TimeSpec {.raises: [].} =
+  TimeSpec(kind: tkFrames, n: n)
 
-func getFlag*(packed: PackedInt): bool {.raises: [].} =
-  int64(packed) < 0
+func millis*(n: int64): TimeSpec {.raises: [].} =
+  TimeSpec(kind: tkMillis, n: n)
 
-func getNumber*(packed: PackedInt): int64 {.raises: [].} =
-  let raw = int64(packed) and 0x7FFFFFFFFFFFFFFF'i64
-  if (raw and 0x4000000000000000'i64) != 0:
-    raw or 0x8000000000000000'i64
-  else:
-    raw
+func sign*(t: TimeSpec): int {.raises: [].} =
+  case t.kind
+  of tkFrames, tkMillis: cmp(t.n, 0'i64)
+  of tkTimecode:
+    if t.tc.h == 0 and t.tc.m == 0 and t.tc.s == 0 and t.tc.f == 0: 0
+    elif t.neg: -1
+    else: 1
 
 type
   NormKind* = enum
@@ -154,7 +164,7 @@ type
   SourceMarker* = object
     ## A marker in the inputs' time, laid end to end, placed on the timeline
     ## through the cuts. `stop` equal to `start` makes it a point.
-    start*, stop*: PackedInt
+    start*, stop*: TimeSpec
     name*, note*: string
     color*: MarkerColor
 
@@ -184,8 +194,8 @@ type mainArgs* = object
   videoHookData*: pointer
 
   # Editing Options
-  margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
-  smooth*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 100)) # 0.2s,0.1s
+  margin*: (TimeSpec, TimeSpec) = (millis(200), millis(200))
+  smooth*: (TimeSpec, TimeSpec) = (millis(200), millis(100))
   edit*: EditExpr = edit(audioMethod())
   whenInactive*: Actions = aCut
   whenActive*: Actions = aNil
@@ -194,12 +204,12 @@ type mainArgs* = object
   `export`*: ExportSpec = ExportSpec(
     kind: exAuto, name: "Auto-Editor Media Group", version: 11)
   output*: string = ""
-  setAction*: seq[(Actions, PackedInt, PackedInt)]
+  setAction*: seq[(Actions, TimeSpec, TimeSpec)]
   markers*: seq[SourceMarker] # in the inputs' frames end to end, like setActionConcat
   adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
   layers*: seq[LayerSpec]                         # library-only overlays
-  transition*: PackedInt = pack(false, 0) # 0 disables; otherwise its duration
-  transitionMinCut*: PackedInt = pack(true, 1000) # 1 second
+  transition*: TimeSpec = frames(0) # 0 disables; otherwise its duration
+  transitionMinCut*: TimeSpec = millis(1000)
   placedTransitions*: seq[PlacedTransition] # library-only: chosen in an editor
 
   # URL download Options

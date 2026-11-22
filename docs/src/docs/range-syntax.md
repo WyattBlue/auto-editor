@@ -58,10 +58,29 @@ You can also use `s`, `sec`, `secs`, `second`, or `seconds`, depending on your p
 
 To say frames outright, write `f`, `frame`, or `frames`: `--cut 0,30f` is the same as `--cut 0,30`.
 
+`min`, `minute`, `minutes`, `hour`, and `hours` work too.
+
+## Clock Time and Timecode
+A time can also be written with colons:
+
+ * `MM:SS` or `HH:MM:SS` is clock time, and the seconds may have a decimal: `1:30`, `1:02:03.5`.
+ * `HH:MM:SS:FF` is timecode, as an editor shows it. `FF` counts frames at the timeline's frame rate. Write `HH:MM:SS;FF` for drop-frame timecode on a 29.97 or 59.94 fps timeline.
+
+```sh
+# Cut from 1 minute 30 seconds to 2 minutes.
+auto-editor example.mp4 --cut 1:30,2:00
+
+# The same cut, as timecode on a 30 fps timeline.
+auto-editor example.mp4 --cut 00:01:30:00,00:02:00:00
+```
+
+Three fields always mean `HH:MM:SS`, never `MM:SS:FF`. For frames, write all four fields.
+
 ## Negative Indexes
 Negative numbers can be used to count down starting from the end.
  * `-60,end` selects the last 60 frames
  * `1sec,-30secs` selects from the first second, to the last 30 seconds from the end.
+ * `-1:30,end` selects the last minute and a half.
 
 ## Speed for Range
 The `--set-speed-for-range` option has a slight twist on time range syntax. It accepts three numbers. `speed`, `start`, and `end`, separated by commas. `speed` can be a decimal number, but not negative. `start` and `end` work as described above.
