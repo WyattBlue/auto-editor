@@ -11,6 +11,7 @@ when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+from ./av import codecAlias
 import render/burnsubs
 import ./lib/escape
 when defined(emscripten):
@@ -598,7 +599,7 @@ judge making cuts.
     of coFrameRate:
       args.frameRate = frameRateArg(key)
     of coVcodec:
-      video.codec = key
+      video.codec = codecAlias(key)
     of coVideoBitrate:
       video.bitrate = parseBitrate(key)
     of coCrf:
@@ -619,7 +620,7 @@ judge making cuts.
     of coPixFmt:
       video.pixFmt = key
     of coAcodec:
-      audio.codec = key
+      audio.codec = codecAlias(key)
     of coLayout:
       audio.layout = key
     of coAudioNormalize:

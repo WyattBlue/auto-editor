@@ -150,15 +150,33 @@ proc resolveEncoderContext*(ctx: var ptr AVCodecContext) =
     avcodec_free_context(addr ctx)
     ctx = replacement
 
-proc initCodec*(name: string): ptr AVCodec =
-  if name == "opus":
-    return avcodec_find_encoder_by_name("libopus")
+const codecAliases = {
+  "h265": "hevc", "x265": "libx265", "x264": "libx264", "avc": "h264",
+  "svtav1": "libsvtav1", "svt-av1": "libsvtav1", "opus": "libopus",
+  "lame": "libmp3lame", "pcm": "pcm_s16le",
+}
 
+func codecAlias*(name: string): string {.raises: [].} =
+  ## The encoder name for what people commonly call a codec, as `h265` for
+  ## hevc. FFmpeg's own names are all lowercase.
+  result = name.toLowerAscii
+  for (alias, real) in codecAliases:
+    if result == alias:
+      return real
+
+proc initCodec*(name: string): ptr AVCodec =
+  let name = codecAlias(name)
   result = avcodec_find_encoder_by_name(name.cstring)
   if result == nil:
     let desc = avcodec_descriptor_get_by_name(name.cstring)
     if desc != nil:
       result = avcodec_find_encoder(desc.id)
+
+const neverSuggest = ["h263", "libx264rgb", "prores_aw", "ac3_fixed",
+  "mp2fixed", "pcm_bluray", "hdr"]
+
+func suggestable(name: string): bool {.raises: [].} =
+  name notin neverSuggest and not name.endsWith("_planar")
 
 proc encoderNames(): seq[string] =
   var opaque: pointer = nil
@@ -167,8 +185,12 @@ proc encoderNames(): seq[string] =
     if c == nil:
       break
     if av_codec_is_encoder(c) != 0:
-      result.add $c.name
-      result.add $avcodec_get_name(c.id)
+      for name in [$c.name, $avcodec_get_name(c.id)]:
+        if name.suggestable:
+          result.add name
+  for (alias, real) in codecAliases:
+    if avcodec_find_encoder_by_name(real.cstring) != nil:
+      result.add alias
   result = result.deduplicate()
 
 proc unknownEncoder(name: string) {.noreturn.} =
