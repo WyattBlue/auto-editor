@@ -102,7 +102,11 @@ proc parseTwoLengths(val, opt: string): (TimeSpec, TimeSpec) =
 proc parseTransition(val: string): (TransitionKind, TimeSpec, TimeSpec) =
   result[2] = millis(1000) # default minimum cut
   let parts = val.split(':')
-  if parts.len notin [2, 3]:
+  # `:` separates the parts, so a clock time or timecode can't be one.
+  const noClock = "; ':' separates its parts, so write times like 1s, not 0:01"
+  if parts.len > 3:
+    error "--transition expects KIND:DURATION[:MIN-CUT]" & noClock
+  if parts.len < 2:
     error "--transition expects KIND:DURATION[:MIN-CUT]"
   if not parseTransitionKind(parts[0], result[0]):
     var ids = @["constant-gain"]
@@ -110,7 +114,8 @@ proc parseTransition(val: string): (TransitionKind, TimeSpec, TimeSpec) =
     error &"Unknown transition kind: '{parts[0]}'{didYouMean(parts[0], ids)}"
   result[1] = parseTimeSimple(parts[1])
   if result[1].sign <= 0:
-    error "--transition duration must be greater than zero"
+    error "--transition duration must be greater than zero" &
+      (if parts.len == 3: noClock else: "")
   if parts.len == 3:
     result[2] = parseTimeSimple(parts[2])
     if result[2].sign < 0:
