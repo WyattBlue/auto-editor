@@ -710,10 +710,8 @@ func pikevm(re: Re, s: string, start: int, caps: var seq[int], cont: int,
           case op
           of opWb: wordBefore != isWordAt(s, pos)
           of opNotb: wordBefore == isWordAt(s, pos)
-          # At a restart, \< ignores the character before it, as C's did.
-          of opWbeg:
-            if first: isWordAt(s, pos) else: not isWordAt(s, prev) and isWordAt(s, pos)
-          of opWend: not first and isWordAt(s, prev) and not isWordAt(s, pos)
+          of opWbeg: not wordBefore and isWordAt(s, pos)
+          of opWend: wordBefore and not isWordAt(s, pos)
           of opBol: first and pos == start and cont < 0
           of opEol: pos >= s.len
           else: false
