@@ -676,7 +676,7 @@ judge making cuts.
                         ".json", ".v1", ".v2", ".v3"]
         var capturePath: string
         if keepRecording:
-          if args.output == "-":
+          if args.output == "-" or isDevicePath(args.output):
             capturePath = "mic_RECORDING.mka"
           else:
             let (outDir, outName, _) = agSplitFile(args.output)

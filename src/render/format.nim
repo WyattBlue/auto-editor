@@ -173,7 +173,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   elif not args.noFaststart:
     options.add("movflags", "faststart")
 
-  var output = openWrite(outputPath)
+  var output = openWrite(outputPath, rules.format)
   output.options = options
   output.streaming = args.fragmented and not args.noFragmented
 

@@ -7,6 +7,7 @@
  - The `text` action takes `:ass`, which reads the text as raw ASS override tags, including in vertical layout.
  - `whisper --language` takes three-letter codes, tags like `en-US`, and language names. An unknown language is now an error.
  - With an explicit `--output`, retimed subtitle sidecars are named after the output and written beside it (`video.en.srt` with `-o out/final.mp4` gives `out/final.en.srt`).
+ - `--output` can be a device or pipe, like `/dev/null`, `/dev/stdout`, or `>(cmd)`. MP4 sent to a pipe is fragmented so it plays.
 
 ## Performance
  - Rendering transitions is faster.

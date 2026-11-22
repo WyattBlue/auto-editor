@@ -104,6 +104,38 @@ func toTimecode*(secs: float, fmt: Code): string =
   of display:
     &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
 
+when defined(posix):
+  from std/posix import Stat, stat, S_ISREG, S_ISDIR, S_ISFIFO, S_ISSOCK
+
+proc isDevicePath*(path: string): bool {.raises: [].} =
+  ## Whether `path` names something other than a file to create or replace:
+  ## a device (/dev/null), a pipe (/dev/stdout, `>(cmd)`), or a socket. Its
+  ## name is fixed, so nothing may add an extension or derive siblings from it.
+  when defined(windows):
+    let (_, name, _) = splitFile(path)
+    path.startsWith(r"\\.\") or name.toUpperAscii in ["NUL", "CON", "PRN",
+      "AUX", "COM1", "COM2", "COM3", "COM4", "LPT1", "LPT2", "LPT3"]
+  elif defined(posix) and not defined(emscripten):
+    # An alias of an open descriptor (/dev/stdout redirected to a file)
+    # stats as whatever it points at.
+    if path in ["/dev/stdout", "/dev/stderr"] or path.startsWith("/dev/fd/") or
+        path.startsWith("/proc/") and "/fd/" in path:
+      return true
+    var st: Stat
+    stat(path.cstring, st) == 0 and not S_ISREG(st.st_mode) and
+      not S_ISDIR(st.st_mode)
+  else:
+    false
+
+proc isPipePath*(path: string): bool {.raises: [].} =
+  ## Whether writing `path` can't seek back, as a muxer finishing its header
+  ## would.
+  when defined(posix) and not defined(emscripten):
+    var st: Stat
+    stat(path.cstring, st) == 0 and (S_ISFIFO(st.st_mode) or S_ISSOCK(st.st_mode))
+  else:
+    false
+
 func agSplitFile*(path: string): tuple[dir, name, ext: string] =
   ## Platform-independent splitFile. Treats both '/' and '\' as path separators
   ## on every OS, so results don't drift between Linux, macOS, and Windows.

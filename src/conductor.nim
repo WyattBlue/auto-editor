@@ -196,10 +196,18 @@ proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
       if hasVideo and not holdsVideo("x" & ext): ".mp4" else: ext
     else: ext
 
+type OutputTarget = tuple
+  path: string       # where to write
+  kind: ExportKind
+  formatName: string # a name whose extension picks the container
+
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
-    isUrl = false, hasVideo = false): (string, ExportKind) {.raises: [AutoEditorError].} =
+    isUrl = false, hasVideo = false): OutputTarget {.raises: [AutoEditorError].} =
   var dir, name, ext: string
-  if userOut == "" or userOut == "-":
+  let device = userOut != "" and userOut != "-" and isDevicePath(userOut)
+  if device:
+    ext = agSplitFile(userOut).ext
+  elif userOut == "" or userOut == "-":
     if path == "":
       error "`--output` must be set." # When a timeline file is the input.
     (dir, name, ext) = agSplitFile(path)
@@ -239,15 +247,20 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
     ext = fitted
 
   if userOut == "-":
-    return ("-", myExport)
+    return ("-", myExport, "-" & ext)
+  if device:
+    # A device keeps its name; the format comes from what a file would be.
+    return (userOut, myExport, "x" & ext)
   if userOut == "":
-    return (&"{root}_ALTERED{ext}", myExport)
+    let path = &"{root}_ALTERED{ext}"
+    return (path, myExport, path)
 
-  return (&"{root}{ext}", myExport)
+  let path = &"{root}{ext}"
+  return (path, myExport, path)
 
 proc defaultOutput*(input: string, `export`: ExportKind, hasVideo: bool): string =
   ## Where an export of `input` goes when no output is asked for.
-  setOutput("", `export`, input, hasVideo = hasVideo)[0]
+  setOutput("", `export`, input, hasVideo = hasVideo).path
 
 proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     isUrl = false): string {.raises: [].} =
@@ -697,20 +710,21 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   mi = built.mi
 
   var exportKind: ExportKind
+  var formatName: string
   var tlName: string
   var fcpVersion: uint8
   let hasVideo = tlV3.v.len > 0 and not args.vn
   if args.`export`.kind == exAuto:
-    (output, exportKind) = setOutput(args.output, exAuto, usePath, args.urlInput,
-      hasVideo)
+    (output, exportKind, formatName) = setOutput(args.output, exAuto, usePath,
+      args.urlInput, hasVideo)
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
   else:
     exportKind = args.`export`.kind
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
-    (output, _) = setOutput(args.output, exportKind, usePath, args.urlInput,
-      hasVideo)
+    (output, _, formatName) = setOutput(args.output, exportKind, usePath,
+      args.urlInput, hasVideo)
 
   if args.preview:
     preview(tlV3)
@@ -768,13 +782,29 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   if output == "-":
     error "Exporting media files to stdout is not supported."
 
-  let rule = initRules(output)
+  let rule = initRules(formatName)
+  let device = isDevicePath(output)
+  if device:
+    # Faststart reopens the finished file to read it back, which a device
+    # (even /dev/stdout redirected to a file) won't allow.
+    if args.faststart:
+      warning "--faststart needs a regular file; writing without it"
+    args.faststart = false
+    args.noFaststart = true
+    if isPipePath(output) and
+        $rule.format.name in ["mp4", "mov", "ipod", "3gp", "3g2", "psp", "f4v"]:
+      if args.noFragmented:
+        error &"{rule.format.name} can't be written to a pipe without " &
+          "fragmenting; drop --no-fragmented"
+      args.fragmented = true
   var video = inputVideo
   video.codec = setVideoCodec(video.codec, mi, rule, args.urlInput)
   let cache = newMediaCache()
   defer: cache.close()
 
   if exportKind == exClipSequence:
+    if device:
+      error "clip-sequence export writes several files; --output must be a file path"
     if not tlV3.isLinear:
       error "Timeline too complex to use clip-sequence export"
 
@@ -808,8 +838,9 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
     makeMedia(args, video, audio, tlV3, output, rule, bar, cache)
 
   # Retiming embedded subtitles is handled by makeMedia. Also retime every
-  # subtitle-only sibling of each original media input into its own sidecar.
-  for input in args.inputs:
+  # subtitle-only sibling of each original media input into its own sidecar,
+  # named after the output, which a device has no room for.
+  for input in (if device: @[] else: args.inputs):
     let (inputDir, inputName, _) = agSplitFile(input)
     var inputLayer: seq[Clip]
     let baseLayer =
@@ -858,7 +889,7 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   let seconds = round(epochTime() - startTime, 2)
   notice &"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})"
 
-  if args.noOpen:
+  if args.noOpen or device:
     discard
   elif args.open:
     when not defined(emscripten):

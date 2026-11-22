@@ -11,6 +11,9 @@ func allowsCodec*(self: Rules, codecId: AVCodecID): bool =
   var tag: cuint = 0
   return av_codec_get_tag2(self.ofmt.codec_tag, codecId, addr tag) > 0
 
+func format*(self: Rules): ptr AVOutputFormat =
+  self.ofmt
+
 func defaultVid*(self: Rules): AVCodecID =
   self.ofmt.video_codec
 

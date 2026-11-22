@@ -520,7 +520,8 @@ proc otioWrite*(name, output: string, tl: v3) =
   # picture doesn't cover the frame. (Premiere's color-matte generator references a
   # project-local item by GUID and can't be carried portably, so it isn't used.)
   var videoTrackNum = 0
-  if output != "-" and tl.bg != RGBColor(red: 0, green: 0, blue: 0):
+  if output != "-" and not isDevicePath(output) and
+      tl.bg != RGBColor(red: 0, green: 0, blue: 0):
     let (dir, nm, _) = splitFile(output)
     let pngPath = dir / (nm & "-bg.png")
     writeSolidPng(pngPath, tl.res[0], tl.res[1], tl.bg.toRgb)

@@ -541,9 +541,10 @@ type OutputContainer* = object
   started: bool = false
   streaming*: bool = false # consumers tail/mirror the file; writes must be append-only
 
-proc openWrite*(file: string): OutputContainer =
+proc openWrite*(file: string, format: ptr AVOutputFormat = nil): OutputContainer =
+  ## Without a `format`, FFmpeg guesses one from the extension of `file`.
   let formatCtx: ptr AVFormatContext = nil
-  discard avformat_alloc_output_context2(addr formatCtx, nil, nil, file.cstring)
+  discard avformat_alloc_output_context2(addr formatCtx, format, nil, file.cstring)
   if formatCtx == nil:
     error "Could not create output context"
 
