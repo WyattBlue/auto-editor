@@ -74,12 +74,36 @@ type
     reGlobal     # Perform global matching
     reUtf8       # Perform utf8 matching
 
+  ReErrorKind* = enum
+    ## Why a pattern didn't compile. The order matches the RE_ codes in re.c.
+    reeNone             ## (not an error)
+    reeTrailingBackslash ## the pattern ends in a lone `\`
+    reeBadEscape        ## `\x`, `\u` or `\U` without enough hex digits
+    reeUnclosedSet      ## a `[` with no `]`
+    reeBadRange         ## a class like `\d` as one end of a range in a set
+    reeUnsupportedGroup ## `(?` not followed by `:`
+    reeUnclosedGroup    ## a `(` with no `)`
+    reeUnmatchedParen   ## a `)` with no `(`
+    reeBadRepeat        ## a `{` that isn't `{n}`, `{n,}` or `{n,m}`
+    reeRepeatTooLarge   ## a repeat count over 65535
+    reeNothingToRepeat  ## `?`, `*` or `+` with nothing before it
+    reeTooNested        ## too many nested groups or alternatives
+    reeTooLarge         ## the compiled pattern is too large
+    reeNoMemory         ## out of memory
+
+  ReError* = object of ValueError
+    ## A pattern that didn't compile: why, and where, as a byte offset into
+    ## the pattern.
+    kind*: ReErrorKind
+    pos*: int
+
   ReGlobalKind = enum
     rgNone
     rgIncludeLastEmpty
     rgExcludeLastEmpty
 
 proc re_compile(pattern: cstring, i: cint, u: cint): ReRaw {.importc, cdecl.}
+proc re_compile_err(pattern: cstring, i: cint, u: cint, kind, pos: var cint): ReRaw {.importc, cdecl.}
 proc re_free(re: ReRaw) {.importc, cdecl.}
 proc re_dup(re: ReRaw): ReRaw {.importc, cdecl.}
 proc re_match(re: ReRaw, text: cstring, L: cint, cont: cstring): cstringArray {.importc, cdecl.}
@@ -159,14 +183,34 @@ iterator matchRaw(s: cstring, L0: int, re: ReRaw, global: ReGlobalKind, sub: boo
       if cast[int](p) >=% cast[int](s) +% L0:
         break
 
+const reErrorMessages: array[ReErrorKind, string] = [
+  "no error", "trailing backslash", "bad escape", "unclosed set",
+  "bad range in set", "unsupported group", "unclosed group",
+  "unmatched parenthesis", "bad repeat", "repeat count too large",
+  "nothing to repeat", "too many nested groups", "pattern too large",
+  "out of memory"]
+
+func message*(kind: ReErrorKind): string =
+  ## A short English description of `kind`.
+  reErrorMessages[kind]
+
 proc re*(s: string, flags: set[ReFlag] = {}): Re =
-  # Constructor of regular expressions.
+  ## Constructor of regular expressions. Raises ReError (a ValueError) saying
+  ## why and where `s` didn't compile.
+  var kind, pos: cint
   result = Re(
-    raw: re_compile(s, cint(reIgnoreCase in flags), cint(reUtf8 in flags)),
+    raw: re_compile_err(s, cint(reIgnoreCase in flags), cint(reUtf8 in flags),
+      kind, pos),
     global: reGlobal in flags
   )
   if result.raw.isNil:
-    raise newException(ValueError, "cannot compile pattern")
+    let k = (if kind in 1.cint .. ord(high(ReErrorKind)).cint: ReErrorKind(kind)
+             else: reeTooLarge)
+    var e = newException(ReError,
+      "cannot compile pattern: " & k.message & " at byte " & $pos)
+    e.kind = k
+    e.pos = pos
+    raise e
 
 proc groupsCount*(re: Re): int =
   # Returns the number of capturing groups.
@@ -181,6 +225,16 @@ iterator match*(s: string, pattern: Re, start = 0): string =
   for i in matchRaw(cs, s.len - start0, pattern.raw, rg, true):
     var slice = (i.a +% start0) .. (i.b +% start0)
     yield if slice.b >= slice.a and slice.a >= 0: s[slice] else: ""
+
+iterator matchBounds*(s: string, pattern: Re, start = 0): Slice[int] =
+  ## The byte bounds in `s` of every whole match in `s[start..]`, whether or
+  ## not the pattern has reGlobal. An empty match comes out as `a ..< a`,
+  ## that is with `b == a - 1`, once at each position it occurs, including
+  ## one at the end of `s`.
+  let start0 = start # avoid to be modified during iteration
+  let cs = cast[cstring](cast[int](s.cstring) +% start0)
+  for i in matchRaw(cs, s.len - start0, pattern.raw, rgIncludeLastEmpty, false):
+    yield (i.a +% start0) .. (i.b +% start0)
 
 proc match*(s: string, pattern: Re, start = 0): seq[string] =
   # Returns all matching substrings of `s[start..]` that match `pattern`.

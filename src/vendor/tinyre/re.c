@@ -178,6 +178,21 @@ static int _code(const char *re, int n) {
   return result;
 }
 
+/* Why a pattern failed to compile; mirrored by ReErrorKind in tinyre.nim. */
+enum {
+  RE_OK, RE_TRAILING_BACKSLASH, RE_BAD_ESCAPE, RE_UNCLOSED_SET, RE_BAD_RANGE,
+  RE_UNSUPPORTED_GROUP, RE_UNCLOSED_GROUP, RE_UNMATCHED_PAREN, RE_BAD_REPEAT,
+  RE_REPEAT_TOO_LARGE, RE_NOTHING_TO_REPEAT, RE_TOO_NESTED, RE_TOO_LARGE,
+  RE_NO_MEMORY
+};
+
+typedef struct { int kind, pos; } re_err;
+
+/* Record the first failure: `at` is where in the pattern it happened. */
+#define FAIL(k, at) do { \
+  if (err && !err->kind) { err->kind = (k); err->pos = (int)((at) - re_loc); } \
+  return -1; } while (0)
+
 static int token(const char *re0, int* forward, int utf8) {
   const char *re = re0;
   int ch;
@@ -216,7 +231,8 @@ static int token(const char *re0, int* forward, int utf8) {
   }
 }
 
-static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
+static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8,
+    re_err *err)
 {
   const char *re = re_loc;
   int *code = sizecode ? NULL : prog->insts;
@@ -224,13 +240,14 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
   int alt_label = 0, c;
   int alt_stack[ALT_MAX], altc = 0;
   int cap_stack[ALT_MAX * 5], capc = 0;
+  int open_stack[ALT_MAX]; /* where each open group starts, for errors */
   int n, ch;
 
   while (*re) {
     switch (*re) {
     case '\\':
       re++;
-      if (!*re) return -1; /* Trailing backslash */
+      if (!*re) FAIL(RE_TRAILING_BACKSLASH, re - 1);
       switch (*re) {
       case '<': case '>': case 'B': case 'b':
         EMIT(PC++, *re == '<' ? WBEG : (*re == '>' ? WEND : (*re == 'B' ? NOTB : WB)));
@@ -259,7 +276,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       case 'U': n = 8; _hex:
         term = PC;
         ch = _code(re, n);
-        if (ch < 0) return -1;
+        if (ch < 0) FAIL(RE_BAD_ESCAPE, re - 1);
         re += n;
         goto _char;
       default: goto _default;
@@ -278,6 +295,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       EMIT(PC++, ANY);
       break;
     case '[':;
+      const char *set_start = re;
       term = PC;
       re++;
       EMIT(PC++, CLASS);
@@ -290,7 +308,10 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       while (*re != ']') {
         int forward;
         int tok = token(re, &forward, utf8);
-        if (tok == -1) return -1;
+        if (tok == -1) {
+          if (!*re || (*re == '\\' && !re[1])) FAIL(RE_UNCLOSED_SET, set_start);
+          FAIL(RE_BAD_ESCAPE, re);
+        }
         re += forward;
 
         if (tok < 0) { // \d\D\s\S\w\W etc.
@@ -304,7 +325,10 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
         if (*re == '-' && re[1] != ']') {
           re++; // skip '-'
           tok = token(re, &forward, utf8);
-          if (tok < 0) return -1; // not allow \d\D\s\S\w\W here
+          if (tok < 0) { // not allow \d\D\s\S\w\W here
+            if (!*re || (*re == '\\' && !re[1])) FAIL(RE_UNCLOSED_SET, set_start);
+            FAIL(tok == -1 ? RE_BAD_ESCAPE : RE_BAD_RANGE, re);
+          }
           re += forward;
         }
         EMIT(PC++, tok);
@@ -316,19 +340,21 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       int sub;
       int capture = 1;
+      const char *group_start = re;
       if (*(re+1) == '?') {
         re += 2;
         if (*re == ':')
           capture = 0;
         else
-          return -1;
+          FAIL(RE_UNSUPPORTED_GROUP, group_start);
       }
       if (capture) {
         sub = ++prog->sub;
         EMIT(PC++, SAVE);
         EMIT(PC++, sub);
       }
-      if (capc + 5 > ALT_MAX * 5) return -1;
+      if (capc + 5 > ALT_MAX * 5) FAIL(RE_TOO_NESTED, group_start);
+      open_stack[capc / 5] = (int)(group_start - re_loc);
       cap_stack[capc++] = capture;
       cap_stack[capc++] = term;
       cap_stack[capc++] = alt_label;
@@ -338,7 +364,8 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       start = PC;
       break;
     case ')':
-      if (--capc-4 < 0) return -1;
+      if (capc < 5) FAIL(RE_UNMATCHED_PAREN, re);
+      --capc;
       if (code && alt_label) {
         EMIT(alt_label, REL(alt_label, PC) + 1);
         int _altc = cap_stack[capc];
@@ -358,12 +385,13 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
     case '{':;
       int maxcnt = 0, mincnt = 0, size = PC - term;
       int split = SPLIT, rsplit = RSPLIT;
+      const char *brace = re;
       re++;
       // {n}, {n,}, or {n,m}
-      if (!isdigit((unsigned char) *re)) return -1;
+      if (!isdigit((unsigned char) *re)) FAIL(RE_BAD_REPEAT, brace);
       while (isdigit((unsigned char) *re)) {
         mincnt = mincnt * 10 + *re++ - '0';
-        if (mincnt > 65535) return -1;
+        if (mincnt > 65535) FAIL(RE_REPEAT_TOO_LARGE, brace);
       }
       if (*re == '}') { // {n}
         maxcnt = mincnt;
@@ -374,14 +402,14 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
         } else if (isdigit((unsigned char) *re)) { // {n,m}
           while (isdigit((unsigned char) *re)) {
             maxcnt = maxcnt * 10 + *re++ - '0';
-            if (maxcnt > 65535) return -1;
+            if (maxcnt > 65535) FAIL(RE_REPEAT_TOO_LARGE, brace);
           }
-          if (*re != '}') return -1;
+          if (*re != '}') FAIL(RE_BAD_REPEAT, brace);
         } else {
-          return -1;
+          FAIL(RE_BAD_REPEAT, brace);
         }
       } else {
-        return -1;
+        FAIL(RE_BAD_REPEAT, brace);
       }
       if (re[1] == '?') { // non-greedy
         split = RSPLIT;
@@ -391,7 +419,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       // {0}, {0,}, {0,2}
       // {1}, {1,}, {1,3}
       for (int i = 0; i < mincnt - 1; i++) {
-        if (PC > MAX_CODE) return -1;
+        if (PC > MAX_CODE) FAIL(RE_TOO_LARGE, re);
         if (code)
           memcpy(&code[PC], &code[term], size*sizeof(int));
         PC += size;
@@ -404,7 +432,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       else if (maxcnt > 0) {
         int diff = mincnt == 0 ? 1 : 0;
         for (int i = maxcnt - mincnt - diff; i > 0; i--) {
-          if (PC > MAX_CODE) return -1;
+          if (PC > MAX_CODE) FAIL(RE_TOO_LARGE, re);
           EMIT(PC++, split);
           EMIT(PC++, REL(PC, PC+((size+2)*i)));
           if (code)
@@ -420,7 +448,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       }
       break;
     case '?':
-      if (PC == term) return -1;
+      if (PC == term) FAIL(RE_NOTHING_TO_REPEAT, re);
       INSERT_CODE(term, 2, PC);
       EMIT(term, re[1] == '?' ? RSPLIT : SPLIT);
       if (re[1] == '?') re++;
@@ -428,7 +456,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       break;
     case '*':
-      if (PC == term) return -1;
+      if (PC == term) FAIL(RE_NOTHING_TO_REPEAT, re);
       INSERT_CODE(term, 2, PC);
       EMIT(PC, JMP);
       EMIT(PC + 1, REL(PC, term));
@@ -439,7 +467,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       break;
     case '+':
-      if (PC == term) return -1;
+      if (PC == term) FAIL(RE_NOTHING_TO_REPEAT, re);
       EMIT(PC, re[1] == '?' ? SPLIT : RSPLIT);
       if (re[1] == '?') re++;
       EMIT(PC + 1, REL(PC, term));
@@ -448,7 +476,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       break;
     case '|':
       if (alt_label) {
-        if (altc >= ALT_MAX) return -1;
+        if (altc >= ALT_MAX) FAIL(RE_TOO_NESTED, re);
         alt_stack[altc++] = alt_label;
       }
       INSERT_CODE(start, 2, PC);
@@ -463,7 +491,7 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       term = PC;
       break;
     }
-    if (PC > MAX_CODE) return -1;
+    if (PC > MAX_CODE) FAIL(RE_TOO_LARGE, re);
     c = uc_len(re, utf8); re += c;
   }
   if (code && alt_label) {
@@ -473,16 +501,17 @@ static int _compilecode(const char *re_loc, rcode *prog, int sizecode, int utf8)
       EMIT(at, REL(at, PC) + 1);
     }
   }
-  return capc ? -1 : 0;
+  if (capc) FAIL(RE_UNCLOSED_GROUP, re_loc + open_stack[capc / 5 - 1]);
+  return 0;
 }
 
-int re_sizecode(const char *re, int *nsub, int utf8)
+int re_sizecode(const char *re, int *nsub, int utf8, re_err *err)
 {
   rcode dummyprog;
   dummyprog.unilen = 3;
   dummyprog.sub = 0;
 
-  int res = _compilecode(re, &dummyprog, 1, utf8);
+  int res = _compilecode(re, &dummyprog, 1, utf8, err);
   if (res < 0) return res;
   *nsub = dummyprog.sub;
   return dummyprog.unilen;
@@ -496,7 +525,7 @@ int re_comp(rcode *prog, const char *re, int nsubs, int utf8)
   prog->presub = nsubs;
   prog->splits = 0;
 
-  int res = _compilecode(re, prog, 0, utf8);
+  int res = _compilecode(re, prog, 0, utf8, NULL);
   if (res < 0) return res;
   int icnt = 0, scnt = SPLIT;
   for (int i = 0; i < prog->unilen; i++)
@@ -767,16 +796,25 @@ struct RE {
   int size;
 };
 
-RE* re_compile(const char *pattern, int insensitive, int utf8) {
+/* As re_compile, but on failure says why in *kind (an RE_ value) and where
+ * in *pos (a byte offset into pattern). */
+RE* re_compile_err(const char *pattern, int insensitive, int utf8, int *kind,
+    int *pos) {
+  re_err err = {RE_OK, 0};
   int sub_els;
-  int sz = re_sizecode(pattern, &sub_els, utf8) * sizeof(int);
+  int sz = re_sizecode(pattern, &sub_els, utf8, &err) * sizeof(int);
+  *kind = err.kind;
+  *pos = err.pos;
   if (sz < 0) return NULL;
   int count = (sub_els + 1) * 2;
   int captures_size = count * sizeof(char*);
   int buffer_size = sizeof(rcode) + sz;
 
   RE* re = (RE*) malloc(sizeof(RE) + captures_size + buffer_size);
-  if(!re) return NULL;
+  if(!re) {
+    *kind = RE_NO_MEMORY;
+    return NULL;
+  }
 
   re->sub_els = sub_els;
   re->captures = (const char**) (((char*)re) + sizeof(RE));
@@ -788,9 +826,15 @@ RE* re_compile(const char *pattern, int insensitive, int utf8) {
 
   if (re_comp((rcode *)re->buffer, pattern, sub_els, utf8)) {
     free(re);
+    *kind = RE_TOO_LARGE; /* sizing passed, so only the size can differ */
     return NULL;
   }
   return re;
+}
+
+RE* re_compile(const char *pattern, int insensitive, int utf8) {
+  int kind, pos;
+  return re_compile_err(pattern, insensitive, utf8, &kind, &pos);
 }
 
 RE* re_dup(RE* re) {
