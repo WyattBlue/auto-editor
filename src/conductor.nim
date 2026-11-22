@@ -756,6 +756,14 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
     preview(tlV3)
     return
 
+  # Writing over a file while it's still being read loses it.
+  if output != "-" and fileExists(output):
+    var inputs = args.inputs
+    for src in tlV3.uniqueSources: inputs.add src[]
+    for input in inputs:
+      if fileExists(input) and (try: sameFile(input, output) except OSError: false):
+        error &"The output would overwrite an input: {output}"
+
   # Timeline/project exports that draw from more than one source remain a paid
   # feature. Rendered media is handled in makeMedia, where an unlicensed render
   # can continue at SD resolution. This also covers timelines imported from a
