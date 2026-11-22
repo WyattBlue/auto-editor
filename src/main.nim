@@ -474,6 +474,20 @@ judge making cuts.
   var expectingLabel: int = 1
   var parseOptions = true
   var positionalStart = int.high # index of first input after `--`
+  # A range option takes ranges until an argument isn't one, as in
+  # `--cut 0,30 -30sec,end video.mp4`.
+  var moreRanges = coNone
+
+  proc addRange(args: var mainArgs, opt: CliOption, key, optKey: string) =
+    case opt
+    of coAddIn:
+      let span = parseTimeRange(key, optKey)
+      args.setAction.add (aNil, span[0], span[1])
+    of coCutOut:
+      let span = parseTimeRange(key, optKey)
+      args.setAction.add (aCut, span[0], span[1])
+    else:
+      args.setAction.add parseSpeedRange(key)
 
   func isKnownOption(key: string): bool =
     for opt in mainOptions:
@@ -484,6 +498,16 @@ judge making cuts.
 
   let cmdLineParams = commandLineParams()
   for key in cmdLineParams:
+    if moreRanges != coNone:
+      if parseOptions and expecting == coNone:
+        try:
+          args.addRange(moreRanges, key, expectingKey)
+          continue
+        except AutoEditorError as e:
+          # A mistyped range would otherwise be taken for an input file.
+          if ',' in key and not key.startsWith("--") and not fileExists(key):
+            error e.msg
+      moreRanges = coNone
     if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
       positionalStart = args.inputs.len
@@ -545,16 +569,9 @@ judge making cuts.
     of coVideoSpeed:
       replaceAction(args.whenActive,
         actionFromUserSpeed(parseSpeed(key, expectingKey)))
-    of coAddIn:
-      block:
-        let span = parseTimeRange(key, expectingKey)
-        args.setAction.add (aNil, span[0], span[1])
-    of coCutOut:
-      block:
-        let span = parseTimeRange(key, expectingKey)
-        args.setAction.add (aCut, span[0], span[1])
-    of coSetSpeed:
-      args.setAction.add parseSpeedRange(key)
+    of coAddIn, coCutOut, coSetSpeed:
+      args.addRange(expecting, key, expectingKey)
+      moreRanges = expecting
     of coSetAction:
       args.setAction.add parseActionAndRange(key, args)
     of coMarker:
