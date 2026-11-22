@@ -259,6 +259,23 @@ func planOutput*(userOut: string, `export`: ExportKind, path: string,
     result.path = (if userOut == "": &"{root}_ALTERED{ext}" else: &"{root}{ext}")
     result.formatName = result.path
 
+type DeviceMux* = object
+  fragment*: bool  ## the container must be fragmented to be readable
+  warning*: string ## an option that had to be dropped, or ""
+
+func deviceMux*(format: string, pipe, faststart, noFragmented: bool): DeviceMux
+    {.raises: [AutoEditorError].} =
+  ## How to mux `format` into a device, or a `pipe` if it is one. Faststart
+  ## is always off: it reopens the finished file to read it back, which a
+  ## device (even /dev/stdout redirected to a file) won't allow.
+  if faststart:
+    result.warning = "--faststart needs a regular file; writing without it"
+  if pipe and format in ["mp4", "mov", "ipod", "3gp", "3g2", "psp", "f4v"]:
+    if noFragmented:
+      error &"{format} can't be written to a pipe without fragmenting; " &
+        "drop --no-fragmented"
+    result.fragment = true
+
 proc setOutput(userOut: string, `export`: ExportKind, path: string,
     isUrl, hasVideo: bool): OutputPlan {.raises: [AutoEditorError].} =
   result = planOutput(userOut, `export`, path, isUrl, hasVideo,
@@ -794,17 +811,13 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   let rule = initRules(formatName)
   let device = isDevicePath(output)
   if device:
-    # Faststart reopens the finished file to read it back, which a device
-    # (even /dev/stdout redirected to a file) won't allow.
-    if args.faststart:
-      warning "--faststart needs a regular file; writing without it"
+    let mux = deviceMux($rule.format.name, isPipePath(output), args.faststart,
+      args.noFragmented)
+    if mux.warning != "":
+      warning mux.warning
     args.faststart = false
     args.noFaststart = true
-    if isPipePath(output) and
-        $rule.format.name in ["mp4", "mov", "ipod", "3gp", "3g2", "psp", "f4v"]:
-      if args.noFragmented:
-        error &"{rule.format.name} can't be written to a pipe without " &
-          "fragmenting; drop --no-fragmented"
+    if mux.fragment:
       args.fragmented = true
   var video = inputVideo
   video.codec = setVideoCodec(video.codec, mi, rule, args.urlInput)
