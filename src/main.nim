@@ -10,7 +10,7 @@ when not defined(emscripten):
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+import ./[about, action, cli, conductor, edit, ffmpeg, license, log, tinyre]
 from ./av import codecAlias
 import render/burnsubs
 import ./lib/escape
@@ -18,8 +18,6 @@ when defined(emscripten):
   import ./av
 import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun, term, rational, suggest]
-
-import vendor/tinyre/tinyre
 
 var micCaptureActive = false
 var stopMicCapture = false

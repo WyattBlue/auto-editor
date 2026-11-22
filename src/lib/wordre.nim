@@ -1,7 +1,7 @@
 ## The pattern the `word` edit method matches subtitles with. Kept apart from
 ## the CLI so other programs can match exactly as auto-editor does.
 
-import ../vendor/tinyre/tinyre
+import ../tinyre
 
 func lastCharStart(s: string): int =
   ## The byte where the last UTF-8 character of `s` starts.
