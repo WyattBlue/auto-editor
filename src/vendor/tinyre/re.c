@@ -64,10 +64,36 @@ static int uc_code(const char * s, int utf8) {
   return dst;
 }
 
-static int isword(const char *s)
+/* Whether code point u is a space or punctuation from the blocks subtitles
+ * use: Latin-1's (but not its ª, µ, º), General and Supplemental
+ * Punctuation, CJK punctuation, and the fullwidth ASCII punctuation. */
+static int isunipunct(int u)
+{
+  if (u >= 0xA0 && u <= 0xBF) return u != 0xAA && u != 0xB5 && u != 0xBA;
+  if (u == 0xD7 || u == 0xF7) return 1;
+  if (u >= 0x2000 && u <= 0x206F) return 1;
+  if (u >= 0x2E00 && u <= 0x2E7F) return 1;
+  if (u >= 0x3000 && u <= 0x303F) return u < 0x3005 || u > 0x3007;
+  return (u >= 0xFF01 && u <= 0xFF0F) || (u >= 0xFF1A && u <= 0xFF20) ||
+    (u >= 0xFF3B && u <= 0xFF40) || (u >= 0xFF5B && u <= 0xFF65);
+}
+
+/* What \b counts as a word character: ASCII letters, digits and `_`, and any
+ * other character but Unicode spaces and punctuation. A byte inside a UTF-8
+ * character counts as one, so there's never a boundary within it. */
+int re_isword(const char *s)
 {
   int c = (unsigned char) s[0];
-  return isalnum(c) || c == '_' || c > 127;
+  if (c < 128) return isalnum(c) || c == '_';
+  if (c < 0xC0) return 1;
+  return !isunipunct(uc_code(s, 1));
+}
+#define isword re_isword
+
+/* tolower for ASCII only: past 255, C's tolower is undefined. */
+static int fold(int c)
+{
+  return c < 128 ? tolower(c) : c;
 }
 
 static int isasciiword(int c)
@@ -156,8 +182,8 @@ static int re_classmatch(const int *pc, int c, int insensitive)
     } else if (!insensitive) {
       if (c >= *pc && c <= pc[1]) return is_positive;
     } else {
-      c = tolower(c);
-      if (c >= tolower(*pc) && c <= tolower(pc[1])) return is_positive;
+      c = fold(c);
+      if (c >= fold(*pc) && c <= fold(pc[1])) return is_positive;
     }
     pc += 2;
   }
@@ -743,7 +769,7 @@ int re_pikevm(rcode *prog, const char *s, int len, const char **subp, int nsubp,
         if (!insensitive) {
           if (c != *(npc+1)) deccont()
         } else {
-          if (tolower(c) != tolower(*(npc+1))) deccont()
+          if (fold(c) != fold(*(npc+1))) deccont()
         }
         npc += 2;
       } else if (spc == CLASS) {

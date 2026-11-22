@@ -109,6 +109,18 @@ proc re_dup(re: ReRaw): ReRaw {.importc, cdecl.}
 proc re_match(re: ReRaw, text: cstring, L: cint, cont: cstring): cstringArray {.importc, cdecl.}
 proc re_max_matches(re: ReRaw): cint {.importc, cdecl.}
 proc re_uc_len(re: ReRaw, s: cstring): cint {.importc, cdecl.}
+proc re_isword(s: cstring): cint {.importc, cdecl, noSideEffect.}
+
+func isWordChar*(s: string, i: int): bool =
+  ## Whether the character starting at byte `i` of `s` is one `\b` counts as
+  ## part of a word: ASCII letters, digits and `_`, and any other character
+  ## but Unicode spaces and punctuation.
+  if i notin 0 ..< s.len: return false
+  let c = s[i].uint8
+  # re_isword decodes the whole character; a cut-off one counts as a word.
+  let size = (if c < 0xC0: 1 elif c < 0xE0: 2 elif c < 0xF0: 3 else: 4)
+  if i + size > s.len: return true
+  re_isword(cast[cstring](unsafeAddr s[i])) != 0
 
 proc `=destroy`(re: Re) =
   if not re.raw.isNil:
@@ -170,7 +182,11 @@ iterator matchRaw(s: cstring, L0: int, re: ReRaw, global: ReGlobalKind, sub: boo
     else:
       L -= cast[int](matches[1]) -% cast[int](p)
       p = matches[1]
-      cont = cast[cstring](cast[int](p) -% 1)
+      # The character before `p`, from its first byte, so `\b` sees all of it.
+      var before = cast[int](p) -% 1
+      while before >% cast[int](s) and (cast[ptr uint8](before)[] and 0xC0) == 0x80:
+        before = before -% 1
+      cont = cast[cstring](before)
 
     lastMatch1 = matches[1]
     case global

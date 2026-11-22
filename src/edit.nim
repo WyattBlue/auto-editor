@@ -1,7 +1,7 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editexpr, editlexer, editparse, ffmpeg, log]
 import ./analyze/[audio, blackdetect, motion, subtitle]
-import ./lib/[audioutil, dnorm16]
+import ./lib/[audioutil, dnorm16, wordre]
 import ./util/[bar, fun, rational, suggest]
 
 import ./vendor/tinyre/tinyre
@@ -394,12 +394,9 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
         m.stream.int16, m.pixelBlack), m.threshold)
     of ekSubtitle, ekWord:
       let name = if m.kind == ekWord: "word" else: "regex"
-      var flags: set[ReFlag]
-      if m.kind == ekSubtitle: flags.incl reUtf8
-      if m.ignoreCase: flags.incl reIgnoreCase
       let regexPattern =
-        if m.kind == ekWord: re("\\b" & escapeRe(m.pattern) & "\\b", flags)
-        else: re(m.pattern, flags)
+        if m.kind == ekWord: wordRe(m.pattern, m.ignoreCase)
+        else: re(m.pattern, (if m.ignoreCase: {reUtf8, reIgnoreCase} else: {reUtf8}))
       let stream = m.stream.int16
       let (ret, val) = subtitle(container, tb, regexPattern, stream)
       if ret != -1:
