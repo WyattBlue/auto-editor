@@ -516,7 +516,8 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
     let inputExt = agSplitFile(input).ext
 
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
-      tlV3 = readJson(readFile(input), interner)
+      let text = (try: readFile(input) except IOError: error "Cannot read: " & input)
+      tlV3 = readJson(text, interner)
       tlV3.applyArgs(args, audio)
     elif inputExt == ".xml":
       tlV3 = fcp7ReadXml(input, interner)

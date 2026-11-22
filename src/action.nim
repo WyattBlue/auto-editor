@@ -446,8 +446,13 @@ proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError
   let n =
     try: parseFloat(num)
     except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
-  if tu == tuFrames: (n.float32, duFrames)
-  else: (float32(n * tu.seconds), duSec)
+  result =
+    if tu == tuFrames: (n.float32, duFrames)
+    else: (float32(n * tu.seconds), duSec)
+  # `not (a and b)` so NaN fails too; inf would write a timeline that can't
+  # be read back.
+  if not (result[0] >= 0 and result[0] < Inf):
+    raise newException(ActionParseError, &"Duration can't be negative or infinite: {spec}")
 
 proc parseKfTime(spec: string): KfTime {.raises: [ActionParseError].} =
   ## "50%" -> percent of the section; otherwise a duration, as parseDuration.
