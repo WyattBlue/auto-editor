@@ -325,7 +325,22 @@ auto-editor video.mp4 -w:1 drawbox:0:0:1920:200:#000000
 its own overlay layer instead of onto the picture (see [add](#add) below).
 
 **How it works:** Uses FFmpeg's `drawbox` filter with `t=fill`, so the
-rectangle is filled rather than outlined. Only RGB colors are supported.
+rectangle is filled rather than outlined. Besides `#RRGGBB` and color names,
+`yuv#YYUUVV` writes raw Y'CbCr values.
+
+### confine
+
+Restrict the adjustment effects that follow it in the chain to a region,
+`confine:x:y:w:h[:radius][:feather][:invert]` or `confine:poly=x1/y1/x2/y2/...`.
+The region takes the same geometry as `mask`. It affects `blur`, `brightness`,
+`brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, and
+`pixelate`; geometry effects like `zoom` and `rotate` are unaffected. A bare
+`confine` resets to the full frame.
+
+```sh
+# Blur only a 200x80 box, e.g. to censor a license plate
+auto-editor video.mp4 -w:1 confine:400:300:200:80,blur:30
+```
 
 ### pos
 
@@ -349,8 +364,9 @@ Overlay a media file on top of the matched sections, `add:path` or
   images are held for the whole section. In place of a file, a **generator action** (with its
   usual arguments) may be given: the layer starts as a transparent canvas that
   the action paints, so the picture below shows through everywhere it did not
-  draw. The video generators are [confetti](/ref/actions#confetti) and
-  [drawbox](/ref/actions#drawbox); [tone](/ref/actions#tone) is an audio
+  draw. The video generators are [confetti](/ref/actions#confetti),
+  [drawbox](/ref/actions#drawbox), [text](/ref/actions#text), and
+  [burn](/ref/actions#burn); [tone](/ref/actions#tone) is an audio
   generator, and adds an audio layer instead of a picture (all are marked `G`
   in the [quick reference](/ref/actions#quick-reference)).
 - **x**, **y**, **scale** — optional placement, applied via a `pos` action
@@ -438,8 +454,8 @@ created when there is an active section for the overlay to sit on: e.g.
 edit leaves no active sections (so the `-w:1` overlay matches nothing) the
 output stays audio-only.
 
-The default output name copies the input's extension, which could not hold that
-video (`song.mp3` → `song_ALTERED.mp3`), so it switches to `.mp4` instead. An
+The default output name would copy the input's extension, which can't hold
+that video, so it switches to `.mp4` instead: `song.mp3` gives `song_ALTERED.mp4`. An
 explicit `-o out.mp3` is still honored, with a warning that the video is dropped.
 
 ## Multiple Actions (Chaining)

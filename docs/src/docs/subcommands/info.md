@@ -46,7 +46,7 @@ resources/only-video/man-on-green-screen.gif:
      - fps: 100/3
      - resolution: 1280x720
      - aspect ratio: 16:9
-     - pixel aspect ratio: 64/64
+     - pixel aspect ratio: 1
      - duration: 24.41
      - pix fmt: bgra
      - timebase: 1/100

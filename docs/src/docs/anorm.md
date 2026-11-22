@@ -14,6 +14,12 @@ Example:
 auto-editor --audio-normalize peak:-3  # set max peak to -3dB
 ```
 
+### Parameters
+
+- **t** (target): Level the highest peak is scaled to, in dB
+  - Default: `-8.0`
+  - Range: `-99.0` to `0.0`
+
 ## EBU
 
 Example:

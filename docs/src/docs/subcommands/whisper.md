@@ -30,12 +30,12 @@ auto-editor whisper example.mp4 ggml-medium.en.bin -o out.srt
 The input media file, or `:mic` to transcribe the microphone live. Only the first audio stream is used; the audio is resampled to 16kHz (whisper's preferred rate) before transcription.
 
 ### `<model>`
-Path to a `ggml` whisper model, e.g. `ggml-small.en.bin` or `ggml-large-v2.bin`.
+Path to a `ggml` whisper model, e.g. `ggml-small.en.bin` or `ggml-large-v2.bin`. A [parakeet](https://huggingface.co/ggml-org/parakeet-GGUF) model works too, though it detects the language itself and doesn't take `--language`, `--translate`, or `--prompt`. On macOS 26 and later, `apple` uses the system's built-in transcriber, which doesn't take `--translate` or `--prompt`.
 
 ### `-l, --language LANG`
-Set the spoken language instead of letting whisper auto-detect it: a code like `en`, `eng`, or `en-US`, or an English name like `english`. A language whisper doesn't know is an error. (default `auto`)
+Set the spoken language instead of letting whisper auto-detect it: a code like `en`, `eng`, or `en-US`, or an English name like `english`. A language whisper doesn't know is an error. With the `apple` model, give a locale like `en_US`. (default `auto`)
 
-### `--format FORMAT`
+### `-f, --format FORMAT`
 Set the output format. Choices are `text`, `srt`, and `json`. Only needed to override the format `--output`'s extension picks. (default `text`)
 
 ### `-o, --output FILE`
@@ -44,8 +44,8 @@ Where to write the transcript. (defaults to stdout)
 ### `-tr, --translate`
 Translate from the source language to English.
 
-### `-sw, --split-words`
-Split the output so that each token is at most one word long.
+### `-sw, --split-word, --split-words`
+Output one word per cue instead of full segments.
 
 ### `--queue SECS`
 The maximum length in seconds of a single transcribed segment. Must be between 1 and 86400. (default 30)

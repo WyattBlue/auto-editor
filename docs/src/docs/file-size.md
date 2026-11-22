@@ -48,7 +48,7 @@ The table below compares different video codecs:
 | av2     | super       | fast?         | experimental  |
 | vvc     | super       | fast?         | experimental  |
 
-Auto-Editor's static builds do not include AV2 or VVC encoders.
+Auto-Editor doesn't support AV2 or VVC yet.
 
 Example:
 ```sh
