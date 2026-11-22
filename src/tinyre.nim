@@ -81,6 +81,8 @@
 # Copyright 2007-2009 Russ Cox. Copyright 2020-2021 Kyryl Melekhin. The VM's
 # design and much of its compiler come from their BSD-licensed pikevm.
 
+import std/algorithm
+
 type
   Prog = object
     code: seq[int]  # instructions; each split's operand is its relative jump
@@ -148,6 +150,8 @@ const
   # needing more than this; kept so the same patterns compile.
   maxMatchStack = 256 * 1024
   altMax = 4096
+  # Past the last code point.
+  invalidByte = 0x110000
 
 # Text and patterns read like C strings: past the end is a NUL.
 template at(s: string, i: int): int =
@@ -169,19 +173,21 @@ func ucLen(s: string, i: int, utf8: bool): int =
   n
 
 func ucCode(s: string, i: int, utf8: bool): int =
-  ## The code point of the character at `i`.
+  ## The code point of the character at `i`. In UTF-8 mode, a byte past 127
+  ## that isn't part of a whole character is `invalidByte` plus the byte, so
+  ## it doesn't match the code point of the same number.
   result = s.at(i)
-  if ucLen(s, i, utf8) > 1:
+  if ucLen(s, i, utf8) == 1:
+    if utf8 and result >= 0x80: result += invalidByte
+  else:
     let d = result
-    if d < 192: discard
-    elif d < 224: result = ((d and 0x1f) shl 6) or (s.at(i+1) and 0x3f)
+    if d < 224: result = ((d and 0x1f) shl 6) or (s.at(i+1) and 0x3f)
     elif d < 240:
       result = ((d and 0x0f) shl 12) or ((s.at(i+1) and 0x3f) shl 6) or
         (s.at(i+2) and 0x3f)
     elif d < 248:
       result = ((d and 0x07) shl 18) or ((s.at(i+1) and 0x3f) shl 12) or
         ((s.at(i+2) and 0x3f) shl 6) or (s.at(i+3) and 0x3f)
-    else: result = 0
 
 func isUniPunct(u: int): bool =
   ## Whether code point `u` is a space or punctuation from the blocks
@@ -216,48 +222,138 @@ func isWordChar*(s: string, i: int): bool =
   ## but Unicode spaces and punctuation.
   i in 0 ..< s.len and isWordAt(s, i)
 
-# Unicode simple case folding (one character to one) for the scripts
-# subtitles mostly use. In each range of alternating case, the capital is on
-# the even (or odd) code point and its small letter is the next one.
-const alternating = [
-  (0x0100, 0x012F, 0), (0x0132, 0x0137, 0), (0x0139, 0x0148, 1),
-  (0x014A, 0x0177, 0), (0x0179, 0x017E, 1), (0x01A0, 0x01A5, 0),
-  (0x01CD, 0x01DC, 1), (0x01DE, 0x01EF, 0), (0x01F8, 0x021F, 0),
-  (0x0222, 0x0233, 0), (0x03D8, 0x03EF, 0), (0x0460, 0x0481, 0),
-  (0x048A, 0x04BF, 0), (0x04C1, 0x04CE, 1), (0x04D0, 0x052F, 0),
-  (0x1E00, 0x1E95, 0), (0x1EA0, 0x1EFF, 0)]
+# Unicode 18 simple case folding (the C and S lines of CaseFolding.txt) past
+# ASCII: in each run, every `step`th character from `lo` to `hi` folds to
+# itself plus `delta`.
+const foldRuns: array[218, tuple[lo, hi, delta, step: int32]] = [
+  (0x00B5, 0x00B5, 775, 1), (0x00C0, 0x00D6, 32, 1), (0x00D8, 0x00DE, 32, 1),
+  (0x0100, 0x012E, 1, 2), (0x0132, 0x0136, 1, 2), (0x0139, 0x0147, 1, 2),
+  (0x014A, 0x0176, 1, 2), (0x0178, 0x0178, -121, 1), (0x0179, 0x017D, 1, 2),
+  (0x017F, 0x017F, -268, 1), (0x0181, 0x0181, 210, 1), (0x0182, 0x0184, 1, 2),
+  (0x0186, 0x0186, 206, 1), (0x0187, 0x0187, 1, 1), (0x0189, 0x018A, 205, 1),
+  (0x018B, 0x018B, 1, 1), (0x018E, 0x018E, 79, 1), (0x018F, 0x018F, 202, 1),
+  (0x0190, 0x0190, 203, 1), (0x0191, 0x0191, 1, 1), (0x0193, 0x0193, 205, 1),
+  (0x0194, 0x0194, 207, 1), (0x0196, 0x0196, 211, 1), (0x0197, 0x0197, 209, 1),
+  (0x0198, 0x0198, 1, 1), (0x019C, 0x019C, 211, 1), (0x019D, 0x019D, 213, 1),
+  (0x019F, 0x019F, 214, 1), (0x01A0, 0x01A4, 1, 2), (0x01A6, 0x01A6, 218, 1),
+  (0x01A7, 0x01A7, 1, 1), (0x01A9, 0x01A9, 218, 1), (0x01AC, 0x01AC, 1, 1),
+  (0x01AE, 0x01AE, 218, 1), (0x01AF, 0x01AF, 1, 1), (0x01B1, 0x01B2, 217, 1),
+  (0x01B3, 0x01B5, 1, 2), (0x01B7, 0x01B7, 219, 1), (0x01B8, 0x01B8, 1, 1),
+  (0x01BC, 0x01BC, 1, 1), (0x01C4, 0x01C4, 2, 1), (0x01C5, 0x01C5, 1, 1),
+  (0x01C7, 0x01C7, 2, 1), (0x01C8, 0x01C8, 1, 1), (0x01CA, 0x01CA, 2, 1),
+  (0x01CB, 0x01DB, 1, 2), (0x01DE, 0x01EE, 1, 2), (0x01F1, 0x01F1, 2, 1),
+  (0x01F2, 0x01F4, 1, 2), (0x01F6, 0x01F6, -97, 1), (0x01F7, 0x01F7, -56, 1),
+  (0x01F8, 0x021E, 1, 2), (0x0220, 0x0220, -130, 1), (0x0222, 0x0232, 1, 2),
+  (0x023A, 0x023A, 10795, 1), (0x023B, 0x023B, 1, 1),
+  (0x023D, 0x023D, -163, 1), (0x023E, 0x023E, 10792, 1),
+  (0x0241, 0x0241, 1, 1), (0x0243, 0x0243, -195, 1), (0x0244, 0x0244, 69, 1),
+  (0x0245, 0x0245, 71, 1), (0x0246, 0x024E, 1, 2), (0x0345, 0x0345, 116, 1),
+  (0x0370, 0x0372, 1, 2), (0x0376, 0x0376, 1, 1), (0x037F, 0x037F, 116, 1),
+  (0x0386, 0x0386, 38, 1), (0x0388, 0x038A, 37, 1), (0x038C, 0x038C, 64, 1),
+  (0x038E, 0x038F, 63, 1), (0x0391, 0x03A1, 32, 1), (0x03A3, 0x03AB, 32, 1),
+  (0x03C2, 0x03C2, 1, 1), (0x03CF, 0x03CF, 8, 1), (0x03D0, 0x03D0, -30, 1),
+  (0x03D1, 0x03D1, -25, 1), (0x03D5, 0x03D5, -15, 1), (0x03D6, 0x03D6, -22, 1),
+  (0x03D8, 0x03EE, 1, 2), (0x03F0, 0x03F0, -54, 1), (0x03F1, 0x03F1, -48, 1),
+  (0x03F4, 0x03F4, -60, 1), (0x03F5, 0x03F5, -64, 1), (0x03F7, 0x03F7, 1, 1),
+  (0x03F9, 0x03F9, -7, 1), (0x03FA, 0x03FA, 1, 1), (0x03FD, 0x03FF, -130, 1),
+  (0x0400, 0x040F, 80, 1), (0x0410, 0x042F, 32, 1), (0x0460, 0x0480, 1, 2),
+  (0x048A, 0x04BE, 1, 2), (0x04C0, 0x04C0, 15, 1), (0x04C1, 0x04CD, 1, 2),
+  (0x04D0, 0x052E, 1, 2), (0x0531, 0x0556, 48, 1), (0x10A0, 0x10C5, 7264, 1),
+  (0x10C7, 0x10C7, 7264, 1), (0x10CD, 0x10CD, 7264, 1),
+  (0x13F8, 0x13FD, -8, 1), (0x1C80, 0x1C80, -6222, 1),
+  (0x1C81, 0x1C81, -6221, 1), (0x1C82, 0x1C82, -6212, 1),
+  (0x1C83, 0x1C84, -6210, 1), (0x1C85, 0x1C85, -6211, 1),
+  (0x1C86, 0x1C86, -6204, 1), (0x1C87, 0x1C87, -6180, 1),
+  (0x1C88, 0x1C88, 35267, 1), (0x1C89, 0x1C89, 1, 1),
+  (0x1C90, 0x1CBA, -3008, 1), (0x1CBD, 0x1CBF, -3008, 1),
+  (0x1E00, 0x1E94, 1, 2), (0x1E9B, 0x1E9B, -58, 1), (0x1E9E, 0x1E9E, -7615, 1),
+  (0x1EA0, 0x1EFE, 1, 2), (0x1F08, 0x1F0F, -8, 1), (0x1F18, 0x1F1D, -8, 1),
+  (0x1F28, 0x1F2F, -8, 1), (0x1F38, 0x1F3F, -8, 1), (0x1F48, 0x1F4D, -8, 1),
+  (0x1F59, 0x1F5F, -8, 2), (0x1F68, 0x1F6F, -8, 1), (0x1F88, 0x1F8F, -8, 1),
+  (0x1F98, 0x1F9F, -8, 1), (0x1FA8, 0x1FAF, -8, 1), (0x1FB8, 0x1FB9, -8, 1),
+  (0x1FBA, 0x1FBB, -74, 1), (0x1FBC, 0x1FBC, -9, 1),
+  (0x1FBE, 0x1FBE, -7173, 1), (0x1FC8, 0x1FCB, -86, 1),
+  (0x1FCC, 0x1FCC, -9, 1), (0x1FD3, 0x1FD3, -7235, 1), (0x1FD8, 0x1FD9, -8, 1),
+  (0x1FDA, 0x1FDB, -100, 1), (0x1FE3, 0x1FE3, -7219, 1),
+  (0x1FE8, 0x1FE9, -8, 1), (0x1FEA, 0x1FEB, -112, 1), (0x1FEC, 0x1FEC, -7, 1),
+  (0x1FF8, 0x1FF9, -128, 1), (0x1FFA, 0x1FFB, -126, 1),
+  (0x1FFC, 0x1FFC, -9, 1), (0x2126, 0x2126, -7517, 1),
+  (0x212A, 0x212A, -8383, 1), (0x212B, 0x212B, -8262, 1),
+  (0x2132, 0x2132, 28, 1), (0x2160, 0x216F, 16, 1), (0x2183, 0x2183, 1, 1),
+  (0x24B6, 0x24CF, 26, 1), (0x2C00, 0x2C2F, 48, 1), (0x2C60, 0x2C60, 1, 1),
+  (0x2C62, 0x2C62, -10743, 1), (0x2C63, 0x2C63, -3814, 1),
+  (0x2C64, 0x2C64, -10727, 1), (0x2C67, 0x2C6B, 1, 2),
+  (0x2C6D, 0x2C6D, -10780, 1), (0x2C6E, 0x2C6E, -10749, 1),
+  (0x2C6F, 0x2C6F, -10783, 1), (0x2C70, 0x2C70, -10782, 1),
+  (0x2C72, 0x2C72, 1, 1), (0x2C75, 0x2C75, 1, 1), (0x2C7E, 0x2C7F, -10815, 1),
+  (0x2C80, 0x2CE2, 1, 2), (0x2CEB, 0x2CED, 1, 2), (0x2CF2, 0x2CF2, 1, 1),
+  (0xA640, 0xA66C, 1, 2), (0xA680, 0xA69A, 1, 2), (0xA722, 0xA72E, 1, 2),
+  (0xA732, 0xA76E, 1, 2), (0xA779, 0xA77B, 1, 2), (0xA77D, 0xA77D, -35332, 1),
+  (0xA77E, 0xA786, 1, 2), (0xA78B, 0xA78B, 1, 1), (0xA78D, 0xA78D, -42280, 1),
+  (0xA790, 0xA792, 1, 2), (0xA796, 0xA7A8, 1, 2), (0xA7AA, 0xA7AA, -42308, 1),
+  (0xA7AB, 0xA7AB, -42319, 1), (0xA7AC, 0xA7AC, -42315, 1),
+  (0xA7AD, 0xA7AD, -42305, 1), (0xA7AE, 0xA7AE, -42308, 1),
+  (0xA7B0, 0xA7B0, -42258, 1), (0xA7B1, 0xA7B1, -42282, 1),
+  (0xA7B2, 0xA7B2, -42261, 1), (0xA7B3, 0xA7B3, 928, 1),
+  (0xA7B4, 0xA7C2, 1, 2), (0xA7C4, 0xA7C4, -48, 1),
+  (0xA7C5, 0xA7C5, -42307, 1), (0xA7C6, 0xA7C6, -35384, 1),
+  (0xA7C7, 0xA7C9, 1, 2), (0xA7CB, 0xA7CB, -42343, 1), (0xA7CC, 0xA7DA, 1, 2),
+  (0xA7DC, 0xA7DC, -42561, 1), (0xA7DD, 0xA7DD, -42342, 1),
+  (0xA7E2, 0xA7E2, -42342, 1), (0xA7F5, 0xA7F5, 1, 1),
+  (0xAB6C, 0xAB6D, -33, 1), (0xAB70, 0xABBF, -38864, 1),
+  (0xFB05, 0xFB05, 1, 1), (0xFF21, 0xFF3A, 32, 1), (0x10400, 0x10427, 40, 1),
+  (0x104B0, 0x104D3, 40, 1), (0x10570, 0x1057A, 39, 1),
+  (0x1057C, 0x1058A, 39, 1), (0x1058C, 0x10592, 39, 1),
+  (0x10594, 0x10595, 39, 1), (0x10C80, 0x10CB2, 64, 1),
+  (0x10D50, 0x10D65, 32, 1), (0x118A0, 0x118BF, 32, 1),
+  (0x16E40, 0x16E5F, 32, 1), (0x16EA0, 0x16EB8, 27, 1),
+  (0x1DF40, 0x1DF40, 1, 1), (0x1DF48, 0x1DF4A, 1, 2), (0x1DF4D, 0x1DF4D, 1, 1),
+  (0x1DF51, 0x1DF51, 1, 1), (0x1DF68, 0x1DF6E, 1, 2), (0x1DF72, 0x1DF7E, 1, 2),
+  (0x1DF95, 0x1DF95, -122550, 1), (0x1E900, 0x1E921, 34, 1)]
 
 func fold(c: int, utf8: bool): int =
-  ## The case-folded form of character `c`: its small letter, for the
-  ## scripts above. Without `utf8`, `c` is a byte and only ASCII folds,
-  ## since a byte past 127 is part of a UTF-8 character, not Latin-1.
+  ## The case-folded form of character `c`. Without `utf8`, `c` is a byte and
+  ## only ASCII folds, since a byte past 127 is part of a UTF-8 character, not
+  ## Latin-1.
   if c < 128 or not utf8:
     return (if c in ord('A') .. ord('Z'): c + 32 else: c)
-  if c <= 0xDE: return (if c >= 0xC0 and c != 0xD7: c + 32 else: c)
-  if c < 0x100: return c
-  for (lo, hi, capitalParity) in alternating:
-    if c >= lo and c <= hi:
-      return (if (c and 1) == capitalParity: c + 1 else: c)
-  case c
-  of 0x0178: 0x00FF          # Ÿ
-  of 0x017F: ord('s')        # long s
-  of 0x0386: 0x03AC          # Ά
-  of 0x0388 .. 0x038A: c + 37
-  of 0x038C: 0x03CC
-  of 0x038E, 0x038F: c + 63
-  of 0x0391 .. 0x03A1, 0x03A3 .. 0x03AB: c + 32 # Greek capitals
-  of 0x03C2: 0x03C3          # final sigma
-  of 0x0400 .. 0x040F: c + 80
-  of 0x0410 .. 0x042F: c + 32 # Cyrillic capitals
-  of 0x04C0: 0x04CF
-  of 0x0531 .. 0x0556: c + 48 # Armenian capitals
-  of 0x1E9E: 0x00DF          # capital sharp s
-  of 0xFF21 .. 0xFF3A: c + 32 # fullwidth Latin capitals
-  else: c
+  var a = 0
+  var b = foldRuns.len - 1
+  while a <= b:
+    let mid = (a + b) div 2
+    let run = foldRuns[mid]
+    if c < run.lo: b = mid - 1
+    elif c > run.hi: a = mid + 1
+    else: return (if (c - run.lo) mod run.step == 0: c + run.delta else: c)
+  c
+
+func addFoldImage(pairs: var seq[int], lo, hi: int, utf8: bool) =
+  ## Adds ranges to `pairs` holding the folded form of each character in
+  ## `lo .. hi` that folding changes. With them, a folded character of the
+  ## text is in the class just when some character of the range folds to it,
+  ## which folding the range's ends can't give: `[A-z]` holds `[` to `` ` ``.
+  var image: seq[int]
+  for c in max(lo, ord('A')) .. min(hi, ord('Z')):
+    image.add c + 32
+  if utf8:
+    for run in foldRuns:
+      if run.hi < lo or run.lo > hi: continue
+      var c = int(run.lo)
+      if c < lo: c += (lo - c + run.step - 1) div run.step * run.step
+      while c <= min(hi, run.hi):
+        image.add c + run.delta
+        c += run.step
+  image.sort
+  var k = 0
+  while k < image.len:
+    var e = k
+    while e + 1 < image.len and image[e + 1] <= image[e] + 1: inc e
+    pairs.add [image[k], image[e]]
+    k = e + 1
 
 func classMatch(code: openArray[int], pc0: int, c: int): bool =
   ## Whether `c` is in the class whose "positive" flag is at `pc0`. Ignoring
-  ## case, `c` and the class's ranges are already folded.
+  ## case, `c` is folded and the class holds its ranges' folded images.
   var pc = pc0
   let positive = code[pc] != 0
   let cnt = code[pc + 1]
@@ -350,7 +446,8 @@ func instructions(code: openArray[int], a, b: int): int =
       inc i
     else: inc i
 
-func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError): bool =
+func compileCode(re: string, prog: var Prog, utf8, icase: bool,
+    err: var CompileError): bool =
   ## Compile `re` into `prog.code`, false with `err` set on failure.
   template code: untyped = prog.code
   template pc: int = code.len
@@ -445,6 +542,14 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
           i += forward
         emit tok
         inc cnt
+      if icase:
+        var images: seq[int]
+        var k = term + 3
+        while k < pc:
+          if code[k] != -1: images.addFoldImage(code[k], code[k + 1], utf8)
+          k += 2
+        for v in images: emit v
+        cnt += images.len div 2
       code[term + 2] = cnt
     of '(':
       term = pc
@@ -506,7 +611,7 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
             maxcnt = maxcnt * 10 + re.at(i) - ord('0')
             inc i
             if maxcnt > 65535: fail(reeRepeatTooLarge, brace)
-          if re.at(i) != ord('}'): fail(reeBadRepeat, brace)
+          if re.at(i) != ord('}') or maxcnt < mincnt: fail(reeBadRepeat, brace)
         else:
           fail(reeBadRepeat, brace)
       else:
@@ -590,12 +695,12 @@ func compileCode(re: string, prog: var Prog, utf8: bool, err: var CompileError):
   if capStack.len > 0: fail(reeUnclosedGroup, openStack[^1])
   true
 
-func compile(pattern: string, utf8: bool, err: var CompileError): Prog =
+func compile(pattern: string, utf8, icase: bool, err: var CompileError): Prog =
   ## Compile `pattern`; `err.kind` is reeNone on success.
   # A C string ends at its first NUL, and so did patterns.
   let nul = pattern.find('\0')
   let re = (if nul >= 0: pattern[0 ..< nul] else: pattern)
-  if not compileCode(re, result, utf8, err):
+  if not compileCode(re, result, utf8, icase, err):
     return
   # Number the splits for the matcher's seen-set, counting instructions as
   # the C matcher sized its thread lists.
@@ -826,20 +931,16 @@ iterator matchRaw(s: string, start: int, re: Re, global: ReGlobalKind, sub: bool
   while true:
     if not pikevm(re, s, p, caps, cont, scratch): break
 
-    var i = 0
-    while i < re.prog.slots:
-      let slice =
-        if caps[i] < 0 or caps[i + 1] < 0: -1 .. -1
-        else: caps[i] .. caps[i + 1] - 1
-      if i == 0 and lastEnd == caps[1] and p == lastEnd:
-        # An empty match at the same place as the last one's end, as `\<`
-        # matches both sides of a restart: don't yield it twice.
-        discard
-      else:
-        yield slice
-      if not sub:
-        break
-      i += 2
+    # An empty match at the same place as the last one's end, as `\<`
+    # matches both sides of a restart: don't yield it, or its groups, twice.
+    if not (lastEnd == caps[1] and p == lastEnd):
+      var i = 0
+      while i < re.prog.slots:
+        yield (if caps[i] < 0 or caps[i + 1] < 0: -1 .. -1
+               else: caps[i] .. caps[i + 1] - 1)
+        if not sub:
+          break
+        i += 2
 
     if p == caps[1]:
       # An empty match: step over a character instead of stopping.
@@ -879,7 +980,7 @@ proc re*(s: string, flags: set[ReFlag] = {}): Re =
   ## Constructor of regular expressions. Raises ReError (a ValueError) saying
   ## why and where `s` didn't compile.
   var err: CompileError
-  let prog = compile(s, reUtf8 in flags, err)
+  let prog = compile(s, reUtf8 in flags, reIgnoreCase in flags, err)
   if err.kind != reeNone:
     var e = newException(ReError,
       "cannot compile pattern: " & err.kind.message & " at byte " & $err.pos)
@@ -898,11 +999,7 @@ proc re*(s: string, flags: set[ReFlag] = {}): Re =
         code[i + 1] = fold(code[i + 1], result.utf8)
         i += 2
       of opClass:
-        for k in 0 ..< code[i + 2]:
-          let at = i + 3 + 2 * k
-          if code[at] != -1:
-            code[at] = fold(code[at], result.utf8)
-            code[at + 1] = fold(code[at + 1], result.utf8)
+        # compile added each range's folded image.
         i += 3 + 2 * code[i + 2]
       of opSave, opJmp: i += 2
       else:
