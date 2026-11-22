@@ -177,7 +177,7 @@ proc remapRange(actionIndex: var seq[int], span: (TimeSpec, TimeSpec), tb: float
   for i in start ..< min(stop, actionIndex.len):
     actionIndex[i] = remap[actionIndex[i]]
 
-proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
+func exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
   ## The extension an export gets from `ext` (the one asked for, or the
   ## input's): a timeline format's own; for media, `ext`, or mp4 when that
   ## can't hold the video the export has (an audio-only input that gained a
@@ -196,15 +196,18 @@ proc exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
       if hasVideo and not holdsVideo("x" & ext): ".mp4" else: ext
     else: ext
 
-type OutputTarget = tuple
-  path: string       # where to write
-  kind: ExportKind
-  formatName: string # a name whose extension picks the container
+type OutputPlan* = object
+  path*: string       ## where to write
+  kind*: ExportKind
+  formatName*: string ## a name whose extension picks the container
+  dropsVideo*: bool   ## the named container can't hold the timeline's video
 
-proc setOutput(userOut: string, `export`: ExportKind, path: string,
-    isUrl = false, hasVideo = false): OutputTarget {.raises: [AutoEditorError].} =
+func planOutput*(userOut: string, `export`: ExportKind, path: string,
+    isUrl, hasVideo, device: bool): OutputPlan {.raises: [AutoEditorError].} =
+  ## Where an export goes and as what, from `--output` (`userOut`), the
+  ## input's `path`, and whether `userOut` is a `device` (or pipe).
   var dir, name, ext: string
-  let device = userOut != "" and userOut != "-" and isDevicePath(userOut)
+  let device = device and userOut != "" and userOut != "-"
   if device:
     ext = agSplitFile(userOut).ext
   elif userOut == "" or userOut == "-":
@@ -235,6 +238,7 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
       of ".v2": myExport = exV2
       of ".v3": myExport = exV3
       else: myExport = exDefault
+  result.kind = myExport
 
   # The default name copies the input's extension, so an audio-only input that
   # gained a video layer would silently lose it: exportExt prefers mp4. If the
@@ -242,25 +246,30 @@ proc setOutput(userOut: string, `export`: ExportKind, path: string,
   let fitted = exportExt(ext, myExport, hasVideo)
   if myExport == exDefault and fitted != ext and userOut != "" and userOut != "-" and
       agSplitFile(userOut).ext != "":
-    warning &"{ext} can't hold a video stream; it will be dropped"
+    result.dropsVideo = true
   else:
     ext = fitted
 
   if userOut == "-":
-    return ("-", myExport, "-" & ext)
-  if device:
+    (result.path, result.formatName) = ("-", "-" & ext)
+  elif device:
     # A device keeps its name; the format comes from what a file would be.
-    return (userOut, myExport, "x" & ext)
-  if userOut == "":
-    let path = &"{root}_ALTERED{ext}"
-    return (path, myExport, path)
+    (result.path, result.formatName) = (userOut, "x" & ext)
+  else:
+    result.path = (if userOut == "": &"{root}_ALTERED{ext}" else: &"{root}{ext}")
+    result.formatName = result.path
 
-  let path = &"{root}{ext}"
-  return (path, myExport, path)
+proc setOutput(userOut: string, `export`: ExportKind, path: string,
+    isUrl, hasVideo: bool): OutputPlan {.raises: [AutoEditorError].} =
+  result = planOutput(userOut, `export`, path, isUrl, hasVideo,
+    device = isDevicePath(userOut))
+  if result.dropsVideo:
+    warning &"{agSplitFile(userOut).ext} can't hold a video stream; it will be dropped"
 
 proc defaultOutput*(input: string, `export`: ExportKind, hasVideo: bool): string =
   ## Where an export of `input` goes when no output is asked for.
-  setOutput("", `export`, input, hasVideo = hasVideo).path
+  planOutput("", `export`, input, isUrl = false, hasVideo = hasVideo,
+    device = false).path
 
 proc setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules,
     isUrl = false): string {.raises: [].} =
@@ -715,16 +724,16 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   var fcpVersion: uint8
   let hasVideo = tlV3.v.len > 0 and not args.vn
   if args.`export`.kind == exAuto:
-    (output, exportKind, formatName) = setOutput(args.output, exAuto, usePath,
-      args.urlInput, hasVideo)
+    let plan = setOutput(args.output, exAuto, usePath, args.urlInput, hasVideo)
+    (output, exportKind, formatName) = (plan.path, plan.kind, plan.formatName)
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
   else:
     exportKind = args.`export`.kind
     tlName = args.`export`.name
     fcpVersion = args.`export`.version
-    (output, _, formatName) = setOutput(args.output, exportKind, usePath,
-      args.urlInput, hasVideo)
+    let plan = setOutput(args.output, exportKind, usePath, args.urlInput, hasVideo)
+    (output, formatName) = (plan.path, plan.formatName)
 
   if args.preview:
     preview(tlV3)

@@ -785,7 +785,7 @@ proc avformat_write_header*(s: ptr AVFormatContext, options: pointer): cint {.im
 proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
     header: "<libavformat/avformat.h>".}
 proc av_guess_format*(short_name, filename, mime_type: cstring): ptr AVOutputFormat {.importc,
-    header: "<libavformat/avformat.h>".}
+    header: "<libavformat/avformat.h>", noSideEffect.}
 proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
 proc avcodec_send_frame*(avctx: ptr AVCodecContext, frame: ptr AVFrame): cint {.importc,
