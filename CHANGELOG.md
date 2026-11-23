@@ -1,4 +1,4 @@
-# 31.9.1
+# 31.10.0
 
 ## Major
 
@@ -15,6 +15,7 @@
  - The video encoder uses every CPU core, and VP9 also encodes rows in parallel.
  - Audio is encoded on its own thread.
  - Motion analysis is faster.
+ - H.264 partial-lossless renders are about 20–30% faster and use less memory
 
 ## Fixes
  - An input with no audio stream, like a still image, is treated as silent by `--edit audio` instead of failing the edit.
@@ -28,6 +29,8 @@
  - Embedded subtitles are retimed by each clip's speed.
  - Motion and black-frame detection line up with the audio on files that don't start at zero, like MPEG-TS.
  - FCPXML exports with more than one source give each clip its own length and name.
+ - FCPXML import handles clips that start before the timeline, plus disabled and skipped clips placed before a transition.
+ - FCP7 XML import reads in/out points at each clip's own frame rate.
 
 # Misc.
  - FFmpeg is updated to 9.1.
