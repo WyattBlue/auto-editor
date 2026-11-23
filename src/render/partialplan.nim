@@ -1,4 +1,4 @@
-import std/[algorithm, strformat, strutils]
+import std/[algorithm, deques, strformat, strutils]
 from std/math import round
 
 import ../[action, av, ffmpeg, log, timeline]
@@ -267,6 +267,9 @@ proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
     encoder.bit_rate = 0
   resolveEncoderContext(encoder)
   encoder.applyPartialEncoderArgs(video)
+  # Every run starts on a forced I frame, and one that reuses the encoder
+  # has to be an IDR to be cut against copied GOPs.
+  encoder.priv_data.setOpt("forced-idr", 1)
   encoder.open()
   return encoder
 
@@ -339,147 +342,180 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     defer: input.close()
     let stream = input.video[0]
 
+    # Encoding reads its own input, so a run can pause across copied spans.
+    var encInput: InputContainer
     var decoder: ptr AVCodecContext = nil
     var frame: ptr AVFrame = nil
     var packet: ptr AVPacket = nil
+    var encoder: ptr AVCodecContext = nil
     if stats.encodeSpans > 0:
+      encInput = try: av.open(sourcePath)
+                 except IOError as e: error e.msg
       decoder = initDecoder(stream.codecpar)
       frame = av_frame_alloc()
       packet = av_packet_alloc()
       if frame == nil or packet == nil:
         error &"Could not allocate partial-lossless {label} frame/packet"
     defer:
+      if encoder != nil: avcodec_free_context(addr encoder)
       if packet != nil: av_packet_free(addr packet)
       if frame != nil: av_frame_free(addr frame)
       if decoder != nil: avcodec_free_context(addr decoder)
+      if stats.encodeSpans > 0: encInput.close()
 
-    var encoder: ptr AVCodecContext = nil
+    # Runs of consecutive encode spans: each one's first and last span.
+    var runFirst, runLast: seq[int]
+    for i, span in spans:
+      if span.kind != ssEncode: continue
+      if i > 0 and spans[i - 1].kind == ssEncode:
+        runLast[^1] = i
+      else:
+        runFirst.add i
+        runLast.add i
+    # The range each fed run's packets take among all the encoded packets.
+    var runStart, runEnd: seq[int64]
+
+    # libx264 stays open across runs, each starting on a forced IDR: a fresh
+    # encoder per run faults its couple hundred megabytes of frames in again,
+    # and a NULL flush stops x264's lookahead thread for good. A run's last
+    # packets then come out only as the next run goes in, so enough of that
+    # run is encoded before the copied GOPs between them, and their DTS are
+    # set as a fresh encoder's would be. x264 sees one frame after another, as its rate
+    # control reads a frame's duration from the next one's PTS: across a copied
+    # stretch, that frame would be given minutes' worth of bits.
+    var reuse = false
     var encodedParameterSets: seq[uint8] = @[]
     var encodedAnnexB = true
-    var firstPacket = false
-    var firstFrameInRun = false
+    var sent = 0'i64
+    var received = 0'i64
+    var emitted = 0'i64
+    var recvRun = 0
+    var reorderFrames = 0'i64
+    var encoded: Deque[(ptr AVPacket, int64)] # received, awaiting their turn
+    var ready: Deque[(ptr AVPacket, int64)]
 
-    # Clone an encoder packet onto the output stream and hand it to the muxer.
-    # The first packet of an encode run carries the encoder's parameter sets so
-    # a decoder can switch between copied and re-encoded regions.
-    template emitEncoded(encodedPacket: ptr AVPacket) =
+    # Clone an encoder packet onto the output stream. The first packet of an
+    # encode run carries the encoder's parameter sets so a decoder can switch
+    # between copied and re-encoded regions.
+    template receive(encodedPacket: ptr AVPacket) =
+      while recvRun + 1 < runStart.len and received >= runStart[recvRun + 1]:
+        inc recvRun
+      let k = received - runStart[recvRun]
+      if received == 0 and encodedPacket.dts != AV_NOPTS_VALUE:
+        # The first frame's PTS is 0, so a fresh encoder's first DTS is minus
+        # its reorder delay. has_b_frames can't say: libx264 reports 2 for a
+        # pyramid x264 turns off with a single B-frame.
+        reorderFrames = -encodedPacket.dts
       let outPacket = av_packet_clone(encodedPacket)
       if outPacket == nil:
         error &"Could not clone encoded {label} packet"
       outPacket.flags = outPacket.flags and not AV_PKT_FLAG_DISCARD
       outPacket.time_base = encoder.time_base
+      if reuse and outPacket.pts != AV_NOPTS_VALUE:
+        outPacket.pts += spans[runFirst[recvRun]].outStart - runStart[recvRun]
       if encoder.max_b_frames == 0 and outPacket.pts != AV_NOPTS_VALUE:
         # An encoder that doesn't reorder still has to leave the copied GOPs'
         # decode delay between DTS and PTS, as one with B-frames does.
         outPacket.dts = outPacket.pts - sourceDelay
+      elif reuse:
+        outPacket.dts = spans[runFirst[recvRun]].outStart - reorderFrames + k
       outPacket.stream_index = outputStream.index
       if isNal:
         outPacket.normalizeLengthPrefixed(
-          if firstPacket: encodedParameterSets else: noParameterSets, label,
+          if k == 0: encodedParameterSets else: noParameterSets, label,
           encodedAnnexB)
-      firstPacket = false
       let orderTs =
         if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts
         else: outPacket.pts
-      yield (outPacket, max(0'i64, orderTs))
+      encoded.addLast (outPacket, max(0'i64, orderTs))
+      inc received
       av_packet_unref(encodedPacket)
 
-    for spanIndex, span in spans:
-      if span.kind == ssCopy:
-        input.seekToKeyBefore(stream,
-          av_rescale_q(span.srcStart, frameTb, stream.time_base) +
-          input.startPts(stream))
-        var first = true
-        var copied = 0'i64
-        var shift = 0'i64
-        var sawDts = false
-        var undated: seq[ptr AVPacket] # leading packets awaiting a DTS
-        let frameDuration = max(1'i64, av_rescale_q(1, frameTb, stream.time_base))
+    template send(f: ptr AVFrame) =
+      for encodedPacket in encoder.encode(f, packet):
+        receive(encodedPacket)
+      if f != nil: inc sent
 
-        template yieldCopied(p: ptr AVPacket) =
-          let orderTs = if p.dts != AV_NOPTS_VALUE: p.dts else: p.pts
-          # In the packet's time base: HEVC's are retimed to frames by now.
-          yield (p, max(0'i64, frameAt(orderTs, p.time_base, tl.tb)))
+    # The frames to encode for run `genRun`, one at a time.
+    var genRun = 0
+    var gen: iterator(): ptr AVFrame = nil
+    template newGen(): iterator(): ptr AVFrame =
+      iterator(): ptr AVFrame =
+        let encStream = encInput.video[0]
+        var firstFrameInRun = true
+        for fedSpan in runFirst[genRun] .. runLast[genRun]:
+          let span = spans[fedSpan]
+          encInput.seekToKeyBefore(encStream,
+            av_rescale_q(span.srcStart, frameTb, encStream.time_base) +
+            encInput.startPts(encStream))
+          avcodec_flush_buffers(decoder)
+          var count = 0'i64
+          var lastDecoded: ptr AVFrame = nil
+          var flushed = false
+          var finished = false
+          while not finished:
+            var src: ptr AVFrame = nil
+            var upTo = 0'i64
+            let ret = avcodec_receive_frame(decoder, frame)
+            if ret == 0:
+              let sourceFrame = int64(round((frame.time(encStream.time_base) -
+                float(encInput.startPts(encStream) * encStream.time_base)) *
+                float(tl.tb)))
+              if sourceFrame < span.srcStart:
+                continue
+              # A WebCodecs decoder hands over whatever layout the browser
+              # picked (NV12 from hardware decoders), while the encoder was
+              # opened for the stream's own format.
+              src = frame.reformat(encoder.pix_fmt)
+              if lastDecoded != nil:
+                av_frame_free(addr lastDecoded)
+              lastDecoded = av_frame_clone(src)
+              # Like the normal renderer, a frame with no picture of its own,
+              # as before a stream that starts late, shows the next one decoded.
+              upTo = min(sourceFrame, span.srcEnd - 1)
+              finished = sourceFrame >= span.srcEnd - 1
+            elif ret == AVERROR_EAGAIN and not flushed:
+              if av_read_frame(encInput.formatContext, encInput.packet) < 0:
+                discard avcodec_send_packet(decoder, nil)
+                flushed = true
+              else:
+                if encInput.packet.stream_index == encStream.index:
+                  discard avcodec_send_packet(decoder, encInput.packet)
+                av_packet_unref(encInput.packet)
+              continue
+            else:
+              # Container duration rounding can leave the timeline one frame
+              # longer than the final decoded timestamp. Match the normal
+              # renderer by holding the last picture to the span's end.
+              finished = true
+              if lastDecoded == nil:
+                break
+              src = lastDecoded
+              upTo = span.srcEnd - 1
+            while span.srcStart + count <= upTo:
+              let slot = av_frame_clone(src)
+              slot.pts = span.outStart + count
+              slot.time_base = frameTb
+              slot.duration = 1
+              slot.pict_type =
+                if firstFrameInRun: AV_PICTURE_TYPE_I
+                else: AV_PICTURE_TYPE_NONE
+              firstFrameInRun = false
+              inc count
+              yield slot
+            if src != frame and src != lastDecoded:
+              av_frame_free(addr src)
+          if lastDecoded != nil:
+            av_frame_free(addr lastDecoded)
 
-        template flushUndated(nextDts: int64) =
-          fillLeadingDts(undated, nextDts, frameDuration)
-          for p in undated: yieldCopied(p)
-          undated.setLen(0)
-
-        let reorderDelay = max(stream.codecpar.video_delay.int64, 0)
-        while av_read_frame(input.formatContext, input.packet) >= 0:
-          let sourcePacket = input.packet
-          if sourcePacket.stream_index != stream.index or
-              sourcePacket.pts == AV_NOPTS_VALUE:
-            av_packet_unref(sourcePacket)
-            continue
-          let sourceFrame = frameAt(sourcePacket.pts - input.startPts(stream),
-            stream.time_base, tl.tb)
-          if sourceFrame >= span.srcEnd:
-            # HEVC stops at the next closed random-access picture, not merely at
-            # the first packet whose presentation timestamp belongs to the next
-            # GOP: reordering can place an in-range picture after this one.
-            let atBoundary = codecId != ID_HEVC or
-              packetIsCopyBoundary(codecId, sourcePacket.data,
-                sourcePacket.size.int)
-            av_packet_unref(sourcePacket)
-            if atBoundary:
-              break
-            continue
-          if sourceFrame < span.srcStart:
-            av_packet_unref(sourcePacket)
-            continue
-          if first and ((sourcePacket.flags and AV_PKT_FLAG_KEY) == 0 or
-              not packetIsCopyBoundary(codecId, sourcePacket.data,
-                sourcePacket.size.int)):
-            av_packet_unref(sourcePacket)
-            continue
-          let isFirst = first
-          first = false
-          let outPacket = av_packet_clone(sourcePacket)
-          if outPacket == nil:
-            error &"Could not clone {label} packet"
-          if codecId == ID_HEVC:
-            # Normalize copied timing to the CFR timeline. Rebuilding DTS in
-            # decode order avoids carrying CRA/RASL preroll offsets across an
-            # edit boundary and matches the encoder's configured reorder delay.
-            outPacket.pts = span.outStart + sourceFrame - span.srcStart
-            outPacket.dts = span.outStart - reorderDelay + copied
-            outPacket.duration = 1
-            outPacket.time_base = frameTb
-            inc copied
-          else:
-            if isFirst:
-              let outputBase = av_rescale_q(span.outStart, frameTb,
-                  stream.time_base)
-              # Matroska can carry a constant sub-frame timestamp offset. H.264
-              # anchors the GOP to its actual key packet instead of preserving
-              # that input offset between re-encoded and copied regions.
-              shift =
-                if codecId == ID_H264: outputBase - outPacket.pts
-                else: outputBase - av_rescale_q(span.srcStart, frameTb,
-                  stream.time_base)
-            if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
-            if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
-            outPacket.time_base = stream.time_base
-          outPacket.stream_index = outputStream.index
-          if isFirst and isNal:
-            outPacket.normalizeLengthPrefixed(sourceParameterSets, label,
-              sourceAnnexB)
-          elif sourceAnnexB:
-            outPacket.normalizeLengthPrefixed(noParameterSets, label, true)
-          av_packet_unref(sourcePacket)
-          if codecId == ID_H264 and not sawDts and outPacket.dts == AV_NOPTS_VALUE:
-            undated.add outPacket
-            continue
-          sawDts = true
-          if undated.len > 0: flushUndated(outPacket.dts)
-          yieldCopied(outPacket)
-        if undated.len > 0: flushUndated(AV_NOPTS_VALUE)
-      else:
+    # Send one more frame to the encoder, starting the next run if none is
+    # under way, and finishing the run when it has no frames left.
+    template feedStep() =
+      if gen == nil:
         if encoder == nil:
           encoder = initPartialEncoder(video, stream.codecpar, frameTb, tl.tb,
             codecId)
+          reuse = $encoder.codec.name == "libx264"
           if isNal:
             encodedParameterSets = parameterSetsFor(codecId, encoder.extradata,
               encoder.extradata_size)
@@ -492,69 +528,149 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
               else: encodedParameterSets.hasRequiredParameterSets
             if not complete:
               error &"{label} encoder did not provide parameter sets for partial-lossless rendering"
-          firstPacket = true
-          firstFrameInRun = true
+        genRun = runStart.len
+        runStart.add(if reuse: sent else: received)
+        gen = newGen()
+      var slot = gen()
+      if finished(gen):
+        gen = nil
+        if not reuse or runStart.len == runFirst.len:
+          send(nil)
+          if not reuse: avcodec_free_context(addr encoder)
+        runEnd.add(if reuse: sent else: received)
+      else:
+        if reuse: slot.pts = sent
+        send(slot)
+        av_frame_free(addr slot)
 
+    var spanIndex = 0
+    var run = 0
+    var copying = false
+    var first = true
+    var copied = 0'i64
+    var shift = 0'i64
+    var sawDts = false
+    var undated: seq[ptr AVPacket] # leading packets awaiting a DTS
+    let frameDuration = max(1'i64, av_rescale_q(1, frameTb, stream.time_base))
+    let reorderDelay = max(stream.codecpar.video_delay.int64, 0)
+
+    template queueCopied(p: ptr AVPacket) =
+      let orderTs = if p.dts != AV_NOPTS_VALUE: p.dts else: p.pts
+      # In the packet's time base: HEVC's are retimed to frames by now.
+      ready.addLast (p, max(0'i64, frameAt(orderTs, p.time_base, tl.tb)))
+
+    template flushUndated(nextDts: int64) =
+      fillLeadingDts(undated, nextDts, frameDuration)
+      for p in undated: queueCopied(p)
+      undated.setLen(0)
+
+    template endCopy() =
+      if undated.len > 0: flushUndated(AV_NOPTS_VALUE)
+      copying = false
+      inc spanIndex
+
+    while true:
+      if ready.len > 0:
+        yield ready.popFirst()
+        continue
+      if spanIndex >= spans.len:
+        break
+      let span = spans[spanIndex]
+
+      if span.kind == ssEncode:
+        # Packets go out as soon as they're this run's; until then, the
+        # encoder is fed, the next run too when this one's tail is still in it.
+        if encoded.len > 0 and (run + 1 >= runStart.len or
+            emitted < runStart[run + 1]):
+          ready.addLast encoded.popFirst()
+          inc emitted
+        elif run < runEnd.len and emitted >= runEnd[run]:
+          spanIndex = runLast[run] + 1
+          inc run
+        elif gen != nil or runStart.len < runFirst.len:
+          feedStep()
+        else:
+          error &"The {label} encoder returned fewer packets than frames"
+        continue
+
+      if not copying:
         input.seekToKeyBefore(stream,
           av_rescale_q(span.srcStart, frameTb, stream.time_base) +
           input.startPts(stream))
-        avcodec_flush_buffers(decoder)
-        var encoded = 0'i64
-        var lastDecoded: ptr AVFrame = nil
-        for decoded in input.flushDecode(stream.index, decoder, frame):
-          let sourceFrame = int64(round((decoded.time(stream.time_base) -
-            float(input.startPts(stream) * stream.time_base)) * float(tl.tb)))
-          if sourceFrame < span.srcStart:
-            continue
-          # A WebCodecs decoder hands over whatever layout the browser picked
-          # (NV12 from hardware decoders), while the encoder was opened for
-          # the stream's own format.
-          var toEncode = decoded.reformat(encoder.pix_fmt)
-          if lastDecoded != nil:
-            av_frame_free(addr lastDecoded)
-          lastDecoded = av_frame_clone(toEncode)
-          # Like the normal renderer, a frame with no picture of its own, as
-          # before a stream that starts late, shows the next one decoded.
-          let upTo = min(sourceFrame, span.srcEnd - 1)
-          while span.srcStart + encoded <= upTo:
-            let slot = av_frame_clone(toEncode)
-            slot.pts = span.outStart + encoded
-            slot.time_base = frameTb
-            slot.duration = 1
-            slot.pict_type =
-              if firstFrameInRun: AV_PICTURE_TYPE_I
-              else: AV_PICTURE_TYPE_NONE
-            firstFrameInRun = false
-            for encodedPacket in encoder.encode(slot, packet):
-              emitEncoded(encodedPacket)
-            av_frame_free(addr slot)
-            inc encoded
-          if toEncode != decoded:
-            av_frame_free(addr toEncode)
-          if sourceFrame >= span.srcEnd - 1:
-            break
+        copying = true
+        first = true
+        copied = 0
+        shift = 0
+        sawDts = false
 
-        # Container duration rounding can leave the timeline one frame longer
-        # than the final decoded timestamp. Match the normal renderer by holding
-        # the last picture for that final timeline frame.
-        while encoded < span.srcEnd - span.srcStart and lastDecoded != nil:
-          let held = av_frame_clone(lastDecoded)
-          held.pts = span.outStart + encoded
-          held.time_base = frameTb
-          held.duration = 1
-          held.pict_type = AV_PICTURE_TYPE_NONE
-          for encodedPacket in encoder.encode(held, packet):
-            emitEncoded(encodedPacket)
-          av_frame_free(addr held)
-          inc encoded
-
-        if lastDecoded != nil:
-          av_frame_free(addr lastDecoded)
-
-        let endsRun = spanIndex + 1 == spans.len or
-          spans[spanIndex + 1].kind == ssCopy
-        if endsRun:
-          for encodedPacket in encoder.encode(nil, packet):
-            emitEncoded(encodedPacket)
-          avcodec_free_context(addr encoder)
+      if av_read_frame(input.formatContext, input.packet) < 0:
+        endCopy()
+        continue
+      let sourcePacket = input.packet
+      if sourcePacket.stream_index != stream.index or
+          sourcePacket.pts == AV_NOPTS_VALUE:
+        av_packet_unref(sourcePacket)
+        continue
+      let sourceFrame = frameAt(sourcePacket.pts - input.startPts(stream),
+        stream.time_base, tl.tb)
+      if sourceFrame >= span.srcEnd:
+        # HEVC stops at the next closed random-access picture, not merely at
+        # the first packet whose presentation timestamp belongs to the next
+        # GOP: reordering can place an in-range picture after this one.
+        let atBoundary = codecId != ID_HEVC or
+          packetIsCopyBoundary(codecId, sourcePacket.data,
+            sourcePacket.size.int)
+        av_packet_unref(sourcePacket)
+        if atBoundary:
+          endCopy()
+        continue
+      if sourceFrame < span.srcStart:
+        av_packet_unref(sourcePacket)
+        continue
+      if first and ((sourcePacket.flags and AV_PKT_FLAG_KEY) == 0 or
+          not packetIsCopyBoundary(codecId, sourcePacket.data,
+            sourcePacket.size.int)):
+        av_packet_unref(sourcePacket)
+        continue
+      let isFirst = first
+      first = false
+      let outPacket = av_packet_clone(sourcePacket)
+      if outPacket == nil:
+        error &"Could not clone {label} packet"
+      if codecId == ID_HEVC:
+        # Normalize copied timing to the CFR timeline. Rebuilding DTS in
+        # decode order avoids carrying CRA/RASL preroll offsets across an
+        # edit boundary and matches the encoder's configured reorder delay.
+        outPacket.pts = span.outStart + sourceFrame - span.srcStart
+        outPacket.dts = span.outStart - reorderDelay + copied
+        outPacket.duration = 1
+        outPacket.time_base = frameTb
+        inc copied
+      else:
+        if isFirst:
+          let outputBase = av_rescale_q(span.outStart, frameTb,
+              stream.time_base)
+          # Matroska can carry a constant sub-frame timestamp offset. H.264
+          # anchors the GOP to its actual key packet instead of preserving
+          # that input offset between re-encoded and copied regions.
+          shift =
+            if codecId == ID_H264: outputBase - outPacket.pts
+            else: outputBase - av_rescale_q(span.srcStart, frameTb,
+              stream.time_base)
+        if outPacket.pts != AV_NOPTS_VALUE: outPacket.pts += shift
+        if outPacket.dts != AV_NOPTS_VALUE: outPacket.dts += shift
+        outPacket.time_base = stream.time_base
+      outPacket.stream_index = outputStream.index
+      if isFirst and isNal:
+        outPacket.normalizeLengthPrefixed(sourceParameterSets, label,
+          sourceAnnexB)
+      elif sourceAnnexB:
+        outPacket.normalizeLengthPrefixed(noParameterSets, label, true)
+      av_packet_unref(sourcePacket)
+      if codecId == ID_H264 and not sawDts and outPacket.dts == AV_NOPTS_VALUE:
+        undated.add outPacket
+        continue
+      sawDts = true
+      if undated.len > 0: flushUndated(outPacket.dts)
+      queueCopied(outPacket)
   )
