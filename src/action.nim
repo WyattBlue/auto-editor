@@ -416,12 +416,7 @@ func applyEase*(e: Easing, t: float32): float32 =
     if x < 0.5'f32: 2.0'f32 * x * x
     else: 1.0'f32 - 2.0'f32 * (1.0'f32 - x) * (1.0'f32 - x)
 
-func easeName(e: Easing): string =
-  case e
-  of easeLinear: "linear"
-  of easeIn: "in"
-  of easeOut: "out"
-  of easeInOut: "inout"
+const easeNames*: array[Easing, string] = ["linear", "in", "out", "inout"]
 
 proc pFloat(s: string): float32 {.raises: [ActionParseError].} =
   # parseFloat accepts "nan" and "inf", which slip past `v < lo or v > hi`
@@ -454,7 +449,7 @@ proc parseDuration(spec: string): (float32, DurUnit) {.raises: [ActionParseError
   if not (result[0] >= 0 and result[0] < Inf):
     raise newException(ActionParseError, &"Duration can't be negative or infinite: {spec}")
 
-proc parseKfTime(spec: string): KfTime {.raises: [ActionParseError].} =
+proc parseKfTime*(spec: string): KfTime {.raises: [ActionParseError].} =
   ## "50%" -> percent of the section; otherwise a duration, as parseDuration.
   if spec.endsWith("%"):
     result = KfTime(at: pFloat(spec[0 ..< spec.len - 1]), unit: kuPercent)
@@ -648,12 +643,12 @@ func timedKeys*(a: Action, kf: seq[float32], kt: seq[KfTime], clipDur: int,
 
 proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
   let name = if spec.startsWith("ease="): spec[5 .. ^1] else: spec
-  case name
-  of "linear": easeLinear
-  of "in": easeIn
-  of "out": easeOut
-  of "inout", "in-out": easeInOut
-  else: raise newException(ActionParseError, &"Unknown easing: {spec}")
+  if name == "in-out":
+    return easeInOut
+  for e, n in easeNames:
+    if n == name:
+      return e
+  raise newException(ActionParseError, &"Unknown easing: {spec}")
 
 proc parseEaseTail(act: var Action, parts: seq[string], idx: int,
     val: string) {.raises: [ActionParseError].} =
@@ -1357,7 +1352,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
 func easeSuffix(a: Action): string =
   ## The trailing ":ease=..." for an animated action, or "" if it has none.
   if not a.hasEase: return ""
-  result = &":ease={easeName(a.easeCurve)}"
+  result = &":ease={easeNames[a.easeCurve]}"
   case a.easeDurUnit
   of duClip: discard
   of duSec: result.add &":{a.easeDur}sec"

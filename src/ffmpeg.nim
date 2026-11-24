@@ -306,6 +306,7 @@ type
     subtitle_header*: ptr uint8
     subtitle_header_size*: cint
     pkt_timebase*: AVRational
+    skip_frame*: AVDiscard
     # ... other fields omitted for brevity
 
 proc `==`*(a: AVSampleFormat, b: cint): bool = cint(ord(a)) == b
@@ -660,6 +661,7 @@ proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint, nb_channel
     header: "<libavutil/samplefmt.h>".}
 
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
+proc av_free*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 proc av_mallocz*(size: csize_t): pointer {.importc, header: "<libavutil/mem.h>".}
 proc av_realloc_array*(`ptr`: pointer, nmemb, size: csize_t): pointer {.importc,
@@ -892,12 +894,16 @@ proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext, frame: ptr AVFrame
     flags: cint): cint {.importc, header: "<libavfilter/buffersink.h>".}
 
 const AVSEEK_FLAG_BACKWARD* = 1
+const AVSEEK_FLAG_BYTE* = 2
 const AV_PKT_FLAG_KEY* = 0x0001
 const AV_PKT_FLAG_DISCARD* = 0x0004
 const AVINDEX_KEYFRAME* = 0x0001
 
 proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
     flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint,
+    min_ts, ts, max_ts: int64, flags: cint): cint {.importc,
+    header: "<libavformat/avformat.h>".}
 
 type AVIndexEntry* {.importc, header: "<libavformat/avformat.h>".} = object
   pos*: int64       # byte position in file
@@ -928,3 +934,22 @@ func planeRow*(frame: ptr AVFrame, plane, y: int): ptr UncheckedArray[uint8] {.i
   ## Row `y` of a picture's plane.
   cast[ptr UncheckedArray[uint8]](cast[int](frame.data[plane]) +
     y * frame.linesize[plane].int)
+
+proc av_cpu_force_count*(count: cint) {.importc, header: "<libavutil/cpu.h>".}
+
+type AVSHA* {.importc: "struct AVSHA", header: "<libavutil/sha.h>", incompleteStruct.} = object
+
+proc av_sha_alloc*(): ptr AVSHA {.importc, header: "<libavutil/sha.h>".}
+proc av_sha_init*(ctx: ptr AVSHA, bits: cint): cint {.importc, header: "<libavutil/sha.h>".}
+proc av_sha_update*(ctx: ptr AVSHA, data: pointer, len: csize_t) {.importc,
+    header: "<libavutil/sha.h>".}
+proc av_sha_final*(ctx: ptr AVSHA, digest: pointer) {.importc, header: "<libavutil/sha.h>".}
+
+type AVHMAC* {.importc, header: "<libavutil/hmac.h>", incompleteStruct.} = object
+
+const AV_HMAC_SHA256* = cint(3) # enum AVHMACType: MD5, SHA1, SHA224, SHA256, ...
+
+proc av_hmac_alloc*(kind: cint): ptr AVHMAC {.importc, header: "<libavutil/hmac.h>".}
+proc av_hmac_free*(ctx: ptr AVHMAC) {.importc, header: "<libavutil/hmac.h>".}
+proc av_hmac_calc*(ctx: ptr AVHMAC, data: pointer, len: cuint, key: pointer, keylen: cuint,
+    output: pointer, outlen: cuint): cint {.importc, header: "<libavutil/hmac.h>".}
