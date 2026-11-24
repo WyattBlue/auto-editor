@@ -825,19 +825,6 @@ proc parseEasing(spec: string): Easing {.raises: [ActionParseError].} =
       return e
   raise newException(ActionParseError, &"Unknown easing: {spec}")
 
-proc parseEaseTail(act: var Action, parts: seq[string], idx: int,
-    val: string) {.raises: [ActionParseError].} =
-  ## Consume an animatable action's trailing ":ease=curve[:duration]", which
-  ## starts at parts[idx]; anything else trailing there is not a valid action.
-  if idx >= parts.len:
-    return
-  if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
-    raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
-  act.hasEase = true
-  act.easeCurve = parseEasing(parts[idx])
-  if parts.len == idx + 2:
-    (act.easeDur, act.easeDurUnit) = parseDuration(parts[idx + 1])
-
 func isTimed*(a: Action): bool =
   ## Whether any of the action's keyframes says when it is.
   case a.kind
@@ -845,13 +832,6 @@ func isTimed*(a: Action): bool =
   of actPos: a.pxKt.len > 0 or a.pyKt.len > 0 or a.pscaleKt.len > 0
   of actPixelate: a.pixWKt.len > 0 or a.pixHKt.len > 0
   else: false
-
-proc checkTimedEase(a: Action) {.raises: [ActionParseError].} =
-  # Timed keyframes say how long the animation takes; an ease duration would
-  # say it again.
-  if a.isTimed and a.easeDurUnit != duClip:
-    raise newException(ActionParseError,
-      "An ease duration can't be given with timed keyframes")
 
 proc parseRgba(spec, what: string): uint32 {.raises: [ActionParseError].} =
   ## A color as 0xRRGGBBAA: a name, #rgb, #rrggbb, or #rrggbbaa.
@@ -878,7 +858,144 @@ func textPart(text: string): string =
   let head = if eq > 0: text[0 ..< eq] else: text
   if head in subsKeys or head in ["vertical", "ass"]: result = "\\" & result
 
-proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionParseError].} =
+type
+  ArgValue* = object
+    ## One written argument, typed by its ArgDef's kind.
+    case kind*: ArgKind
+    of akNumber, akInteger: num*: float64
+    of akKeyframes:
+      kf*: seq[float64]
+      kt*: seq[KfTime]     # each keyframe's time, or empty when none has one
+    of akColor, akChoice, akPath, akText:
+      str*: string         # as written, after it parses; text and paths unescaped
+    of akDuration:
+      dur*: float64        # seconds for duSec, frames for duFrames
+      durUnit*: DurUnit
+    of akFlag: on*: bool   # confetti's `shimmer` is a `no-shimmer` that's off
+    of akPoints: pts*: seq[int32] # x1, y1, x2, y2, ...
+  SpecEase* = object
+    curve*: Easing
+    dur*: float64          # in `unit`; 0 for duClip
+    unit*: DurUnit         # duClip when no duration is written
+  ActionSpec* = object
+    ## An action as written, before toAction packs it. `args` lines up with
+    ## its ActionDef's, none where an argument isn't written. Numbers are
+    ## float64 and colors are kept as written; `$` doesn't normalize them.
+    name*: string
+    args*: seq[Option[ArgValue]]
+    ease*: Option[SpecEase]
+
+func `==`*(a, b: ArgValue): bool =
+  if a.kind != b.kind: return false
+  case a.kind
+  of akNumber, akInteger: a.num == b.num
+  of akKeyframes: a.kf == b.kf and a.kt == b.kt
+  of akColor, akChoice, akPath, akText: a.str == b.str
+  of akDuration: a.dur == b.dur and a.durUnit == b.durUnit
+  of akFlag: a.on == b.on
+  of akPoints: a.pts == b.pts
+
+func `==`*(a, b: ActionSpec): bool =
+  a.name == b.name and a.args == b.args and a.ease == b.ease
+
+func argIndex(action, arg: string): int =
+  for d in actionDefs:
+    if d.name == action:
+      for i, a in d.args:
+        if a.name == arg: return i
+  -1
+
+template ix(action, arg: static string): int =
+  const i = argIndex(action, arg)
+  static: doAssert i >= 0, action & " has no argument " & arg
+  i
+
+func initSpec(name: string): ActionSpec =
+  result = ActionSpec(name: name)
+  for d in actionDefs:
+    if d.name == name:
+      result.args.setLen(d.args.len)
+
+func numV(v: float64): Option[ArgValue] = some(ArgValue(kind: akNumber, num: v))
+func intV(v: int): Option[ArgValue] = some(ArgValue(kind: akInteger, num: float64(v)))
+func kfV(r: tuple[kf: seq[float64], kt: seq[KfTime]]): Option[ArgValue] =
+  some(ArgValue(kind: akKeyframes, kf: r.kf, kt: r.kt))
+func strV(kind: ArgKind, s: string): Option[ArgValue] =
+  case kind
+  of akColor: some(ArgValue(kind: akColor, str: s))
+  of akChoice: some(ArgValue(kind: akChoice, str: s))
+  of akPath: some(ArgValue(kind: akPath, str: s))
+  else: some(ArgValue(kind: akText, str: s))
+func flagV(on = true): Option[ArgValue] = some(ArgValue(kind: akFlag, on: on))
+
+proc pNum(s: string): float64 {.raises: [ActionParseError].} =
+  ## A number that's finite as the float32 it's packed into.
+  result =
+    try: parseFloat(s)
+    except ValueError: raise newException(ActionParseError, &"Invalid float value: {s}")
+  if classify(float32(result)) in {fcNan, fcInf, fcNegInf}:
+    raise newException(ActionParseError, &"Invalid float value: {s}")
+  if result == 0: result = 0 # -0 is 0, so it formats as it's written back
+
+proc pDur(spec: string): (float64, DurUnit) {.raises: [ActionParseError].} =
+  ## parseDuration, kept as a float64.
+  let (num, suffix) = splitTimeUnit(spec)
+  var tu: TimeUnit
+  if not parseTimeUnit(suffix, tu):
+    raise newException(ActionParseError, &"Invalid duration: {spec}")
+  let n =
+    try: parseFloat(num)
+    except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
+  result = if tu == tuFrames: (n, duFrames) else: (n * tu.seconds, duSec)
+  if result[0] == 0: result[0] = 0
+  # `not (a and b)` so NaN fails too; inf would write a timeline that can't
+  # be read back.
+  let f = float32(result[0])
+  if not (f >= 0 and f < Inf):
+    raise newException(ActionParseError, &"Duration can't be negative or infinite: {spec}")
+
+proc pRamp(spec: string): tuple[kf: seq[float64], kt: seq[KfTime]] {.
+    raises: [ActionParseError].} =
+  ## parseRamp, kept as float64s.
+  var timed = false
+  for part in spec.split(".."):
+    let at = part.find('@')
+    if at < 0:
+      result.kf.add pNum(part)
+      result.kt.add KfTime(unit: kuAuto)
+    else:
+      timed = true
+      result.kf.add pNum(part[0 ..< at])
+      result.kt.add parseKfTime(part[at + 1 .. ^1])
+  if result.kf.len > 255:
+    raise newException(ActionParseError, "Too many keyframes (max 255)")
+  if not timed: result.kt.setLen(0)
+
+proc easeTail(s: var ActionSpec, parts: seq[string], idx: int,
+    val: string) {.raises: [ActionParseError].} =
+  ## Consume an animatable action's trailing ":ease=curve[:duration]", which
+  ## starts at parts[idx]; anything else trailing there is not a valid action.
+  if idx >= parts.len:
+    return
+  if not parts[idx].startsWith("ease=") or parts.len > idx + 2:
+    raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
+  var e = SpecEase(curve: parseEasing(parts[idx]))
+  if parts.len == idx + 2:
+    (e.dur, e.unit) = pDur(parts[idx + 1])
+  s.ease = some(e)
+
+func isTimed(s: ActionSpec): bool =
+  for a in s.args:
+    if a.isSome and a.get.kind == akKeyframes and a.get.kt.len > 0: return true
+
+proc checkTimedEase(s: ActionSpec) {.raises: [ActionParseError].} =
+  # Timed keyframes say how long the animation takes; an ease duration would
+  # say it again.
+  if s.isTimed and s.ease.isSome and s.ease.get.unit != duClip:
+    raise newException(ActionParseError,
+      "An ease duration can't be given with timed keyframes")
+
+proc subsSpec(parts: seq[string], text: bool): ActionSpec {.raises: [ActionParseError].} =
   # The subtitle file comes first, unnamed, then key=value overrides. A part
   # that isn't one goes back onto what came before it, so the colon of a
   # Windows drive stays in a path.
@@ -889,13 +1006,13 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
   var cur = 0
   for part in parts[1 .. ^1]:
     if part in ["vertical", "ass"]:
-      if kind != actText:
+      if not text:
         raise newException(ActionParseError, &"{name}: {part} only applies to text")
       if part == "vertical": vertical = true else: ass = true
     else:
       let eq = part.find('=')
       let key = if eq > 0: subsKeys.find(part[0 ..< eq]) else: -1
-      if key > 0 or key == 0 and kind == actBurn:
+      if key > 0 or key == 0 and not text:
         if seen[key]:
           raise newException(ActionParseError, &"{name}: {subsKeys[key]} given twice")
         (cur, seen[key], given[key]) = (key, true, part[eq + 1 .. ^1])
@@ -903,32 +1020,35 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
         given[cur] &= ":" & part
       else:
         (seen[cur], given[cur]) = (true, part)
-  if kind == actText: given[0] = decodeString(given[0])
-  if kind == actText and given[0].len == 0:
+  if text: given[0] = decodeString(given[0])
+  if text and given[0].len == 0:
     raise newException(ActionParseError, "text needs something to say")
   if given[0].len > 4096 or given[1].len > 4096:
     raise newException(ActionParseError,
-      if kind == actText: "text is too long" else: "burn path is too long")
-  result = if kind == actText: Action(kind: actText) else: Action(kind: actBurn)
-  (result.burnFile, result.burnFont) = (given[0], given[1])
+      if text: "text is too long" else: "burn path is too long")
+  result = initSpec(name)
+  if given[0].len > 0:
+    result.args[0] = strV(if text: akText else: akPath, given[0])
+  if seen[1]: result.args[ix("burn", "font")] = strV(akPath, given[1])
   if seen[2]:
-    result.burnSize = pFloat(given[2])
-    if kind == actText: checkArg("text", "size", result.burnSize)
-    else: checkArg("burn", "size", result.burnSize)
-  for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
+    let size = pNum(given[2])
+    if text: checkArg("text", "size", float32(size))
+    else: checkArg("burn", "size", float32(size))
+    result.args[ix("burn", "size")] = numV(size)
+  for k in 3 .. 5:
     if seen[k]:
-      result.burnSet.incl part
-      result.burnColors[part] = parseRgba(given[k], &"{name} {subsKeys[k]}")
+      discard parseRgba(given[k], &"{name} {subsKeys[k]}")
+      result.args[k] = strV(akColor, given[k])
+  static: doAssert ix("burn", "color") == 3 and ix("burn", "bg") == 5
   if seen[6]:
-    let a = alignNames.find(given[6])
-    if a < 0:
+    if alignNames.find(given[6]) < 0:
       raise newException(ActionParseError, &"{name}: unknown align: {given[6]}")
-    result.burnAlign = uint8(a + 1)
-  result.burnVertical = vertical
-  result.burnAss = ass
+    result.args[ix("burn", "align")] = strV(akChoice, given[6])
+  if vertical: result.args[ix("text", "vertical")] = flagV()
+  if ass: result.args[ix("text", "ass")] = flagV()
 
-proc parseShapeRegion(parts: seq[string], kind: ActionKind,
-    name: string): Action {.raises: [ActionParseError].} =
+proc shapeSpec(parts: seq[string], name: string): ActionSpec {.
+    raises: [ActionParseError].} =
   ## Shared `x:y:w:h[:radius][:feather][:invert]` geometry for `mask`/`confine`.
   ## Fields take positional or `key=value` form (freely mixed); `invert` is a
   ## bare flag. radius: 0 = rect, >0 = rounded-rect corner px, -1 = ellipse.
@@ -982,23 +1102,20 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
     checkArg(action, "h", vals[3])
     checkArg(action, "radius", vals[4])
     checkArg(action, "feather", vals[5])
-  if kind == actMask: check("mask") else: check("confine")
+  if name == "mask": check("mask") else: check("confine")
 
-  result = Action(kind: kind)  # branch fields assigned after (shared by both kinds)
-  result.mX = int32(vals[0])
-  result.mY = int32(vals[1])
-  result.mW = int32(vals[2])
-  result.mH = int32(vals[3])
-  result.mRadius = int32(vals[4])
-  result.mFeather = uint8(vals[5])
-  result.mInvert = inv
+  result = initSpec(name)
+  static: doAssert ix("mask", "feather") == 5 and ix("confine", "feather") == 5
+  for i in 0 ..< 6:
+    if seen[i]: result.args[i] = intV(vals[i])
+  if inv: result.args[ix("mask", "invert")] = flagV()
 
 const maxPolyPoints = 1000
 
-proc parsePolyMask(parts: seq[string], kind: ActionKind,
-    name: string): Action {.raises: [ActionParseError].} =
-  var xs, ys: seq[int32]
-  var feather = 0'u8
+proc polySpec(parts: seq[string], name: string): ActionSpec {.
+    raises: [ActionParseError].} =
+  var pts: seq[int32]
+  var feather = -1
   var inv = false
   var gotPoly = false
 
@@ -1027,26 +1144,24 @@ proc parsePolyMask(parts: seq[string], kind: ActionKind,
       if n > maxPolyPoints:
         raise newException(ActionParseError,
           &"{name}: poly has too many points (max {maxPolyPoints})")
-      for i in 0 ..< n:
-        xs.add addPoint(nums[2 * i], p)
-        ys.add addPoint(nums[2 * i + 1], p)
+      for num in nums:
+        pts.add addPoint(num, p)
     elif p.startsWith("feather="):
       let v = try: parseInt(p[8 .. ^1])
         except ValueError: raise newException(ActionParseError, &"{name}: invalid feather: {p}")
-      if kind == actMaskPoly: checkArg("mask", "feather", v)
+      if name == "mask": checkArg("mask", "feather", v)
       else: checkArg("confine", "feather", v)
-      feather = uint8(v)
+      feather = v
     else:
       raise newException(ActionParseError, &"{name}: unknown key: {p}")
 
   if not gotPoly:
     raise newException(ActionParseError, &"{name} poly requires at least 3 points")
 
-  result = Action(kind: kind)
-  result.mPolyXs = xs
-  result.mPolyYs = ys
-  result.mFeather = feather
-  result.mInvert = inv
+  result = initSpec(name)
+  result.args[ix("mask", "poly")] = some(ArgValue(kind: akPoints, pts: pts))
+  if feather >= 0: result.args[ix("mask", "feather")] = intV(feather)
+  if inv: result.args[ix("mask", "invert")] = flagV()
 
 func checkSpeed(name: string, v: float32) {.raises: [ActionParseError].} =
   # Speed <= 0 makes the renderer's atempo decomposition loop forever, and its
@@ -1054,150 +1169,153 @@ func checkSpeed(name: string, v: float32) {.raises: [ActionParseError].} =
   if name == "varispeed": checkArg("varispeed", "v", v)
   else: checkArg("speed", "v", v)
 
-func parseAction*(val: string): Action {.raises: [ActionParseError].} =
-  if val == "invert":
-    return Action(kind: actInvert)
-  if val == "hflip":
-    return Action(kind: actHflip)
-  if val == "vflip":
-    return Action(kind: actVflip)
-  if val == "loop":
-    return Action(kind: actLoop)
-  if val == "erosion":
-    return Action(kind: actErosion)
-  if val == "confine":  # bare = reset to full frame
-    return Action(kind: actConfine, mReset: true)
+func parseActionSpec*(val: string): ActionSpec {.raises: [ActionParseError].} =
+  ## Parse an action as written, with every check parseAction makes. Also
+  ## takes `cut`, `nil` and `ease:curve[:duration]`, which toAction refuses.
+  if val in ["invert", "hflip", "vflip", "loop", "erosion", "cut", "nil", "confine"]:
+    # A bare confine resets to the full frame.
+    return initSpec(val)
 
   if val.startsWith("text:"):
-    return parseSubs(splitUnescaped(val, ':'), actText)
+    return subsSpec(splitUnescaped(val, ':'), true)
 
   let parts = val.split(":")
+  let name = parts[0]
 
-  if parts[0] == "mask":
+  if name in ["mask", "confine"]:
     if parts.anyIt(it.startsWith("poly=")):
-      return parsePolyMask(parts, actMaskPoly, "mask")
-    return parseShapeRegion(parts, actMask, "mask")
-  if parts[0] == "confine":
-    if parts.anyIt(it.startsWith("poly=")):
-      return parsePolyMask(parts, actConfinePoly, "confine")
-    return parseShapeRegion(parts, actConfine, "confine")
+      return polySpec(parts, name)
+    return shapeSpec(parts, name)
 
-  if parts[0] == "burn":
-    return parseSubs(parts, actBurn)
+  if name == "burn":
+    return subsSpec(parts, false)
 
-  if parts[0] == "convolve":
+  if name == "convolve":
     # The path is everything after the name, so a Windows drive colon stays put.
     let path = parts[1 .. ^1].join(":")
     if path.len == 0:
       raise newException(ActionParseError, "convolve needs a path")
     if path.len > 4096:
       raise newException(ActionParseError, "convolve path is too long")
-    return Action(kind: actConvolve, irPath: path)
+    result = initSpec(name)
+    result.args[0] = strV(akPath, path)
+    return
+
+  if name == "ease" and parts.len in 2..3:
+    result = initSpec(name)
+    result.args[0] = strV(akChoice, easeNames[parseEasing(parts[1])])
+    if parts.len == 3:
+      let (dur, unit) = pDur(parts[2])
+      result.args[1] = some(ArgValue(kind: akDuration, dur: dur, durUnit: unit))
+    return
+
+  result = initSpec(name)
 
   # deesser takes positional args: intensity[:max[:freq]]
-  if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
-    var vals = [toUnorm16(0.0), halfUnorm16, halfUnorm16]
+  if parts.len >= 2 and parts.len <= 4 and name == "deesser":
     for idx in 1 ..< parts.len:
-      let v = pFloat(parts[idx])
+      let v = pNum(parts[idx])
       case idx
-      of 1: checkArg("deesser", "intensity", v)
-      of 2: checkArg("deesser", "max", v)
-      else: checkArg("deesser", "freq", v)
-      vals[idx - 1] = toUnorm16(v)
-    return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
+      of 1: checkArg("deesser", "intensity", float32(v))
+      of 2: checkArg("deesser", "max", float32(v))
+      else: checkArg("deesser", "freq", float32(v))
+      result.args[idx - 1] = numV(v)
+    return
 
-  if parts[0] in ["highpass", "lowpass"] and parts.len <= 2:
-    var hz = (if parts[0] == "highpass": 80.0'f32 else: 10000.0'f32)
-    if parts.len == 2: hz = pFloat(parts[1])
-    if parts[0] == "highpass": checkArg("highpass", "hz", hz)
-    else: checkArg("lowpass", "hz", hz)
-    let cutoff = uint16(round(hz))
-    return (if parts[0] == "highpass": Action(kind: actHighpass, cutoff: cutoff)
-      else: Action(kind: actLowpass, cutoff: cutoff))
+  if name in ["highpass", "lowpass"] and parts.len <= 2:
+    if parts.len == 2:
+      let hz = pNum(parts[1])
+      if name == "highpass": checkArg("highpass", "hz", float32(hz))
+      else: checkArg("lowpass", "hz", float32(hz))
+      result.args[0] = numV(hz)
+    return
 
-  if parts[0] == "dehum" and parts.len <= 3:
-    var hz = 60.0'f32
-    var n = 4.0'f32
-    if parts.len >= 2: hz = pFloat(parts[1])
-    if parts.len == 3: n = pFloat(parts[2])
-    checkArg("dehum", "hz", hz)
-    checkArg("dehum", "harmonics", n)
-    return Action(kind: actDehum, humHz: uint16(round(hz)), humHarmonics: uint8(n))
+  if name == "dehum" and parts.len <= 3:
+    var hz = 60.0
+    var n = 4.0
+    if parts.len >= 2:
+      hz = pNum(parts[1])
+      result.args[0] = numV(hz)
+    if parts.len == 3:
+      n = pNum(parts[2])
+      result.args[1] = some(ArgValue(kind: akInteger, num: n))
+    checkArg("dehum", "hz", float32(hz))
+    checkArg("dehum", "harmonics", float32(n))
+    return
 
   # duck takes positional args: [amount[:threshold[:attack[:release]]]]
-  if parts[0] == "duck" and parts.len <= 5:
-    var vals = [0.85'f32, 0.04'f32, 100.0'f32, 500.0'f32]
+  if name == "duck" and parts.len <= 5:
+    var vals = [0.85, 0.04, 100.0, 500.0]
     for idx in 1 ..< parts.len:
-      vals[idx - 1] = pFloat(parts[idx])
-    checkArg("duck", "amount", vals[0])
-    checkArg("duck", "threshold", vals[1])
-    checkArg("duck", "attack", vals[2])
-    checkArg("duck", "release", vals[3])
-    return Action(kind: actDuck, duckAmount: toUnorm16(vals[0]),
-      duckThresh: toUnorm16(vals[1]), duckAttack: uint16(vals[2]),
-      duckRelease: uint16(vals[3]))
+      vals[idx - 1] = pNum(parts[idx])
+      result.args[idx - 1] = numV(vals[idx - 1])
+    checkArg("duck", "amount", float32(vals[0]))
+    checkArg("duck", "threshold", float32(vals[1]))
+    checkArg("duck", "attack", float32(vals[2]))
+    checkArg("duck", "release", float32(vals[3]))
+    return
 
-  # lens takes positional args: [k1[:k2]]
-  if parts[0] == "lens" and parts.len <= 3:
-    if parts.len == 1:
-      # A fun fisheye bulge, used when `lens` is given with no arguments.
-      return Action(kind: actLens, k1: toSnorm16(-0.5'f32), k2: toSnorm16(0.0'f32))
-    var k = [0.0'f32, 0.0'f32]
+  # lens takes positional args: [k1[:k2]]; bare, a fun fisheye.
+  if name == "lens" and parts.len <= 3:
+    var k = [0.0, 0.0]
     for idx in 1 ..< parts.len:
-      k[idx - 1] = pFloat(parts[idx])
-    checkArg("lens", "k1", k[0])
-    checkArg("lens", "k2", k[1])
-    return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
+      k[idx - 1] = pNum(parts[idx])
+      result.args[idx - 1] = numV(k[idx - 1])
+    checkArg("lens", "k1", float32(k[0]))
+    checkArg("lens", "k2", float32(k[1]))
+    return
 
   # tone: a MIDI note plus an optional waveform name, "tone:note[:waveform]".
-  if parts[0] == "tone" and parts.len <= 3:
+  if name == "tone" and parts.len <= 3:
     if parts.len == 1:
       raise newException(ActionParseError, "tone requires a MIDI note (tone:69 is A4)")
-    let n = pFloat(parts[1])
+    let n = pNum(parts[1])
     # Whole notes only: a fraction would round away silently and stop
     # round-tripping.
-    checkArg("tone", "note", n)
-    var wave = wSine
+    checkArg("tone", "note", float32(n))
+    result.args[0] = some(ArgValue(kind: akInteger, num: n))
     if parts.len == 3:
-      let idx = waveformNames.find(parts[2])
-      if idx < 0:
+      if waveformNames.find(parts[2]) < 0:
         raise newException(ActionParseError, &"tone: unknown waveform: {parts[2]}" &
           didYouMean(parts[2], @waveformNames))
-      wave = Waveform(idx)
-    return Action(kind: actTone, note: uint8(n), wave: wave)
+      result.args[1] = strV(akChoice, parts[2])
+    return
 
   # rotate: a fixed angle "rotate:deg" (static, expands the canvas).
-  if parts[0] == "rotate" and parts.len == 2:
+  if name == "rotate" and parts.len == 2:
     if '/' in parts[1]:
       raise newException(ActionParseError,
         "rotate takes a fixed angle (rotate:deg); use spin:deg/rate for a continuous spin")
-    return Action(kind: actRotate, rStart: Unorm16(rotCode(pFloat(parts[1]))))
+    result.args[0] = numV(pNum(parts[1]))
+    return
 
-  if parts[0] == "scale" and parts.len in 2..3:
-    let w = pFloat(parts[1])
-    let h = (if parts.len == 3: pFloat(parts[2]) else: w)
-    checkArg("scale", "w", w)
-    checkArg("scale", "h", h)
-    return Action(kind: actScale, tScaleW: w, tScaleH: h, tUniform: parts.len == 2)
-  if parts[0] == "turn" and parts.len == 2:
-    return Action(kind: actTurn, tDeg: pFloat(parts[1]))
+  if name == "scale" and parts.len in 2..3:
+    let w = pNum(parts[1])
+    let h = (if parts.len == 3: pNum(parts[2]) else: w)
+    checkArg("scale", "w", float32(w))
+    checkArg("scale", "h", float32(h))
+    result.args[0] = numV(w)
+    if parts.len == 3: result.args[1] = numV(h)
+    return
+  if name == "turn" and parts.len == 2:
+    result.args[0] = numV(pNum(parts[1]))
+    return
 
   # spin: a continuous rotation "spin:deg/rate", starting at `deg` and turning
   # `rate` degrees/second.
-  if parts[0] == "spin" and parts.len == 2:
+  if name == "spin" and parts.len == 2:
     let spec = parts[1]
     let slash = spec.find('/')
     if slash < 0:
       raise newException(ActionParseError, "spin requires spin:deg/rate")
-    return Action(kind: actSpin,
-      sStart: Unorm16(rotCode(pFloat(spec[0 ..< slash]))),
-      sRate: pFloat(spec[slash + 1 .. ^1]))
+    result.args[0] = numV(pNum(spec[0 ..< slash]))
+    result.args[1] = numV(pNum(spec[slash + 1 .. ^1]))
+    return
 
   # drawbox takes positional args: x:y:w:h:color (color is RGB only).
-  if parts[0] == "drawbox":
+  if name == "drawbox":
     if parts.len != 6:
       raise newException(ActionParseError, "drawbox requires x:y:w:h:color")
-    var coords: array[4, int32]
     for idx in 0 ..< 4:
       let n = pInt(parts[idx + 1])
       case idx
@@ -1205,118 +1323,82 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       of 1: checkArg("drawbox", "y", n)
       of 2: checkArg("drawbox", "w", n)
       else: checkArg("drawbox", "h", n)
-      coords[idx] = int32(n)
-    let col = (
-      try:
-        parseColor(parts[5])
-      except ValueError:
-        raise newException(ActionParseError, &"Invalid color: {parts[5]}")
-    )
-    return Action(kind: actDrawbox, dbX: coords[0], dbY: coords[1],
-      dbW: coords[2], dbH: coords[3], dbColor: col)
+      result.args[idx] = intV(n)
+    try: discard parseColor(parts[5])
+    except ValueError: raise newException(ActionParseError, &"Invalid color: {parts[5]}")
+    result.args[4] = strV(akColor, parts[5])
+    return
 
-  if parts[0] in ["colorkey", "chromakey"]:
+  if name in ["colorkey", "chromakey"]:
     if parts.len < 2 or parts.len > 4:
-      raise newException(ActionParseError,
-        &"{parts[0]} requires color[:similar:blend]")
-    let col = (
-      try:
-        parseColor(parts[1])
-      except ValueError:
-        raise newException(ActionParseError, &"Invalid color: {parts[1]}")
-    )
-    var vals = [toUnorm16(0.25'f32), toUnorm16(0.0'f32)]
+      raise newException(ActionParseError, &"{name} requires color[:similar:blend]")
+    try: discard parseColor(parts[1])
+    except ValueError: raise newException(ActionParseError, &"Invalid color: {parts[1]}")
+    result.args[0] = strV(akColor, parts[1])
     for idx in 2 ..< parts.len:
-      let v = pFloat(parts[idx])
+      let v = pNum(parts[idx])
       # Both keyers take the same ranges.
-      if idx == 2: checkArg("colorkey", "similar", v)
-      else: checkArg("colorkey", "blend", v)
-      vals[idx - 2] = toUnorm16(v)
-    if vals[0] < toUnorm16(0.01'f32):
-      vals[0] = toUnorm16(0.01'f32)
-
-    if parts[0] == "colorkey":
-      return Action(kind: actColorKey, color: col, similar: vals[0], blend: vals[1])
-    return Action(kind: actChromaKey, color: col, similar: vals[0], blend: vals[1])
+      if idx == 2: checkArg("colorkey", "similar", float32(v))
+      else: checkArg("colorkey", "blend", float32(v))
+      result.args[idx - 1] = numV(v)
+    return
 
   # choke: shrink the alpha matte inward by `n` pixels (default 1).
-  if parts[0] == "choke" and parts.len <= 2:
-    if parts.len == 1:
-      return Action(kind: actChoke, chokeN: 1)
-    let n = pInt(parts[1])
-    checkArg("choke", "n", n)
-    return Action(kind: actChoke, chokeN: uint8(n))
+  if name == "choke" and parts.len <= 2:
+    if parts.len == 2:
+      let n = pInt(parts[1])
+      checkArg("choke", "n", n)
+      result.args[0] = intV(n)
+    return
 
   # pixelate: bare = 16px blocks; pixelate:n = n square; pixelate:w:h =
   # rectangular. Each size is a ramp with an optional ease suffix:
   #   pixelate:24   pixelate:1..48   pixelate:8..40:8:ease=inout
-  if parts[0] == "pixelate":
-    proc blockKf(spec: string, isW: bool): tuple[kf: seq[float32], kt: seq[KfTime]] {.
+  if name == "pixelate":
+    proc blockKf(spec: string, isW: bool): tuple[kf: seq[float64], kt: seq[KfTime]] {.
         raises: [ActionParseError].} =
       # Whole pixels: atf-8 packs them as uint16.
-      result = parseRamp(spec)
+      result = pRamp(spec)
       for v in result.kf:
-        if isW: checkArg("pixelate", "w", v, alsoWhole = true)
-        else: checkArg("pixelate", "h", v, alsoWhole = true)
+        if isW: checkArg("pixelate", "w", float32(v), alsoWhole = true)
+        else: checkArg("pixelate", "h", float32(v), alsoWhole = true)
 
     var idx = 1
-    var w = (kf: @[16.0'f32], kt: newSeq[KfTime]())
-    var h = (kf: newSeq[float32](), kt: newSeq[KfTime]())
     if parts.len > idx and not parts[idx].startsWith("ease="):
-      w = blockKf(parts[idx], true)
+      result.args[0] = kfV(blockKf(parts[idx], true))
       inc idx
       if parts.len > idx and not parts[idx].startsWith("ease="):
-        h = blockKf(parts[idx], false)
+        result.args[1] = kfV(blockKf(parts[idx], false))
         inc idx
-    if h.kf.len == 0:  # one ramp given: square blocks
-      h = w
-    result = Action(kind: actPixelate, pixWKf: w.kf, pixHKf: h.kf,
-      pixWKt: w.kt, pixHKt: h.kt)
-    result.parseEaseTail(parts, idx, val)
+    result.easeTail(parts, idx, val)
     result.checkTimedEase()
-    return result
+    return
 
   # confetti: [count[:gravity][:scheme][:origin]]. Scheme and origin are name
   # tokens, so every argument can be given in any order; bare numbers fill
   # count then gravity.
-  if parts[0] == "confetti":
-    var count = confettiCountId
-    var gravity = confettiGravityId
-    var scheme = csParty
-    var origin = confettiOriginId
-    var shimmer = true
-    var seed = 0'u16
+  if name == "confetti":
     var numsSeen = 0
-    var schemeSeen = false
-    var originSeen = false
-    var shimmerSeen = false
-    var seedSeen = false
     for idx in 1 ..< parts.len:
       let p = parts[idx]
-      let asScheme = confettiSchemeNames.find(p)
-      let asOrigin = confettiOriginNames.find(p)
-      if asScheme >= 0:
-        if schemeSeen:
+      if confettiSchemeNames.find(p) >= 0:
+        if result.args[2].isSome:
           raise newException(ActionParseError, "confetti: scheme given twice")
-        scheme = ConfettiScheme(asScheme)
-        schemeSeen = true
-      elif asOrigin >= 0:
-        if originSeen:
+        result.args[2] = strV(akChoice, p)
+      elif confettiOriginNames.find(p) >= 0:
+        if result.args[3].isSome:
           raise newException(ActionParseError, "confetti: origin given twice")
-        origin = ConfettiOrigin(asOrigin)
-        originSeen = true
+        result.args[3] = strV(akChoice, p)
       elif p.startsWith("seed="):
-        if seedSeen:
+        if result.args[4].isSome:
           raise newException(ActionParseError, "confetti: seed given twice")
         let v = pInt(p[5 .. ^1], "confetti seed")
         checkArg("confetti", "seed", v)
-        seed = uint16(v)
-        seedSeen = true
+        result.args[4] = intV(v)
       elif p == "shimmer" or p == "no-shimmer":
-        if shimmerSeen:
+        if result.args[5].isSome:
           raise newException(ActionParseError, "confetti: shimmer given twice")
-        shimmer = p == "shimmer"
-        shimmerSeen = true
+        result.args[5] = flagV(p == "no-shimmer")
       elif p.len == 0 or p[0] notin {'0' .. '9', '-', '+', '.'}:
         # Not a number, so it was meant as one of the name tokens.
         raise newException(ActionParseError, &"confetti: unknown value: {p}" &
@@ -1325,54 +1407,55 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       elif numsSeen == 0:
         let n = pInt(p, "confetti count")
         checkArg("confetti", "count", n)
-        count = uint16(n)
+        result.args[0] = intV(n)
         numsSeen = 1
       elif numsSeen == 1:
-        gravity = pFloat(p)
-        checkArg("confetti", "gravity", gravity)
+        let gravity = pNum(p)
+        checkArg("confetti", "gravity", float32(gravity))
+        result.args[1] = numV(gravity)
         numsSeen = 2
       else:
         raise newException(ActionParseError, &"confetti: unexpected value: {p}")
-    return Action(kind: actConfetti, cCount: count, cGravity: gravity,
-      cScheme: scheme, cOrigin: origin, cShimmer: shimmer, cSeed: seed)
+    static: doAssert ix("confetti", "scheme") == 2 and ix("confetti", "no-shimmer") == 5
+    return
 
   # aberration: per-channel chromatic split. Positional shorthand (no '=') is the
   # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
   # explicit per-channel form, which starts every channel at 0.
-  if parts[0] == "aberration":
-    proc toEdge(v: string): bool {.raises: [ActionParseError].} =
-      case v
-      of "smear": false
-      of "wrap": true
-      else: raise newException(ActionParseError, "aberration edge must be smear or wrap")
-    var rh, rv, gh, gv, bh, bv = 0
-    var wrap = false
+  if name == "aberration":
+    proc toEdge(v: string): string {.raises: [ActionParseError].} =
+      if v notin ["smear", "wrap"]:
+        raise newException(ActionParseError, "aberration edge must be smear or wrap")
+      v
     var keyword = false
     for idx in 1 ..< parts.len:
       if '=' in parts[idx]:
         keyword = true
         break
 
-    if parts.len == 1:
-      rh = 5; bh = -5
-    elif not keyword:
+    if not keyword:
       # Symmetric: up to two bare pixel counts (h, v) plus an optional edge token.
       var nums: seq[int]
       for idx in 1 ..< parts.len:
         let p = parts[idx]
         if p == "smear" or p == "wrap":
-          wrap = toEdge(p)
+          result.args[2] = strV(akChoice, toEdge(p))
         else:
           nums.add pInt(p, "aberration value")
       if nums.len > 2:
         raise newException(ActionParseError, "aberration takes at most h:v positional shifts")
-      let h = if nums.len >= 1: nums[0] else: 5
-      let v = if nums.len >= 2: nums[1] else: 0
       # Range-checked before negating, which overflows on low(int).
-      checkArg("aberration", "h", h)
-      checkArg("aberration", "v", v)
-      rh = h; bh = -h; rv = v; bv = -v
+      if nums.len >= 1:
+        checkArg("aberration", "h", nums[0])
+        result.args[0] = intV(nums[0])
+      if nums.len >= 2:
+        checkArg("aberration", "v", nums[1])
+        result.args[1] = intV(nums[1])
     else:
+      # Every channel is written, at 0 where it isn't given, which is what
+      # tells this form from the shorthand.
+      for i in ix("aberration", "rh") .. ix("aberration", "bv"):
+        result.args[i] = intV(0)
       for idx in 1 ..< parts.len:
         let p = parts[idx]
         let eq = p.find('=')
@@ -1382,114 +1465,285 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         let key = p[0 ..< eq]
         let value = p[eq + 1 .. ^1]
         if key == "edge":
-          wrap = toEdge(value)
-          continue
-        let n = pInt(value, "aberration value")
-        case key
-        of "rh": checkArg("aberration", "rh", n); rh = n
-        of "rv": checkArg("aberration", "rv", n); rv = n
-        of "gh": checkArg("aberration", "gh", n); gh = n
-        of "gv": checkArg("aberration", "gv", n); gv = n
-        of "bh": checkArg("aberration", "bh", n); bh = n
-        of "bv": checkArg("aberration", "bv", n); bv = n
-        else: raise newException(ActionParseError, &"Unknown aberration key: {key}")
-    return Action(kind: actAberration, abRh: int8(rh), abRv: int8(rv), abGh: int8(gh),
-        abGv: int8(gv), abBh: int8(bh), abBv: int8(bv), abWrap: wrap)
+          result.args[2] = strV(akChoice, toEdge(value))
+        else:
+          let n = pInt(value, "aberration value")
+          case key
+          of "rh": checkArg("aberration", "rh", n)
+          of "rv": checkArg("aberration", "rv", n)
+          of "gh": checkArg("aberration", "gh", n)
+          of "gv": checkArg("aberration", "gv", n)
+          of "bh": checkArg("aberration", "bh", n)
+          of "bv": checkArg("aberration", "bv", n)
+          else: raise newException(ActionParseError, &"Unknown aberration key: {key}")
+          result.args[argIndex("aberration", key)] = intV(n)
+    return
 
   # pos: overlay placement, each field an animatable ramp:
   #   pos:x:y   pos:x:y:scale   pos:0..600:300:1..0.5:ease=inout
-  if parts[0] == "pos":
+  if name == "pos":
     if parts.len < 3:
       raise newException(ActionParseError, "pos requires x:y[:scale]")
-    let x = parseRamp(parts[1])
-    let y = parseRamp(parts[2])
+    let x = pRamp(parts[1])
+    let y = pRamp(parts[2])
     # parts[3] is the scale ramp unless it's the ease suffix.
-    var s = (kf: @[1.0'f32], kt: newSeq[KfTime]())
     var idx = 3
     if parts.len > 3 and not parts[3].startsWith("ease="):
-      s = parseRamp(parts[3])
+      let s = pRamp(parts[3])
+      for v in s.kf: checkArg("pos", "scale", float32(v))
+      result.args[2] = kfV(s)
       idx = 4
-    for v in s.kf: checkArg("pos", "scale", v)
     # x/y are rounded to an int, which is UB out of range.
-    for v in x.kf: checkArg("pos", "x", v)
-    for v in y.kf: checkArg("pos", "y", v)
-    result = Action(kind: actPos, pxKf: x.kf, pyKf: y.kf, pscaleKf: s.kf,
-      pxKt: x.kt, pyKt: y.kt, pscaleKt: s.kt)
-    result.parseEaseTail(parts, idx, val)
+    for v in x.kf: checkArg("pos", "x", float32(v))
+    for v in y.kf: checkArg("pos", "y", float32(v))
+    result.args[0] = kfV(x)
+    result.args[1] = kfV(y)
+    result.easeTail(parts, idx, val)
     result.checkTimedEase()
-    return result
+    return
 
   # Animatable scalar effects: a value or keyframe ramp, with optional easing:
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
-  if parts[0] in animScalar and parts.len >= 2:
-    let (kf, kt) = parseRamp(parts[1])
-    for v in kf:
-      case parts[0]
-      of "zoom": checkArg("zoom", "v", v)
-      of "opacity": checkArg("opacity", "v", v)
-      of "brightness": checkArg("brightness", "v", v)
-      of "blur": checkArg("blur", "v", v) # gblur's sigma tops out at 1024.
+  if name in animScalar and parts.len >= 2:
+    let r = pRamp(parts[1])
+    for v in r.kf:
+      case name
+      of "zoom": checkArg("zoom", "v", float32(v))
+      of "opacity": checkArg("opacity", "v", float32(v))
+      of "brightness": checkArg("brightness", "v", float32(v))
+      of "blur": checkArg("blur", "v", float32(v)) # gblur's sigma tops out at 1024.
       else: discard
-
-    result = case parts[0]
-      of "zoom": Action(kind: actZoom, kf: kf, kt: kt)
-      of "blur": Action(kind: actBlur, kf: kf, kt: kt)
-      of "opacity": Action(kind: actOpacity, kf: kf, kt: kt)
-      of "volume": Action(kind: actVolume, kf: kf, kt: kt)
-      else: Action(kind: actBrightness, kf: kf, kt: kt)
-    result.parseEaseTail(parts, 2, val)
+    result.args[0] = kfV(r)
+    result.easeTail(parts, 2, val)
     result.checkTimedEase()
-    return result
+    return
 
-  if parts[0] in ["speed", "varispeed"] and parts.len >= 2 and
+  if name in ["speed", "varispeed"] and parts.len >= 2 and
       (".." in parts[1] or '@' in parts[1] or parts.len > 2):
     # A ramp across the section's media: speed:1..8, speed:1@0%..4@50%..1
-    let (kf, kt) = parseRamp(parts[1])
-    for v in kf:
-      checkSpeed(parts[0], v)
-    for t in kt:
+    let r = pRamp(parts[1])
+    for v in r.kf:
+      checkSpeed(name, float32(v))
+    for t in r.kt:
       if t.unit notin {kuAuto, kuPercent}:
         raise newException(ActionParseError,
-          &"{parts[0]} keyframes are placed by percent of the section's media")
-    result = Action(kind: actSpeed, varispeed: parts[0] == "varispeed", sKf: kf,
-      sKt: kt)
-    result.parseEaseTail(parts, 2, val)
-    if result.easeDurUnit != duClip:
-      raise newException(ActionParseError, &"{parts[0]} ramps ease across the whole section")
-    if kf.len == 1 and not result.hasEase:
-      result.sKf.setLen(0)
-      result.sKt.setLen(0)
-      result.val = kf[0]
-    else:
-      result.val = float32(result.meanSpeed)
-    return result
+          &"{name} keyframes are placed by percent of the section's media")
+    result.args[0] = kfV(r)
+    result.easeTail(parts, 2, val)
+    if result.ease.isSome and result.ease.get.unit != duClip:
+      raise newException(ActionParseError, &"{name} ramps ease across the whole section")
+    return
 
   if parts.len == 2:
-    let effectType = parts[0]
-    let effectVal = pFloat(parts[1])
-    case effectType
+    let v = pNum(parts[1])
+    case name
     of "speed", "varispeed":
-      checkSpeed(effectType, effectVal)
-      return Action(kind: actSpeed, val: effectVal,
-        varispeed: effectType == "varispeed")
+      checkSpeed(name, float32(v))
+      result.args[0] = some(ArgValue(kind: akKeyframes, kf: @[v]))
+      return
     of "pitch":
-      checkArg("pitch", "semitones", effectVal)
-      return Action(kind: actPitch, pCents: int16(round(effectVal * 100.0'f32)))
-    of "brighthue":
-      checkArg("brighthue", "v", effectVal)
-      return Action(kind: actLuv, brighthue: effectVal, contrast: luvContrastId,
-        saturation: luvSaturationId)
-    of "contrast":
-      checkArg("contrast", "v", effectVal)
-      return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: effectVal,
-        saturation: luvSaturationId)
-    of "saturation":
-      checkArg("saturation", "v", effectVal)
-      return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: luvContrastId,
-        saturation: effectVal)
-    else: discard
+      checkArg("pitch", "semitones", float32(v))
+    of "brighthue": checkArg("brighthue", "v", float32(v))
+    of "contrast": checkArg("contrast", "v", float32(v))
+    of "saturation": checkArg("saturation", "v", float32(v))
+    else:
+      raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
+    result.args[0] = numV(v)
+    return
 
   raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
+
+func has(s: ActionSpec, i: int): bool = s.args[i].isSome
+func num(s: ActionSpec, i: int, default: float64): float64 =
+  if s.args[i].isSome: s.args[i].get.num else: default
+func str(s: ActionSpec, i: int): string =
+  if s.args[i].isSome: s.args[i].get.str else: ""
+func kf32(s: ActionSpec, i: int): seq[float32] =
+  for v in s.args[i].get.kf: result.add float32(v)
+func kts(s: ActionSpec, i: int): seq[KfTime] = s.args[i].get.kt
+
+func packEase(a: var Action, s: ActionSpec) =
+  if s.ease.isSome:
+    let e = s.ease.get
+    a.hasEase = true
+    a.easeCurve = e.curve
+    a.easeDurUnit = e.unit
+    a.easeDur = float32(e.dur)
+
+proc specColor(spec: string): RGBColor {.raises: [ActionParseError].} =
+  try: parseColor(spec)
+  except ValueError: raise newException(ActionParseError, &"Invalid color: {spec}")
+
+proc toAction*(s: ActionSpec): Action {.raises: [ActionParseError].} =
+  ## Pack a spec from parseActionSpec. `cut`, `nil` and `ease` aren't actions
+  ## on their own, so they're refused.
+  case s.name
+  of "invert": Action(kind: actInvert)
+  of "hflip": Action(kind: actHflip)
+  of "vflip": Action(kind: actVflip)
+  of "loop": Action(kind: actLoop)
+  of "erosion": Action(kind: actErosion)
+  of "speed", "varispeed":
+    var a = Action(kind: actSpeed, varispeed: s.name == "varispeed")
+    let kf = s.kf32(0)
+    if kf.len == 1 and s.ease.isNone:
+      a.val = kf[0]
+    else:
+      a.sKf = kf
+      a.sKt = s.kts(0)
+      a.packEase(s)
+      a.val = float32(a.meanSpeed)
+    a
+  of "zoom", "opacity", "blur", "brightness", "volume":
+    var a = case s.name
+      of "zoom": Action(kind: actZoom, kf: s.kf32(0), kt: s.kts(0))
+      of "opacity": Action(kind: actOpacity, kf: s.kf32(0), kt: s.kts(0))
+      of "blur": Action(kind: actBlur, kf: s.kf32(0), kt: s.kts(0))
+      of "brightness": Action(kind: actBrightness, kf: s.kf32(0), kt: s.kts(0))
+      else: Action(kind: actVolume, kf: s.kf32(0), kt: s.kts(0))
+    a.packEase(s)
+    a
+  of "deesser":
+    Action(kind: actDeesser, intensity: toUnorm16(float32(s.num(0, 0))),
+      maxd: toUnorm16(float32(s.num(1, 0.5))), freq: toUnorm16(float32(s.num(2, 0.5))))
+  of "highpass":
+    Action(kind: actHighpass, cutoff: uint16(round(float32(s.num(0, 80)))))
+  of "lowpass":
+    Action(kind: actLowpass, cutoff: uint16(round(float32(s.num(0, 10000)))))
+  of "dehum":
+    Action(kind: actDehum, humHz: uint16(round(float32(s.num(0, 60)))),
+      humHarmonics: uint8(float32(s.num(1, 4))))
+  of "duck":
+    Action(kind: actDuck, duckAmount: toUnorm16(float32(s.num(0, 0.85))),
+      duckThresh: toUnorm16(float32(s.num(1, 0.04))),
+      duckAttack: uint16(float32(s.num(2, 100))), duckRelease: uint16(float32(s.num(3, 500))))
+  of "lens":
+    if not s.has(0): Action(kind: actLens, k1: toSnorm16(-0.5'f32), k2: toSnorm16(0.0'f32))
+    else: Action(kind: actLens, k1: toSnorm16(float32(s.num(0, 0))),
+      k2: toSnorm16(float32(s.num(1, 0))))
+  of "tone":
+    let w = waveformNames.find(s.str(1))
+    Action(kind: actTone, note: uint8(float32(s.num(0, 0))),
+      wave: (if w < 0: wSine else: Waveform(w)))
+  of "pitch":
+    Action(kind: actPitch, pCents: int16(round(float32(s.num(0, 0)) * 100.0'f32)))
+  of "brighthue":
+    Action(kind: actLuv, brighthue: float32(s.num(0, 0)), contrast: luvContrastId,
+      saturation: luvSaturationId)
+  of "contrast":
+    Action(kind: actLuv, brighthue: luvBrighthueId, contrast: float32(s.num(0, 1)),
+      saturation: luvSaturationId)
+  of "saturation":
+    Action(kind: actLuv, brighthue: luvBrighthueId, contrast: luvContrastId,
+      saturation: float32(s.num(0, 1)))
+  of "rotate": Action(kind: actRotate, rStart: Unorm16(rotCode(float32(s.num(0, 0)))))
+  of "turn": Action(kind: actTurn, tDeg: float32(s.num(0, 0)))
+  of "scale":
+    let w = float32(s.num(0, 1))
+    Action(kind: actScale, tScaleW: w, tScaleH: float32(s.num(1, float64(w))),
+      tUniform: not s.has(1))
+  of "spin":
+    Action(kind: actSpin, sStart: Unorm16(rotCode(float32(s.num(0, 0)))),
+      sRate: float32(s.num(1, 0)))
+  of "convolve": Action(kind: actConvolve, irPath: s.str(0))
+  of "drawbox":
+    Action(kind: actDrawbox, dbX: int32(s.num(0, 0)), dbY: int32(s.num(1, 0)),
+      dbW: int32(s.num(2, 1)), dbH: int32(s.num(3, 1)), dbColor: specColor(s.str(4)))
+  of "colorkey", "chromakey":
+    let similar = max(toUnorm16(float32(s.num(1, 0.25))), toUnorm16(0.01'f32))
+    let blend = toUnorm16(float32(s.num(2, 0)))
+    let color = specColor(s.str(0))
+    if s.name == "colorkey": Action(kind: actColorKey, color: color, similar: similar,
+      blend: blend)
+    else: Action(kind: actChromaKey, color: color, similar: similar, blend: blend)
+  of "choke": Action(kind: actChoke, chokeN: uint8(s.num(0, 1)))
+  of "pixelate":
+    var a = Action(kind: actPixelate, pixWKf: @[16.0'f32])
+    if s.has(0): (a.pixWKf, a.pixWKt) = (s.kf32(0), s.kts(0))
+    if s.has(1): (a.pixHKf, a.pixHKt) = (s.kf32(1), s.kts(1))
+    else: (a.pixHKf, a.pixHKt) = (a.pixWKf, a.pixWKt)
+    a.packEase(s)
+    a
+  of "pos":
+    var a = Action(kind: actPos, pxKf: s.kf32(0), pyKf: s.kf32(1), pxKt: s.kts(0),
+      pyKt: s.kts(1), pscaleKf: @[1.0'f32])
+    if s.has(2): (a.pscaleKf, a.pscaleKt) = (s.kf32(2), s.kts(2))
+    a.packEase(s)
+    a
+  of "confetti":
+    let scheme = confettiSchemeNames.find(s.str(2))
+    let origin = confettiOriginNames.find(s.str(3))
+    Action(kind: actConfetti, cCount: uint16(s.num(0, float64(confettiCountId))),
+      cGravity: float32(s.num(1, float64(confettiGravityId))),
+      cScheme: (if scheme < 0: csParty else: ConfettiScheme(scheme)),
+      cOrigin: (if origin < 0: confettiOriginId else: ConfettiOrigin(origin)),
+      cShimmer: not (s.has(5) and s.args[5].get.on), cSeed: uint16(s.num(4, 0)))
+  of "aberration":
+    var ch: array[6, int]
+    if s.has(ix("aberration", "rh")):
+      for i in 0 ..< 6: ch[i] = int(s.num(ix("aberration", "rh") + i, 0))
+    else:
+      let h = int(s.num(0, 5))
+      let v = int(s.num(1, 0))
+      ch = [h, v, 0, 0, -h, -v]
+    Action(kind: actAberration, abRh: int8(ch[0]), abRv: int8(ch[1]), abGh: int8(ch[2]),
+      abGv: int8(ch[3]), abBh: int8(ch[4]), abBv: int8(ch[5]), abWrap: s.str(2) == "wrap")
+  of "mask", "confine":
+    let poly = ix("mask", "poly")
+    let inv = s.has(ix("mask", "invert"))
+    let feather = uint8(s.num(ix("mask", "feather"), 0))
+    if s.has(poly):
+      var a = Action(kind: (if s.name == "mask": actMaskPoly else: actConfinePoly))
+      let pts = s.args[poly].get.pts
+      for i in 0 ..< pts.len div 2:
+        a.mPolyXs.add pts[2 * i]
+        a.mPolyYs.add pts[2 * i + 1]
+      a.mFeather = feather
+      a.mInvert = inv
+      a
+    elif not s.has(0):
+      Action(kind: actConfine, mReset: true)
+    else:
+      var a = Action(kind: (if s.name == "mask": actMask else: actConfine))
+      a.mX = int32(s.num(0, 0))
+      a.mY = int32(s.num(1, 0))
+      a.mW = int32(s.num(2, 1))
+      a.mH = int32(s.num(3, 1))
+      a.mRadius = int32(s.num(4, 0))
+      a.mFeather = feather
+      a.mInvert = inv
+      a
+  of "burn", "text":
+    var a = if s.name == "text": Action(kind: actText) else: Action(kind: actBurn)
+    a.burnFile = s.str(0)
+    a.burnFont = s.str(ix("burn", "font"))
+    a.burnSize = float32(s.num(ix("burn", "size"), 0))
+    for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
+      if s.has(k):
+        a.burnSet.incl part
+        a.burnColors[part] = parseRgba(s.str(k), &"{s.name} {subsKeys[k]}")
+    if s.has(ix("burn", "align")):
+      a.burnAlign = uint8(alignNames.find(s.str(ix("burn", "align"))) + 1)
+    if s.name == "text":
+      a.burnVertical = s.has(ix("text", "vertical"))
+      a.burnAss = s.has(ix("text", "ass"))
+    a
+  else:
+    raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(s.name)}")
+
+func parseAction*(val: string): Action {.raises: [ActionParseError].} =
+  toAction(parseActionSpec(val))
+
+proc meanSpeed*(s: ActionSpec): float64 {.raises: [ActionParseError].} =
+  ## A speed or varispeed ramp's mean speed over its media, as the CLI packs it.
+  meanSpeed(toAction(s))
+
+proc normalizedColor*(spec: string): string {.raises: [ActionParseError].} =
+  ## A color as #rrggbb, or #rrggbbaa when it's see-through; yuv#yyuuvv stays YUV.
+  if spec.startsWith("#") and spec.len == 9:
+    return rgbaStr(parseRgba(spec, "color"))
+  specColor(spec).toString
+
 
 func easeSuffix(a: Action): string =
   ## The trailing ":ease=..." for an animated action, or "" if it has none.
@@ -1538,6 +1792,82 @@ func maskPolyStr(a: Action, name: string): string =
   result = &"""{name}:poly={nums.join("/")}"""
   if a.mFeather > 0'u8: result.add &":feather={a.mFeather}"
   if a.mInvert: result.add ":invert"
+
+func numStr(v: float64): string =
+  if v == floor(v) and abs(v) < 1e15: $int64(v) else: $v
+
+func rampStr(v: ArgValue): string =
+  var parts: seq[string]
+  for x in v.kf: parts.add numStr(x)
+  rampStr(parts, v.kt)
+
+func durStr(dur: float64, unit: DurUnit): string =
+  case unit
+  of duClip: ""
+  of duSec: numStr(dur) & "sec"
+  of duFrames: numStr(dur)
+
+func `$`*(s: ActionSpec): string =
+  ## The action's text, which parseActionSpec reads back to an equal spec.
+  func val(v: ArgValue): string =
+    case v.kind
+    of akNumber, akInteger: numStr(v.num)
+    of akKeyframes: rampStr(v)
+    of akColor, akChoice, akPath, akText: v.str
+    of akDuration: durStr(v.dur, v.durUnit)
+    of akFlag: ""
+    of akPoints: v.pts.mapIt($it).join("/")
+  template a(i: int): ArgValue = s.args[i].get
+  template has(i: int): bool = s.args[i].isSome
+
+  result = s.name
+  case s.name
+  of "burn", "text":
+    if s.name == "text": result = "text:" & textPart(s.str(0))
+    elif has(0): result &= ":" & a(0).str
+    for k in 1 ..< subsKeys.len:
+      if has(k): result &= &":{subsKeys[k]}={val(a(k))}"
+    if s.name == "text":
+      if has(ix("text", "vertical")): result &= ":vertical"
+      if has(ix("text", "ass")): result &= ":ass"
+  of "mask", "confine":
+    let feather = ix("mask", "feather")
+    if has(ix("mask", "poly")):
+      result &= ":poly=" & val(a(ix("mask", "poly")))
+      if has(feather): result &= ":feather=" & val(a(feather))
+    elif has(0):
+      for i in 0 ..< 4: result &= ":" & val(a(i))
+      if has(4):
+        result &= ":" & val(a(4))
+        if has(feather): result &= ":" & val(a(feather))
+      elif has(feather): result &= ":feather=" & val(a(feather))
+    if has(ix("mask", "invert")): result &= ":invert"
+  of "spin":
+    result &= &":{val(a(0))}/{val(a(1))}"
+  of "aberration":
+    if has(ix("aberration", "rh")):
+      var ps: seq[string]
+      for key in ["rh", "rv", "gh", "gv", "bh", "bv"]:
+        let v = a(argIndex("aberration", key)).num
+        if v != 0: ps.add &"{key}={numStr(v)}"
+      if has(2): ps.add "edge=" & a(2).str
+      if ps.len == 0: ps.add "rh=0"
+      result &= ":" & ps.join(":")
+    else:
+      for i in 0 ..< 3:
+        if has(i): result &= ":" & val(a(i))
+  of "confetti":
+    for i in 0 ..< 4:
+      if has(i): result &= ":" & val(a(i))
+    if has(4): result &= ":seed=" & val(a(4))
+    if has(5): result &= (if a(5).on: ":no-shimmer" else: ":shimmer")
+  else:
+    for i in 0 ..< s.args.len:
+      if has(i): result &= ":" & val(a(i))
+  if s.ease.isSome:
+    let e = s.ease.get
+    result &= ":ease=" & easeNames[e.curve]
+    if e.unit != duClip: result &= ":" & durStr(e.dur, e.unit)
 
 when not defined(nimscript):
   func `$`*(act: Action): string =
