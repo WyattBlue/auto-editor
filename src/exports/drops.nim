@@ -116,7 +116,7 @@ func shortensSpans(base: seq[Clip], markers: seq[Marker]): bool {.raises: [].} =
         break
 
 func fcpxmlShortensSpans(tl: v3): bool {.raises: [].} =
-  if tl.v.len > 0 and tl.v[0].len > 0: tl.v[0].shortensSpans(tl.markers)
+  if tl.hasBaseVideo: tl.v[0].shortensSpans(tl.markers)
   elif tl.a.len > 0: tl.a[0].shortensSpans(tl.markers)
   else: false
 
@@ -127,7 +127,7 @@ proc exportDrops*(tl: v3, kind: ExportKind): seq[string] {.raises: [].} =
   if not kind.isEditorExport:
     return
   let sup = support(kind)
-  let videoBase = tl.v.len > 0 and tl.v[0].len > 0
+  let videoBase = tl.hasBaseVideo
 
   var s = DropScan(videoBase: videoBase)
   for clip in (if videoBase: tl.v[0] elif tl.a.len > 0: tl.a[0] else: @[]):

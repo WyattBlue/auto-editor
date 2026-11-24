@@ -143,7 +143,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
-  let renderVideo = includeVideo and renderTl.v.len > 0 and renderTl.v[0].len > 0
+  let renderVideo = includeVideo and renderTl.hasBaseVideo
   if renderVideo:
     template limitTo(limit: SizeLimit, what, source: string) =
       let (width, height) = scaledVideoResolution(renderTl.res, video.scale)

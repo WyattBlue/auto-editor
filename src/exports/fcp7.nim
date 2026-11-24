@@ -417,7 +417,7 @@ proc premiereWriteAudio(audio: XmlNode, files: var FileDefs, tl: v3,
   aformat.add aschar
   audio.add aformat
 
-  let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
+  let hasVideo = tl.hasBaseVideo
   var transitionPlans = newSeq[seq[TransitionLink]](tl.a.len)
   for i, layer in tl.a:
     let transitions = (if i < tl.at.len: tl.at[i] else: @[])
@@ -579,7 +579,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
     files.ids[mi] = &"file-{idCounter}"
     ptrToMi[ptrSrc] = mi
 
-  let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
+  let hasVideo = tl.hasBaseVideo
 
   # clipitem ids run V1, V2, ... then audio. Audio ids start past every video clip
   # across all tracks, not just v[0]'s, so <link> refs stay unambiguous.

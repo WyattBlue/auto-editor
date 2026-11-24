@@ -127,9 +127,9 @@ proc exportJsonTl*(tlV3: v3, `export`: ExportKind, output: string) =
       error "No chunks available for export"
 
     var source: string = ""
-    if tlV3.v.len > 0 and tlV3.v[0].len > 0:
+    if tlV3.hasBaseVideo:
       source = tlV3.v[0][0].src[]
-    elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
+    elif tlV3.hasBaseAudio:
       source = tlV3.a[0][0].src[]
 
     let clips2 = tlV3.clips2

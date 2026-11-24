@@ -318,10 +318,10 @@ proc fcp11WriteXml*(groupName: string, version: uint8, output: string,
 
   var clips: seq[Clip]
   var transitions: seq[Transition]
-  if tl.v.len > 0 and tl.v[0].len > 0:
+  if tl.hasBaseVideo:
     clips = tl.v[0]
     if tl.vt.len > 0: transitions = tl.vt[0]
-  elif tl.a.len > 0 and tl.a[0].len > 0:
+  elif tl.hasBaseAudio:
     clips = tl.a[0]
     if tl.at.len > 0: transitions = tl.at[0]
 

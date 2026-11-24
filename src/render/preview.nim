@@ -46,7 +46,7 @@ proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
   r.tb = tb
   r.sampleRate = r.renderTl.sr.int
   let start = clamp(int64(round(startSeconds * tb.float64)), 0, max(r.renderTl.len - 1, 0))
-  if r.renderTl.v.len > 0 and r.renderTl.v[0].len > 0:
+  if r.renderTl.hasBaseVideo:
     # Frames come unturned; the export carries the template's display matrix.
     if r.renderTl.templateFile != nil:
       let vids = r.cache.getContainer(r.renderTl.templateFile).video

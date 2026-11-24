@@ -192,8 +192,16 @@ proc rescale*(self: var v3, tb: AVRational) {.raises: [ActionParseError].} =
       span(w.start, w.dur)
   self.tb = tb
 
+func hasBaseVideo*(tl: v3): bool {.inline.} =
+  ## Whether the bottom video track has a clip; tracks can be empty.
+  tl.v.len > 0 and tl.v[0].len > 0
+
+func hasBaseAudio*(tl: v3): bool {.inline.} =
+  ## Whether the first audio track has a clip; tracks can be empty.
+  tl.a.len > 0 and tl.a[0].len > 0
+
 func timelineIsEmpty(self: v3): bool =
-  (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
+  not self.hasBaseVideo and not self.hasBaseAudio
 
 func isLinear*(self: v3): bool {.raises: [].} =
   return self.clips2.len > 0 or self.timelineIsEmpty
