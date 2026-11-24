@@ -4,8 +4,8 @@ when not defined(emscripten):
 from std/math import round
 
 import ./[av, action, edit, ffmpeg, license, log, media, stats, timeline]
-import ./lib/editutil
-import ./util/[color, bar, fun, lang, rules, rational]
+import ./lib/[editutil, lang]
+import ./util/[color, bar, fun, rules, rational]
 
 import ./imports/[edl, fcp7, fcp11, json]
 import ./exports/[drops, edl, fcp7, fcp11, json, shotcut, kdenlive, otio]

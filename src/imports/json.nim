@@ -1,7 +1,8 @@
 import std/[json, strformat]
 
 import ../[action, av, ffmpeg, media, log, timeline]
-import ../util/[color, fun, lang, rational]
+import ../util/[color, fun, rational]
+import ../lib/lang
 
 proc parseActionOrErr(val: string): Action {.raises: [AutoEditorError].} =
   try: parseAction(val)

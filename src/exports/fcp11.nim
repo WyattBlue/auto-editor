@@ -3,7 +3,8 @@ from std/math import ceil, round
 import ../util/xml
 
 import ../[ffmpeg, log, media, timeline]
-import ../util/[fun, lang, rational]
+import ../util/[fun, rational]
+import ../lib/lang
 import ../util/speedmap
 
 #[

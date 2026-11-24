@@ -1,9 +1,9 @@
 import std/[algorithm, options, os, sets, strformat, tables]
 from std/math import round, ceil, exp, sin, PI
 
-import ./[action, av, ffmpeg, media, log, transitions, wavutil]
-import ./util/[color, fun, lang, rational]
-import ./lib/cliputil
+import ./[action, av, ffmpeg, media, log, wavutil]
+import ./util/[color, fun, rational]
+import ./lib/[cliputil, lang, transitions]
 import ./util/speedmap
 
 type v1* = object

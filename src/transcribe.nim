@@ -1,7 +1,6 @@
 import std/[os, json, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
-import ./util/lang
-import ./lib/srttime
+import ./lib/[lang, srttime]
 
 type
   WhisperCtx = pointer

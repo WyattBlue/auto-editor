@@ -1,7 +1,8 @@
 import std/math
 
 import ./[av, ffmpeg, log]
-import ./util/[lang, rational]
+import ./util/rational
+import ./lib/lang
 
 type
   VideoStream* = object

@@ -7,7 +7,7 @@
 import std/tables
 import std/macros except error
 import ../log
-import ./xmllexer
+import ../lib/xmllexer
 
 type
   XmlAttributes* = seq[(string, string)]

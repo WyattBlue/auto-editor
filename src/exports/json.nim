@@ -1,7 +1,8 @@
 import std/[json, sequtils]
 
 import ../[action, ffmpeg, log, timeline]
-import ../util/[color, lang]
+import ../util/color
+import ../lib/lang
 
 func effectGroupToJson(actions: Actions): JsonNode {.raises: [].} =
   if actions.isCut: return %["cut"]

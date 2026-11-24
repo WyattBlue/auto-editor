@@ -1,7 +1,8 @@
 import std/[json, sets, strformat, strutils, tables]
 
 import ../[av, cli, ffmpeg, log, media]
-import ../util/[fun, lang, rational]
+import ../util/[fun, rational]
+import ../lib/lang
 import ./help
 
 proc genericTrack(lang: Lang, bitrate: int64) =

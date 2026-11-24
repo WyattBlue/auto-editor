@@ -5,7 +5,8 @@
 import std/[algorithm, math, os, strformat, strutils, tables]
 
 import ../[action, av, log, timeline]
-import ../util/[color, fun, lang, rational, xml]
+import ../util/[color, fun, rational, xml]
+import ../lib/lang
 import ../util/speedmap
 
 # Tags common in FCPXML, so the parsed tree can share their strings.
