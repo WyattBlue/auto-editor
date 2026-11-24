@@ -169,11 +169,34 @@ type
     lo*, hi*: float
     loIncl*, hiIncl*: bool  # closed (inclusive) bounds
     each*: bool             # the interval applies to each positional arg
+  ArgKind* = enum
+    akNumber,    # a decimal number
+    akInteger,   # a whole number
+    akColor,     # a color name, #rgb, #rrggbb, #rrggbbaa, or yuv#YYUUVV where taken
+    akChoice,    # one of `choices`
+    akPath,      # a file or folder
+    akText,      # free text
+    akKeyframes, # a number or a ramp `a..b..c`, each optionally `@time`
+    akFlag,      # present or not, written as its bare name
+    akDuration,  # a time: a frame count, or with a unit like `2sec`
+    akPoints     # x/y pairs, `x1/y1/x2/y2/...`
+  ArgDef* = object
+    ## One argument of an action. Positional arguments come in order;
+    ## `keyword` ones are written `name=value`, anywhere after them.
+    name*: string
+    kind*: ArgKind
+    range*: Option[RangeDoc] # every value, for keyframes; parseAction rejects others
+    optional*: bool
+    default*: string         # as written, when leaving it out means a value
+    keyword*: bool
+    choices*: seq[string]
+    unit*: string
   ActionDef* = object
     name*: string
     flags*: ActionFlags
     argSpec*: string  # storage type ("float32") or positional spec ("k1[:k2]")
     range*: Option[RangeDoc]
+    args*: seq[ArgDef]
     help*: string
 
 const
@@ -191,6 +214,9 @@ static:
   assert ord(high(ConfettiOrigin)) <= originMask.int, "origin outgrew 2 bits"
 
 const
+  easeNames*: array[Easing, string] = ["linear", "in", "out", "inout"]
+  alignNames*: array[1 .. 9, string] = ["bottom-left", "bottom",
+    "bottom-right", "left", "center", "right", "top-left", "top", "top-right"]
   waveformNames*: array[Waveform, string] =
     ["sine", "saw", "square", "triangle"]
   confettiSchemeNames*: array[ConfettiScheme, string] =
@@ -203,6 +229,62 @@ const
 
 func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[RangeDoc] =
   some(RangeDoc(lo: lo, hi: hi, loIncl: loIncl, hiIncl: hiIncl, each: each))
+
+const
+  i32Lo = float(low(int32))
+  i32Hi = float(high(int32))
+
+func arg(name: string, kind: ArgKind, lo, hi: float, loIncl, hiIncl: bool,
+    default: string, optional, keyword: bool, choices: seq[string] = @[],
+    unit = ""): ArgDef =
+  result = ArgDef(name: name, kind: kind, optional: optional or default != "",
+    default: default, keyword: keyword, choices: choices, unit: unit)
+  if lo == lo:
+    result.range = rng(lo, hi, loIncl, hiIncl)
+
+func numArg(name: string, lo = NaN, hi = NaN, loIncl = true, hiIncl = true,
+    default = "", optional = false, keyword = false, unit = ""): ArgDef =
+  arg(name, akNumber, lo, hi, loIncl, hiIncl, default, optional, keyword, unit = unit)
+
+func intArg(name: string, lo = NaN, hi = NaN, default = "", optional = false,
+    keyword = false, unit = ""): ArgDef =
+  arg(name, akInteger, lo, hi, true, true, default, optional, keyword, unit = unit)
+
+func kfArg(name: string, lo = NaN, hi = NaN, loIncl = true, hiIncl = true,
+    default = "", optional = false, unit = ""): ArgDef =
+  arg(name, akKeyframes, lo, hi, loIncl, hiIncl, default, optional, false, unit = unit)
+
+func colorArg(name: string, optional = false, keyword = false): ArgDef =
+  arg(name, akColor, NaN, NaN, true, true, "", optional, keyword)
+
+func choiceArg(name: string, choices: openArray[string], default = "",
+    optional = false, keyword = false): ArgDef =
+  arg(name, akChoice, NaN, NaN, true, true, default, optional, keyword, @choices)
+
+func pathArg(name: string, optional = false, keyword = false): ArgDef =
+  arg(name, akPath, NaN, NaN, true, true, "", optional, keyword)
+
+func flagArg(name: string): ArgDef =
+  arg(name, akFlag, NaN, NaN, true, true, "", true, true)
+
+func shapeArgs(optional: bool): seq[ArgDef] =
+  @[intArg("x", i32Lo, i32Hi, optional = optional, unit = "px"),
+    intArg("y", i32Lo, i32Hi, optional = optional, unit = "px"),
+    intArg("w", 1, i32Hi, optional = optional, unit = "px"),
+    intArg("h", 1, i32Hi, optional = optional, unit = "px"),
+    intArg("radius", -1, i32Hi, default = "0", unit = "px"),
+    intArg("feather", 0, 255, default = "0", unit = "px"),
+    flagArg("invert"),
+    arg("poly", akPoints, i32Lo, i32Hi, true, true, "", true, true)]
+
+func subsArgs(size: string): seq[ArgDef] =
+  @[pathArg("font", optional = true, keyword = true),
+    numArg("size", 0, 100, loIncl = false, default = size, optional = true,
+      keyword = true, unit = "%"),
+    colorArg("color", optional = true, keyword = true),
+    colorArg("outline", optional = true, keyword = true),
+    colorArg("bg", optional = true, keyword = true),
+    choiceArg("align", alignNames, optional = true, keyword = true)]
 
 func `$`*(r: RangeDoc): string =
   ## e.g. "(0.0, 99999.0)", "each [-1.0, 1.0]"
@@ -223,35 +305,51 @@ const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "cut", flags: {afAudio, afVideo},
     help: "Remove the section completely from the output."),
   ActionDef(name: "speed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
+    args: @[kfArg("v", 0, 99999, loIncl = false, hiIncl = false)],
     help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed. A ramp like `speed:1..4` or `speed:1@0%..6@50%..1` spreads its keyframes across the section's source, eased with `:ease=curve`."),
   ActionDef(name: "varispeed", flags: {afAudio, afVideo}, argSpec: "float32", range: rng(0.2, 100.0),
+    args: @[kfArg("v", 0.2, 100)],
     help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Ramps like `speed`'s, e.g. `varispeed:1..4`."),
   ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
+    args: @[choiceArg("curve", easeNames), arg("duration", akDuration, 0, Inf, true, false, "", true, false)],
     help: """
 Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
 The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`.
 Keyframes can also say when they are, as `value@time`: a bare frame count, `sec`, or `%` of the section, e.g. `zoom:1@0..2@1.5sec..1@100%`. The value holds before the first and after the last, a keyframe without a time sits evenly between its timed neighbors, and the curve eases each step between keyframes. A duration can't be given with timed keyframes."""),
   ActionDef(name: "volume", flags: {afAudio, afAnimatable}, argSpec: "v[..v...]",
+    args: @[kfArg("v")],
     help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB). Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
   ActionDef(name: "deesser", flags: {afAudio}, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
+    args: @[numArg("intensity", 0, 1), numArg("max", 0, 1, default = "0.5"),
+      numArg("freq", 0, 1, default = "0.5")],
     help: """
 Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
 Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the reduction (default 0.5), and `freq` sets the split frequency (default 0.5)."""),
   ActionDef(name: "highpass", flags: {afAudio}, argSpec: "[hz]", range: rng(10.0, 20000.0),
+    args: @[numArg("hz", 10, 20000, default = "80", unit = "Hz")],
     help: "Cut the lows below `hz` (default 80), such as rumble, wind and handling noise under speech. A 12 dB per octave Butterworth filter; chain two for a steeper slope."),
   ActionDef(name: "lowpass", flags: {afAudio}, argSpec: "[hz]", range: rng(10.0, 20000.0),
+    args: @[numArg("hz", 10, 20000, default = "10000", unit = "Hz")],
     help: "Cut the highs above `hz` (default 10000), such as hiss. A 12 dB per octave Butterworth filter; chain two for a steeper slope."),
   ActionDef(name: "dehum", flags: {afAudio}, argSpec: "[hz[:harmonics]]",
+    args: @[numArg("hz", 20, 1000, default = "60", unit = "Hz"),
+      intArg("harmonics", 1, 16, default = "4")],
     help: "Remove mains hum: a narrow notch at `hz` (default 60; use 50 where the mains is 50 Hz) and at each of its first `harmonics` multiples (default 4, up to 16)."),
   ActionDef(name: "duck", flags: {afAudio}, argSpec: "[amount[:threshold[:attack[:release]]]]",
+    args: @[numArg("amount", 0, 1, default = "0.85"), numArg("threshold", 0, 1, default = "0.04"),
+      numArg("attack", 0, 65535, default = "100", unit = "ms"),
+      numArg("release", 0, 65535, default = "500", unit = "ms")],
     help: """
 Autoduck (sidechain): lower this clip's audio wherever the louder audio layers beneath it (higher track indices) are active, e.g. tuck a music/desktop track under a voice track. Cross-track, so it is applied when the audio layers are mixed; a no-op on the bottom-most layer and on single-layer audio.
 Positional args: `amount` is the maximum attenuation (0.0 = none, 1.0 = duck to silence, default 0.85), `threshold` the key loudness 0.0..1.0 that engages the duck (default 0.04), and `attack`/`release` the duck-down/recover times in milliseconds (defaults 100 and 500)."""),
   ActionDef(name: "pitch", flags: {afAudio}, argSpec: "semitones", range: rng(-24.0, 24.0),
+    args: @[numArg("semitones", -24, 24, unit = "semitones")],
     help: "Shift the pitch of the section without changing its speed. `12` is one octave up, `-12` one octave down, `0` leaves it unchanged, and fractional values work (`pitch:0.5` is a quarter tone). Implemented by resampling and then time-stretching back with ffmpeg's `asetrate` and `atempo` filters, so large shifts pick up the usual time-stretch artifacts. To change speed and pitch together, use `varispeed` instead."),
   ActionDef(name: "tone", flags: {afAudio, afGenerator}, argSpec: "midi-note[:waveform]", range: rng(0.0, 127.0),
+    args: @[intArg("note", 0, 127), choiceArg("waveform", waveformNames, default = "sine")],
     help: "Synthesize a wave at a MIDI note's pitch, as a generator: it stands in for a file in `add:`, adding its own audio layer rather than altering existing audio. `69` is A4 (440 Hz), `60` middle C; each step is a semitone. `waveform` is `sine` (default), `saw`, `square`, or `triangle`; the harmonic-rich ones are band-limited, so they stay clean instead of aliasing at high notes. It has no envelope of its own — chain the animatable `volume` action for fades and decays, e.g. `add:tone:60,volume:1..0:ease=out`. Stack several `add:tone` layers for a chord; the mix sums them. `speed`/`varispeed` only stretch the tone, they do not change its pitch — change the note instead. Examples: `add:tone:69`, `add:tone:36:saw`, `add:tone:48:square,volume:0.4`."),
   ActionDef(name: "convolve", flags: {afAudio}, argSpec: "path",
+    args: @[pathArg("path")],
     help: """
 Make headphone audio sound farther from the ears: with Saq's spatial-stereo impulse responses (https://github.com/mTvare6/saqol/tree/main/crates/saq-dsp/assets/spatial-stereo), the processed version feels less "on the ear", so it feels less "blocked" after listening to music for a while. Download that folder and pass it as `path`, e.g. `convolve:spatial-stereo`.
 More generally, this runs the audio through any measured impulse response (IR), like a convolution reverb or a cabinet sim. `path` is an audio file or a folder.
@@ -267,48 +365,82 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
   ActionDef(name: "erosion", flags: {afVideo},
     help: "Erode the picture by replacing each pixel with the darkest of its 3x3 neighborhood. Bright details shrink and dark regions grow, giving a gritty, eaten-away look. Implemented via ffmpeg's `erosion` filter."),
   ActionDef(name: "zoom", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 100.0, loIncl = false),
+    args: @[kfArg("v", 0, 100, loIncl = false)],
     help: "Scale the picture about its center by val. 1.0 = no zoom, 2.0 = zoom in 2x, 0.5 = zoom out 2x. Animatable: accepts keyframes `a..b..c` interpolated across the section, optionally eased with `:ease=`."),
   ActionDef(name: "opacity", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 1.0),
+    args: @[kfArg("v", 0, 1)],
     help: "Blend the section against the background. 1.0 = fully opaque, 0.0 = fully transparent. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
   ActionDef(name: "blur", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(0.0, 1024.0),
+    args: @[kfArg("v", 0, 1024)],
     help: "Gaussian-blur the picture by sigma = val. 0.0 = no blur; larger values blur more. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
   ActionDef(name: "brightness", flags: {afVideo, afAnimatable}, argSpec: "v[..v...]", range: rng(-1.0, 1.0),
+    args: @[kfArg("v", -1, 1)],
     help: "Shift brightness by adding an equal offset to the R, G, and B channels. 0.0 = unchanged, positive brightens, negative darkens. Implemented via ffmpeg's `lutrgb` filter. Animatable: accepts keyframes `a..b..c`, optionally eased with `:ease=`."),
   ActionDef(name: "brighthue", flags: {afVideo}, argSpec: "snorm16", range: rng(-1.0, 1.0),
+    args: @[numArg("v", -1, 1)],
     help: "Shift luma by offsetting the Y channel. 0.0 = unchanged, positive brightens, negative darkens."),
   ActionDef(name: "contrast", flags: {afVideo}, argSpec: "float32", range: rng(-2.0, 2.0),
+    args: @[numArg("v", -2, 2)],
     help: "Scale contrast around mid-gray. 1.0 = unchanged, higher values increase contrast, lower values reduce it. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "saturation", flags: {afVideo}, argSpec: "float32", range: rng(0.0, 3.0),
+    args: @[numArg("v", 0, 3)],
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "rotate", flags: {afVideo}, argSpec: "deg",
+    args: @[numArg("deg", unit = "degrees")],
     help: "Rotate the picture clockwise about its center by a fixed `deg` angle, expanding the frame so nothing is clipped and filling the exposed corners with the background color. Good for aspect flips, e.g. `rotate:90`. For a continuous spin, use `spin` instead."),
   ActionDef(name: "scale", flags: {afVideo}, argSpec: "v|w:h", range: rng(0.0, 100.0, loIncl = false),
+    args: @[numArg("w", 0, 100, loIncl = false), numArg("h", 0, 100, loIncl = false, optional = true)],
     help: "Scale the picture about its center, by `v` both ways or by `w` across and `h` down, e.g. `scale:0.8` or `scale:0.4:1`. On the base (bottom) track what grows past the edge is cut off and what shrinks away shows the background, like `zoom`; an overlay grows or shrinks about the center of where it's placed. Combines with `turn`."),
   ActionDef(name: "turn", flags: {afVideo}, argSpec: "deg",
+    args: @[numArg("deg", unit = "degrees")],
     help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
   ActionDef(name: "burn", flags: {afVideo, afGenerator},
     argSpec: "[file][:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
+    args: @[pathArg("file", optional = true)] & subsArgs(""),
     help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
     argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical][:ass]",
+    args: @[arg("text", akText, NaN, NaN, true, true, "", false, false)] & subsArgs("8") &
+      @[flagArg("vertical"), flagArg("ass")],
     help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. Append `:ass` to write the text as ASS event text: override blocks like `{\\b1}` and escapes like `\\N` and `\\h` reach libass as written, so part of a text can be bold, italic, or another color. In an action, each of those backslashes doubles: `text:plain {\\\\b1}bold{\\\\b0}:ass`. Without `:ass`, braces and backslashes show as they are. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
+    args: @[numArg("deg", unit = "degrees"), numArg("rate", unit = "degrees/sec")],
     help: "Spin the picture continuously, starting at `deg` and turning at `rate` degrees per second (negative is counter-clockwise), e.g. `spin:0/120`. The picture spins within a constant square that contains every rotation (so it is never clipped); on an overlay the exposed corners are transparent, otherwise they are filled with the background color."),
   ActionDef(name: "drawbox", flags: {afVideo, afGenerator}, argSpec: "x:y:w:h:color",
+    args: @[intArg("x", i32Lo, i32Hi, unit = "px"), intArg("y", i32Lo, i32Hi, unit = "px"),
+      intArg("w", 1, i32Hi, unit = "px"), intArg("h", 1, i32Hi, unit = "px"), colorArg("color")],
     help: "Draw a filled rectangle onto the picture. Positional args: `x` and `y` are the top-left corner, `w` and `h` the width and height in pixels, and `color` an RGB color (a name like `red` or a hex value like `#ff0000`), or `yuv#YYUUVV` to write those 8-bit Y'CbCr values into a YUV picture as they are. Example: `drawbox:100:100:400:200:red`. As a generator it can take a file's place in `add:`, painting the box on its own overlay layer, e.g. `add:drawbox:100:100:400:200:red`. Implemented via ffmpeg's `drawbox` filter."),
   ActionDef(name: "pos", flags: {afVideo, afAnimatable}, argSpec: "x:y[:scale]",
+    args: @[kfArg("x", -2147483648.0, 2147483648.0, false, false, unit = "px"),
+      kfArg("y", -2147483648.0, 2147483648.0, false, false, unit = "px"),
+      kfArg("scale", 0, Inf, false, false, default = "1")],
     help: "Place this clip as an overlay when it is composited over a lower video track. `x` and `y` are the top-left corner in canvas pixels; the optional `scale` multiplies the source's native size (default 1.0). Has no effect on the base (bottom) track. Example: `pos:600:300:0.5`. Animatable: each of `x`, `y`, and `scale` accepts a keyframe ramp `a..b..c` interpolated across the section, optionally eased with `:ease=`, e.g. `pos:0..600:300:1..0.5:ease=inout` slides the overlay across while shrinking it."),
   ActionDef(name: "lens", flags: {afVideo}, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
+    args: @[numArg("k1", -1, 1, default = "-0.5"), numArg("k2", -1, 1, default = "0")],
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
 Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
   ActionDef(name: "colorkey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
+    args: @[colorArg("color"), numArg("similar", 0, 1, default = "0.25"),
+      numArg("blend", 0, 1, default = "0")],
     help: "Make a color transparent by matching it in RGB space. Best for flat, synthetic backgrounds (a logo's matte, a screen recording, a gif with one clean color); for real green-/blue-screen camera footage use `chromakey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green`, a hex value, or `yuv#YYUUVV`), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `colorkey` filter."),
   ActionDef(name: "chromakey", flags: {afVideo}, argSpec: "color[:similar:blend]", range: rng(0.0, 1.0),
+    args: @[colorArg("color"), numArg("similar", 0, 1, default = "0.25"),
+      numArg("blend", 0, 1, default = "0")],
     help: "Make a color transparent by matching it in chroma (YUV) space, tolerating lighting variation, shadows, and soft edges. This is the green-/blue-screen keyer for real camera footage; for flat synthetic backgrounds use `colorkey` instead. On the base (bottom) video track there is nothing to reveal, so the matched color is replaced with the timeline background (`-bg`) instead. Positional args: `color` is the key color (a name like `green`, a hex value, or `yuv#YYUUVV`), `similar` how close a pixel must be to be keyed (default 0.25), and `blend` how soft the edge is (default 0.0). Implemented via ffmpeg's `chromakey` filter."),
   ActionDef(name: "choke", flags: {afVideo}, argSpec: "[n]", range: rng(1.0, 16.0),
+    args: @[intArg("n", 1, 16, default = "1", unit = "px")],
     help: "Shrink (choke) the alpha matte left by a `colorkey`/`chromakey` inward by `n` pixels (default 1), cutting off the ring of key-color spill and ragged edge pixels around the subject. Must come after the key in the chain, e.g. `add:fg.mp4,chromakey:green,choke:2`. Only meaningful on overlay tracks (where keying produces alpha); a no-op on the base track. Implemented by eroding only the alpha plane via ffmpeg's `erosion` filter."),
   ActionDef(name: "aberration", flags: {afVideo}, argSpec: "[h[:v[:edge]]]", range: rng(-127.0, 127.0, each = true),
+    args: @[intArg("h", -127, 127, default = "5", unit = "px"),
+      intArg("v", -127, 127, default = "0", unit = "px"),
+      choiceArg("edge", ["smear", "wrap"], default = "smear"),
+      intArg("rh", -127, 127, default = "0", keyword = true, unit = "px"),
+      intArg("rv", -127, 127, default = "0", keyword = true, unit = "px"),
+      intArg("gh", -127, 127, default = "0", keyword = true, unit = "px"),
+      intArg("gv", -127, 127, default = "0", keyword = true, unit = "px"),
+      intArg("bh", -127, 127, default = "0", keyword = true, unit = "px"),
+      intArg("bv", -127, 127, default = "0", keyword = true, unit = "px")],
     help: """
 Fake chromatic aberration by shifting the color channels apart, leaving red/cyan fringing for a cheap-lens or glitch look. Implemented via ffmpeg's `rgbashift` filter.
 Simple form `aberration[:h[:v[:edge]]]`: split red and blue symmetrically by `h` pixels horizontally (default 5) and `v` pixels vertically (default 0), with green left in place. `edge` is `smear` (extend the border pixel, the default) or `wrap` (wrap around to the far side).
@@ -317,16 +449,24 @@ Per-channel form: pass `key=value` pairs drawn from `rh`, `rv`, `gh`, `gv`, `bh`
     help: "Loop the clip's source back to its start when it runs out of frames, instead of ending. Useful for overlays whose source (e.g. a short gif) is shorter than the section it covers, e.g. `add:logo.gif,loop`."),
   ActionDef(name: "mask", flags: {afVideo},
     argSpec: "x:y:w:h[:radius][:feather][:invert] | poly=x1/y1/x2/y2/...[:feather=N][:invert]",
+    args: shapeArgs(false),
     help: """
 Cut the picture to a rounded-rectangle, ellipse, or arbitrary polygon, making everything outside the shape transparent. `x`/`y` are the top-left corner and `w`/`h` the size in pixels. `radius` is the corner radius in pixels: `0` (the default) is a sharp rectangle, a positive value rounds the corners, and `-1` is a true ellipse (the `w`x`h` box's inscribed oval). The optional `feather` softens the edge by that many pixels (0 = hard, the default); append `:invert` to hide the inside instead. Every field also takes a keyword form (`x=`, `y=`, `w=`, `h=`, `radius=`/`r=`, `feather=`), so positional and keyword args can be mixed.
 The `poly=` form cuts to an arbitrary closed polygon instead: `x1/y1/x2/y2/...` is at least 3 points (canvas pixels, up to a few hundred, enough for a GUI to flatten Bezier curves into), filled with the nonzero winding rule, closing back to the first point. It takes `feather=` (keyword only here) and `:invert` same as above. Example: `mask:poly=960/200/1100/500/1300/520/1150/700/960/900/770/700/620/520/820/500`.
 On the base (bottom) track there is nothing to reveal, so the masked-out area is filled with the timeline background (`-bg`) instead; on an overlay it reveals the track below. Good for circular/rounded picture-in-picture, vignettes, crop-to-shape, and star/sign/custom cutouts. Example: `add:cam.mp4,pos:900:540:0.3,mask:640:360:300:300:-1:40`."""),
   ActionDef(name: "confine", flags: {afVideo},
     argSpec: "[x:y:w:h[:radius][:feather][:invert] | poly=x1/y1/x2/y2/...[:feather=N][:invert]]",
+    args: shapeArgs(true),
     help: "Restrict the adjustment effects that follow it (`blur`, `brightness`, `brighthue`, `contrast`, `saturation`, `invert`, `erosion`, `aberration`, `pixelate`) to a rounded-rectangle, ellipse, or arbitrary polygon region (`mask`'s geometry, including its `poly=` form), leaving the rest of the picture untouched. Stays in effect until the next `confine` changes the region; a bare `confine` with no arguments resets to the full frame. Geometry effects (zoom, rotate, pos, ...) are unaffected. Example: `confine:400:300:200:80,blur:30` blurs only the box, e.g. to censor a face or plate."),
   ActionDef(name: "pixelate", flags: {afVideo, afAnimatable}, argSpec: "[w[..w...][:h[..h...]]]", range: rng(1.0, 1024.0, each = true),
+    args: @[kfArg("w", 1, 1024, default = "16", unit = "px"),
+      kfArg("h", 1, 1024, optional = true, unit = "px")],
     help: "Pixelate the picture into a coarse mosaic of blocks, the classic censoring look. With no argument, uses 16px blocks; `pixelate:n` sets square n×n blocks and `pixelate:w:h` rectangular ones (px). Pair it with `confine` to censor just a face or plate, e.g. `confine:400:300:200:80,pixelate:24`. Implemented via ffmpeg's `pixelize` filter. Animatable: `w` and `h` each accept a keyframe ramp `a..b..c` of whole pixel sizes interpolated across the section, optionally eased with `:ease=`, e.g. `pixelate:1..48:ease=in` dissolves the picture into ever-coarser blocks."),
   ActionDef(name: "confetti", flags: {afVideo, afGenerator}, argSpec: "[count[:gravity][:scheme][:origin][:seed=N][:no-shimmer]]",
+    args: @[intArg("count", 1, 400, default = "200"), numArg("gravity", 0, 20, default = "1.4"),
+      choiceArg("scheme", confettiSchemeNames, default = "party"),
+      choiceArg("origin", confettiOriginNames, default = "sides"),
+      intArg("seed", 0, 65535, default = "0", keyword = true), flagArg("no-shimmer")],
     help: """
 Throw colorful confetti over the picture. The whole charge fires in one burst when the section starts, like a party popper, and is not replenished as the pieces fall out of frame, so put the action on a short section where you want the pop. Each piece is a small four-sided chip that arcs over and flutters down, spinning and tumbling in 3D.
 Every argument is optional and they may be given in any order, so `confetti:neon:top` and `confetti:top:neon` are the same; bare numbers fill `count` first, then `gravity`.
@@ -334,6 +474,43 @@ Every argument is optional and they may be given in any order, so `confetti:neon
 `scheme` is `party` (default), `neon`, `gold`, `duotone`, or `white`. A chip flashes white as it turns edge-on, catching the light like foil; add `no-shimmer` to keep every piece its flat color. `origin` is `sides` (default, two cannons at the bottom corners firing inward), `bottom`, `top` (a shower from just above the frame), or `center`.
 Drawn onto the frame, so it is not carried into video-editor exports. As a generator it can take a file's place in `add:`, painting the confetti on its own overlay layer, e.g. `add:confetti:300`. Examples: `confetti`, `confetti:250:3`, `confetti:60:0.8:white:center`."""),
 ]
+
+func findArg(action, name: string): ArgDef =
+  for d in actionDefs:
+    if d.name == action:
+      for a in d.args:
+        if a.name == name: return a
+  doAssert false, &"{action} has no argument {name}"
+
+func inRange(r: RangeDoc, v: float): bool =
+  (if r.loIncl: v >= r.lo else: v > r.lo) and (if r.hiIncl: v <= r.hi else: v < r.hi)
+
+func rangeMsg(action: string, d: ArgDef, whole: bool): string =
+  ## "zoom must be in (0.0, 100.0]", naming the argument when there are several.
+  var count = 0
+  for a in actionDefs:
+    if a.name == action: count = a.args.len
+  let r = d.range.get
+  func bound(v: float): string =
+    if whole and abs(v) < 1e15: $int(v) else: $v
+  let label = if count == 1: action else: &"{action} {d.name}"
+  let what = if whole: "a whole number in" else: "in"
+  let unit = if d.unit == "": "" else: " " & d.unit
+  if r.hi == Inf:
+    let what = if r.loIncl: "at least" else: "greater than"
+    return &"{label} must be {what} {bound(r.lo)}{unit}"
+  &"""{label} must be {what} {(if r.loIncl: "[" else: "(")}{bound(r.lo)}, """ &
+    &"""{bound(r.hi)}{(if r.hiIncl: "]" else: ")")}{unit}"""
+
+template checkArg(action, name: static string, v: float32 | float | int,
+    alsoWhole = false) =
+  ## Reject `v` outside the range actionDefs gives this argument.
+  const d = findArg(action, name)
+  const whole = d.kind == akInteger or alsoWhole
+  const msg = rangeMsg(action, d, whole)
+  let x = float(v)
+  if not (inRange(d.range.get, x) and (not whole or x == round(x))):
+    raise newException(ActionParseError, msg)
 
 const actionNames* = block:
   var names: seq[string]
@@ -415,8 +592,6 @@ func applyEase*(e: Easing, t: float32): float32 =
   of easeInOut:
     if x < 0.5'f32: 2.0'f32 * x * x
     else: 1.0'f32 - 2.0'f32 * (1.0'f32 - x) * (1.0'f32 - x)
-
-const easeNames*: array[Easing, string] = ["linear", "in", "out", "inout"]
 
 proc pFloat(s: string): float32 {.raises: [ActionParseError].} =
   # parseFloat accepts "nan" and "inf", which slip past `v < lo or v > hi`
@@ -695,9 +870,6 @@ func rgbaStr*(c: uint32): string =
   result = "#" & toHex(int(c shr 8), 6).toLowerAscii
   if (c and 0xff) != 0xff: result &= toHex(int(c and 0xff), 2).toLowerAscii
 
-const alignNames*: array[1 .. 9, string] = ["bottom-left", "bottom",
-  "bottom-right", "left", "center", "right", "top-left", "top", "top-right"]
-
 const subsKeys = ["file", "font", "size", "color", "outline", "bg", "align"]
 
 func textPart(text: string): string =
@@ -741,8 +913,8 @@ proc parseSubs(parts: seq[string], kind: ActionKind): Action {.raises: [ActionPa
   (result.burnFile, result.burnFont) = (given[0], given[1])
   if seen[2]:
     result.burnSize = pFloat(given[2])
-    if not (result.burnSize > 0 and result.burnSize <= 100):
-      raise newException(ActionParseError, &"{name} size must be in (0, 100]")
+    if kind == actText: checkArg("text", "size", result.burnSize)
+    else: checkArg("burn", "size", result.burnSize)
   for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
     if seen[k]:
       result.burnSet.incl part
@@ -805,12 +977,12 @@ proc parseShapeRegion(parts: seq[string], kind: ActionKind,
   for i in 0 ..< 4:
     if not seen[i]:
       raise newException(ActionParseError, &"{name} requires {slots[i]}")
-  if vals[2] <= 0 or vals[3] <= 0:
-    raise newException(ActionParseError, &"{name} width and height must be positive")
-  if vals[4] < -1:
-    raise newException(ActionParseError, &"{name} radius must be -1 (ellipse) or >= 0")
-  if vals[5] < 0 or vals[5] > 255:
-    raise newException(ActionParseError, &"{name} feather must be in [0, 255]")
+  template check(action: static string) =
+    checkArg(action, "w", vals[2])
+    checkArg(action, "h", vals[3])
+    checkArg(action, "radius", vals[4])
+    checkArg(action, "feather", vals[5])
+  if kind == actMask: check("mask") else: check("confine")
 
   result = Action(kind: kind)  # branch fields assigned after (shared by both kinds)
   result.mX = int32(vals[0])
@@ -861,8 +1033,8 @@ proc parsePolyMask(parts: seq[string], kind: ActionKind,
     elif p.startsWith("feather="):
       let v = try: parseInt(p[8 .. ^1])
         except ValueError: raise newException(ActionParseError, &"{name}: invalid feather: {p}")
-      if v < 0 or v > 255:
-        raise newException(ActionParseError, &"{name} feather must be in [0, 255]")
+      if kind == actMaskPoly: checkArg("mask", "feather", v)
+      else: checkArg("confine", "feather", v)
       feather = uint8(v)
     else:
       raise newException(ActionParseError, &"{name}: unknown key: {p}")
@@ -877,14 +1049,10 @@ proc parsePolyMask(parts: seq[string], kind: ActionKind,
   result.mInvert = inv
 
 func checkSpeed(name: string, v: float32) {.raises: [ActionParseError].} =
-  # `not (a and b)` instead of `<= or >=` so NaN fails the check too;
-  # speed <= 0 makes the renderer's atempo decomposition loop forever.
-  if name == "varispeed":
-    # The renderer's asetrate holds varispeed to this range.
-    if not (v >= 0.2'f32 and v <= 100.0'f32):
-      raise newException(ActionParseError, "varispeed must be in range [0.2, 100.0]")
-  elif not (v > 0.0'f32 and v < 99999.0'f32):
-    raise newException(ActionParseError, &"{name} must be in range (0, 99999)")
+  # Speed <= 0 makes the renderer's atempo decomposition loop forever, and its
+  # asetrate holds varispeed to its range.
+  if name == "varispeed": checkArg("varispeed", "v", v)
+  else: checkArg("speed", "v", v)
 
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
@@ -930,14 +1098,19 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
     var vals = [toUnorm16(0.0), halfUnorm16, halfUnorm16]
     for idx in 1 ..< parts.len:
-      vals[idx - 1] = toUnorm16(pFloat(parts[idx]))
+      let v = pFloat(parts[idx])
+      case idx
+      of 1: checkArg("deesser", "intensity", v)
+      of 2: checkArg("deesser", "max", v)
+      else: checkArg("deesser", "freq", v)
+      vals[idx - 1] = toUnorm16(v)
     return Action(kind: actDeesser, intensity: vals[0], maxd: vals[1], freq: vals[2])
 
   if parts[0] in ["highpass", "lowpass"] and parts.len <= 2:
     var hz = (if parts[0] == "highpass": 80.0'f32 else: 10000.0'f32)
     if parts.len == 2: hz = pFloat(parts[1])
-    if not (hz >= 10.0 and hz <= 20000.0):
-      raise newException(ActionParseError, &"{parts[0]} must be in [10, 20000] Hz")
+    if parts[0] == "highpass": checkArg("highpass", "hz", hz)
+    else: checkArg("lowpass", "hz", hz)
     let cutoff = uint16(round(hz))
     return (if parts[0] == "highpass": Action(kind: actHighpass, cutoff: cutoff)
       else: Action(kind: actLowpass, cutoff: cutoff))
@@ -947,10 +1120,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var n = 4.0'f32
     if parts.len >= 2: hz = pFloat(parts[1])
     if parts.len == 3: n = pFloat(parts[2])
-    if not (hz >= 20.0'f32 and hz <= 1000.0'f32):
-      raise newException(ActionParseError, "dehum must be in [20, 1000] Hz")
-    if not (n >= 1.0'f32 and n <= 16.0'f32 and n == round(n)):
-      raise newException(ActionParseError, "dehum harmonics must be a whole number in [1, 16]")
+    checkArg("dehum", "hz", hz)
+    checkArg("dehum", "harmonics", n)
     return Action(kind: actDehum, humHz: uint16(round(hz)), humHarmonics: uint8(n))
 
   # duck takes positional args: [amount[:threshold[:attack[:release]]]]
@@ -958,14 +1129,10 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var vals = [0.85'f32, 0.04'f32, 100.0'f32, 500.0'f32]
     for idx in 1 ..< parts.len:
       vals[idx - 1] = pFloat(parts[idx])
-    # `not (a and b)` so NaN fails the checks too; uint16(NaN) is UB.
-    if not (vals[0] >= 0.0 and vals[0] <= 1.0):
-      raise newException(ActionParseError, "duck amount must be in [0.0, 1.0]")
-    if not (vals[1] >= 0.0 and vals[1] <= 1.0):
-      raise newException(ActionParseError, "duck threshold must be in [0.0, 1.0]")
-    if not (vals[2] >= 0.0 and vals[2] <= 65535.0 and
-        vals[3] >= 0.0 and vals[3] <= 65535.0):
-      raise newException(ActionParseError, "duck attack/release must be in [0, 65535] ms")
+    checkArg("duck", "amount", vals[0])
+    checkArg("duck", "threshold", vals[1])
+    checkArg("duck", "attack", vals[2])
+    checkArg("duck", "release", vals[3])
     return Action(kind: actDuck, duckAmount: toUnorm16(vals[0]),
       duckThresh: toUnorm16(vals[1]), duckAttack: uint16(vals[2]),
       duckRelease: uint16(vals[3]))
@@ -978,9 +1145,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var k = [0.0'f32, 0.0'f32]
     for idx in 1 ..< parts.len:
       k[idx - 1] = pFloat(parts[idx])
-    for v in k:
-      if v < -1.0'f32 or v > 1.0'f32:
-        raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
+    checkArg("lens", "k1", k[0])
+    checkArg("lens", "k2", k[1])
     return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
 
   # tone: a MIDI note plus an optional waveform name, "tone:note[:waveform]".
@@ -988,10 +1154,9 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if parts.len == 1:
       raise newException(ActionParseError, "tone requires a MIDI note (tone:69 is A4)")
     let n = pFloat(parts[1])
-    # `not (a and b)` so NaN fails the check too; uint8(NaN) is UB. Whole notes
-    # only: a fraction would round away silently and stop round-tripping.
-    if not (n >= 0.0'f32 and n <= 127.0'f32 and n == round(n)):
-      raise newException(ActionParseError, "tone must be a whole MIDI note in [0, 127]")
+    # Whole notes only: a fraction would round away silently and stop
+    # round-tripping.
+    checkArg("tone", "note", n)
     var wave = wSine
     if parts.len == 3:
       let idx = waveformNames.find(parts[2])
@@ -1011,9 +1176,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if parts[0] == "scale" and parts.len in 2..3:
     let w = pFloat(parts[1])
     let h = (if parts.len == 3: pFloat(parts[2]) else: w)
-    for v in [w, h]:
-      if not (v > 0.0 and v <= 100.0):
-        raise newException(ActionParseError, "scale must be in (0.0, 100.0]")
+    checkArg("scale", "w", w)
+    checkArg("scale", "h", h)
     return Action(kind: actScale, tScaleW: w, tScaleH: h, tUniform: parts.len == 2)
   if parts[0] == "turn" and parts.len == 2:
     return Action(kind: actTurn, tDeg: pFloat(parts[1]))
@@ -1036,12 +1200,12 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     var coords: array[4, int32]
     for idx in 0 ..< 4:
       let n = pInt(parts[idx + 1])
-      if n < low(int32).int or n > high(int32).int:
-        raise newException(ActionParseError,
-          &"drawbox value out of range: {parts[idx + 1]}")
+      case idx
+      of 0: checkArg("drawbox", "x", n)
+      of 1: checkArg("drawbox", "y", n)
+      of 2: checkArg("drawbox", "w", n)
+      else: checkArg("drawbox", "h", n)
       coords[idx] = int32(n)
-    if coords[2] <= 0 or coords[3] <= 0:
-      raise newException(ActionParseError, "drawbox width and height must be positive")
     let col = (
       try:
         parseColor(parts[5])
@@ -1063,7 +1227,11 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     )
     var vals = [toUnorm16(0.25'f32), toUnorm16(0.0'f32)]
     for idx in 2 ..< parts.len:
-      vals[idx - 2] = toUnorm16(pFloat(parts[idx]))
+      let v = pFloat(parts[idx])
+      # Both keyers take the same ranges.
+      if idx == 2: checkArg("colorkey", "similar", v)
+      else: checkArg("colorkey", "blend", v)
+      vals[idx - 2] = toUnorm16(v)
     if vals[0] < toUnorm16(0.01'f32):
       vals[0] = toUnorm16(0.01'f32)
 
@@ -1076,31 +1244,29 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if parts.len == 1:
       return Action(kind: actChoke, chokeN: 1)
     let n = pInt(parts[1])
-    if n < 1 or n > 16:
-      raise newException(ActionParseError, "choke must be in [1, 16]")
+    checkArg("choke", "n", n)
     return Action(kind: actChoke, chokeN: uint8(n))
 
   # pixelate: bare = 16px blocks; pixelate:n = n square; pixelate:w:h =
   # rectangular. Each size is a ramp with an optional ease suffix:
   #   pixelate:24   pixelate:1..48   pixelate:8..40:8:ease=inout
   if parts[0] == "pixelate":
-    proc blockKf(spec: string): tuple[kf: seq[float32], kt: seq[KfTime]] {.
+    proc blockKf(spec: string, isW: bool): tuple[kf: seq[float32], kt: seq[KfTime]] {.
         raises: [ActionParseError].} =
+      # Whole pixels: atf-8 packs them as uint16.
       result = parseRamp(spec)
       for v in result.kf:
-        # `not (a and b)` so NaN fails the check too; uint16(NaN) is UB.
-        if not (v >= 1.0'f32 and v <= 1024.0'f32 and v == round(v)):
-          raise newException(ActionParseError,
-            "pixelate block size must be a whole number in [1, 1024]")
+        if isW: checkArg("pixelate", "w", v, alsoWhole = true)
+        else: checkArg("pixelate", "h", v, alsoWhole = true)
 
     var idx = 1
     var w = (kf: @[16.0'f32], kt: newSeq[KfTime]())
     var h = (kf: newSeq[float32](), kt: newSeq[KfTime]())
     if parts.len > idx and not parts[idx].startsWith("ease="):
-      w = blockKf(parts[idx])
+      w = blockKf(parts[idx], true)
       inc idx
       if parts.len > idx and not parts[idx].startsWith("ease="):
-        h = blockKf(parts[idx])
+        h = blockKf(parts[idx], false)
         inc idx
     if h.kf.len == 0:  # one ramp given: square blocks
       h = w
@@ -1143,8 +1309,7 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         if seedSeen:
           raise newException(ActionParseError, "confetti: seed given twice")
         let v = pInt(p[5 .. ^1], "confetti seed")
-        if v < 0 or v > 65535:
-          raise newException(ActionParseError, "confetti seed must be in [0, 65535]")
+        checkArg("confetti", "seed", v)
         seed = uint16(v)
         seedSeen = true
       elif p == "shimmer" or p == "no-shimmer":
@@ -1159,15 +1324,12 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
             @["shimmer", "no-shimmer"]))
       elif numsSeen == 0:
         let n = pInt(p, "confetti count")
-        if n < 1 or n > 400:
-          raise newException(ActionParseError, "confetti count must be in [1, 400]")
+        checkArg("confetti", "count", n)
         count = uint16(n)
         numsSeen = 1
       elif numsSeen == 1:
         gravity = pFloat(p)
-        # `not (a and b)` so NaN fails the check too.
-        if not (gravity >= 0.0'f32 and gravity <= 20.0'f32):
-          raise newException(ActionParseError, "confetti gravity must be in [0.0, 20.0]")
+        checkArg("confetti", "gravity", gravity)
         numsSeen = 2
       else:
         raise newException(ActionParseError, &"confetti: unexpected value: {p}")
@@ -1178,10 +1340,6 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   # symmetric case `aberration[:h[:v[:edge]]]`; any `key=value` part switches to the
   # explicit per-channel form, which starts every channel at 0.
   if parts[0] == "aberration":
-    template chk(n: int): int8 =
-      if n < -127 or n > 127:
-        raise newException(ActionParseError, "aberration shift must be in [-127, 127]")
-      int8(n)
     proc toEdge(v: string): bool {.raises: [ActionParseError].} =
       case v
       of "smear": false
@@ -1208,9 +1366,11 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           nums.add pInt(p, "aberration value")
       if nums.len > 2:
         raise newException(ActionParseError, "aberration takes at most h:v positional shifts")
+      let h = if nums.len >= 1: nums[0] else: 5
+      let v = if nums.len >= 2: nums[1] else: 0
       # Range-checked before negating, which overflows on low(int).
-      let h = int(chk(if nums.len >= 1: nums[0] else: 5))
-      let v = int(chk(if nums.len >= 2: nums[1] else: 0))
+      checkArg("aberration", "h", h)
+      checkArg("aberration", "v", v)
       rh = h; bh = -h; rv = v; bv = -v
     else:
       for idx in 1 ..< parts.len:
@@ -1226,15 +1386,15 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
           continue
         let n = pInt(value, "aberration value")
         case key
-        of "rh": rh = n
-        of "rv": rv = n
-        of "gh": gh = n
-        of "gv": gv = n
-        of "bh": bh = n
-        of "bv": bv = n
+        of "rh": checkArg("aberration", "rh", n); rh = n
+        of "rv": checkArg("aberration", "rv", n); rv = n
+        of "gh": checkArg("aberration", "gh", n); gh = n
+        of "gv": checkArg("aberration", "gv", n); gv = n
+        of "bh": checkArg("aberration", "bh", n); bh = n
+        of "bv": checkArg("aberration", "bv", n); bv = n
         else: raise newException(ActionParseError, &"Unknown aberration key: {key}")
-    return Action(kind: actAberration, abRh: chk(rh), abRv: chk(rv), abGh: chk(gh),
-        abGv: chk(gv), abBh: chk(bh), abBv: chk(bv), abWrap: wrap)
+    return Action(kind: actAberration, abRh: int8(rh), abRv: int8(rv), abGh: int8(gh),
+        abGv: int8(gv), abBh: int8(bh), abBv: int8(bv), abWrap: wrap)
 
   # pos: overlay placement, each field an animatable ramp:
   #   pos:x:y   pos:x:y:scale   pos:0..600:300:1..0.5:ease=inout
@@ -1249,13 +1409,10 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     if parts.len > 3 and not parts[3].startsWith("ease="):
       s = parseRamp(parts[3])
       idx = 4
-    for v in s.kf:
-      if v <= 0.0'f32:
-        raise newException(ActionParseError, "pos scale must be greater than 0.0")
+    for v in s.kf: checkArg("pos", "scale", v)
     # x/y are rounded to an int, which is UB out of range.
-    for v in x.kf & y.kf:
-      if not (abs(v) < 2147483648.0'f32):
-        raise newException(ActionParseError, "pos x/y is out of range")
+    for v in x.kf: checkArg("pos", "x", v)
+    for v in y.kf: checkArg("pos", "y", v)
     result = Action(kind: actPos, pxKf: x.kf, pyKf: y.kf, pscaleKf: s.kf,
       pxKt: x.kt, pyKt: y.kt, pscaleKt: s.kt)
     result.parseEaseTail(parts, idx, val)
@@ -1266,25 +1423,13 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   #   zoom:2   zoom:1..2   zoom:1..0.5..1   zoom:1..2:ease=inout:2sec
   if parts[0] in animScalar and parts.len >= 2:
     let (kf, kt) = parseRamp(parts[1])
-    case parts[0]
-    of "zoom":
-      for v in kf:
-        if v <= 0.0 or v > 100.0:
-          raise newException(ActionParseError, "zoom must be in (0.0, 100.0]")
-    of "opacity":
-      for v in kf:
-        if v < 0.0 or v > 1.0:
-          raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
-    of "brightness":
-      for v in kf:
-        if v < -1.0 or v > 1.0:
-          raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
-    of "blur":
-      # gblur's sigma tops out at 1024.
-      for v in kf:
-        if v < 0.0 or v > 1024.0:
-          raise newException(ActionParseError, "blur must be in [0.0, 1024.0]")
-    else: discard
+    for v in kf:
+      case parts[0]
+      of "zoom": checkArg("zoom", "v", v)
+      of "opacity": checkArg("opacity", "v", v)
+      of "brightness": checkArg("brightness", "v", v)
+      of "blur": checkArg("blur", "v", v) # gblur's sigma tops out at 1024.
+      else: discard
 
     result = case parts[0]
       of "zoom": Action(kind: actZoom, kf: kf, kt: kt)
@@ -1328,21 +1473,18 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
       return Action(kind: actSpeed, val: effectVal,
         varispeed: effectType == "varispeed")
     of "pitch":
-      # `not (a and b)` so NaN fails the check too; int16(NaN) is UB.
-      if not (effectVal >= -24.0'f32 and effectVal <= 24.0'f32):
-        raise newException(ActionParseError, "pitch must be in [-24.0, 24.0] semitones")
+      checkArg("pitch", "semitones", effectVal)
       return Action(kind: actPitch, pCents: int16(round(effectVal * 100.0'f32)))
     of "brighthue":
+      checkArg("brighthue", "v", effectVal)
       return Action(kind: actLuv, brighthue: effectVal, contrast: luvContrastId,
         saturation: luvSaturationId)
     of "contrast":
-      if effectVal < -2.0'f32 or effectVal > 2.0'f32:
-        raise newException(ActionParseError, "contrast must be in [-2.0, 2.0]")
+      checkArg("contrast", "v", effectVal)
       return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: effectVal,
         saturation: luvSaturationId)
     of "saturation":
-      if effectVal < 0.0'f32 or effectVal > 3.0'f32:
-        raise newException(ActionParseError, "saturation must be in [0.0, 3.0]")
+      checkArg("saturation", "v", effectVal)
       return Action(kind: actLuv, brighthue: luvBrighthueId, contrast: luvContrastId,
         saturation: effectVal)
     else: discard
