@@ -1,7 +1,8 @@
 from ../log import AutoEditorError, error
 from std/math import floor, ceil
 
-import ../[av, ffmpeg, tinyre]
+import ../[av, ffmpeg]
+import ../lib/tinyre
 import ../util/rational
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,

@@ -1,7 +1,7 @@
 import std/[math, strformat, strutils]
 
 import ../[action, av, log, ffmpeg, timeline]
-import ../lib/speedmap
+import ../util/speedmap
 import ../util/rational
 
 # Remux subtitle packets from each clip's source onto the cut timeline,

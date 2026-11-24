@@ -5,7 +5,7 @@ when not defined(emscripten):
 import ./[action, cli, editexpr, ffmpeg, transitions]
 export editexpr, transitions
 import ./util/[color, rational, term]
-import ./lib/timecode
+import ./util/timecode
 
 type
   AutoEditorError* = object of CatchableError

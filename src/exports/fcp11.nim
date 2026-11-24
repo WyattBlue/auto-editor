@@ -4,7 +4,7 @@ import ../util/xml
 
 import ../[ffmpeg, log, media, timeline]
 import ../util/[fun, lang, rational]
-import ../lib/speedmap
+import ../util/speedmap
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.

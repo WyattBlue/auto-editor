@@ -10,7 +10,8 @@ when not defined(emscripten):
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, action, cli, conductor, edit, ffmpeg, license, log, tinyre]
+import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+import ./lib/tinyre
 from ./av import codecAlias
 import render/burnsubs
 import ./lib/escape

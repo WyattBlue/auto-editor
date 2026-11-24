@@ -10,7 +10,7 @@ import std/[algorithm, os, strformat, strutils, tables]
 from std/math import round
 
 import ../[log, timeline]
-import ../lib/[speedmap, timecode]
+import ../util/[speedmap, timecode]
 import ../util/fun
 
 type

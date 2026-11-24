@@ -5,7 +5,7 @@ from std/math import ceil
 import std/strutils
 
 import ../ffmpeg
-import ../util/rational
+import ./rational
 
 type Timecode* = object
   h*, m*, s*, f*: int64

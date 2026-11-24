@@ -3,7 +3,8 @@ from std/uri import decodeUrl
 from std/math import ceil, gcd, `mod`, round, trunc, pow
 
 import ../log
-import ../lib/[dnorm16, timecode, timeunit]
+import ../lib/[dnorm16, timeunit]
+import ./timecode
 
 func b64urlDecode*(s: string): seq[byte] =
   var padded = s.replace('-', '+').replace('_', '/')

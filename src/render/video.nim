@@ -5,7 +5,8 @@ from std/algorithm import sort, upperBound
 import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/[color, rational]
 import ./[burnsubs, transition]
-import ../lib/[dnorm16, speedmap]
+import ../lib/dnorm16
+import ../util/speedmap
 
 func mod360(deg: float32): float32 {.inline.} =
   # Like `floorMod(deg, 360)`, but compiles to fdiv/floor/fma instead of a

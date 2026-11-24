@@ -6,7 +6,7 @@ when defined(windows):
 
 import ../[action, ffmpeg, log, media, timeline]
 import ../util/[fun, rational]
-import ../lib/speedmap
+import ../util/speedmap
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

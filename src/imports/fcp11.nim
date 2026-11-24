@@ -6,7 +6,7 @@ import std/[algorithm, math, os, strformat, strutils, tables]
 
 import ../[action, av, log, timeline]
 import ../util/[color, fun, lang, rational, xml]
-import ../lib/speedmap
+import ../util/speedmap
 
 # Tags common in FCPXML, so the parsed tree can share their strings.
 const fcp11Tags = ["fcpxml", "resources", "format", "asset", "media-rep",

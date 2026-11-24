@@ -3,7 +3,8 @@ from std/math import round, ceil, exp, sin, PI
 
 import ./[action, av, ffmpeg, media, log, transitions, wavutil]
 import ./util/[color, fun, lang, rational]
-import ./lib/[cliputil, speedmap]
+import ./lib/cliputil
+import ./util/speedmap
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]

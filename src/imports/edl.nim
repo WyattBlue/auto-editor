@@ -12,7 +12,7 @@ import std/[algorithm, os, strformat, strutils, tables]
 from std/math import round
 
 import ../[action, av, ffmpeg, log, media, timeline]
-import ../lib/timecode
+import ../util/timecode
 import ../util/[color, rational]
 
 type
