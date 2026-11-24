@@ -1,5 +1,4 @@
 import std/strformat
-
 import ./[av, ffmpeg, log, resampler]
 import ./util/rational
 

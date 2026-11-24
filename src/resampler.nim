@@ -1,7 +1,6 @@
 import std/strformat
-import log
-import ffmpeg
-import util/rational
+import ./[ffmpeg, log]
+import ./util/rational
 
 type AudioResampler* = object
   layout: AVChannelLayout

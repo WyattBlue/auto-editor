@@ -1,9 +1,7 @@
 import std/[algorithm, sequtils, strformat, strutils, tables]
 from std/math import classify, fcInf, fcNan, fcNegInf, round
-
 import ../[action, ffmpeg, log, timeline]
-import ../util/[color, fun, rational, xml]
-import ../util/speedmap
+import ../util/[color, fun, rational, speedmap, xml]
 
 # Tags common in FCP7 XML, so the parsed tree can share their strings.
 const fcp7Tags = ["xmeml", "sequence", "media", "video", "audio", "track",

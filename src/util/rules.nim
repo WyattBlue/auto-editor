@@ -1,7 +1,6 @@
 import std/strformat
-
-import ./fun
 import ../[ffmpeg, log]
+import ./fun
 
 
 type Rules* = object

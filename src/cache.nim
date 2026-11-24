@@ -1,10 +1,8 @@
 import std/[algorithm, options, os, streams, strformat, strutils, times]
-
-import ./[about, ffmpeg, log]
-import ./util/[fun, rational]
-import ./lib/dnorm16
-
 import nimcrypto/sha
+import ./[about, ffmpeg, log]
+import ./lib/dnorm16
+import ./util/[fun, rational]
 
 type CacheCodec = enum
   ccFloat32 = 0'u8 # raw float32

@@ -1,9 +1,8 @@
 import std/[algorithm, heapqueue, options, sequtils, sets, strformat, strutils]
 from std/math import round
-
-import ../[action, av, ffmpeg, license, log, media, timeline, throttle]
-import ../util/[bar, rules, rational]
-import ./[asyncenc, video, audio, subtitle, partialplan]
+import ../[action, av, ffmpeg, license, log, media, throttle, timeline]
+import ../util/[bar, rational, rules]
+import ./[asyncenc, audio, partialplan, subtitle, video]
 
 type Priority = object
   index: float64

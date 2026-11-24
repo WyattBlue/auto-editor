@@ -6,7 +6,6 @@
 
 import std/algorithm
 from std/math import round
-
 import ../action
 
 type SpeedMap* = object

@@ -1,8 +1,7 @@
-import std/[atomics, json, math, strformat, strutils, sequtils, tables]
-
+import std/[atomics, json, math, sequtils, strformat, strutils, tables]
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
-import ../util/rational
 import ../lib/[biquad, dnorm16]
+import ../util/rational
 import ./convolve
 
 # Import C string functions for JSON capture

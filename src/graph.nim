@@ -1,7 +1,5 @@
 import std/strformat
-
-import ffmpeg
-import log
+import ./[ffmpeg, log]
 import ./util/rational
 
 type Graph* = ref object

@@ -8,7 +8,6 @@
 ## worker's alone until `close`, so nothing of Nim's crosses the thread.
 
 import std/typedthreads
-
 import ../[ffmpeg, log]
 
 type

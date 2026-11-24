@@ -1,4 +1,4 @@
-import std/[math, strutils, strformat, parseutils]
+import std/[math, parseutils, strformat, strutils]
 
 proc av_get_known_color_name(color_idx: cint, rgbp: ptr ptr uint8): cstring
     {.importc, header: "<libavutil/parseutils.h>".}

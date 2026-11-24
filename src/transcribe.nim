@@ -1,4 +1,4 @@
-import std/[os, json, strformat, strutils, typedthreads]
+import std/[json, os, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
 import ./lib/[lang, srttime]
 

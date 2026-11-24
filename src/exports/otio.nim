@@ -1,6 +1,5 @@
 import std/[json, os, sets, strutils, tables]
 from std/math import round, hypot, ceil, sin, cos, PI
-
 import ../[action, ffmpeg, log, media, timeline]
 import ../util/[color, fun, rational]
 

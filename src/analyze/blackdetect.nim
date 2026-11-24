@@ -1,8 +1,7 @@
 import std/[math, options, strformat]
-
 import ../[av, cache, ffmpeg, log]
-import ../util/[bar, rational]
 import ../lib/dnorm16
+import ../util/[bar, rational]
 import ./motion # reuse the generic VideoProcessor + videoPipeline frame pump
 
 const AV_PIX_FMT_FLAG_PAL = 1'u64 shl 1

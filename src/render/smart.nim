@@ -1,6 +1,5 @@
 import std/algorithm
 from std/math import round
-
 import ../[av, ffmpeg, log, timeline]
 import ../util/rational
 

@@ -1,11 +1,8 @@
 import std/[algorithm, strformat, strutils, tables]
 from std/math import ceil, round
-import ../util/xml
-
 import ../[ffmpeg, log, media, timeline]
-import ../util/[fun, rational]
 import ../lib/lang
-import ../util/speedmap
+import ../util/[fun, rational, speedmap, xml]
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.

@@ -1,7 +1,6 @@
-import std/[base64, os, strutils, strformat]
+import std/[base64, os, strformat, strutils]
 from std/uri import decodeUrl
 from std/math import ceil, gcd, `mod`, round, trunc, pow
-
 import ../log
 import ../lib/[dnorm16, timeunit]
 import ./timecode

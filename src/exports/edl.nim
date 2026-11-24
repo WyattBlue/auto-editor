@@ -8,10 +8,8 @@
 
 import std/[algorithm, os, strformat, strutils, tables]
 from std/math import round
-
 import ../[log, timeline]
-import ../util/[speedmap, timecode]
-import ../util/fun
+import ../util/[fun, speedmap, timecode]
 
 type
   Channel = enum

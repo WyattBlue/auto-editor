@@ -3,7 +3,6 @@
 ## with nothing encoded.
 
 import std/[atomics, math, sequtils]
-
 import ../[action, av, conductor, ffmpeg, log, timeline]
 import ../util/[bar, rational]
 import ./[audio, format, video]

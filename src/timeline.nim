@@ -1,10 +1,8 @@
 import std/[algorithm, options, os, sets, strformat, tables]
 from std/math import round, ceil, exp, sin, PI
-
-import ./[action, av, ffmpeg, media, log, wavutil]
-import ./util/[color, fun, rational]
+import ./[action, av, ffmpeg, log, media, wavutil]
 import ./lib/[cliputil, lang, transitions]
-import ./util/speedmap
+import ./util/[color, fun, rational, speedmap]
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]

@@ -10,10 +10,8 @@
 
 import std/[algorithm, os, strformat, strutils, tables]
 from std/math import round
-
 import ../[action, av, ffmpeg, log, media, timeline]
-import ../util/timecode
-import ../util/[color, rational]
+import ../util/[color, rational, timecode]
 
 type
   Trans = enum

@@ -1,6 +1,6 @@
-import std/[algorithm, hashes, math, sequtils, strformat, strutils, options]
-import ./util/color
+import std/[algorithm, hashes, math, options, sequtils, strformat, strutils]
 import ./lib/[dnorm16, escape, suggest, timeunit]
+import ./util/color
 
 type
   # The order is part of the API

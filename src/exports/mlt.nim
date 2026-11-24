@@ -1,8 +1,7 @@
 import std/[strformat, strutils]
-import ../util/xml
 from std/math import log10, round
-
 import ../action
+import ../util/xml
 
 # Helpers shared by the MLT-based exporters (Shotcut, Kdenlive).
 

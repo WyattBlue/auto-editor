@@ -1,5 +1,4 @@
-import std/[times, math, strutils, strformat, os]
-import std/[typedthreads, atomics]
+import std/[atomics, math, os, strformat, strutils, times, typedthreads]
 when not defined(windows):
   import std/posix
   var SIGWINCH {.importc, header: "<signal.h>".}: cint

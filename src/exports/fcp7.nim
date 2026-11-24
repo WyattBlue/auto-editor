@@ -1,12 +1,9 @@
 import std/[os, sets, strformat, tables]
-import ../util/xml
 from std/math import ceil, round
+import ../[action, ffmpeg, log, media, timeline]
+import ../util/[fun, rational, speedmap, xml]
 when defined(windows):
   import std/strutils
-
-import ../[action, ffmpeg, log, media, timeline]
-import ../util/[fun, rational]
-import ../util/speedmap
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

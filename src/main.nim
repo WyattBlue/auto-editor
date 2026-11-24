@@ -1,23 +1,21 @@
 import std/[options, os, parseutils, sequtils, strformat, strutils]
-when not defined(emscripten):
+import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
+import ./cmds/[cache, desc, info, levels, subdump, whisper]
+import ./lib/[escape, suggest, tinyre]
+import ./render/burnsubs
+import ./util/[color, fun, rational, term]
+from ./av import codecAlias
+when defined(emscripten):
+  import ./av
+else:
   import std/osproc
+  import ./cmds/completion
   import ./media
   when defined(macosx) or defined(windows) or defined(linux):
     import std/tempfiles
     import ./[mic, wavutil]
-  import cmds/completion
-
-when not defined(windows) and not defined(emscripten):
-  import std/posix_utils
-
-import ./[about, action, cli, conductor, edit, ffmpeg, license, log]
-from ./av import codecAlias
-import render/burnsubs
-import ./lib/[escape, suggest, tinyre]
-when defined(emscripten):
-  import ./av
-import cmds/[info, desc, cache, levels, subdump, whisper]
-import util/[color, fun, term, rational]
+  when not defined(windows):
+    import std/posix_utils
 
 var micCaptureActive = false
 var stopMicCapture = false

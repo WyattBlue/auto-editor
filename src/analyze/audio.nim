@@ -1,9 +1,7 @@
 import std/[math, options, strformat]
-
 import ../[av, cache, ffmpeg, log, resampler]
-import ../lib/audioutil
+import ../lib/[audioutil, dnorm16]
 import ../util/[bar, rational]
-import ../lib/dnorm16
 
 when defined(arm64) or defined(aarch64):
   type Vec16x8 {.importc: "int16x8_t", header: "<arm_neon.h>".} = object

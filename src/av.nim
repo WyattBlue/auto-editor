@@ -1,8 +1,7 @@
-import std/[math, strformat, strutils, sequtils, tables]
-
+import std/[math, sequtils, strformat, strutils, tables]
 import ./[ffmpeg, log]
-import ./util/rational
 import ./lib/[audioutil, lang, suggest]
+import ./util/rational
 
 var useWebCodecs* = false
 

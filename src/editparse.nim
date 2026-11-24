@@ -1,5 +1,4 @@
 import std/[strformat, strutils]
-
 import ./[editlexer, editmethods]
 import ./lib/suggest
 

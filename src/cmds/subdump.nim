@@ -1,8 +1,7 @@
 import std/[json, os, strutils]
-
 import ../[av, cli, ffmpeg, log]
-import ./help
 import ../util/rational
+import ./help
 
 assertArgumentOptions(subdumpOptions, {})
 

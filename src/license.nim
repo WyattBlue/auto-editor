@@ -1,8 +1,7 @@
 import std/[envvars, json, strformat, strutils]
-
 import ./log
 import ./util/fun
-import vendor/libp2p/ed25519
+import ./vendor/libp2p/ed25519
 
 const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
 const LICENSE_PERIOD_YEARS = 3

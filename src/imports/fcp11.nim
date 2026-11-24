@@ -3,11 +3,9 @@
 ## timeline can't hold is left out with a warning.
 
 import std/[algorithm, math, os, strformat, strutils, tables]
-
 import ../[action, av, log, timeline]
-import ../util/[color, fun, rational, xml]
 import ../lib/lang
-import ../util/speedmap
+import ../util/[color, fun, rational, speedmap, xml]
 
 # Tags common in FCPXML, so the parsed tree can share their strings.
 const fcp11Tags = ["fcpxml", "resources", "format", "asset", "media-rep",

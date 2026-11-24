@@ -1,9 +1,8 @@
 ## SMPTE timecode, as EDLs count it: whole frames at an integer base, with
 ## drop-frame numbering for the NTSC rates.
 
-from std/math import ceil
 import std/strutils
-
+from std/math import ceil
 import ../ffmpeg
 import ./rational
 

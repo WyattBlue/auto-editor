@@ -1,12 +1,10 @@
 import std/[envvars, options, os, strformat, tables, times]
-when not defined(emscripten):
-  import std/strutils
-
 import ./[action, cli, editexpr, ffmpeg]
 import ./lib/transitions
+import ./util/[color, rational, term, timecode]
+when not defined(emscripten):
+  import std/strutils
 export editexpr, transitions
-import ./util/[color, rational, term]
-import ./util/timecode
 
 type
   AutoEditorError* = object of CatchableError

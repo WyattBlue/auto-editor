@@ -1,5 +1,4 @@
 import std/[math, os, strformat, tables]
-
 import ../[av, ffmpeg, log, resampler]
 
 type

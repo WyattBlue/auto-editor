@@ -1,5 +1,4 @@
 import std/sequtils
-
 import ../ffmpeg
 import ./smart
 

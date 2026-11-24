@@ -1,9 +1,8 @@
-import std/[json, os, sequtils, tables, strformat, sysrand, strutils]
-import ./mlt
-import ../util/xml
+import std/[json, os, sequtils, strformat, strutils, sysrand, tables]
 import ../[action, log, media, timeline]
-import ../util/[color, fun, rational]
 import ../lib/dnorm16
+import ../util/[color, fun, rational, xml]
+import ./mlt
 
 proc genUuid*(): string =
   var bytes: array[16, byte]

@@ -3,10 +3,8 @@
 ## and leaves these unset.
 
 import std/atomics
-
 import ./[av, log]
 import ./util/bar
-
 export ProgressHook, LogHook, AutoEditorError
 
 type JobHooks* = object

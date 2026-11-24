@@ -1,9 +1,8 @@
-import std/[sets, strutils, strformat]
+import std/[sets, strformat, strutils]
 from std/math import round
-
 import ./[action, av, ffmpeg, log, timeline]
-import ./util/[fun, rational]
 import ./lib/cliputil
+import ./util/[fun, rational]
 import ./vendor/csort/csort
 
 type f64 = float64

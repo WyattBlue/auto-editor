@@ -1,5 +1,4 @@
 import std/[os, strformat, strutils, terminal]
-
 import ../[about, cli, log]
 import ../util/fun
 import ./help

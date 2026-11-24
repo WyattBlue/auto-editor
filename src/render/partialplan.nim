@@ -1,6 +1,5 @@
 import std/[algorithm, deques, strformat, strutils]
 from std/math import round
-
 import ../[action, av, ffmpeg, log, timeline]
 import ../util/rational
 import ./[h264, hevc, smart]

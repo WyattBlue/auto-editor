@@ -8,7 +8,6 @@
 
 import std/[atomics, cpuinfo, locks, typedthreads]
 from std/math import PI, arcsin, arctan2, ceil, cos, exp, floor, pow, round, sin, sqrt, tan
-
 import ../lib/transitions
 
 type

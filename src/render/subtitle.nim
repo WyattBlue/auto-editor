@@ -1,8 +1,6 @@
 import std/[math, strformat, strutils]
-
-import ../[action, av, log, ffmpeg, timeline]
-import ../util/speedmap
-import ../util/rational
+import ../[action, av, ffmpeg, log, timeline]
+import ../util/[rational, speedmap]
 
 # Remux subtitle packets from each clip's source onto the cut timeline,
 # clipping each cue's visible window to its clip boundary. A cue that overlaps
