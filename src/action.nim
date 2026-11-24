@@ -166,10 +166,12 @@ type
   ActionFlags* = set[ActionFlag]
 
   RangeDoc* = object
+    ## An interval of allowed values.
     lo*, hi*: float
     loIncl*, hiIncl*: bool  # closed (inclusive) bounds
     each*: bool             # the interval applies to each positional arg
   ArgKind* = enum
+    ## What an action argument is written as.
     akNumber,    # a decimal number
     akInteger,   # a whole number
     akColor,     # a color name, #rgb, #rrggbb, #rrggbbaa, or yuv#YYUUVV where taken
@@ -192,6 +194,7 @@ type
     choices*: seq[string]
     unit*: string
   ActionDef* = object
+    ## An action: its name, what it applies to, its arguments, and its help.
     name*: string
     flags*: ActionFlags
     argSpec*: string  # storage type ("float32") or positional spec ("k1[:k2]")
@@ -239,7 +242,7 @@ func arg(name: string, kind: ArgKind, lo, hi: float, loIncl, hiIncl: bool,
     unit = ""): ArgDef =
   result = ArgDef(name: name, kind: kind, optional: optional or default != "",
     default: default, keyword: keyword, choices: choices, unit: unit)
-  if lo == lo:
+  if lo == lo: # NaN, the wrappers' default, means no range
     result.range = rng(lo, hi, loIncl, hiIncl)
 
 func numArg(name: string, lo = NaN, hi = NaN, loIncl = true, hiIncl = true,
@@ -275,7 +278,8 @@ func shapeArgs(optional: bool): seq[ArgDef] =
     intArg("radius", -1, i32Hi, default = "0", unit = "px"),
     intArg("feather", 0, 255, default = "0", unit = "px"),
     flagArg("invert"),
-    arg("poly", akPoints, i32Lo, i32Hi, true, true, "", true, true)]
+    arg("poly", akPoints, i32Lo, i32Hi, loIncl = true, hiIncl = true, default = "",
+      optional = true, keyword = true)]
 
 func subsArgs(size: string): seq[ArgDef] =
   @[pathArg("font", optional = true, keyword = true),
@@ -311,7 +315,8 @@ const actionDefs*: seq[ActionDef] = @[
     args: @[kfArg("v", 0.2, 100)],
     help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Ramps like `speed`'s, e.g. `varispeed:1..4`."),
   ActionDef(name: "ease", flags: {afAudio, afVideo}, argSpec: "curve[:duration]",
-    args: @[choiceArg("curve", easeNames), arg("duration", akDuration, 0, Inf, true, false, "", true, false)],
+    args: @[choiceArg("curve", easeNames), arg("duration", akDuration, 0, Inf,
+      loIncl = true, hiIncl = false, default = "", optional = true, keyword = false)],
     help: """
 Set the easing for the animated actions that follow it (until another `ease` overrides it); equivalent to adding `:ease=curve` to each. `curve` is one of `linear`, `in`, `out`, or `inout`.
 The optional `duration` (e.g. `2sec` or a bare frame count) is how long the animation takes before holding at its end value; omitted, it spans the whole section. Example: `ease:inout,zoom:1..2`.
@@ -400,7 +405,8 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
     argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical][:ass]",
-    args: @[arg("text", akText, NaN, NaN, true, true, "", false, false)] & subsArgs("8") &
+    args: @[arg("text", akText, NaN, NaN, loIncl = true, hiIncl = true,
+      default = "", optional = false, keyword = false)] & subsArgs("8") &
       @[flagArg("vertical"), flagArg("ass")],
     help: "Write a line of text with libass, white with a black outline in the frame's center unless told otherwise. As a generator it takes a file's place in `add:`, the text on its own overlay layer, e.g. `add:text:Chapter 1`; as an action it writes over a section's picture. In the text, `\\n` starts a new line, and a backslash before a comma, colon, or backslash keeps it from ending the text or the action: `text:Hello\\, world`. The overrides are `burn`'s, with `size` defaulting to 8, and `align` places the text: `center`, `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, or `bottom-right`. Append `:vertical` for tategaki-style vertical layout: each line's characters stack top to bottom, upright, and lines run right to left (so the first `\\n`-separated line sits rightmost); `align` still places the whole block. Append `:ass` to write the text as ASS event text: override blocks like `{\\b1}` and escapes like `\\N` and `\\h` reach libass as written, so part of a text can be bold, italic, or another color. In an action, each of those backslashes doubles: `text:plain {\\\\b1}bold{\\\\b0}:ass`. Without `:ass`, braces and backslashes show as they are. To put it anywhere, chain `pos` onto its layer, e.g. `add:text:Hi:size=12,pos:0:-300`."),
   ActionDef(name: "spin", flags: {afVideo}, argSpec: "deg/rate",
@@ -489,7 +495,9 @@ func rangeMsg(action: string, d: ArgDef, whole: bool): string =
   ## "zoom must be in (0.0, 100.0]", naming the argument when there are several.
   var count = 0
   for a in actionDefs:
-    if a.name == action: count = a.args.len
+    if a.name == action:
+      count = a.args.len
+      break
   let r = d.range.get
   func bound(v: float): string =
     if whole and abs(v) < 1e15: $int(v) else: $v
@@ -874,6 +882,7 @@ type
     of akFlag: on*: bool   # confetti's `shimmer` is a `no-shimmer` that's off
     of akPoints: pts*: seq[int32] # x1, y1, x2, y2, ...
   SpecEase* = object
+    ## An animated action's `:ease=curve[:duration]`.
     curve*: Easing
     dur*: float64          # in `unit`; 0 for duClip
     unit*: DurUnit         # duClip when no duration is written
@@ -886,6 +895,7 @@ type
     ease*: Option[SpecEase]
 
 func `==`*(a, b: ArgValue): bool =
+  ## Values compare as numbers, so `16` equals `16.0`.
   if a.kind != b.kind: return false
   case a.kind
   of akNumber, akInteger: a.num == b.num
@@ -896,9 +906,13 @@ func `==`*(a, b: ArgValue): bool =
   of akPoints: a.pts == b.pts
 
 func `==`*(a, b: ActionSpec): bool =
+  ## Equal as written: an argument left out isn't equal to one given its
+  ## default, so `lens:-0.5` isn't `lens`.
   a.name == b.name and a.args == b.args and a.ease == b.ease
 
-func argIndex(action, arg: string): int =
+func argIndex*(action, arg: string): int =
+  ## Where `arg` sits in `action`'s ActionDef.args and an ActionSpec's
+  ## args, or -1 when it has no such argument.
   for d in actionDefs:
     if d.name == action:
       for i, a in d.args:
@@ -910,7 +924,9 @@ template ix(action, arg: static string): int =
   static: doAssert i >= 0, action & " has no argument " & arg
   i
 
-func initSpec(name: string): ActionSpec =
+func initSpec*(name: string): ActionSpec =
+  ## A spec for `name` with nothing written, its args sized to the action's.
+  ## An unknown name has no args.
   result = ActionSpec(name: name)
   for d in actionDefs:
     if d.name == name:
@@ -935,7 +951,6 @@ proc pNum(s: string): float64 {.raises: [ActionParseError].} =
     except ValueError: raise newException(ActionParseError, &"Invalid float value: {s}")
   if classify(float32(result)) in {fcNan, fcInf, fcNegInf}:
     raise newException(ActionParseError, &"Invalid float value: {s}")
-  if result == 0: result = 0 # -0 is 0, so it formats as it's written back
 
 proc pDur(spec: string): (float64, DurUnit) {.raises: [ActionParseError].} =
   ## parseDuration, kept as a float64.
@@ -947,7 +962,6 @@ proc pDur(spec: string): (float64, DurUnit) {.raises: [ActionParseError].} =
     try: parseFloat(num)
     except ValueError: raise newException(ActionParseError, &"Invalid duration: {spec}")
   result = if tu == tuFrames: (n, duFrames) else: (n * tu.seconds, duSec)
-  if result[0] == 0: result[0] = 0
   # `not (a and b)` so NaN fails too; inf would write a timeline that can't
   # be read back.
   let f = float32(result[0])
@@ -1454,6 +1468,8 @@ func parseActionSpec*(val: string): ActionSpec {.raises: [ActionParseError].} =
     else:
       # Every channel is written, at 0 where it isn't given, which is what
       # tells this form from the shorthand.
+      static: doAssert ix("aberration", "bv") - ix("aberration", "rh") == 5 and
+        ix("aberration", "gh") - ix("aberration", "rh") == 2
       for i in ix("aberration", "rh") .. ix("aberration", "bv"):
         result.args[i] = intV(0)
       for idx in 1 ..< parts.len:
@@ -1553,11 +1569,14 @@ func parseActionSpec*(val: string): ActionSpec {.raises: [ActionParseError].} =
 
   raise newException(ActionParseError, &"Unknown action: {actionDidYouMean(val)}")
 
-func has(s: ActionSpec, i: int): bool = s.args[i].isSome
+func has(s: ActionSpec, i: int): bool = i < s.args.len and s.args[i].isSome
 func num(s: ActionSpec, i: int, default: float64): float64 =
-  if s.args[i].isSome: s.args[i].get.num else: default
+  if s.has(i) and s.args[i].get.kind in {akNumber, akInteger}: s.args[i].get.num
+  else: default
 func str(s: ActionSpec, i: int): string =
-  if s.args[i].isSome: s.args[i].get.str else: ""
+  if s.has(i) and s.args[i].get.kind in {akColor, akChoice, akPath, akText}:
+    s.args[i].get.str
+  else: ""
 func kf32(s: ActionSpec, i: int): seq[float32] =
   for v in s.args[i].get.kf: result.add float32(v)
 func kts(s: ActionSpec, i: int): seq[KfTime] = s.args[i].get.kt
@@ -1575,8 +1594,8 @@ proc specColor(spec: string): RGBColor {.raises: [ActionParseError].} =
   except ValueError: raise newException(ActionParseError, &"Invalid color: {spec}")
 
 proc toAction*(s: ActionSpec): Action {.raises: [ActionParseError].} =
-  ## Pack a spec from parseActionSpec. `cut`, `nil` and `ease` aren't actions
-  ## on their own, so they're refused.
+  ## Pack a spec, which is trusted to be as parseActionSpec makes them.
+  ## `cut`, `nil` and `ease` aren't actions on their own, so they're refused.
   case s.name
   of "invert": Action(kind: actInvert)
   of "hflip": Action(kind: actHflip)
@@ -1736,6 +1755,8 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
 
 proc meanSpeed*(s: ActionSpec): float64 {.raises: [ActionParseError].} =
   ## A speed or varispeed ramp's mean speed over its media, as the CLI packs it.
+  if s.name notin ["speed", "varispeed"]:
+    raise newException(ActionParseError, &"{s.name} has no speed")
   meanSpeed(toAction(s))
 
 proc normalizedColor*(spec: string): string {.raises: [ActionParseError].} =
@@ -1818,52 +1839,53 @@ func `$`*(s: ActionSpec): string =
     of akFlag: ""
     of akPoints: v.pts.mapIt($it).join("/")
   template a(i: int): ArgValue = s.args[i].get
-  template has(i: int): bool = s.args[i].isSome
 
   result = s.name
   case s.name
   of "burn", "text":
     if s.name == "text": result = "text:" & textPart(s.str(0))
-    elif has(0): result &= ":" & a(0).str
+    elif s.has(0): result &= ":" & s.str(0)
     for k in 1 ..< subsKeys.len:
-      if has(k): result &= &":{subsKeys[k]}={val(a(k))}"
+      if s.has(k): result &= &":{subsKeys[k]}={val(a(k))}"
     if s.name == "text":
-      if has(ix("text", "vertical")): result &= ":vertical"
-      if has(ix("text", "ass")): result &= ":ass"
+      if s.has(ix("text", "vertical")): result &= ":vertical"
+      if s.has(ix("text", "ass")): result &= ":ass"
   of "mask", "confine":
     let feather = ix("mask", "feather")
-    if has(ix("mask", "poly")):
+    if s.has(ix("mask", "poly")):
       result &= ":poly=" & val(a(ix("mask", "poly")))
-      if has(feather): result &= ":feather=" & val(a(feather))
-    elif has(0):
-      for i in 0 ..< 4: result &= ":" & val(a(i))
-      if has(4):
+      if s.has(feather): result &= ":feather=" & val(a(feather))
+    elif s.has(0):
+      for i in 0 ..< 4:
+        if s.has(i): result &= ":" & val(a(i))
+      if s.has(4):
         result &= ":" & val(a(4))
-        if has(feather): result &= ":" & val(a(feather))
-      elif has(feather): result &= ":feather=" & val(a(feather))
-    if has(ix("mask", "invert")): result &= ":invert"
+        if s.has(feather): result &= ":" & val(a(feather))
+      elif s.has(feather): result &= ":feather=" & val(a(feather))
+    if s.has(ix("mask", "invert")): result &= ":invert"
   of "spin":
-    result &= &":{val(a(0))}/{val(a(1))}"
+    if s.has(0) and s.has(1): result &= &":{val(a(0))}/{val(a(1))}"
   of "aberration":
-    if has(ix("aberration", "rh")):
+    if s.has(ix("aberration", "rh")):
       var ps: seq[string]
       for key in ["rh", "rv", "gh", "gv", "bh", "bv"]:
-        let v = a(argIndex("aberration", key)).num
+        let v = s.num(argIndex("aberration", key), 0)
         if v != 0: ps.add &"{key}={numStr(v)}"
-      if has(2): ps.add "edge=" & a(2).str
+      if s.has(2): ps.add "edge=" & s.str(2)
       if ps.len == 0: ps.add "rh=0"
       result &= ":" & ps.join(":")
     else:
       for i in 0 ..< 3:
-        if has(i): result &= ":" & val(a(i))
+        if s.has(i): result &= ":" & val(a(i))
   of "confetti":
     for i in 0 ..< 4:
-      if has(i): result &= ":" & val(a(i))
-    if has(4): result &= ":seed=" & val(a(4))
-    if has(5): result &= (if a(5).on: ":no-shimmer" else: ":shimmer")
+      if s.has(i): result &= ":" & val(a(i))
+    if s.has(4): result &= ":seed=" & val(a(4))
+    if s.has(5) and a(5).kind == akFlag:
+      result &= (if a(5).on: ":no-shimmer" else: ":shimmer")
   else:
     for i in 0 ..< s.args.len:
-      if has(i): result &= ":" & val(a(i))
+      if s.has(i): result &= ":" & val(a(i))
   if s.ease.isSome:
     let e = s.ease.get
     result &= ":ease=" & easeNames[e.curve]
