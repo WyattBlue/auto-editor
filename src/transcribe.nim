@@ -1,6 +1,7 @@
 import std/[os, json, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
 import ./util/lang
+import ./lib/srttime
 
 type
   WhisperCtx = pointer
@@ -220,9 +221,6 @@ type OutCtx = object
   splitWords: bool
   index: int
   segStartMs: int64
-
-func srtTime(ms: int64): string =
-  &"{ms div 3600000:02}:{(ms div 60000) mod 60:02}:{(ms div 1000) mod 60:02},{ms mod 1000:03}"
 
 # Called by whisper_stream.c per text segment, on this (main) thread, so Nim GC
 # and File writes are safe.
