@@ -1,9 +1,8 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editexpr, editlexer, editparse, ffmpeg, log]
-import ./lib/tinyre
 import ./analyze/[audio, blackdetect, motion, subtitle]
-import ./lib/[audioutil, dnorm16, wordre]
-import ./util/[bar, fun, rational, suggest]
+import ./lib/[audioutil, dnorm16, suggest, tinyre, wordre]
+import ./util/[bar, fun, rational]
 
 type
   NormSymbol = enum

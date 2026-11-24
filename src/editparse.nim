@@ -1,7 +1,7 @@
 import std/[strformat, strutils]
 
 import ./[editlexer, editmethods]
-import ./util/suggest
+import ./lib/suggest
 
 type
   BoundEditArg* = tuple[position: int, value: string]

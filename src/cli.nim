@@ -1,5 +1,5 @@
 import std/[macros, strformat, strutils]
-import ./util/suggest
+import ./lib/suggest
 
 type Categories* = enum
   cNone cEdit cTl cUrl cDis cCon cVid cAud cMis
