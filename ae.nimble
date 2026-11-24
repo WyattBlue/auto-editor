@@ -210,8 +210,8 @@ let svtav1 = Package(
 )
 let whisper = Package(
   name: "whisper",
-  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.5.tar.gz",
-  sha256: "ff1a9053feb509ff9d7729703355541ae9690073a6b1c40eb692c962e0dc1720",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.6.tar.gz",
+  sha256: "7ab15dc88022d2425ad94dcffd8abbf1b6d7018089b4e48d6b40780738e0b445",
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
@@ -334,7 +334,7 @@ func dirName(package: Package): string =
   if package.name == "amf-headers":
     return "AMF-1.5.2"
   if package.name == "whisper":
-    return "whisper.cpp-1.9.5"
+    return "whisper.cpp-1.9.6"
   if package.name == "bwlame":
     return "bwlame-4.1.0"
 
@@ -534,7 +534,7 @@ includedir=${{prefix}}/include
 
 Name: whisper
 Description: whisper.cpp
-Version: 1.9.5
+Version: 1.9.6
 Libs: {libs}
 Libs.private: {libsPrivate}
 Cflags: -I${{includedir}}
@@ -605,7 +605,7 @@ includedir=${{prefix}}/include
 
 Name: whisper
 Description: whisper.cpp
-Version: 1.9.5
+Version: 1.9.6
 Libs: -L${{libdir}} -lwhisper -lparakeet -lggml-base -lggml -lggml-cpu
 Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
