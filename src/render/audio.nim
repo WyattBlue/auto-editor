@@ -275,8 +275,17 @@ proc get(getter: Getter, start, endSample: int, sequential = false): seq[int16] 
     totalSamples = held
   else:
     getter.carry.setLen(0)
-    # Seek to the approximate position
-    if av_seek_frame(container.formatContext, stream.index, startPts,
+    # A decoder started inside the stream needs its pre-roll before its
+    # output is exact (AAC's overlap, MP3's bit reservoir), so seek that much
+    # earlier; the frames before `start` are dropped below. The probe and the
+    # decoder each may declare it. MP3 declares a worst case reaching
+    # seconds at low MPEG-2 bitrates, more than real files use, so it's
+    # capped to keep many cuts cheap.
+    const maxPrerollSeconds = 1.0
+    let preroll = min(max(stream.codecpar.seek_preroll, decoderCtx.seek_preroll).float /
+      sampleRate.float, maxPrerollSeconds)
+    let seekPts = startPts - int64(preroll * timeBase.den.float / timeBase.num.float)
+    if av_seek_frame(container.formatContext, stream.index, seekPts,
         AVSEEK_FLAG_BACKWARD) < 0:
       # If seeking fails, fall back to reading from beginning
       discard av_seek_frame(container.formatContext, stream.index, 0,

@@ -239,6 +239,7 @@ type
     video_delay*: cint
     ch_layout*: AVChannelLayout
     sample_rate*: cint
+    seek_preroll*: cint
 
   AVCodecConfig* {.importc: "enum AVCodecConfig", header: "<libavcodec/codec.h>".} = enum
     AV_CODEC_CONFIG_PIX_FORMAT,
@@ -307,6 +308,7 @@ type
     subtitle_header_size*: cint
     pkt_timebase*: AVRational
     skip_frame*: AVDiscard
+    seek_preroll*: cint
     # ... other fields omitted for brevity
 
 proc `==`*(a: AVSampleFormat, b: cint): bool = cint(ord(a)) == b
