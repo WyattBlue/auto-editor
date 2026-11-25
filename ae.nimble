@@ -136,19 +136,19 @@ type Package = object
 
 let nvheaders = Package(
   name: "nv-codec-headers",
-  sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz",
-  sha256: "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116",
+  sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.1.tar.gz",
+  sha256: "c293161bd92dac53f2f8fab08abcd4f96773c3644a57b23c2260b4be2311ab2f",
 )
 let amfheaders = Package(
   name: "amf-headers",
-  sourceUrl: "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.5.2.tar.gz",
-  sha256: "8a70b6dc85261e6e6e57769bd81ac1e09c0a4c96bbd5e358ffbc2dee51e8e50a",
+  sourceUrl: "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.5.3.tar.gz",
+  sha256: "eb7d7d14c239117478f229cf174dc359fa2ba1e0817a7cb16277cc5251709f0f",
   ffFlag: "--enable-amf",
 )
 let alsa = Package(
   name: "alsa-lib",
-  sourceUrl: "https://www.alsa-project.org/files/pub/lib/alsa-lib-1.2.14.tar.bz2",
-  sha256: "be9c88a0b3604367dd74167a2b754a35e142f670292ae47a2fdef27a2ee97a32",
+  sourceUrl: "https://www.alsa-project.org/files/pub/lib/alsa-lib-1.2.16.1.tar.bz2",
+  sha256: "f740db7f488255944ffd4428416ee3390a96742856916433df468c281436480e",
   buildArguments: @["--disable-python"],
 )
 let libvpl = Package(
@@ -266,8 +266,8 @@ let fribidi = Package(
 )
 let harfbuzz = Package(
   name: "harfbuzz",
-  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/15.1.0/harfbuzz-15.1.0.tar.xz",
-  sha256: "0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d",
+  sourceUrl: "https://github.com/harfbuzz/harfbuzz/releases/download/15.2.0/harfbuzz-15.2.0.tar.xz",
+  sha256: "e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb",
   buildSystem: "meson",
   buildArguments: @["--auto-features=disabled", "-Dtests=disabled",
     "-Ddocs=disabled", "-Dutilities=disabled", "-Dintrospection=disabled",
@@ -330,9 +330,9 @@ func dirName(package: Package): string =
   if package.name == "libvpl":
     return "libvpl-2.17.0"
   if package.name == "nv-codec-headers":
-    return "nv-codec-headers-n13.0.19.0"
+    return "nv-codec-headers-n13.0.19.1"
   if package.name == "amf-headers":
-    return "AMF-1.5.2"
+    return "AMF-1.5.3"
   if package.name == "whisper":
     return "whisper.cpp-1.9.6"
   if package.name == "bwlame":
