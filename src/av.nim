@@ -381,6 +381,19 @@ proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRa
       den: video.avg_frame_rate.num)
   AVRational(num: 0, den: 1)
 
+proc setActiveStream*(container: InputContainer, index: cint) =
+  ## Tell the demuxer to discard packets for every stream except `index`, so
+  ## av_read_frame skips demuxing streams we don't decode (e.g. video while
+  ## analyzing audio). Call resetDiscards() when finished to restore the
+  ## container for callers that read every stream.
+  for i in 0 ..< container.formatContext.nb_streams.int:
+    let s = container.formatContext.streams[i]
+    s.discardLevel = (if s.index == index: AVDISCARD_DEFAULT else: AVDISCARD_ALL)
+
+proc resetDiscards*(container: InputContainer) =
+  for i in 0 ..< container.formatContext.nb_streams.int:
+    container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
+
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
   let formatCtx = container.formatContext
@@ -388,6 +401,10 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   if container.audio.len > 0:
     let audio = container.audio[0]
+    # Only the audio's packets count: let the demuxer skip the rest instead
+    # of reading every video frame off the disk.
+    container.setActiveStream(audio.index)
+    defer: container.resetDiscards()
     let endPts = scanPackets(formatCtx, audio, 0).endPts
     return (if endPts > 0: endPts - formatCtx.startPts(audio) else: 0) *
       audio.time_base
@@ -402,19 +419,6 @@ proc mediaLength*(container: InputContainer): AVRational =
     return scanVideoLength(formatCtx, video)
 
   error "No audio or video stream found"
-
-proc setActiveStream*(container: InputContainer, index: cint) =
-  ## Tell the demuxer to discard packets for every stream except `index`, so
-  ## av_read_frame skips demuxing streams we don't decode (e.g. video while
-  ## analyzing audio). Call resetDiscards() when finished to restore the
-  ## container for callers that read every stream.
-  for i in 0 ..< container.formatContext.nb_streams.int:
-    let s = container.formatContext.streams[i]
-    s.discardLevel = (if s.index == index: AVDISCARD_DEFAULT else: AVDISCARD_ALL)
-
-proc resetDiscards*(container: InputContainer) =
-  for i in 0 ..< container.formatContext.nb_streams.int:
-    container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
 
 var decodeErrors* {.threadvar.}: int ## per thread, as a job's hooks are
 
