@@ -232,6 +232,85 @@ index 8b7e728..c10ab93 100644
          } else {
              pkt->data = NULL;
              if (ctx->observed_quit) {
+diff --git a/libavformat/matroskadec.c b/libavformat/matroskadec.c
+index 1f6cb96..e0163c1 100644
+--- a/libavformat/matroskadec.c
++++ b/libavformat/matroskadec.c
+@@ -1107,6 +1107,60 @@ static int ebml_read_binary(AVIOContext *pb, int length,
+     return 0;
+ }
+ 
++/*
++ * Read a block as ebml_read_binary does, unless its track's stream is
++ * discarded: then nothing would use the data, so only the track number is
++ * read and 1 is returned with *length the bytes left to skip.
++ */
++static int matroska_read_block(MatroskaDemuxContext *matroska, AVIOContext *pb,
++                               uint64_t *length, int64_t pos, EbmlBin *bin)
++{
++    MatroskaTrack *tracks = matroska->tracks.elem;
++    uint8_t head[8];
++    int size = *length, n = FFMIN(size, sizeof(head)), bytes, ret, i;
++
++    if (!n)
++        return ebml_read_binary(pb, size, pos, bin);
++    if ((ret = avio_read(pb, head, n)) != n)
++        return ret < 0 ? ret : NEEDS_CHECKING;
++
++    /* The track number is a variable-length integer, as ebml_read_num reads. */
++    bytes = head[0] ? 8 - ff_log2_tab[head[0]] : n + 1;
++    if (bytes <= n) {
++        uint64_t num = head[0] ^ (1 << ff_log2_tab[head[0]]);
++
++        for (i = 1; i < bytes; i++)
++            num = num << 8 | head[i];
++        for (i = 0; i < matroska->tracks.nb_elem; i++)
++            if (tracks[i].num == num) {
++                if (tracks[i].stream &&
++                    tracks[i].stream->discard >= AVDISCARD_ALL) {
++                    *length = size - n;
++                    return 1;
++                }
++                break;
++            }
++    }
++
++    ret = av_buffer_realloc(&bin->buf, size + AV_INPUT_BUFFER_PADDING_SIZE);
++    if (ret < 0)
++        return ret;
++    memset(bin->buf->data + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++    memcpy(bin->buf->data, head, n);
++
++    bin->data = bin->buf->data;
++    bin->size = size;
++    bin->pos  = pos;
++    if ((ret = avio_read(pb, bin->data + n, size - n)) != size - n) {
++        av_buffer_unref(&bin->buf);
++        bin->data = NULL;
++        bin->size = 0;
++        return ret < 0 ? ret : NEEDS_CHECKING;
++    }
++
++    return 0;
++}
++
+ /*
+  * Read the next element, but only the header. The contents
+  * are supposed to be sub-elements which can be read separately.
+@@ -1493,7 +1547,12 @@ static int ebml_parse(MatroskaDemuxContext *matroska,
+         res = ebml_read_ascii(pb, length, syntax->def.s, data);
+         break;
+     case EBML_BIN:
+-        res = ebml_read_binary(pb, length, pos_alt, data);
++        if (id == MATROSKA_ID_SIMPLEBLOCK || id == MATROSKA_ID_BLOCK) {
++            res = matroska_read_block(matroska, pb, &length, pos_alt, data);
++            if (res == 1)
++                goto skip;
++        } else
++            res = ebml_read_binary(pb, length, pos_alt, data);
+         break;
+     case EBML_LEVEL1:
+     case EBML_NEST:
 diff --git a/libavformat/mp3enc.c b/libavformat/mp3enc.c
 index 4ea54f7..11bdf7b 100644
 --- a/libavformat/mp3enc.c
