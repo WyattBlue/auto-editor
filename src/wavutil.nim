@@ -283,7 +283,8 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32,
 
   var currentPts: int64 = 0
 
-  # Read and process frames
+  # Only this stream is transcoded: let the demuxer skip the video's data.
+  container.setActiveStream(audioStreamIdx)
   while av_read_frame(container.formatContext, packet) >= 0:
     defer: av_packet_unref(packet)
 
