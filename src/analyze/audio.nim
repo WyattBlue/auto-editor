@@ -438,10 +438,10 @@ proc streamPeaks*(input: string, stream, samplesPerBucket: int,
   let bar = initBar(BarType.none) # for the cancel flag
   for (bucketStart, peaks) in processor.channelPeaks(container, audioStream, channels):
     bar.tick(0)
-    if bucketStart + samplesPerBucket <= startSample: continue
-    if bucketStart >= endSample: break
-    for c in 0 ..< min(n, peaks.len):
-      if result[c].firstSample < 0: result[c].firstSample = bucketStart
-      result[c].peaks.add peaks[c]
+    if bucketStart + samplesPerBucket > startSample:
+      if bucketStart >= endSample: break
+      for c in 0 ..< min(n, peaks.len):
+        if result[c].firstSample < 0: result[c].firstSample = bucketStart
+        result[c].peaks.add peaks[c]
   for w in result.mitems:
     if w.firstSample < 0: w.firstSample = startSample

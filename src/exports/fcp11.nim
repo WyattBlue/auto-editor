@@ -142,34 +142,34 @@ proc anchorCaptions(asset: XmlNode, tl: v3, orders: seq[CueOrder], clip: Clip,
       template cue: Caption = track.cues[i]
       let start = max(cue.start, clip.start)
       let dur = cue.start + cue.dur - start
-      if dur <= 0: continue
-      inc styleId
-      let caption = newElement("caption")
-      var name = cue.text
-      let nl = name.find('\n')
-      if nl >= 0: name = name[0 ..< nl]
-      caption.attrs = {
-        "lane": $(t + 1),
-        "offset": fraction(clip.offset + startPoint + start - clip.start, tl.tb),
-        "name": name,
-        "duration": fraction(dur, tl.tb),
-        "role": "SRT?captionFormat=SRT." & fcpLang(track.lang),
-      }.toXmlAttributes
-      let text = newElement("text")
-      let styled = newElement("text-style")
-      styled.attrs = {"ref": "ts" & $styleId}.toXmlAttributes
-      styled.add newText(cue.text)
-      text.add styled
-      caption.add text
-      let def = newElement("text-style-def")
-      def.attrs = {"id": "ts" & $styleId}.toXmlAttributes
-      let style = newElement("text-style")
-      style.attrs = {"font": "Helvetica", "fontSize": "63", "fontFace": "Regular",
-        "fontColor": "1 1 1 1", "backgroundColor": "0 0 0 0.75",
-        "alignment": "center"}.toXmlAttributes
-      def.add style
-      caption.add def
-      asset.add caption
+      if dur > 0:
+        inc styleId
+        let caption = newElement("caption")
+        var name = cue.text
+        let nl = name.find('\n')
+        if nl >= 0: name = name[0 ..< nl]
+        caption.attrs = {
+          "lane": $(t + 1),
+          "offset": fraction(clip.offset + startPoint + start - clip.start, tl.tb),
+          "name": name,
+          "duration": fraction(dur, tl.tb),
+          "role": "SRT?captionFormat=SRT." & fcpLang(track.lang),
+        }.toXmlAttributes
+        let text = newElement("text")
+        let styled = newElement("text-style")
+        styled.attrs = {"ref": "ts" & $styleId}.toXmlAttributes
+        styled.add newText(cue.text)
+        text.add styled
+        caption.add text
+        let def = newElement("text-style-def")
+        def.attrs = {"id": "ts" & $styleId}.toXmlAttributes
+        let style = newElement("text-style")
+        style.attrs = {"font": "Helvetica", "fontSize": "63", "fontFace": "Regular",
+          "fontColor": "1 1 1 1", "backgroundColor": "0 0 0 0.75",
+          "alignment": "center"}.toXmlAttributes
+        def.add style
+        caption.add def
+        asset.add caption
 
 proc addMarkers(asset: XmlNode, tl: v3, clip: Clip, startPoint: int64,
     lo, hi: int64) {.raises: [].} =
@@ -177,18 +177,18 @@ proc addMarkers(asset: XmlNode, tl: v3, clip: Clip, startPoint: int64,
   ## they start during: FCPXML keeps markers on clips, in the clip's own
   ## time, and has no place for a color.
   for m in tl.markers:
-    if m.start < lo or m.start >= hi: continue
-    let marker = newElement("marker")
-    var attrs = @{
-      "start": fraction(clip.offset + startPoint + m.start - clip.start, tl.tb),
-      # A span ends with its clip: nothing can carry it across the cut.
-      "duration": fraction(max(1'i64,
-        min(m.dur, clip.start + clip.dur - m.start)), tl.tb),
-      "value": m.name,
-    }
-    if m.note != "": attrs.add ("note", m.note)
-    marker.attrs = attrs.toXmlAttributes
-    asset.add marker
+    if m.start >= lo and m.start < hi:
+      let marker = newElement("marker")
+      var attrs = @{
+        "start": fraction(clip.offset + startPoint + m.start - clip.start, tl.tb),
+        # A span ends with its clip: nothing can carry it across the cut.
+        "duration": fraction(max(1'i64,
+          min(m.dur, clip.start + clip.dur - m.start)), tl.tb),
+        "value": m.name,
+      }
+      if m.note != "": attrs.add ("note", m.note)
+      marker.attrs = attrs.toXmlAttributes
+      asset.add marker
 
 proc makeClip(spine: XmlNode, tl: v3, sources: seq[MediaInfo],
     ptrToIdx: Table[ptr string, int], clip: Clip): (XmlNode, int64) =

@@ -107,80 +107,80 @@ proc trackEvents(tl: v3, track: TrackExport, reels: Table[ptr string, string],
     int64(round((clip.offset.float64 + float64(frame - clip.start)) * map.mean))
 
   for j, clip in track.clips:
-    if clip.src == nil: continue
-    let reel = reels[clip.src]
-    let speed = initSpeedMap(tl.effects[clip.effects]).mean
-    let name = extractFilename(clip.src[])
-    let clipEnd = clip.start + clip.dur
-    var recIn = clip.start
-    var recOut = clipEnd
-    var ev = Event(channels: {track.channel})
-    var fromLine = Line(dur: -1)
-    var hasFrom = false
+    if clip.src != nil:
+      let reel = reels[clip.src]
+      let speed = initSpeedMap(tl.effects[clip.effects]).mean
+      let name = extractFilename(clip.src[])
+      let clipEnd = clip.start + clip.dur
+      var recIn = clip.start
+      var recOut = clipEnd
+      var ev = Event(channels: {track.channel})
+      var fromLine = Line(dur: -1)
+      var hasFrom = false
 
-    if plan[j].outgoing >= 0:
-      let t = track.transitions[plan[j].outgoing]
-      # The record out of this clip's own event is where the transition
-      # begins; the transition's event carries the rest.
-      recOut = t.spanStart
-    if plan[j].incoming >= 0:
-      let t = track.transitions[plan[j].incoming]
-      recIn = t.spanStart
-      hasFrom = true
-      if t.alignment == taStart or j == 0 or track.clips[j - 1].src == nil:
-        fromLine.reel = "BL"
+      if plan[j].outgoing >= 0:
+        let t = track.transitions[plan[j].outgoing]
+        # The record out of this clip's own event is where the transition
+        # begins; the transition's event carries the rest.
+        recOut = t.spanStart
+      if plan[j].incoming >= 0:
+        let t = track.transitions[plan[j].incoming]
+        recIn = t.spanStart
+        hasFrom = true
+        if t.alignment == taStart or j == 0 or track.clips[j - 1].src == nil:
+          fromLine.reel = "BL"
+        else:
+          let prev = track.clips[j - 1]
+          fromLine.reel = reels[prev.src]
+          let src = prev.sourceAt(recIn)
+          fromLine.srcIn = src
+          fromLine.srcOut = src
+          ev.comments.add "FROM CLIP NAME: " & extractFilename(prev.src[])
+        fromLine.trans = "C"
+        fromLine.recIn = recIn
+        fromLine.recOut = recIn
+        ev.lines.add fromLine
+        var line = Line(reel: reel, trans: transitionCode(t.kind), dur: t.dur)
+        line.srcIn = max(0'i64, clip.sourceAt(recIn))
+        line.srcOut = line.srcIn + (recOut - recIn)
+        line.recIn = recIn
+        line.recOut = recOut
+        ev.lines.add line
+        ev.comments.add "TO CLIP NAME: " & name
+        ev.comments.add "SOURCE FILE: " & paths[clip.src]
+        ev.comments.add "EFFECT NAME: " & transitionName(t.kind, track.video)
       else:
-        let prev = track.clips[j - 1]
-        fromLine.reel = reels[prev.src]
-        let src = prev.sourceAt(recIn)
-        fromLine.srcIn = src
-        fromLine.srcOut = src
-        ev.comments.add "FROM CLIP NAME: " & extractFilename(prev.src[])
-      fromLine.trans = "C"
-      fromLine.recIn = recIn
-      fromLine.recOut = recIn
-      ev.lines.add fromLine
-      var line = Line(reel: reel, trans: transitionCode(t.kind), dur: t.dur)
-      line.srcIn = max(0'i64, clip.sourceAt(recIn))
-      line.srcOut = line.srcIn + (recOut - recIn)
-      line.recIn = recIn
-      line.recOut = recOut
-      ev.lines.add line
-      ev.comments.add "TO CLIP NAME: " & name
-      ev.comments.add "SOURCE FILE: " & paths[clip.src]
-      ev.comments.add "EFFECT NAME: " & transitionName(t.kind, track.video)
-    else:
-      let srcIn = clip.sourceAt(recIn)
-      ev.lines.add Line(reel: reel, trans: "C", dur: -1, srcIn: srcIn,
-        srcOut: srcIn + (recOut - recIn), recIn: recIn, recOut: recOut)
-      ev.comments.add "FROM CLIP NAME: " & name
-      ev.comments.add "SOURCE FILE: " & paths[clip.src]
+        let srcIn = clip.sourceAt(recIn)
+        ev.lines.add Line(reel: reel, trans: "C", dur: -1, srcIn: srcIn,
+          srcOut: srcIn + (recOut - recIn), recIn: recIn, recOut: recOut)
+        ev.comments.add "FROM CLIP NAME: " & name
+        ev.comments.add "SOURCE FILE: " & paths[clip.src]
 
-    if speed != 1.0:
-      # `M2 REEL fps source-in`: the source frames played a second.
-      ev.m2Reel = reel
-      ev.m2 = &"{speed * base.float64:05.1f}" & "                " &
-        formatTimecode(ev.lines[^1].srcIn, base, drop)
-    ev.mergeable = not hasFrom and speed == 1.0
-    ev.key = (clip.src, clip.stream, recIn, recOut, ev.lines[^1].srcIn)
-    ev.order = (recIn, order)
-    if recOut > recIn:
-      result.add ev
+      if speed != 1.0:
+        # `M2 REEL fps source-in`: the source frames played a second.
+        ev.m2Reel = reel
+        ev.m2 = &"{speed * base.float64:05.1f}" & "                " &
+          formatTimecode(ev.lines[^1].srcIn, base, drop)
+      ev.mergeable = not hasFrom and speed == 1.0
+      ev.key = (clip.src, clip.stream, recIn, recOut, ev.lines[^1].srcIn)
+      ev.order = (recIn, order)
+      if recOut > recIn:
+        result.add ev
 
-    if plan[j].outgoing >= 0:
-      let t = track.transitions[plan[j].outgoing]
-      if t.alignment == taEnd:
-        # Fade to black: the clip plays on under the transition.
-        let src = clip.sourceAt(recOut)
-        var fade = Event(channels: {track.channel}, order: (recOut, order))
-        fade.lines.add Line(reel: reel, trans: "C", dur: -1, srcIn: src,
-          srcOut: src, recIn: recOut, recOut: recOut)
-        fade.lines.add Line(reel: "BL", trans: transitionCode(t.kind),
-          dur: t.dur, srcIn: 0, srcOut: t.dur, recIn: recOut,
-          recOut: recOut + t.dur)
-        fade.comments.add "FROM CLIP NAME: " & name
-        fade.comments.add "EFFECT NAME: " & transitionName(t.kind, track.video)
-        result.add fade
+      if plan[j].outgoing >= 0:
+        let t = track.transitions[plan[j].outgoing]
+        if t.alignment == taEnd:
+          # Fade to black: the clip plays on under the transition.
+          let src = clip.sourceAt(recOut)
+          var fade = Event(channels: {track.channel}, order: (recOut, order))
+          fade.lines.add Line(reel: reel, trans: "C", dur: -1, srcIn: src,
+            srcOut: src, recIn: recOut, recOut: recOut)
+          fade.lines.add Line(reel: "BL", trans: transitionCode(t.kind),
+            dur: t.dur, srcIn: 0, srcOut: t.dur, recIn: recOut,
+            recOut: recOut + t.dur)
+          fade.comments.add "FROM CLIP NAME: " & name
+          fade.comments.add "EFFECT NAME: " & transitionName(t.kind, track.video)
+          result.add fade
 
 proc edlWrite*(name, output: string, tl: v3) =
   let base = timecodeBase(tl.tb)

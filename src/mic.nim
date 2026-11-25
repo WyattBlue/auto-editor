@@ -125,13 +125,12 @@ elif defined(windows):
         if device.media_types[j] == AVMEDIA_TYPE_AUDIO:
           hasAudio = true
           break
-      if not hasAudio:
-        continue
-      if fallback == nil:
-        fallback = device
-      let description = $device.device_description
-      if description.toLowerAscii.contains("usb"):
-        return ($device.device_name, description, "")
+      if hasAudio:
+        if fallback == nil:
+          fallback = device
+        let description = $device.device_description
+        if description.toLowerAscii.contains("usb"):
+          return ($device.device_name, description, "")
 
     if fallback != nil:
       let description = $fallback.device_description
@@ -306,16 +305,16 @@ proc readerLoop(a: ptr MicReaderArgs) {.thread.} =
     if ret == AVERROR_EAGAIN:
       # avfoundation never blocks; it just says nothing is ready yet.
       sleep(2)
-      continue
-    if ret < 0:
-      if not (a.stop[] or a.quit):
-        a.err = ret
-      break
-    if pkt.stream_index != a.streamIndex:
-      av_packet_unref(pkt)
-      continue
-    a.packets.send(pkt) # the consumer frees it
-    pkt = av_packet_alloc()
+    else:
+      if ret < 0:
+        if not (a.stop[] or a.quit):
+          a.err = ret
+        break
+      if pkt.stream_index == a.streamIndex:
+        a.packets.send(pkt) # the consumer frees it
+        pkt = av_packet_alloc()
+      else:
+        av_packet_unref(pkt)
   if pkt == nil:
     a.err = AVERROR(ENOMEM)
   else:

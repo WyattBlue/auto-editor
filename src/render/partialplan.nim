@@ -369,12 +369,12 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     # Runs of consecutive encode spans: each one's first and last span.
     var runFirst, runLast: seq[int]
     for i, span in spans:
-      if span.kind != ssEncode: continue
-      if i > 0 and spans[i - 1].kind == ssEncode:
-        runLast[^1] = i
-      else:
-        runFirst.add i
-        runLast.add i
+      if span.kind == ssEncode:
+        if i > 0 and spans[i - 1].kind == ssEncode:
+          runLast[^1] = i
+        else:
+          runFirst.add i
+          runLast.add i
     # The range each fed run's packets take among all the encoded packets.
     var runStart, runEnd: seq[int64]
 

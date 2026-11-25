@@ -76,59 +76,56 @@ proc getNextToken(self: var Lexer): Token {.raises: [ValueError].} =
   while self.`char` != '\0':
     while self.`char` != '\0' and isWhiteSpace(self.`char`):
       self.advance()
-    if self.`char` == '\0':
-      continue
-
-    if self.`char` == ';':
-      while self.`char` != '\0' and self.`char` != '\n':
-        self.advance()
-      continue
-
-    if self.`char` in "(){}[]":
-      let par = self.`char`
-      self.advance()
-      return Token(kind: if par in "({[": Lparen else: Rparen,
-          `from`: self.pos - 1, to: self.pos)
-
-    if self.`char` == ':':
-      self.advance()
-      return Token(kind: Colon, `from`: self.pos - 1, to: self.pos)
-
-    if self.`char` == '=':
-      self.advance()
-      return Token(kind: Equal, `from`: self.pos - 1, to: self.pos)
-
-    if self.`char` == ',':
-      self.advance()
-      return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
-
-    if self.`char` == '"':
-      self.advance()
-      let `from` = self.pos
-      var hasEscapes = false
-      while self.`char` != '\0' and self.`char` != '"':
-        if self.`char` == '\\' and self.pos + 1 < uint32(self.text.len):
-          hasEscapes = true
+    if self.`char` != '\0':
+      if self.`char` == ';':
+        while self.`char` != '\0' and self.`char` != '\n':
           self.advance()
-        self.advance()
-      if self.`char` != '"':
-        raise newException(ValueError, "Unterminated string literal")
-      let `to` = self.pos
-      self.advance()
-      return Token(kind: Str, `from`: `from`, to: `to`, hasEscapes: hasEscapes)
+      else:
+        if self.`char` in "(){}[]":
+          let par = self.`char`
+          self.advance()
+          return Token(kind: if par in "({[": Lparen else: Rparen,
+              `from`: self.pos - 1, to: self.pos)
 
-    if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 <
-        uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
-      let `from` = self.pos
-      while self.`char` notin "()[]{}\",:;\0 \t\n\r\x0b\x0c":
-        self.advance()
-      return Token(kind: Num, `from`: `from`, to: self.pos)
+        if self.`char` == ':':
+          self.advance()
+          return Token(kind: Colon, `from`: self.pos - 1, to: self.pos)
 
-    let `from` = self.pos
-    while self.`char` notin ".()[]{}=\",:;\0 \t\n\r\x0b\x0c":
-      self.advance()
+        if self.`char` == '=':
+          self.advance()
+          return Token(kind: Equal, `from`: self.pos - 1, to: self.pos)
 
-    return Token(kind: Sym, `from`: `from`, to: self.pos)
+        if self.`char` == ',':
+          self.advance()
+          return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
+
+        if self.`char` == '"':
+          self.advance()
+          let `from` = self.pos
+          var hasEscapes = false
+          while self.`char` != '\0' and self.`char` != '"':
+            if self.`char` == '\\' and self.pos + 1 < uint32(self.text.len):
+              hasEscapes = true
+              self.advance()
+            self.advance()
+          if self.`char` != '"':
+            raise newException(ValueError, "Unterminated string literal")
+          let `to` = self.pos
+          self.advance()
+          return Token(kind: Str, `from`: `from`, to: `to`, hasEscapes: hasEscapes)
+
+        if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 <
+            uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
+          let `from` = self.pos
+          while self.`char` notin "()[]{}\",:;\0 \t\n\r\x0b\x0c":
+            self.advance()
+          return Token(kind: Num, `from`: `from`, to: self.pos)
+
+        let `from` = self.pos
+        while self.`char` notin ".()[]{}=\",:;\0 \t\n\r\x0b\x0c":
+          self.advance()
+
+        return Token(kind: Sym, `from`: `from`, to: self.pos)
 
   return Token(kind: Eof)
 

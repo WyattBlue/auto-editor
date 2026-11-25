@@ -166,85 +166,81 @@ proc parse(text: string): Parsed =
   var unknown = 0
   for raw in text.splitLines:
     let l = raw.strip()
-    if l.len == 0: continue
-    let upper = l.toUpperAscii
-    if upper.startsWith("TITLE:"): continue
-    if upper.startsWith("FCM:"):
-      drop = "DROP" in upper and "NON" notin upper
-      result.anyDrop = result.anyDrop or drop
-      continue
-    var mark: Loc
-    if parseResolveMarker(l, mark):
-      if result.events.len > 0 and not skipMetadata:
-        mark.tc = result.events[^1].lines[0].tcs[2]
-        mark.drop = result.events[^1].drop
-        result.locs.add mark
-        result.events[^1].marks = true
-      continue
-    if skipMetadata and (l[0] == '*' or upper.startsWith("M2") or
-        upper.startsWith("AUD")):
-      continue
-    if l[0] == '*':
-      if result.events.len == 0: continue
-      let c = l[1 .. ^1].strip()
-      let cu = c.toUpperAscii
-      template value(prefix: string): string = c[prefix.len .. ^1].strip()
-      if cu.startsWith("FROM CLIP NAME:"):
-        result.events[^1].fromClip = value("FROM CLIP NAME:")
-      elif cu.startsWith("TO CLIP NAME:"):
-        result.events[^1].toClip = value("TO CLIP NAME:")
-      elif cu.startsWith("SOURCE FILE:"):
-        result.events[^1].files.add value("SOURCE FILE:")
-      elif cu.startsWith("EFFECT NAME:"):
-        result.events[^1].effect = value("EFFECT NAME:")
-      elif cu.startsWith("LOC:"):
-        var loc: Loc
-        if parseLoc(value("LOC:"), drop, loc): result.locs.add loc
-      continue
-    if upper.startsWith("M2"):
-      # `M2 REEL fps source-in`; a reel with spaces is joined back.
-      let toks = l.splitWhitespace()
-      if toks.len >= 3 and result.events.len > 0:
-        var fpsAt = -1
-        var tc: Timecode
-        for i in countdown(toks.len - 1, 2):
-          if not parseTimecode(toks[i], tc):
-            try:
-              discard parseFloat(toks[i])
-              fpsAt = i
-              break
-            except ValueError: discard
-        if fpsAt >= 2:
-          let fps = (try: parseFloat(toks[fpsAt]) except ValueError: 0.0)
-          result.events[^1].m2.add (toks[1 ..< fpsAt].join(" "), fps)
-      continue
-    if upper.startsWith("AUD"):
-      if result.events.len > 0 and result.events[^1].lines.len > 0:
-        for tok in l.splitWhitespace()[1 .. ^1]:
-          var n: int64
-          if parseInt64(tok, n) and n in 1 .. 99:
-            result.events[^1].lines[^1].audio.add n.int
-      continue
-    if upper.startsWith(">>>") or upper.startsWith("REM"): continue
-    var line: Line
-    if parseEventLine(l, line):
-      for tc in line.tcs:
-        result.maxFrame = max(result.maxFrame, tc.f)
-        result.anyDrop = result.anyDrop or tc.drop
-      if result.events.len > 0 and not skipMetadata and
-          result.events[^1].lines[^1].num == line.num:
-        result.events[^1].lines.add line
+    if l.len > 0:
+      let upper = l.toUpperAscii
+      var mark: Loc
+      var line: Line
+      if upper.startsWith("TITLE:"):
+        discard
+      elif upper.startsWith("FCM:"):
+        drop = "DROP" in upper and "NON" notin upper
+        result.anyDrop = result.anyDrop or drop
+      elif parseResolveMarker(l, mark):
+        if result.events.len > 0 and not skipMetadata:
+          mark.tc = result.events[^1].lines[0].tcs[2]
+          mark.drop = result.events[^1].drop
+          result.locs.add mark
+          result.events[^1].marks = true
+      elif skipMetadata and (l[0] == '*' or upper.startsWith("M2") or
+          upper.startsWith("AUD")):
+        discard
+      elif l[0] == '*':
+        if result.events.len > 0:
+          let c = l[1 .. ^1].strip()
+          let cu = c.toUpperAscii
+          template value(prefix: string): string = c[prefix.len .. ^1].strip()
+          if cu.startsWith("FROM CLIP NAME:"):
+            result.events[^1].fromClip = value("FROM CLIP NAME:")
+          elif cu.startsWith("TO CLIP NAME:"):
+            result.events[^1].toClip = value("TO CLIP NAME:")
+          elif cu.startsWith("SOURCE FILE:"):
+            result.events[^1].files.add value("SOURCE FILE:")
+          elif cu.startsWith("EFFECT NAME:"):
+            result.events[^1].effect = value("EFFECT NAME:")
+          elif cu.startsWith("LOC:"):
+            var loc: Loc
+            if parseLoc(value("LOC:"), drop, loc): result.locs.add loc
+      elif upper.startsWith("M2"):
+        # `M2 REEL fps source-in`; a reel with spaces is joined back.
+        let toks = l.splitWhitespace()
+        if toks.len >= 3 and result.events.len > 0:
+          var fpsAt = -1
+          var tc: Timecode
+          for i in countdown(toks.len - 1, 2):
+            if not parseTimecode(toks[i], tc):
+              try:
+                discard parseFloat(toks[i])
+                fpsAt = i
+                break
+              except ValueError: discard
+          if fpsAt >= 2:
+            let fps = (try: parseFloat(toks[fpsAt]) except ValueError: 0.0)
+            result.events[^1].m2.add (toks[1 ..< fpsAt].join(" "), fps)
+      elif upper.startsWith("AUD"):
+        if result.events.len > 0 and result.events[^1].lines.len > 0:
+          for tok in l.splitWhitespace()[1 .. ^1]:
+            var n: int64
+            if parseInt64(tok, n) and n in 1 .. 99:
+              result.events[^1].lines[^1].audio.add n.int
+      elif upper.startsWith(">>>") or upper.startsWith("REM"):
+        discard
+      elif parseEventLine(l, line):
+        for tc in line.tcs:
+          result.maxFrame = max(result.maxFrame, tc.f)
+          result.anyDrop = result.anyDrop or tc.drop
+        if result.events.len > 0 and not skipMetadata and
+            result.events[^1].lines[^1].num == line.num:
+          result.events[^1].lines.add line
+        else:
+          result.events.add Event(lines: @[line], drop: drop)
+        skipMetadata = false
+      elif upper.startsWith("SPLIT:"):
+        warning "EDL split (L-cut/J-cut) lines are not supported; the split was ignored"
       else:
-        result.events.add Event(lines: @[line], drop: drop)
-      skipMetadata = false
-      continue
-    if upper.startsWith("SPLIT:"):
-      warning "EDL split (L-cut/J-cut) lines are not supported; the split was ignored"
-      continue
-    if l[0] in Digits:
-      # Comments after a rejected event aren't the previous event's.
-      skipMetadata = true
-    inc unknown
+        if l[0] in Digits:
+          # Comments after a rejected event aren't the previous event's.
+          skipMetadata = true
+        inc unknown
   if unknown > 0:
     warning &"Ignored {unknown} unrecognised EDL line(s)"
 
@@ -283,17 +279,17 @@ proc overwrite(track: var Track, clip: Clip) =
     let cEnd = c.start + c.dur
     if cEnd <= lo or c.start >= hi:
       kept.add c
-      continue
-    if c.start < lo:
-      var left = c
-      left.dur = lo - c.start
-      kept.add left
-    if cEnd > hi:
-      var right = c
-      right.start = hi
-      right.offset = c.offset + (hi - c.start)
-      right.dur = cEnd - hi
-      kept.add right
+    else:
+      if c.start < lo:
+        var left = c
+        left.dur = lo - c.start
+        kept.add left
+      if cEnd > hi:
+        var right = c
+        right.start = hi
+        right.offset = c.offset + (hi - c.start)
+        right.dur = cEnd - hi
+        kept.add right
   kept.add clip
   kept.sort(proc (a, b: Clip): int = cmp(a.start, b.start))
   track.clips.setLen(first)
@@ -321,17 +317,17 @@ proc speedOf(im: var Importer, ev: Event, reel: string): float64 =
   ## what v3 can't play.
   result = 1.0
   for (r, fps) in ev.m2:
-    if r != reel: continue
-    if fps == 0.0:
-      im.dropped.inc "freeze frame"
-      return
-    let speed = abs(fps) / im.base.float64
-    if speed != speed or speed < 0.0001 or speed > 1000.0:
-      warning &"EDL motion line for reel {reel} has an unusable speed ({fps}); " &
-        "the clip keeps normal speed"
-      return
-    if fps < 0: im.dropped.inc "reversed clip"
-    return speed
+    if r == reel:
+      if fps == 0.0:
+        im.dropped.inc "freeze frame"
+        return
+      let speed = abs(fps) / im.base.float64
+      if speed != speed or speed < 0.0001 or speed > 1000.0:
+        warning &"EDL motion line for reel {reel} has an unusable speed ({fps}); " &
+          "the clip keeps normal speed"
+        return
+      if fps < 0: im.dropped.inc "reversed clip"
+      return speed
 
 proc effectsFor(im: var Importer, speed: float64): uint32 =
   var acts: seq[Action]
@@ -439,15 +435,15 @@ proc importEvent(im: var Importer, ev: Event) =
   for line in ev.lines:
     if line.trans == trKey:
       im.dropped.inc "keyed clip"
-      continue
-    if line.trans != trCut:
-      warning &"EDL event {line.num}: transition without an outgoing source line imported as a cut"
-    if line.reel.toUpperAscii == "BL": continue
-    let t0 = im.rec(line.tcs[2], drop)
-    let t1 = im.rec(line.tcs[3], drop)
-    let speed = im.speedOf(ev, line.reel)
-    im.lay(line, t0, t1 - t0, im.frames(line.tcs[0], drop), speed,
-      im.effectsFor(speed))
+    else:
+      if line.trans != trCut:
+        warning &"EDL event {line.num}: transition without an outgoing source line imported as a cut"
+      if line.reel.toUpperAscii != "BL":
+        let t0 = im.rec(line.tcs[2], drop)
+        let t1 = im.rec(line.tcs[3], drop)
+        let speed = im.speedOf(ev, line.reel)
+        im.lay(line, t0, t1 - t0, im.frames(line.tcs[0], drop), speed,
+          im.effectsFor(speed))
 
 proc resolvePath(name, edlDir: string): string {.inline.} =
   if name.isAbsolute: name else: edlDir / name
@@ -457,18 +453,18 @@ proc resolveSources(p: var Parsed, edlDir: string, interner: var StringInterner)
   ## relative to the EDL.
   for ev in p.events.mitems:
     # A marker list's events name no media.
-    if ev.marks and ev.fromClip == "" and ev.files.len == 0: continue
-    for i, line in ev.lines.mpairs:
-      if line.reel.toUpperAscii == "BL": continue
-      let incoming = i > 0 and line.trans in {trDissolve, trWipe}
-      var name = ""
-      if ev.files.len > 0:
-        name = (if incoming and ev.files.len > 1: ev.files[1] else: ev.files[0])
-      elif incoming and ev.toClip != "": name = ev.toClip
-      elif ev.fromClip != "": name = ev.fromClip
-      elif incoming and ev.toClip != "": name = ev.toClip
-      else: name = line.reel
-      line.src = interner.intern(resolvePath(name, edlDir))
+    if not (ev.marks and ev.fromClip == "" and ev.files.len == 0):
+      for i, line in ev.lines.mpairs:
+        if line.reel.toUpperAscii != "BL":
+          let incoming = i > 0 and line.trans in {trDissolve, trWipe}
+          var name = ""
+          if ev.files.len > 0:
+            name = (if incoming and ev.files.len > 1: ev.files[1] else: ev.files[0])
+          elif incoming and ev.toClip != "": name = ev.toClip
+          elif ev.fromClip != "": name = ev.fromClip
+          elif incoming and ev.toClip != "": name = ev.toClip
+          else: name = line.reel
+          line.src = interner.intern(resolvePath(name, edlDir))
 
 proc edlRead*(path: string, interner: var StringInterner,
     frameRate: AVRational): v3 =

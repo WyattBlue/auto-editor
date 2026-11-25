@@ -16,15 +16,16 @@ proc main*(args: seq[string]) =
     try:
       formatContext = av.openFormatCtx(inputFile.cstring)
     except IOError:
-      continue
+      formatContext = nil
 
-    let entry = av_dict_get(formatContext.metadata, "description", nil, 0)
-    try:
-      if entry != nil:
-        stdout.write("\n" & $entry.value & "\n\n")
-      else:
-        stdout.write("\nNo description.\n\n")
-    except IOError:
-      discard
+    if formatContext != nil:
+      let entry = av_dict_get(formatContext.metadata, "description", nil, 0)
+      try:
+        if entry != nil:
+          stdout.write("\n" & $entry.value & "\n\n")
+        else:
+          stdout.write("\nNo description.\n\n")
+      except IOError:
+        discard
 
-    avformat_close_input(addr formatContext)
+      avformat_close_input(addr formatContext)

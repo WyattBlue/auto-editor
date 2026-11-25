@@ -340,11 +340,12 @@ proc applyAdds(tl: var v3, args: var mainArgs,
       return
     var matches = false
     for i, spec in args.adds:
-      if soundOnly[i]: continue # no picture, so it needs no canvas
-      for clip in tl.a[0]:
-        if clip.effects.int == spec.selector:
-          matches = true
-          break
+      # Sound-only specs have no picture, so they can't match here.
+      if not soundOnly[i]:
+        for clip in tl.a[0]:
+          if clip.effects.int == spec.selector:
+            matches = true
+            break
       if matches: break
     if not matches:
       return
@@ -398,30 +399,28 @@ proc applyAdds(tl: var v3, args: var mainArgs,
       if clip.effects.int == spec.selector:
         track.add Clip(src: srcPtr, start: clip.start, dur: clip.dur,
           offset: (if follows: clip.offset else: 0), effects: eIdx, stream: 0)
-    if track.len == 0:
-      continue
+    if track.len != 0:
+      if not soundOnly[i]:
+        tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
+        tl.v.add track
 
-    if not soundOnly[i]:
-      tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
-      tl.v.add track
-
-    # An added layer is an overlay, so its sound has to be heard over the base
-    # rather than written beside it as a second stream (which .wav/.mp3 can't
-    # hold). Audio langs come last, so append.
-    if audioGen:
-      tl.langs.add toLang("und")
-      tl.a.add track
-      args.mixAudioStreams = true
-    else:
-      # The overlay's own audio, one layer per stream, on the same sections as
-      # its picture so the two stay in sync.
-      for stream in 0 ..< mis[i].a.len:
-        var atrack = track
-        for clip in atrack.mitems:
-          clip.stream = int16(stream)
-        tl.langs.add mis[i].a[stream].lang
-        tl.a.add atrack
+      # An added layer is an overlay, so its sound has to be heard over the base
+      # rather than written beside it as a second stream (which .wav/.mp3 can't
+      # hold). Audio langs come last, so append.
+      if audioGen:
+        tl.langs.add toLang("und")
+        tl.a.add track
         args.mixAudioStreams = true
+      else:
+        # The overlay's own audio, one layer per stream, on the same sections as
+        # its picture so the two stay in sync.
+        for stream in 0 ..< mis[i].a.len:
+          var atrack = track
+          for clip in atrack.mitems:
+            clip.stream = int16(stream)
+          tl.langs.add mis[i].a[stream].lang
+          tl.a.add atrack
+          args.mixAudioStreams = true
   tl.updateNumberOfSrc()
 
 proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
@@ -442,52 +441,52 @@ proc applyLayers(tl: var v3, args: var mainArgs, interner: var StringInterner) =
     let spec = args.layers[li]
     let first = clamp(spec.start, 0, total)
     let last = clamp((if spec.finish < 0: total else: spec.finish), first, total)
-    if last <= first: continue
-    var own: seq[Action]
-    if spec.effects.len > 0:
-      try:
-        let parsed = parseActions(spec.effects)
-        defer: parsed.free()
-        for a in parsed: own.add a
-      except ActionParseError as e:
-        error e.msg
-    let src = interner.intern(spec.path)
-    let mi = initMediaInfo(spec.path)
-    var track: seq[Clip]
-    if spec.followCuts and not mi.isStill:
-      # The base's sections, speeds included, so the layer stays in step
-      # with the source it's laid over.
-      var groups: Table[uint32, uint32]
-      for clip in base:
-        let a = max(clip.start, first)
-        let b = min(clip.start + clip.dur, last)
-        if b <= a: continue
-        # Offsets are in speed-scaled frames, so a trim of k output frames
-        # moves the offset by k; a speed ramp is cut down with the clip.
-        var part = tl.sliceClip(effectIndex, clip, a, b)
-        if part.effects notin groups:
-          var acts: seq[Action]
-          for x in tl.effects[part.effects]: acts.add x
-          acts.add own
-          groups[part.effects] = tl.group(effectIndex, acts)
-        part.src = src
-        part.stream = 0
-        part.effects = groups[part.effects]
-        track.add part
-    else:
-      track.add Clip(src: src, start: first, dur: last - first, offset: first,
-        effects: tl.group(effectIndex, own))
+    if last > first:
+      var own: seq[Action]
+      if spec.effects.len > 0:
+        try:
+          let parsed = parseActions(spec.effects)
+          defer: parsed.free()
+          for a in parsed: own.add a
+        except ActionParseError as e:
+          error e.msg
+      let src = interner.intern(spec.path)
+      let mi = initMediaInfo(spec.path)
+      var track: seq[Clip]
+      if spec.followCuts and not mi.isStill:
+        # The base's sections, speeds included, so the layer stays in step
+        # with the source it's laid over.
+        var groups: Table[uint32, uint32]
+        for clip in base:
+          let a = max(clip.start, first)
+          let b = min(clip.start + clip.dur, last)
+          if b > a:
+            # Offsets are in speed-scaled frames, so a trim of k output frames
+            # moves the offset by k; a speed ramp is cut down with the clip.
+            var part = tl.sliceClip(effectIndex, clip, a, b)
+            if part.effects notin groups:
+              var acts: seq[Action]
+              for x in tl.effects[part.effects]: acts.add x
+              acts.add own
+              groups[part.effects] = tl.group(effectIndex, acts)
+            part.src = src
+            part.stream = 0
+            part.effects = groups[part.effects]
+            track.add part
+      else:
+        track.add Clip(src: src, start: first, dur: last - first, offset: first,
+          effects: tl.group(effectIndex, own))
 
-    if mi.v.len > 0:
-      tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
-      tl.v.add track
-    # Its sound is heard over the base, like an `add:` layer's.
-    for stream in 0 ..< mi.a.len:
-      var atrack = track
-      for clip in atrack.mitems: clip.stream = int16(stream)
-      tl.langs.add mi.a[stream].lang
-      tl.a.add atrack
-      args.mixAudioStreams = true
+      if mi.v.len > 0:
+        tl.langs.insert(toLang("und"), tl.v.len) # keep video langs before audio
+        tl.v.add track
+      # Its sound is heard over the base, like an `add:` layer's.
+      for stream in 0 ..< mi.a.len:
+        var atrack = track
+        for clip in atrack.mitems: clip.stream = int16(stream)
+        tl.langs.add mi.a[stream].lang
+        tl.a.add atrack
+        args.mixAudioStreams = true
   tl.updateNumberOfSrc()
 
 type BuiltTimeline* = object
@@ -609,29 +608,29 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
                   getConLen())
             else:
               remapRange(actionIndex, span, tbf, remap, getConLen())
-            continue
-          # A set-action range is an explicit override, conceptually distinct
-          # from the `-w:0`/`-w:1` (silent/normal) sections. Give it a unique
-          # effects index (never deduping into indices 0/1) so an `add` selector
-          # matches only what it should: `-w:1 add` overlays genuine active
-          # sections, not a `--set-action`/`--add-in` range, and a set-action's
-          # own `add` matches just that range.
-          actionMap.add actionRange[0]
-          let aIdx = actionMap.len - 1
-          if args.setActionConcat:
-            # An editor's range, over the inputs end to end: only its part on
-            # this input applies, in this input's frames.
-            let lo = max(toTb(span[0], tbf) - concatOffset, 0)
-            let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
-            if hi > lo:
-              applyToRange(actionIndex, (frames(lo), frames(hi)), tbf, aIdx,
-                getConLen())
           else:
-            applyToRange(actionIndex, span, tbf, aIdx, getConLen())
-          if i == 0:
-            for a in args.adds.mitems:
-              if a.setActionRef == sIdx:
-                a.selector = aIdx
+            # A set-action range is an explicit override, conceptually distinct
+            # from the `-w:0`/`-w:1` (silent/normal) sections. Give it a unique
+            # effects index (never deduping into indices 0/1) so an `add` selector
+            # matches only what it should: `-w:1 add` overlays genuine active
+            # sections, not a `--set-action`/`--add-in` range, and a set-action's
+            # own `add` matches just that range.
+            actionMap.add actionRange[0]
+            let aIdx = actionMap.len - 1
+            if args.setActionConcat:
+              # An editor's range, over the inputs end to end: only its part on
+              # this input applies, in this input's frames.
+              let lo = max(toTb(span[0], tbf) - concatOffset, 0)
+              let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
+              if hi > lo:
+                applyToRange(actionIndex, (frames(lo), frames(hi)), tbf, aIdx,
+                  getConLen())
+            else:
+              applyToRange(actionIndex, span, tbf, aIdx, getConLen())
+            if i == 0:
+              for a in args.adds.mitems:
+                if a.setActionRef == sIdx:
+                  a.selector = aIdx
 
         let inputMi = initMediaInfo(container.formatContext, args.inputs[i])
 
@@ -880,38 +879,33 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
       if clip.src != nil and clip.src[] == input:
         inputLayer.add clip
 
-    if inputLayer.len == 0:
-      continue
-
-    var siblings: seq[string]
-    for kind, name in walkDir(if inputDir == "": "." else: inputDir, relative = true):
-      if kind in {pcFile, pcLinkToFile} and name.startsWith(inputName & "."):
-        siblings.add inputDir / name
-    siblings.sort()
-    for sibling in siblings:
-      if sibling == input:
-        continue
-      var sidecar: InputContainer
-      try:
-        sidecar = av.open(sibling)
-      except IOError:
-        continue
-      let isSubtitleOnly = sidecar.subtitle.len > 0 and
-        sidecar.video.len == 0 and sidecar.audio.len == 0
-      sidecar.close()
-      if not isSubtitleOnly:
-        continue
-
-      let (subDir, subName, subExt) = agSplitFile(sibling)
-      var altered = (subDir / subName) & "_ALTERED" & subExt
-      if args.output != "":
-        let (outDir, outName, _) = agSplitFile(output)
-        altered =
-          if args.inputs.len == 1: (outDir / outName) & subName[inputName.len .. ^1] & subExt
-          else: (outDir / subName) & "_ALTERED" & subExt
-        if altered == sibling:
-          altered = (subDir / subName) & "_ALTERED" & subExt
-      makeAlteredSubtitle(sibling, altered, inputLayer, tlV3.effects, tlV3.tb)
+    if inputLayer.len != 0:
+      var siblings: seq[string]
+      for kind, name in walkDir(if inputDir == "": "." else: inputDir, relative = true):
+        if kind in {pcFile, pcLinkToFile} and name.startsWith(inputName & "."):
+          siblings.add inputDir / name
+      siblings.sort()
+      for sibling in siblings:
+        if sibling != input:
+          var sidecar: InputContainer
+          try:
+            sidecar = av.open(sibling)
+          except IOError:
+            continue
+          let isSubtitleOnly = sidecar.subtitle.len > 0 and
+            sidecar.video.len == 0 and sidecar.audio.len == 0
+          sidecar.close()
+          if isSubtitleOnly:
+            let (subDir, subName, subExt) = agSplitFile(sibling)
+            var altered = (subDir / subName) & "_ALTERED" & subExt
+            if args.output != "":
+              let (outDir, outName, _) = agSplitFile(output)
+              altered =
+                if args.inputs.len == 1: (outDir / outName) & subName[inputName.len .. ^1] & subExt
+                else: (outDir / subName) & "_ALTERED" & subExt
+              if altered == sibling:
+                altered = (subDir / subName) & "_ALTERED" & subExt
+            makeAlteredSubtitle(sibling, altered, inputLayer, tlV3.effects, tlV3.tb)
 
   bar.destroy()
 

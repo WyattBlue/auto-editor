@@ -489,21 +489,21 @@ iterator flushDecode*(container: InputContainer, index: cint,
     ret = avcodec_receive_frame(codecCtx, frame)
     if ret == 0:
       yield frame
-      continue
-    if ret != AVERROR_EAGAIN:
-      break # AVERROR_EOF or fatal error
-
-    if flushed:
-      break
-
-    ret = av_read_frame(container.formatContext, packet)
-    if ret < 0:
-      discard avcodec_send_packet(codecCtx, nil) # signal end-of-stream
-      flushed = true
     else:
-      if packet.stream_index == index:
-        discard avcodec_send_packet(codecCtx, packet)
-      av_packet_unref(packet)
+      if ret != AVERROR_EAGAIN:
+        break # AVERROR_EOF or fatal error
+
+      if flushed:
+        break
+
+      ret = av_read_frame(container.formatContext, packet)
+      if ret < 0:
+        discard avcodec_send_packet(codecCtx, nil) # signal end-of-stream
+        flushed = true
+      else:
+        if packet.stream_index == index:
+          discard avcodec_send_packet(codecCtx, packet)
+        av_packet_unref(packet)
 
 proc startPts*(container: InputContainer, stream: ptr AVStream): int64 =
   ## The container's start time in `stream`'s time base, which is time 0 to
@@ -989,26 +989,24 @@ func dialogue*(assText: string): string =
     curChar = assText[i]
     nextChar = (if i + 1 >= textLen: '\0' else: assText[i + 1])
 
-    if not state:
-      if curChar == '\\' and nextChar == 'N':
-        # `\N` is a hard line break.
-        result &= "\n"
-        i += 2
-        continue
-      if curChar == '\\' and nextChar in {'n', 'h'}:
-        # `\n` (soft break) and `\h` (non-breaking space) collapse to a space.
-        result &= " "
-        i += 2
-        continue
-      if curChar == '\\' and nextChar in {'{', '}'}:
-        # libass reads `\{` and `\}` as literal braces, never as a block.
-        result &= nextChar
-        i += 2
-        continue
-      if curChar == '{' and i < lastClose:
-        state = true
-      else:
-        result &= curChar
-    elif curChar == '}':
-      state = false
-    i += 1
+    if not state and curChar == '\\' and nextChar == 'N':
+      # `\N` is a hard line break.
+      result &= "\n"
+      i += 2
+    elif not state and curChar == '\\' and nextChar in {'n', 'h'}:
+      # `\n` (soft break) and `\h` (non-breaking space) collapse to a space.
+      result &= " "
+      i += 2
+    elif not state and curChar == '\\' and nextChar in {'{', '}'}:
+      # libass reads `\{` and `\}` as literal braces, never as a block.
+      result &= nextChar
+      i += 2
+    else:
+      if not state:
+        if curChar == '{' and i < lastClose:
+          state = true
+        else:
+          result &= curChar
+      elif curChar == '}':
+        state = false
+      i += 1

@@ -367,26 +367,24 @@ func optionDidYouMean*(key: string, opts: seq[OptDef]): string =
 proc writeZshOptions(name: string, opts: seq[OptDef]) =
   echo "  " & name & "=("
   for opt in opts:
-    if opt.hidden:
-      continue
-    let desc =
-      if opt.help != "":
-        opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:")
-      else: ""
-    for name in opt.names.split(", "):
-      let n = name.strip().replace(":", "\\:")
-      if desc != "":
-        echo "    '" & n & ":" & desc & "'"
-      else:
-        echo "    '" & n & "'"
+    if not opt.hidden:
+      let desc =
+        if opt.help != "":
+          opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:")
+        else: ""
+      for name in opt.names.split(", "):
+        let n = name.strip().replace(":", "\\:")
+        if desc != "":
+          echo "    '" & n & ":" & desc & "'"
+        else:
+          echo "    '" & n & "'"
   echo "  )"
 
 proc zshcomplete*() =
   var locals = @["subcommands", "options"]
   for cmd in commands:
-    if not cmd.shellCompletion:
-      continue
-    locals.add cmd.name & "_options"
+    if cmd.shellCompletion:
+      locals.add cmd.name & "_options"
 
   echo "#compdef auto-editor"
   echo ""
@@ -394,18 +392,16 @@ proc zshcomplete*() =
   echo "  local -a " & locals.join(" ")
   echo "  subcommands=("
   for cmd in commands:
-    if not cmd.shellCompletion:
-      continue
-    if cmd.help != "":
-      echo "    '" & cmd.name & ":" & cmd.help.replace("'", "'\\''") & "'"
-    else:
-      echo "    '" & cmd.name & "'"
+    if cmd.shellCompletion:
+      if cmd.help != "":
+        echo "    '" & cmd.name & ":" & cmd.help.replace("'", "'\\''") & "'"
+      else:
+        echo "    '" & cmd.name & "'"
   echo "  )"
   writeZshOptions("options", mainOptions)
   for cmd in commands:
-    if not cmd.shellCompletion:
-      continue
-    writeZshOptions(cmd.name & "_options", cmd.opts)
+    if cmd.shellCompletion:
+      writeZshOptions(cmd.name & "_options", cmd.opts)
   echo """
   if (( CURRENT == 2 )); then
     _describe 'command' subcommands
@@ -414,13 +410,12 @@ proc zshcomplete*() =
   else
     case "$words[2]" in"""
   for cmd in commands:
-    if not cmd.shellCompletion:
-      continue
-    echo "      " & cmd.name & ")"
-    echo "        _describe 'option' " & cmd.name & "_options"
-    if cmd.files:
-      echo "        _files"
-    echo "        ;;"
+    if cmd.shellCompletion:
+      echo "      " & cmd.name & ")"
+      echo "        _describe 'option' " & cmd.name & "_options"
+      if cmd.files:
+        echo "        _files"
+      echo "        ;;"
   echo """      *)
         _describe 'option' options
         _files

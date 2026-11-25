@@ -172,20 +172,18 @@ proc writeCaptions*(track: CaptionTrack, ctx: ptr AVCodecContext,
     let size = avcodec_encode_subtitle(ctx, addr buf[0], buf.len.cint, addr sub)
     if size < 0:
       error "Could not encode caption: " & av_err2str(size)
-    if size == 0:
-      continue
-
-    var packet: AVPacket
-    if av_new_packet(addr packet, size) < 0:
-      error "Could not allocate caption packet"
-    copyMem(packet.data, addr buf[0], size)
-    packet.stream_index = outputStream.index
-    packet.time_base = ctx.time_base
-    packet.pts = pts
-    packet.dts = pts
-    packet.duration = dur
-    output.mux(packet)
-    av_packet_unref(addr packet)
+    if size != 0:
+      var packet: AVPacket
+      if av_new_packet(addr packet, size) < 0:
+        error "Could not allocate caption packet"
+      copyMem(packet.data, addr buf[0], size)
+      packet.stream_index = outputStream.index
+      packet.time_base = ctx.time_base
+      packet.pts = pts
+      packet.dts = pts
+      packet.duration = dur
+      output.mux(packet)
+      av_packet_unref(addr packet)
 
 proc makeAlteredSubtitle*(sourcePath, outputPath: string, layer: seq[Clip],
     effects: seq[Actions], timelineTb: AVRational) =

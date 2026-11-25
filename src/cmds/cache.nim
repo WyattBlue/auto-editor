@@ -34,19 +34,18 @@ proc main*(args: seq[string]) =
       if kind == pcFile:
         let (_, key, ext) = agSplitFile(path)
         # Only .bin files with the 16-char hash prefix are cache entries.
-        if ext != ".bin" or key.len < 16:
-          continue
-        let size = getFileSize(path)
-        totalSize += size
-        let (sizeNum, sizeUnit) = formatBytes(size)
+        if ext == ".bin" and key.len >= 16:
+          let size = getFileSize(path)
+          totalSize += size
+          let (sizeNum, sizeUnit) = formatBytes(size)
 
-        let hashPart = key[0 ..< 16]
-        let restPart = key[16 .. ^1]
+          let hashPart = key[0 ..< 16]
+          let restPart = key[16 .. ^1]
 
-        stdout.styledWrite(fgYellow, "entry: ")
-        stdout.write "\e[90m", hashPart, "\e[0m"
-        stdout.styledWriteLine(restPart, "  ", fgYellow, "size: ", fgGreen, sizeNum,
-            fgBlue, sizeUnit, resetStyle)
+          stdout.styledWrite(fgYellow, "entry: ")
+          stdout.write "\e[90m", hashPart, "\e[0m"
+          stdout.styledWriteLine(restPart, "  ", fgYellow, "size: ", fgGreen, sizeNum,
+              fgBlue, sizeUnit, resetStyle)
   except:
     discard
 

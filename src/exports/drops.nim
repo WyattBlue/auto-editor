@@ -77,43 +77,42 @@ func carried(s: DropScan, layer: seq[Clip], i: int, rule: LayerRule,
 proc scan(s: var DropScan, tl: v3, layers: seq[seq[Clip]], video: bool,
     rule: LayerRule, supported: set[ActionKind], ramps: bool) {.raises: [].} =
   for i, layer in layers:
-    if layer.len == 0: continue
-    let isBase = (if video: i == 0 else: i == 0 and not s.videoBase)
-    # Generator layers (add:text, add:tone) have no file for an editor to
-    # reference. A video base without files is different: it's the canvas
-    # an audio-only timeline gets for its overlays, not content.
-    if not (video and i == 0) and layer.allIt(it.src == nil):
-      inc s.generated
-      continue
-    if not s.carried(layer, i, rule, isBase):
-      if video: inc s.droppedV else: inc s.droppedA
-      continue
-    for clip in layer:
-      if clip.src == nil: continue
-      for act in tl.effects[clip.effects]:
-        if act.kind notin supported and act.kind.appliesTo(video):
-          let name = ($act).split({':', ','})[0]
-          if name notin s.actions: s.actions.add name
-        elif act.kind == actSpeed and act.sKf.len > 0 and not ramps:
-          const name = "speed ramp (as its mean speed)"
-          if name notin s.actions: s.actions.add name
+    if layer.len != 0:
+      let isBase = (if video: i == 0 else: i == 0 and not s.videoBase)
+      # Generator layers (add:text, add:tone) have no file for an editor to
+      # reference. A video base without files is different: it's the canvas
+      # an audio-only timeline gets for its overlays, not content.
+      if not (video and i == 0) and layer.allIt(it.src == nil):
+        inc s.generated
+      elif not s.carried(layer, i, rule, isBase):
+        if video: inc s.droppedV else: inc s.droppedA
+      else:
+        for clip in layer:
+          if clip.src != nil:
+            for act in tl.effects[clip.effects]:
+              if act.kind notin supported and act.kind.appliesTo(video):
+                let name = ($act).split({':', ','})[0]
+                if name notin s.actions: s.actions.add name
+              elif act.kind == actSpeed and act.sKf.len > 0 and not ramps:
+                const name = "speed ramp (as its mean speed)"
+                if name notin s.actions: s.actions.add name
 
 func shortensSpans(base: seq[Clip], markers: seq[Marker]): bool {.raises: [].} =
   ## Whether a marker span runs past the clip it's written on. FCPXML keeps
   ## a marker on the base layer's clip it starts during, as fcp11 does, so
   ## the span ends with that clip.
   for m in markers:
-    if m.dur <= 0: continue
-    for i, clip in base:
-      if clip.src == nil: continue
-      var hi = high(int64)
-      for j in i + 1 ..< base.len:
-        if base[j].src != nil:
-          hi = base[j].start
-          break
-      if m.start >= (if i == 0: 0'i64 else: clip.start) and m.start < hi:
-        if m.dur > clip.start + clip.dur - m.start: return true
-        break
+    if m.dur > 0:
+      for i, clip in base:
+        if clip.src != nil:
+          var hi = high(int64)
+          for j in i + 1 ..< base.len:
+            if base[j].src != nil:
+              hi = base[j].start
+              break
+          if m.start >= (if i == 0: 0'i64 else: clip.start) and m.start < hi:
+            if m.dur > clip.start + clip.dur - m.start: return true
+            break
 
 func fcpxmlShortensSpans(tl: v3): bool {.raises: [].} =
   if tl.hasBaseVideo: tl.v[0].shortensSpans(tl.markers)

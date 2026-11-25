@@ -39,15 +39,15 @@ proc blackLumaMax(fmt: AVPixelFormat, range: AVColorRange, thres: uint8): int =
     error "Could not allocate luma probe"
   let vsub = av_pix_fmt_desc_get(fmt).log2_chroma_h.int
   for p in 0 ..< src.data.len:
-    if src.data[p] == nil: continue
-    # Other planes get neutral chroma; fill no more rows than a subsampled
-    # plane has.
-    let rows = (if p == 0: h else: (h + (1 shl vsub) - 1) shr vsub)
-    for y in 0 ..< rows:
-      let row = cast[ptr UncheckedArray[uint8]](cast[int](src.data[p]) +
-        y * src.linesize[p].int)
-      for x in 0 ..< src.linesize[p].int:
-        row[x] = (if p == 0: uint8(min(x, 255)) else: 128'u8)
+    if src.data[p] != nil:
+      # Other planes get neutral chroma; fill no more rows than a subsampled
+      # plane has.
+      let rows = (if p == 0: h else: (h + (1 shl vsub) - 1) shr vsub)
+      for y in 0 ..< rows:
+        let row = cast[ptr UncheckedArray[uint8]](cast[int](src.data[p]) +
+          y * src.linesize[p].int)
+        for x in 0 ..< src.linesize[p].int:
+          row[x] = (if p == 0: uint8(min(x, 255)) else: 128'u8)
   dst.format = AV_PIX_FMT_GRAY8.cint
   dst.width = w
   dst.height = h

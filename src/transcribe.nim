@@ -494,16 +494,16 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
     let ret = readPacket(pkt)
     if ret == AVERROR_EAGAIN:
       sleep(5)
-      continue
-    if ret < 0:
-      if ret != AVERROR_EOF:
-        warning &"Stopped reading audio: {av_err2str(ret)}"
-      break
-    if pkt.stream_index == audioStream.index and avcodec_send_packet(dec, pkt) >= 0:
-      while avcodec_receive_frame(dec, frame) >= 0:
-        feed(frame)
-        av_frame_unref(frame)
-    av_packet_unref(pkt)
+    else:
+      if ret < 0:
+        if ret != AVERROR_EOF:
+          warning &"Stopped reading audio: {av_err2str(ret)}"
+        break
+      if pkt.stream_index == audioStream.index and avcodec_send_packet(dec, pkt) >= 0:
+        while avcodec_receive_frame(dec, frame) >= 0:
+          feed(frame)
+          av_frame_unref(frame)
+      av_packet_unref(pkt)
 
   # Flush the decoder first: delay codecs (AAC/MP3) still hold the last frames,
   # which carry the end of the final utterance.

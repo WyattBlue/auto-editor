@@ -364,12 +364,12 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
             # can read, like the `apac` one in iPhone Spatial Audio files.
             debug &"audio: skipping stream {i}, no decoder for " &
               $avcodec_get_name(codecId)
-            continue
-          let channelIndex = streamChannel(i)
-          if channelIndex >= -1:
-            result.orWithThreshold(
-              audio(bar, container, input, tb, i.int16, channelIndex), m.threshold)
-            matched = true
+          else:
+            let channelIndex = streamChannel(i)
+            if channelIndex >= -1:
+              result.orWithThreshold(
+                audio(bar, container, input, tb, i.int16, channelIndex), m.threshold)
+              matched = true
         if not matched:
           if undecodable > 0 and undecodable == container.audio.len:
             error "audio: no audio stream in this file can be decoded."

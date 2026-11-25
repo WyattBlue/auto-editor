@@ -115,17 +115,17 @@ proc dropUndecodableAudio*(tl: var v3, cache: MediaCache) =
     for clip in layer:
       if clip.src == nil:
         kept.add clip
-        continue
-      let container = cache.getContainer(clip.src)
-      if clip.stream.int >= container.audio.len:
-        kept.add clip
-        continue
-      let codecId = container.audio[clip.stream.int].codecpar.codec_id
-      if canDecode(codecId):
-        kept.add clip
-      elif not reported.containsOrIncl((clip.src, clip.stream)):
-        warning &"Skipping audio stream {clip.stream}: no decoder for " &
-          $avcodec_get_name(codecId)
+      else:
+        let container = cache.getContainer(clip.src)
+        if clip.stream.int >= container.audio.len:
+          kept.add clip
+        else:
+          let codecId = container.audio[clip.stream.int].codecpar.codec_id
+          if canDecode(codecId):
+            kept.add clip
+          elif not reported.containsOrIncl((clip.src, clip.stream)):
+            warning &"Skipping audio stream {clip.stream}: no decoder for " &
+              $avcodec_get_name(codecId)
     layer = kept
 
 proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
@@ -216,11 +216,7 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
 
   if includeAudio and args.mixAudioStreams and tl.a.len > 0:
     # Create a single audio stream for mixed output
-    var hasAnyClips = false
-    for i in 0..<tl.a.len:
-      if tl.a[i].len > 0:
-        hasAnyClips = true
-        break
+    let hasAnyClips = tl.a.anyIt(it.len > 0)
 
     if hasAnyClips:
       let rate = AVRational(num: tl.sr, den: 1)
@@ -540,11 +536,8 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
           index = max(index, audioIndex)
 
     # Break if no more frames
-    var hasFrames = videoFrame != nil or videoPacket != nil
-    for audioFrame in audioFrames:
-      if audioFrame != nil:
-        hasFrames = true
-        break
+    var hasFrames = videoFrame != nil or videoPacket != nil or
+      audioFrames.anyIt(it != nil)
     for i, e in asyncAudio:
       if e != nil and not audioDone[i]:
         hasFrames = true
@@ -622,13 +615,12 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       av_packet_unref(outPacket)
 
   for i, aEncCtx in audioEncoders:
-    if asyncAudio[i] != nil:
-      continue # flushed above
-    for outPacket in aEncCtx.encode(nil, outPacket):
-      outPacket.stream_index = audioStreams[i].index
-      av_packet_rescale_ts(outPacket, aEncCtx.time_base, audioStreams[i].time_base)
-      output.mux(outPacket[])
-      av_packet_unref(outPacket)
+    if asyncAudio[i] == nil: # otherwise it was already flushed above
+      for outPacket in aEncCtx.encode(nil, outPacket):
+        outPacket.stream_index = audioStreams[i].index
+        av_packet_rescale_ts(outPacket, aEncCtx.time_base, audioStreams[i].time_base)
+        output.mux(outPacket[])
+        av_packet_unref(outPacket)
 
   # Copy embedded images
   for (outStream, cachedPkt) in imageStreams:

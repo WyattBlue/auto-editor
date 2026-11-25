@@ -2317,42 +2317,39 @@ when not defined(nimscript):
     var pendDur = 0.0'f32
     for part in splitUnescaped(val.strip(), ',', textOnly = true):
       let trimmedPart = part.strip()
-      if trimmedPart == "nil":
-        continue
-      if trimmedPart == "cut":
-        return aCut
+      if trimmedPart != "nil":
+        if trimmedPart == "cut":
+          return aCut
 
-      let segs = trimmedPart.split(":")
-      if segs[0] == "ease" and segs.len in {2, 3}:
-        pendActive = true
-        pendCurve = parseEasing(segs[1])
-        if segs.len == 3:
-          (pendDur, pendUnit) = parseDuration(segs[2])
+        let segs = trimmedPart.split(":")
+        if segs[0] == "ease" and segs.len in {2, 3}:
+          pendActive = true
+          pendCurve = parseEasing(segs[1])
+          if segs.len == 3:
+            (pendDur, pendUnit) = parseDuration(segs[2])
+          else:
+            pendUnit = duClip
+            pendDur = 0.0'f32
         else:
-          pendUnit = duClip
-          pendDur = 0.0'f32
-        continue
-
-      var action = parseAction(trimmedPart)
-      if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness,
-          actVolume, actPos, actPixelate} and not action.hasEase:
-        action.hasEase = true
-        action.easeCurve = pendCurve
-        # Timed keyframes keep their own timing; they take only the curve.
-        if not action.isTimed:
-          action.easeDurUnit = pendUnit
-          action.easeDur = pendDur
-      if action.kind == actLuv:
-        # Adjacent-fusion: collapse this actLuv into previous one if it's also actLuv.
-        # Per field, the non-identity value wins; later wins on genuine conflicts.
-        if list.len > 0 and list[^1].kind == actLuv:
-          var prev = list[^1]
-          if action.brighthue != luvBrighthueId: prev.brighthue = action.brighthue
-          if action.contrast != luvContrastId: prev.contrast = action.contrast
-          if action.saturation != luvSaturationId: prev.saturation = action.saturation
-          list[^1] = prev
-          continue
-      list.add action
+          var action = parseAction(trimmedPart)
+          if pendActive and action.kind in {actZoom, actBlur, actOpacity, actBrightness,
+              actVolume, actPos, actPixelate} and not action.hasEase:
+            action.hasEase = true
+            action.easeCurve = pendCurve
+            # Timed keyframes keep their own timing; they take only the curve.
+            if not action.isTimed:
+              action.easeDurUnit = pendUnit
+              action.easeDur = pendDur
+          # Adjacent-fusion: collapse this actLuv into previous one if it's also actLuv.
+          # Per field, the non-identity value wins; later wins on genuine conflicts.
+          if action.kind == actLuv and list.len > 0 and list[^1].kind == actLuv:
+            var prev = list[^1]
+            if action.brighthue != luvBrighthueId: prev.brighthue = action.brighthue
+            if action.contrast != luvContrastId: prev.contrast = action.contrast
+            if action.saturation != luvSaturationId: prev.saturation = action.saturation
+            list[^1] = prev
+          else:
+            list.add action
 
     # Drop any all-identity actLuv (no-op), and canonicalize `loop`: it's a
     # per-clip flag, not an ordered effect, so any number of `loop` tokens
@@ -2363,11 +2360,11 @@ when not defined(nimscript):
     for a in list:
       if a.kind == actLuv and a.brighthue == luvBrighthueId and
           a.contrast == luvContrastId and a.saturation == luvSaturationId:
-        continue
-      if a.kind == actLoop:
+        discard
+      elif a.kind == actLoop:
         hasLoop = true
-        continue
-      pruned.add a
+      else:
+        pruned.add a
     if hasLoop:
       pruned.insert(Action(kind: actLoop), 0)
     return newActions(pruned)

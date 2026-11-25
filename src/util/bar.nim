@@ -111,40 +111,38 @@ proc progressWorker(data: ThreadData) {.thread.} =
     if data.paused.load():
       data.sleeping.store(true)
       sleep(sleepRate)
-      continue
-
-    data.sleeping.store(false)
-
-    when not defined(windows) and not defined(emscripten):
-      if termResized.load():
-        columns = terminalWidth()
-        termResized.store(false)
-    elif defined(windows):
-      inc widthCounter
-      if widthCounter >= widthRefreshRate:
-        columns = terminalWidth()
-        widthCounter = 0
-
-    let currentProgress = data.progress.load()
-    if currentProgress == lastProgress:
-      data.sleeping.store(true)
-      sleep(sleepRate)
-      continue
-
-    let total = data.total.load()
-    let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
-    let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
-
-    let output = formatProgressOutput(config, data.title, data.lenTitle, columns,
-        progress, rate, data.begin, currentProgress, total)
-    when defined(emscripten):
-      wasmProgressWrite(output.cstring)
     else:
-      stderr.write(output & "\r")
-      stderr.flushFile()
+      data.sleeping.store(false)
 
-    lastProgress = currentProgress
-    sleep(sleepRate)
+      when not defined(windows) and not defined(emscripten):
+        if termResized.load():
+          columns = terminalWidth()
+          termResized.store(false)
+      elif defined(windows):
+        inc widthCounter
+        if widthCounter >= widthRefreshRate:
+          columns = terminalWidth()
+          widthCounter = 0
+
+      let currentProgress = data.progress.load()
+      if currentProgress == lastProgress:
+        data.sleeping.store(true)
+        sleep(sleepRate)
+      else:
+        let total = data.total.load()
+        let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
+        let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
+
+        let output = formatProgressOutput(config, data.title, data.lenTitle, columns,
+            progress, rate, data.begin, currentProgress, total)
+        when defined(emscripten):
+          wasmProgressWrite(output.cstring)
+        else:
+          stderr.write(output & "\r")
+          stderr.flushFile()
+
+        lastProgress = currentProgress
+        sleep(sleepRate)
 
 var
   progressHook* {.threadvar.}: ProgressHook

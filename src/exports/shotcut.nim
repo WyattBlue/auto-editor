@@ -281,59 +281,59 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   # because the MLT XML parser cannot resolve forward references.
   var transitionTags = newSeq[string](layer.len)
   for i, clip in layer:
-    if plans[i].outCenter == -1: continue
-    let t = transitions[plans[i].outCenter]
-    let next = layer[i + 1]
-    let h = min(t.dur div 2, next.offset)
-    let h2 = t.dur - t.dur div 2
+    if plans[i].outCenter != -1:
+      let t = transitions[plans[i].outCenter]
+      let next = layer[i + 1]
+      let h = min(t.dur div 2, next.offset)
+      let h2 = t.dur - t.dur div 2
 
-    let tag = &"transition{i}"
-    transitionTags[i] = tag
-    let tagA = tag & "a"
-    let tagB = tag & "b"
-    mlt.addSourceProducer(tl, tagA, clip,
-      clip.offset + clip.dur + plans[i].postroll, 0, 0)
-    mlt.addSourceProducer(tl, tagB, next, next.offset + next.dur, 0, 0)
+      let tag = &"transition{i}"
+      transitionTags[i] = tag
+      let tagA = tag & "a"
+      let tagB = tag & "b"
+      mlt.addSourceProducer(tl, tagA, clip,
+        clip.offset + clip.dur + plans[i].postroll, 0, 0)
+      mlt.addSourceProducer(tl, tagB, next, next.offset + next.dur, 0, 0)
 
-    let tr = newElement("tractor")
-    tr.attrs = {"id": tag, "in": "00:00:00.000",
-      "out": tc(h + h2 - 1, tb)}.toXmlAttributes()
-    tr.addProp("shotcut:transition", "lumaMix")
+      let tr = newElement("tractor")
+      tr.attrs = {"id": tag, "in": "00:00:00.000",
+        "out": tc(h + h2 - 1, tb)}.toXmlAttributes()
+      tr.addProp("shotcut:transition", "lumaMix")
 
-    var track = newElement("track")
-    track.attrs = {"producer": tagA,
-      "in": tc(clip.offset + clip.dur - h, tb),
-      "out": tc(clip.offset + clip.dur + h2 - 1, tb)}.toXmlAttributes()
-    tr.add(track)
-    track = newElement("track")
-    track.attrs = {"producer": tagB,
-      "in": tc(next.offset - h, tb),
-      "out": tc(next.offset + h2 - 1, tb)}.toXmlAttributes()
-    tr.add(track)
+      var track = newElement("track")
+      track.attrs = {"producer": tagA,
+        "in": tc(clip.offset + clip.dur - h, tb),
+        "out": tc(clip.offset + clip.dur + h2 - 1, tb)}.toXmlAttributes()
+      tr.add(track)
+      track = newElement("track")
+      track.attrs = {"producer": tagB,
+        "in": tc(next.offset - h, tb),
+        "out": tc(next.offset + h2 - 1, tb)}.toXmlAttributes()
+      tr.add(track)
 
-    # Frames inside the sub-tractor carry 0-based positions. A transition
-    # without explicit in/out computes its progress against the b-producer's
-    # full source range instead, which breaks the fade ramp.
-    let trIo = {"in": "00:00:00.000",
-      "out": tc(h + h2 - 1, tb)}.toXmlAttributes()
-    if tl.v.len > 0:
-      let luma = newElement("transition")
-      luma.attrs = trIo
-      luma.addProp("a_track", "0")
-      luma.addProp("b_track", "1")
-      luma.addProp("factory", "loader")
-      luma.addProp("mlt_service", "luma")
-      tr.add(luma)
-    if tl.a.len > 0:
-      let mix = newElement("transition")
-      mix.attrs = trIo
-      mix.addProp("a_track", "0")
-      mix.addProp("b_track", "1")
-      mix.addProp("start", "-1")
-      mix.addProp("accepts_blanks", "1")
-      mix.addProp("mlt_service", "mix")
-      tr.add(mix)
-    mlt.add(tr)
+      # Frames inside the sub-tractor carry 0-based positions. A transition
+      # without explicit in/out computes its progress against the b-producer's
+      # full source range instead, which breaks the fade ramp.
+      let trIo = {"in": "00:00:00.000",
+        "out": tc(h + h2 - 1, tb)}.toXmlAttributes()
+      if tl.v.len > 0:
+        let luma = newElement("transition")
+        luma.attrs = trIo
+        luma.addProp("a_track", "0")
+        luma.addProp("b_track", "1")
+        luma.addProp("factory", "loader")
+        luma.addProp("mlt_service", "luma")
+        tr.add(luma)
+      if tl.a.len > 0:
+        let mix = newElement("transition")
+        mix.attrs = trIo
+        mix.addProp("a_track", "0")
+        mix.addProp("b_track", "1")
+        mix.addProp("start", "-1")
+        mix.addProp("accepts_blanks", "1")
+        mix.addProp("mlt_service", "mix")
+        tr.add(mix)
+      mlt.add(tr)
 
   let main_playlist = newElement("playlist")
   main_playlist.attrs = {"id": "playlist0"}.toXmlAttributes()

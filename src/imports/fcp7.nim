@@ -36,11 +36,11 @@ proc readRate(rateNode: XmlNode): AVRational =
   var timebase = 30
   var ntsc = false
   for rc in rateNode:
-    if rc.kind != xnElement: continue
-    if rc.tag == "timebase":
-      timebase = xmlInt(rc, 1, high(cint)).int
-    elif rc.tag == "ntsc":
-      ntsc = rc.innerText.strip() == "TRUE"
+    if rc.kind == xnElement:
+      if rc.tag == "timebase":
+        timebase = xmlInt(rc, 1, high(cint)).int
+      elif rc.tag == "ntsc":
+        ntsc = rc.innerText.strip() == "TRUE"
   readTbNtsc(timebase, ntsc)
 
 func num(s: string): (bool, float) =
@@ -54,24 +54,24 @@ func num(s: string): (bool, float) =
 
 func readParam(parmNode: XmlNode): (string, seq[(float, float)]) =
   for c in parmNode:
-    if c.kind != xnElement: continue
-    case c.tag
-    of "parameterid":
-      result[0] = c.innerText.strip()
-    of "value":
-      let (ok, v) = num(c.innerText)
-      if ok: result[1].add (0.0, v)
-    of "keyframe":
-      var timeOk, valOk = false
-      var time, value = 0.0
-      for kc in c:
-        if kc.kind != xnElement: continue
-        case kc.tag
-        of "when": (timeOk, time) = num(kc.innerText)
-        of "value": (valOk, value) = num(kc.innerText)
-        else: discard
-      if timeOk and valOk: result[1].add (time, value)
-    else: discard
+    if c.kind == xnElement:
+      case c.tag
+      of "parameterid":
+        result[0] = c.innerText.strip()
+      of "value":
+        let (ok, v) = num(c.innerText)
+        if ok: result[1].add (0.0, v)
+      of "keyframe":
+        var timeOk, valOk = false
+        var time, value = 0.0
+        for kc in c:
+          if kc.kind == xnElement:
+            case kc.tag
+            of "when": (timeOk, time) = num(kc.innerText)
+            of "value": (valOk, value) = num(kc.innerText)
+            else: discard
+        if timeOk and valOk: result[1].add (time, value)
+      else: discard
 
 func addFixed(acts: var seq[Action], act: Action) =
   for a in acts:
@@ -128,54 +128,53 @@ proc readFilters(filterNode: XmlNode, acts: var seq[Action], remap: var Remap,
       return
 
   for effectTag in filterNode:
-    if effectTag.kind != xnElement or effectTag.tag != "effect": continue
+    if effectTag.kind == xnElement and effectTag.tag == "effect":
+      var effectId = ""
+      var params: Table[string, seq[(float, float)]]
+      for effectChild in effectTag:
+        if effectChild.kind == xnElement:
+          if effectChild.tag == "effectid":
+            effectId = effectChild.innerText.strip()
+          elif effectChild.tag == "parameter":
+            let (id, vals) = readParam(effectChild)
+            if id != "" and vals.len > 0:
+              params[id] = vals
 
-    var effectId = ""
-    var params: Table[string, seq[(float, float)]]
-    for effectChild in effectTag:
-      if effectChild.kind != xnElement: continue
-      if effectChild.tag == "effectid":
-        effectId = effectChild.innerText.strip()
-      elif effectChild.tag == "parameter":
-        let (id, vals) = readParam(effectChild)
-        if id != "" and vals.len > 0:
-          params[id] = vals
-
-    case effectId
-    of "timeremap":
-      let speeds = params.getOrDefault("speed")
-      if speeds.len > 0:
-        let speed = speeds[0][1] / 100.0
-        remap.speed = abs(speed)
-        remap.freeze = speed == 0.0
-        remap.reverse = speed < 0.0
-        remap.ramp = speeds.anyIt(it[1] != speeds[0][1])
-      for v in params.getOrDefault("variablespeed"):
-        if v[1] != 0.0: remap.ramp = true
-      for v in params.getOrDefault("reverse"):
-        if v[1] != 0.0: remap.reverse = true
-      for p in effectTag:
-        if p.kind != xnElement or p.tag != "parameter": continue
-        let (id, _) = readParam(p)
-        if id != "graphdict": continue
-        for kf in p:
-          if kf.kind != xnElement or kf.tag != "keyframe": continue
-          var timeOk, valOk = false
-          var time, value = 0.0
-          for kc in kf:
-            if kc.kind != xnElement: continue
-            if kc.tag == "when": (timeOk, time) = num(kc.innerText)
-            elif kc.tag == "value": (valOk, value) = num(kc.innerText)
-          if timeOk and valOk: remap.graph.add (time, value)
-    of "opacity":
-      let kf = kfSeq(params.getOrDefault("opacity"), srcIn, srcOut, 0.01, 0.0, 1.0)
-      if kf.len > 0:
-        acts.addFixed Action(kind: actOpacity, kf: kf)
-    of "audiolevels":
-      let kf = kfSeq(params.getOrDefault("level"), srcIn, srcOut, 1.0, 0.0, 3.98109)
-      if kf.len > 0:
-        acts.addFixed Action(kind: actVolume, kf: kf)
-    else: discard
+      case effectId
+      of "timeremap":
+        let speeds = params.getOrDefault("speed")
+        if speeds.len > 0:
+          let speed = speeds[0][1] / 100.0
+          remap.speed = abs(speed)
+          remap.freeze = speed == 0.0
+          remap.reverse = speed < 0.0
+          remap.ramp = speeds.anyIt(it[1] != speeds[0][1])
+        for v in params.getOrDefault("variablespeed"):
+          if v[1] != 0.0: remap.ramp = true
+        for v in params.getOrDefault("reverse"):
+          if v[1] != 0.0: remap.reverse = true
+        for p in effectTag:
+          if p.kind != xnElement or p.tag != "parameter": continue
+          let (id, _) = readParam(p)
+          if id != "graphdict": continue
+          for kf in p:
+            if kf.kind != xnElement or kf.tag != "keyframe": continue
+            var timeOk, valOk = false
+            var time, value = 0.0
+            for kc in kf:
+              if kc.kind != xnElement: continue
+              if kc.tag == "when": (timeOk, time) = num(kc.innerText)
+              elif kc.tag == "value": (valOk, value) = num(kc.innerText)
+            if timeOk and valOk: remap.graph.add (time, value)
+      of "opacity":
+        let kf = kfSeq(params.getOrDefault("opacity"), srcIn, srcOut, 0.01, 0.0, 1.0)
+        if kf.len > 0:
+          acts.addFixed Action(kind: actOpacity, kf: kf)
+      of "audiolevels":
+        let kf = kfSeq(params.getOrDefault("level"), srcIn, srcOut, 1.0, 0.0, 3.98109)
+        if kf.len > 0:
+          acts.addFixed Action(kind: actVolume, kf: kf)
+      else: discard
 
 type FileInfo = object
   src: ptr string
@@ -188,17 +187,17 @@ proc resolveFile(fileNode: XmlNode, files: var Table[string, FileInfo],
   if fileId != "" and fileId in files:
     return files[fileId]
   for fc in fileNode:
-    if fc.kind != xnElement: continue
-    if fc.tag == "pathurl":
-      result.src = interner.intern(uriToPath(fc.innerText.strip()))
-    elif fc.tag == "media":
-      for m in fc:
-        if m.kind != xnElement or m.tag != "audio": continue
-        var channels = 2
-        for a in m:
-          if a.kind == xnElement and a.tag == "channelcount":
-            channels = int(xmlInt(a, 1, 64))
-        result.channels.add channels
+    if fc.kind == xnElement:
+      if fc.tag == "pathurl":
+        result.src = interner.intern(uriToPath(fc.innerText.strip()))
+      elif fc.tag == "media":
+        for m in fc:
+          if m.kind == xnElement and m.tag == "audio":
+            var channels = 2
+            for a in m:
+              if a.kind == xnElement and a.tag == "channelcount":
+                channels = int(xmlInt(a, 1, 64))
+            result.channels.add channels
   if result.src != nil and fileId != "":
     files[fileId] = result
 
@@ -217,37 +216,37 @@ proc readTransition(node: XmlNode, audio: bool): Transition =
   var alignment = taCenter
   var kind = tkDissolve
   for c in node:
-    if c.kind != xnElement: continue
-    case c.tag
-    of "start": startVal = xmlInt(c, 0, maxFrames)
-    of "end": endVal = xmlInt(c, 0, maxFrames)
-    of "effect":
-      # An unknown transition plays as a dissolve.
-      for f in c:
-        if f.kind == xnElement and f.tag in ["effectid", "name"] and
-            kindFromName(f.innerText.strip(), not audio, kind):
-          break
-      if kind == tkDipToBlackLegacy:
-        # A light dip color dips to white.
-        var total, count = 0
+    if c.kind == xnElement:
+      case c.tag
+      of "start": startVal = xmlInt(c, 0, maxFrames)
+      of "end": endVal = xmlInt(c, 0, maxFrames)
+      of "effect":
+        # An unknown transition plays as a dissolve.
         for f in c:
-          if f.kind != xnElement or f.tag != "parameter": continue
-          for v in f:
-            if v.kind != xnElement or v.tag != "value": continue
-            for ch in v:
-              if ch.kind == xnElement and ch.tag in ["red", "green", "blue"]:
-                let (ok, n) = num(ch.innerText)
-                if ok:
-                  total += int(n)
-                  inc count
-        if count > 0 and total div count > 127: kind = tkDipToWhiteLegacy
-    of "alignment":
-      alignment = case c.innerText.strip()
-        of "start", "start-black": taStart
-        of "center": taCenter
-        of "end", "end-black": taEnd
-        else: error &"Unsupported transition alignment: '{c.innerText.strip()}'"
-    else: discard
+          if f.kind == xnElement and f.tag in ["effectid", "name"] and
+              kindFromName(f.innerText.strip(), not audio, kind):
+            break
+        if kind == tkDipToBlackLegacy:
+          # A light dip color dips to white.
+          var total, count = 0
+          for f in c:
+            if f.kind != xnElement or f.tag != "parameter": continue
+            for v in f:
+              if v.kind != xnElement or v.tag != "value": continue
+              for ch in v:
+                if ch.kind == xnElement and ch.tag in ["red", "green", "blue"]:
+                  let (ok, n) = num(ch.innerText)
+                  if ok:
+                    total += int(n)
+                    inc count
+          if count > 0 and total div count > 127: kind = tkDipToWhiteLegacy
+      of "alignment":
+        alignment = case c.innerText.strip()
+          of "start", "start-black": taStart
+          of "center": taCenter
+          of "end", "end-black": taEnd
+          else: error &"Unsupported transition alignment: '{c.innerText.strip()}'"
+      else: discard
   if startVal < 0 or endVal <= startVal:
     error "Invalid transitionitem: <start> must come before <end>"
   let dur = endVal - startVal
@@ -263,26 +262,26 @@ proc generatorColor(effect: XmlNode): (bool, RGBColor) =
   var name, id: string
   var color = RGBColor(red: 0, green: 0, blue: 0)
   for c in effect:
-    if c.kind != xnElement: continue
-    case c.tag
-    of "name": name = c.innerText.strip().toLowerAscii()
-    of "effectid": id = c.innerText.strip().toLowerAscii()
-    of "parameter":
-      var isFill = false
-      var value: XmlNode = nil
-      for pc in c:
-        if pc.kind != xnElement: continue
-        if pc.tag == "parameterid": isFill = pc.innerText.strip() == "fillcolor"
-        elif pc.tag == "value": value = pc
-      if isFill and value != nil:
-        for ch in value:
-          if ch.kind != xnElement or ch.tag notin ["red", "green", "blue"]: continue
-          let v = uint8(xmlInt(ch, 0, 255))
-          case ch.tag
-          of "red": color.red = v
-          of "green": color.green = v
-          else: color.blue = v
-    else: discard
+    if c.kind == xnElement:
+      case c.tag
+      of "name": name = c.innerText.strip().toLowerAscii()
+      of "effectid": id = c.innerText.strip().toLowerAscii()
+      of "parameter":
+        var isFill = false
+        var value: XmlNode = nil
+        for pc in c:
+          if pc.kind != xnElement: continue
+          if pc.tag == "parameterid": isFill = pc.innerText.strip() == "fillcolor"
+          elif pc.tag == "value": value = pc
+        if isFill and value != nil:
+          for ch in value:
+            if ch.kind != xnElement or ch.tag notin ["red", "green", "blue"]: continue
+            let v = uint8(xmlInt(ch, 0, 255))
+            case ch.tag
+            of "red": color.red = v
+            of "green": color.green = v
+            else: color.blue = v
+      else: discard
   if id == "slug" or name in ["slug", "black video"]: return (true, color)
   if id == "color" or name in ["color", "color matte", "colour matte"]:
     return (true, color)
@@ -309,14 +308,14 @@ proc readMarker(node: XmlNode): (bool, Marker) =
   var stop = -1'i64
   marker.start = -1
   for c in node:
-    if c.kind != xnElement: continue
-    case c.tag
-    of "name": marker.name = c.innerText.strip()
-    of "comment": marker.note = c.innerText.strip()
-    of "in": marker.start = xmlInt(c, -1, maxFrames)
-    of "out": stop = xmlInt(c, -1, maxFrames)
-    of "pproColor": marker.color = fromPproColor(xmlInt(c, 0, high(uint32).int64))
-    else: discard
+    if c.kind == xnElement:
+      case c.tag
+      of "name": marker.name = c.innerText.strip()
+      of "comment": marker.note = c.innerText.strip()
+      of "in": marker.start = xmlInt(c, -1, maxFrames)
+      of "out": stop = xmlInt(c, -1, maxFrames)
+      of "pproColor": marker.color = fromPproColor(xmlInt(c, 0, high(uint32).int64))
+      else: discard
   marker.dur = max(0'i64, stop - marker.start)
   (marker.start >= 0, marker)
 
@@ -342,159 +341,159 @@ proc parseTrack(trackNode: XmlNode, files: var Table[string, FileInfo],
       result.transitions.add parsed[k]
 
   for k, trackChild in items:
-    if trackChild.tag == "transitionitem": continue
-    let generator = trackChild.tag == "generatoritem"
+    if trackChild.tag != "transitionitem":
+      let generator = trackChild.tag == "generatoritem"
 
-    var startVal = 0i64
-    var endVal = 0i64
-    var inVal = 0i64
-    var outVal = -1i64
-    var ticksIn, ticksOut = -1'i64
-    var fileNode, effectNode: XmlNode = nil
-    var nested = false
-    var enabled = true
-    var trackIndex = 1'i64
-    var clipTb = tb
-    var acts: seq[Action]
-    var filterNodes, markerNodes: seq[XmlNode]
+      var startVal = 0i64
+      var endVal = 0i64
+      var inVal = 0i64
+      var outVal = -1i64
+      var ticksIn, ticksOut = -1'i64
+      var fileNode, effectNode: XmlNode = nil
+      var nested = false
+      var enabled = true
+      var trackIndex = 1'i64
+      var clipTb = tb
+      var acts: seq[Action]
+      var filterNodes, markerNodes: seq[XmlNode]
 
-    for ci in trackChild:
-      if ci.kind != xnElement: continue
-      case ci.tag
-      # -1 marks a start or end inside a transition.
-      of "start": startVal = xmlInt(ci, -1, maxFrames)
-      of "end": endVal = xmlInt(ci, -1, maxFrames)
-      of "in": inVal = xmlInt(ci, 0, maxFrames)
-      of "out": outVal = xmlInt(ci, -1, maxFrames)
-      of "pproTicksIn": ticksIn = xmlInt(ci, lo = 0)
-      of "pproTicksOut": ticksOut = xmlInt(ci, lo = 0)
-      of "file": fileNode = ci
-      of "effect": effectNode = ci
-      of "sequence": nested = true
-      of "enabled": enabled = ci.innerText.strip() != "FALSE"
-      of "filter": filterNodes.add ci
-      of "marker": markerNodes.add ci
-      of "rate": clipTb = readRate(ci)
-      of "sourcetrack":
-        for st in ci:
-          if st.kind == xnElement and st.tag == "trackindex":
-            trackIndex = xmlInt(st, 1, high(int32))
-      else: discard
+      for ci in trackChild:
+        if ci.kind == xnElement:
+          case ci.tag
+          # -1 marks a start or end inside a transition.
+          of "start": startVal = xmlInt(ci, -1, maxFrames)
+          of "end": endVal = xmlInt(ci, -1, maxFrames)
+          of "in": inVal = xmlInt(ci, 0, maxFrames)
+          of "out": outVal = xmlInt(ci, -1, maxFrames)
+          of "pproTicksIn": ticksIn = xmlInt(ci, lo = 0)
+          of "pproTicksOut": ticksOut = xmlInt(ci, lo = 0)
+          of "file": fileNode = ci
+          of "effect": effectNode = ci
+          of "sequence": nested = true
+          of "enabled": enabled = ci.innerText.strip() != "FALSE"
+          of "filter": filterNodes.add ci
+          of "marker": markerNodes.add ci
+          of "rate": clipTb = readRate(ci)
+          of "sourcetrack":
+            for st in ci:
+              if st.kind == xnElement and st.tag == "trackindex":
+                trackIndex = xmlInt(st, 1, high(int32))
+          else: discard
 
-    if not enabled: continue
-    # <in>, <out> and the filters' keyframes count frames at the clip's own
-    # rate, which can differ from the sequence's (Premiere's ticks show it).
-    let scale = tb.float64 / clipTb.float64
-    proc toSeqFrames(v: int64): int64 =
-      let f = round(v.float64 * scale)
-      if not (f <= maxFrames.float64):
-        error "Invalid clipitem: <in> or <out> is too far into its media"
-      int64(f)
-    if scale != 1.0:
-      inVal = toSeqFrames(inVal)
-      if outVal >= 0: outVal = toSeqFrames(outVal)
-    var fill: RGBColor
-    var file: FileInfo
-    if generator:
-      var known = false
-      if effectNode != nil: (known, fill) = generatorColor(effectNode)
-      if not known or audio:
-        dropped.inc "generated clip"
-        continue
-    elif fileNode == nil:
-      if nested: dropped.inc "nested sequence"
-      continue
-    else:
-      file = resolveFile(fileNode, files, interner)
-      if file.src == nil: continue
+      if enabled:
+        # <in>, <out> and the filters' keyframes count frames at the clip's own
+        # rate, which can differ from the sequence's (Premiere's ticks show it).
+        let scale = tb.float64 / clipTb.float64
+        proc toSeqFrames(v: int64): int64 =
+          let f = round(v.float64 * scale)
+          if not (f <= maxFrames.float64):
+            error "Invalid clipitem: <in> or <out> is too far into its media"
+          int64(f)
+        if scale != 1.0:
+          inVal = toSeqFrames(inVal)
+          if outVal >= 0: outVal = toSeqFrames(outVal)
+        var fill: RGBColor
+        var file: FileInfo
+        if generator:
+          var known = false
+          if effectNode != nil: (known, fill) = generatorColor(effectNode)
+          if not known or audio:
+            dropped.inc "generated clip"
+            continue
+        elif fileNode == nil:
+          if nested: dropped.inc "nested sequence"
+          continue
+        else:
+          file = resolveFile(fileNode, files, interner)
+          if file.src == nil: continue
 
-    # An edge inside a transition is the transition's edit point. A centered
-    # transition also extends the clip's media by its half on that side.
-    var inExt, outExt = 0'i64
-    if startVal == -1:
-      if k == 0 or items[k - 1].tag != "transitionitem":
-        error "clipitem <start> of -1 has no transition before it"
-      let t = parsed[k - 1]
-      startVal = t.at
-      if t.alignment == taCenter: inExt = t.dur div 2
-    if endVal == -1:
-      if k + 1 >= items.len or items[k + 1].tag != "transitionitem":
-        error "clipitem <end> of -1 has no transition after it"
-      let t = parsed[k + 1]
-      endVal = t.at
-      if t.alignment == taCenter: outExt = t.dur - t.dur div 2
-    if endVal <= startVal:
-      error "Invalid clipitem: <start> must come before <end>"
-    let dur = endVal - startVal
-    if generator:
-      # A source-less clip paints its effects on the canvas.
-      let box = Action(kind: actDrawbox, dbX: 0, dbY: 0, dbW: res[0], dbH: res[1],
-        dbColor: fill)
-      result.clips.add Clip(src: nil, start: startVal, dur: dur,
-        effects: effectIndex.intern(effects, newActions(@[box])))
-      continue
-    if outVal <= inVal: outVal = inVal + dur + inExt + outExt
-    var remap = Remap()
-    for fn in filterNodes:
-      readFilters(fn, acts, remap, inVal.float / scale, outVal.float / scale)
-    for point in remap.graph.mitems:
-      point = (point[0] * scale, point[1] * scale)
-    let ticksPerFrame = pproTicksPerSecond.float / tb.float
-    var speed = remap.speed
-    if remap.freeze:
-      dropped.inc "freeze frame"
-      speed = 1.0
-    if remap.reverse: dropped.inc "reversed clip"
-    var rampOffset = -1'i64
-    if remap.ramp and not remap.reverse and remap.graph.len >= 2:
-      # The time remap graph gives the source frame at each frame of the
-      # clip, which a ramp follows.
-      let (s, mediaIn, ok) = speedFromMap(remap.graph, float(inVal + inExt),
-        dur.float)
-      if ok and s.sKf.len > 0:
-        acts.addFixed s
-        rampOffset = int64(round(mediaIn / s.val))
-      elif ok:
-        speed = s.val
-      remap.ramp = not ok
-    if remap.ramp:
-      # Played at its average speed, which keeps the clip's length and the
-      # media it covers. Premiere's ticks give the media exactly; without
-      # them only the first keyframe's speed is known.
-      dropped.inc "speed ramp"
-      if ticksOut > ticksIn and ticksIn >= 0:
-        speed = (ticksOut - ticksIn).float / ticksPerFrame /
-          float(dur + inExt + outExt)
-    if rampOffset < 0 and speed > 0.0 and speed < 99999.0 and speed != 1.0:
-      acts.addFixed Action(kind: actSpeed, val: speed.float32)
-    # <in> is clamped at 0 when the handle runs past the media start, so take
-    # the offset from <out> instead. Premiere's ticks give the source time
-    # exactly, where <in> is rounded to a frame after the speed change.
-    let offset =
-      if rampOffset >= 0: rampOffset
-      elif inExt > 0: max(0'i64, outVal - outExt - dur)
-      elif ticksIn >= 0: int64(round(ticksIn.float / ticksPerFrame / speed))
-      else: inVal
-    # A clip carries all of its media's markers, in the media's frames:
-    # those in the part it plays show on the timeline. A ramp or a reversed
-    # clip moves through its media unevenly, so theirs are left out.
-    if rampOffset < 0 and not remap.ramp and not remap.reverse and speed > 0.0:
-      for mn in markerNodes:
-        let (ok, m) = readMarker(mn)
-        if not ok: continue
-        let at = startVal + int64(round(m.start.float64 * scale / speed)) - offset
-        if at < startVal or at >= endVal: continue
-        let span = int64(round(m.dur.float64 * scale / speed))
-        result.markers.add Marker(start: at, dur: min(span, endVal - at),
-          name: m.name, note: m.note, color: m.color)
-    let e = effectIndex.intern(effects, newActions(acts))
-    var stream = 0'i16
-    if audio:
-      let (s, firstChannel) = file.streamOf(trackIndex)
-      stream = s
-      if firstChannel: result.laterChannels = false
-    result.clips.add Clip(src: file.src, start: startVal, dur: dur,
-      offset: offset, effects: e, stream: stream)
+        # An edge inside a transition is the transition's edit point. A centered
+        # transition also extends the clip's media by its half on that side.
+        var inExt, outExt = 0'i64
+        if startVal == -1:
+          if k == 0 or items[k - 1].tag != "transitionitem":
+            error "clipitem <start> of -1 has no transition before it"
+          let t = parsed[k - 1]
+          startVal = t.at
+          if t.alignment == taCenter: inExt = t.dur div 2
+        if endVal == -1:
+          if k + 1 >= items.len or items[k + 1].tag != "transitionitem":
+            error "clipitem <end> of -1 has no transition after it"
+          let t = parsed[k + 1]
+          endVal = t.at
+          if t.alignment == taCenter: outExt = t.dur - t.dur div 2
+        if endVal <= startVal:
+          error "Invalid clipitem: <start> must come before <end>"
+        let dur = endVal - startVal
+        if generator:
+          # A source-less clip paints its effects on the canvas.
+          let box = Action(kind: actDrawbox, dbX: 0, dbY: 0, dbW: res[0], dbH: res[1],
+            dbColor: fill)
+          result.clips.add Clip(src: nil, start: startVal, dur: dur,
+            effects: effectIndex.intern(effects, newActions(@[box])))
+        else:
+          if outVal <= inVal: outVal = inVal + dur + inExt + outExt
+          var remap = Remap()
+          for fn in filterNodes:
+            readFilters(fn, acts, remap, inVal.float / scale, outVal.float / scale)
+          for point in remap.graph.mitems:
+            point = (point[0] * scale, point[1] * scale)
+          let ticksPerFrame = pproTicksPerSecond.float / tb.float
+          var speed = remap.speed
+          if remap.freeze:
+            dropped.inc "freeze frame"
+            speed = 1.0
+          if remap.reverse: dropped.inc "reversed clip"
+          var rampOffset = -1'i64
+          if remap.ramp and not remap.reverse and remap.graph.len >= 2:
+            # The time remap graph gives the source frame at each frame of the
+            # clip, which a ramp follows.
+            let (s, mediaIn, ok) = speedFromMap(remap.graph, float(inVal + inExt),
+              dur.float)
+            if ok and s.sKf.len > 0:
+              acts.addFixed s
+              rampOffset = int64(round(mediaIn / s.val))
+            elif ok:
+              speed = s.val
+            remap.ramp = not ok
+          if remap.ramp:
+            # Played at its average speed, which keeps the clip's length and the
+            # media it covers. Premiere's ticks give the media exactly; without
+            # them only the first keyframe's speed is known.
+            dropped.inc "speed ramp"
+            if ticksOut > ticksIn and ticksIn >= 0:
+              speed = (ticksOut - ticksIn).float / ticksPerFrame /
+                float(dur + inExt + outExt)
+          if rampOffset < 0 and speed > 0.0 and speed < 99999.0 and speed != 1.0:
+            acts.addFixed Action(kind: actSpeed, val: speed.float32)
+          # <in> is clamped at 0 when the handle runs past the media start, so take
+          # the offset from <out> instead. Premiere's ticks give the source time
+          # exactly, where <in> is rounded to a frame after the speed change.
+          let offset =
+            if rampOffset >= 0: rampOffset
+            elif inExt > 0: max(0'i64, outVal - outExt - dur)
+            elif ticksIn >= 0: int64(round(ticksIn.float / ticksPerFrame / speed))
+            else: inVal
+          # A clip carries all of its media's markers, in the media's frames:
+          # those in the part it plays show on the timeline. A ramp or a reversed
+          # clip moves through its media unevenly, so theirs are left out.
+          if rampOffset < 0 and not remap.ramp and not remap.reverse and speed > 0.0:
+            for mn in markerNodes:
+              let (ok, m) = readMarker(mn)
+              if ok:
+                let at = startVal + int64(round(m.start.float64 * scale / speed)) - offset
+                if at >= startVal and at < endVal:
+                  let span = int64(round(m.dur.float64 * scale / speed))
+                  result.markers.add Marker(start: at, dur: min(span, endVal - at),
+                    name: m.name, note: m.note, color: m.color)
+          let e = effectIndex.intern(effects, newActions(acts))
+          var stream = 0'i16
+          if audio:
+            let (s, firstChannel) = file.streamOf(trackIndex)
+            stream = s
+            if firstChannel: result.laterChannels = false
+          result.clips.add Clip(src: file.src, start: startVal, dur: dur,
+            offset: offset, effects: e, stream: stream)
 
 proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   let root = parseXmlFile(path, fcp7Tags)
@@ -516,16 +515,16 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   var markers: seq[Marker]
 
   for child in seqNode:
-    if child.kind != xnElement: continue
-    case child.tag
-    of "rate":
-      tb = readRate(child)
-    of "media":
-      mediaNode = child
-    of "marker":
-      let (ok, marker) = readMarker(child)
-      if ok: markers.add marker
-    else: discard
+    if child.kind == xnElement:
+      case child.tag
+      of "rate":
+        tb = readRate(child)
+      of "media":
+        mediaNode = child
+      of "marker":
+        let (ok, marker) = readMarker(child)
+        if ok: markers.add marker
+      else: discard
 
   if mediaNode == nil:
     error "No <media> found in XML"
@@ -541,57 +540,57 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
   var vtrans, atrans: seq[seq[Transition]]
 
   for mediaChild in mediaNode:
-    if mediaChild.kind != xnElement: continue
-    case mediaChild.tag
-    of "video":
-      for vidChild in mediaChild:
-        if vidChild.kind != xnElement: continue
-        case vidChild.tag
-        of "format":
-          for fc in vidChild:
-            if fc.kind != xnElement: continue
-            if fc.tag == "samplecharacteristics":
-              var w = 1920'i32
-              var h = 1080'i32
-              for sc in fc:
-                if sc.kind != xnElement: continue
-                if sc.tag == "width": w = xmlInt(sc, 1, high(int32)).int32
-                elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
-              res = (w, h)
-        of "track":
-          let (clips, transitions, _, clipMarkers) = parseTrack(vidChild, files,
-            effects, effectIndex, interner, audio = false, res, tb, dropped)
-          markers.add clipMarkers
-          if clips.len > 0:
-            vobjs.add clips
-            vtrans.add transitions
-        else: discard
-    of "audio":
-      for audChild in mediaChild:
-        if audChild.kind != xnElement: continue
-        case audChild.tag
-        of "format":
-          for fc in audChild:
-            if fc.kind != xnElement: continue
-            if fc.tag == "samplecharacteristics":
-              for sc in fc:
-                if sc.kind != xnElement: continue
-                if sc.tag == "samplerate":
-                  sr = xmlInt(sc, minSampleRate, maxSampleRate).cint
-        of "track":
-          let idx = audChild.attr("currentExplodedTrackIndex")
-          if idx != "" and idx != "0": continue
-          let (clips, transitions, laterChannels, clipMarkers) = parseTrack(
-            audChild, files, effects, effectIndex, interner, audio = true, res, tb,
-            dropped)
-          markers.add clipMarkers
-          # Clips play whole streams, which the stream's first-channel track
-          # already holds.
-          if clips.len > 0 and not laterChannels:
-            aobjs.add clips
-            atrans.add transitions
-        else: discard
-    else: discard
+    if mediaChild.kind == xnElement:
+      case mediaChild.tag
+      of "video":
+        for vidChild in mediaChild:
+          if vidChild.kind != xnElement: continue
+          case vidChild.tag
+          of "format":
+            for fc in vidChild:
+              if fc.kind != xnElement: continue
+              if fc.tag == "samplecharacteristics":
+                var w = 1920'i32
+                var h = 1080'i32
+                for sc in fc:
+                  if sc.kind != xnElement: continue
+                  if sc.tag == "width": w = xmlInt(sc, 1, high(int32)).int32
+                  elif sc.tag == "height": h = xmlInt(sc, 1, high(int32)).int32
+                res = (w, h)
+          of "track":
+            let (clips, transitions, _, clipMarkers) = parseTrack(vidChild, files,
+              effects, effectIndex, interner, audio = false, res, tb, dropped)
+            markers.add clipMarkers
+            if clips.len > 0:
+              vobjs.add clips
+              vtrans.add transitions
+          else: discard
+      of "audio":
+        for audChild in mediaChild:
+          if audChild.kind != xnElement: continue
+          case audChild.tag
+          of "format":
+            for fc in audChild:
+              if fc.kind != xnElement: continue
+              if fc.tag == "samplecharacteristics":
+                for sc in fc:
+                  if sc.kind != xnElement: continue
+                  if sc.tag == "samplerate":
+                    sr = xmlInt(sc, minSampleRate, maxSampleRate).cint
+          of "track":
+            let idx = audChild.attr("currentExplodedTrackIndex")
+            if idx == "" or idx == "0":
+              let (clips, transitions, laterChannels, clipMarkers) = parseTrack(
+                audChild, files, effects, effectIndex, interner, audio = true, res, tb,
+                dropped)
+              markers.add clipMarkers
+              # Clips play whole streams, which the stream's first-channel track
+              # already holds.
+              if clips.len > 0 and not laterChannels:
+                aobjs.add clips
+                atrans.add transitions
+          else: discard
+      else: discard
 
   let bg = RGBColor(red: 0, green: 0, blue: 0)
   result = v3(tb: tb, bg: bg, sr: sr, res: res, v: vobjs, a: aobjs, effects: effects)

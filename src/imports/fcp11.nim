@@ -93,25 +93,25 @@ proc clipEffects(r: var Reader, n: XmlNode, inSecs: float64, dur: int64,
     offset: var int64): uint32 =
   var acts: seq[Action]
   for c in n:
-    if c.kind != xnElement: continue
-    case c.tag
-    of "timeMap":
-      let speed = r.speedOf(c, inSecs, dur, offset)
-      if speed.val != 1.0'f32 or speed.sKf.len > 0: acts.add speed
-    of "adjust-volume":
-      let amount = c.attr("amount")
-      if amount.endsWith("dB"):
-        var db: float64
-        try:
-          db = parseFloat(amount[0 ..< ^2])
-        except ValueError:
-          error &"Invalid adjust-volume amount: '{amount}'"
-        if db.isNaN:
-          error &"Invalid adjust-volume amount: '{amount}'"
-        let gain = clamp(pow(10.0, db / 20.0), 0.0, 3.98109)
-        if gain != 1.0:
-          acts.add Action(kind: actVolume, kf: @[gain.float32])
-    else: discard
+    if c.kind == xnElement:
+      case c.tag
+      of "timeMap":
+        let speed = r.speedOf(c, inSecs, dur, offset)
+        if speed.val != 1.0'f32 or speed.sKf.len > 0: acts.add speed
+      of "adjust-volume":
+        let amount = c.attr("amount")
+        if amount.endsWith("dB"):
+          var db: float64
+          try:
+            db = parseFloat(amount[0 ..< ^2])
+          except ValueError:
+            error &"Invalid adjust-volume amount: '{amount}'"
+          if db.isNaN:
+            error &"Invalid adjust-volume amount: '{amount}'"
+          let gain = clamp(pow(10.0, db / 20.0), 0.0, 3.98109)
+          if gain != 1.0:
+            acts.add Action(kind: actVolume, kf: @[gain.float32])
+      else: discard
   r.effectIndex.intern(r.effects, newActions(acts))
 
 proc place(r: var Reader, n: XmlNode, start: int64): (bool, Placed) =
@@ -134,11 +134,13 @@ proc place(r: var Reader, n: XmlNode, start: int64): (bool, Placed) =
     var media: XmlNode = nil
     var hasVideo, hasAudio = false
     for c in n:
-      if c.kind != xnElement or c.attr("ref") == "": continue
-      if c.tag == "video": hasVideo = true
-      elif c.tag == "audio": hasAudio = true
-      else: continue
-      if media == nil or c.tag == "video": media = c
+      if c.kind == xnElement and c.attr("ref") != "":
+        if c.tag == "video":
+          hasVideo = true
+          media = c
+        elif c.tag == "audio":
+          hasAudio = true
+          if media == nil: media = c
     if media == nil:
       r.dropped.inc "empty clip"
       return
@@ -222,43 +224,43 @@ proc readMarkers(r: var Reader, n: XmlNode, start: int64) =
   ## its own time, and one outside the part of it that plays isn't shown.
   let length = r.frames(n.attrSeconds("duration"))
   for c in n:
-    if c.kind != xnElement or c.tag notin ["marker", "chapter-marker"]: continue
-    let local = r.frames(c.attrSeconds("start") - n.attrSeconds("start"))
-    if local < 0 or local >= length or start + local < 0: continue
-    # Final Cut Pro's markers are a frame long: only a longer one is a span.
-    let dur = r.frames(c.attrSeconds("duration"))
-    # A marker's kind is told apart by color in Final Cut Pro, so keep that.
-    let color =
-      if c.tag == "chapter-marker": mcOrange
-      elif c.attr("completed") == "0": mcRed
-      elif c.attr("completed") == "1": mcGreen
-      else: mcBlue
-    r.markers.add Marker(start: start + local, dur: (if dur > 1: dur else: 0),
-      name: c.attr("value"), note: c.attr("note"), color: color)
+    if c.kind == xnElement and c.tag in ["marker", "chapter-marker"]:
+      let local = r.frames(c.attrSeconds("start") - n.attrSeconds("start"))
+      if local >= 0 and local < length and start + local >= 0:
+        # Final Cut Pro's markers are a frame long: only a longer one is a span.
+        let dur = r.frames(c.attrSeconds("duration"))
+        # A marker's kind is told apart by color in Final Cut Pro, so keep that.
+        let color =
+          if c.tag == "chapter-marker": mcOrange
+          elif c.attr("completed") == "0": mcRed
+          elif c.attr("completed") == "1": mcGreen
+          else: mcBlue
+        r.markers.add Marker(start: start + local, dur: (if dur > 1: dur else: 0),
+          name: c.attr("value"), note: c.attr("note"), color: color)
 
 proc readConnected(r: var Reader, parent: XmlNode, parentStart: int64) =
   ## Clips connected to `parent`, which starts at timeline frame `parentStart`.
   ## Their offsets are in the parent's own time, which begins at its start.
   let origin = parent.attrSeconds("start")
   for c in parent:
-    if c.kind != xnElement or c.attr("lane") == "": continue
-    var lane: int
-    try:
-      lane = parseInt(c.attr("lane"))
-    except ValueError:
-      error "Invalid lane: '" & c.attr("lane") & "'"
-    if c.tag == "spine":
-      r.dropped.inc "connected storyline"
-      continue
-    let start = parentStart + r.frames(c.attrSeconds("offset") - origin)
-    r.readMarkers(c, start)
-    if c.attr("enabled") == "0": continue
-    if c.tag == "caption":
-      r.readCaption(c, start)
-      continue
-    let (ok, placed) = r.place(c, start)
-    if ok:
-      r.lanes.mgetOrPut(lane, @[]).add placed
+    if c.kind == xnElement and c.attr("lane") != "":
+      var lane: int
+      try:
+        lane = parseInt(c.attr("lane"))
+      except ValueError:
+        error "Invalid lane: '" & c.attr("lane") & "'"
+      if c.tag == "spine":
+        r.dropped.inc "connected storyline"
+      else:
+        let start = parentStart + r.frames(c.attrSeconds("offset") - origin)
+        r.readMarkers(c, start)
+        if c.attr("enabled") != "0":
+          if c.tag == "caption":
+            r.readCaption(c, start)
+          else:
+            let (ok, placed) = r.place(c, start)
+            if ok:
+              r.lanes.mgetOrPut(lane, @[]).add placed
 
 func layered(clips: seq[Clip]): seq[seq[Clip]] =
   ## `clips` as few layers as hold them without overlap, in start order.
@@ -278,32 +280,32 @@ proc readAssets(r: var Reader, resources: XmlNode,
     interner: var StringInterner): Table[string, XmlNode] =
   ## Fill `r.assets`; return the formats by id.
   for n in resources:
-    if n.kind != xnElement: continue
-    case n.tag
-    of "format":
-      result[n.attr("id")] = n
-    of "asset":
-      var src = ""
-      for c in n:
-        if c.kind == xnElement and c.tag == "media-rep" and
-            c.attr("kind") in ["", "original-media"]:
-          src = uriToPath(c.attr("src"))
-          break
-      if src == "" and n.attr("src") != "": # FCPXML 1.8 and earlier
-        src = uriToPath(n.attr("src"))
-      if src == "":
-        error &"asset '{n.attr(\"id\")}' has no media"
-      r.assets[n.attr("id")] = Asset(src: interner.intern(src),
-        start: n.attrSeconds("start"), hasVideo: n.attr("hasVideo") == "1",
-        hasAudio: n.attr("hasAudio") == "1")
-    else: discard
+    if n.kind == xnElement:
+      case n.tag
+      of "format":
+        result[n.attr("id")] = n
+      of "asset":
+        var src = ""
+        for c in n:
+          if c.kind == xnElement and c.tag == "media-rep" and
+              c.attr("kind") in ["", "original-media"]:
+            src = uriToPath(c.attr("src"))
+            break
+        if src == "" and n.attr("src") != "": # FCPXML 1.8 and earlier
+          src = uriToPath(n.attr("src"))
+        if src == "":
+          error &"asset '{n.attr(\"id\")}' has no media"
+        r.assets[n.attr("id")] = Asset(src: interner.intern(src),
+          start: n.attrSeconds("start"), hasVideo: n.attr("hasVideo") == "1",
+          hasAudio: n.attr("hasAudio") == "1")
+      else: discard
 
 proc findFirst(n: XmlNode, tag: string): XmlNode =
   for c in n:
-    if c.kind != xnElement: continue
-    if c.tag == tag: return c
-    let found = c.findFirst(tag)
-    if found != nil: return found
+    if c.kind == xnElement:
+      if c.tag == tag: return c
+      let found = c.findFirst(tag)
+      if found != nil: return found
   nil
 
 proc parseSampleRate(s: string): cint =
@@ -374,58 +376,58 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
   var video, audio: seq[Clip]
   var story: seq[StoryItem]
   for n in spine:
-    if n.kind != xnElement: continue
-    let start = r.frames(n.attrSeconds("offset") - tcStart)
-    if n.tag != "transition": r.readMarkers(n, start)
-    case n.tag
-    of "asset-clip", "clip":
-      var item = StoryItem(kind: skGap)
-      if n.attr("enabled") != "0":
-        let (ok, placed) = r.place(n, start)
-        if ok:
-          if placed.video: video.add placed.clip
-          if placed.audio: audio.add placed.clip
-          item = StoryItem(kind: skClip, start: start,
-            stop: start + placed.clip.dur)
-      story.add item
-      r.readConnected(n, start)
-    of "gap":
-      story.add StoryItem(kind: skGap)
-      r.readConnected(n, start)
-    of "transition":
-      let stop = n.attrSeconds("offset") + n.attrSeconds("duration") - tcStart
-      var kind = tkDissolve
-      if not kindFromName(n.attr("name"), true, kind):
-        for f in n:
-          if f.kind == xnElement and f.tag == "filter-video" and
-              kindFromName(f.attr("name"), true, kind):
-            break
-      story.add StoryItem(kind: skTransition, start: start, stop: r.frames(stop),
-        transition: kind)
-    else:
-      r.dropped.inc uiName(n.tag)
-      # It still holds its place: a transition beside it isn't beside the
-      # clip before it.
-      story.add StoryItem(kind: skGap)
+    if n.kind == xnElement:
+      let start = r.frames(n.attrSeconds("offset") - tcStart)
+      if n.tag != "transition": r.readMarkers(n, start)
+      case n.tag
+      of "asset-clip", "clip":
+        var item = StoryItem(kind: skGap)
+        if n.attr("enabled") != "0":
+          let (ok, placed) = r.place(n, start)
+          if ok:
+            if placed.video: video.add placed.clip
+            if placed.audio: audio.add placed.clip
+            item = StoryItem(kind: skClip, start: start,
+              stop: start + placed.clip.dur)
+        story.add item
+        r.readConnected(n, start)
+      of "gap":
+        story.add StoryItem(kind: skGap)
+        r.readConnected(n, start)
+      of "transition":
+        let stop = n.attrSeconds("offset") + n.attrSeconds("duration") - tcStart
+        var kind = tkDissolve
+        if not kindFromName(n.attr("name"), true, kind):
+          for f in n:
+            if f.kind == xnElement and f.tag == "filter-video" and
+                kindFromName(f.attr("name"), true, kind):
+              break
+        story.add StoryItem(kind: skTransition, start: start, stop: r.frames(stop),
+          transition: kind)
+      else:
+        r.dropped.inc uiName(n.tag)
+        # It still holds its place: a transition beside it isn't beside the
+        # clip before it.
+        story.add StoryItem(kind: skGap)
 
   # A transition sits between the story items it joins; where it starts
   # against their edit point gives its alignment.
   var transitions: seq[Transition]
   for k, item in story:
-    if item.kind != skTransition: continue
-    let hasPrev = k > 0 and story[k - 1].kind == skClip
-    let hasNext = k + 1 < story.len and story[k + 1].kind == skClip
-    let dur = item.stop - item.start
-    if dur <= 0 or not (hasPrev or hasNext):
-      r.dropped.inc "transition"
-      continue
-    let at = (if hasNext: story[k + 1].start else: story[k - 1].stop)
-    let alignment =
-      if not hasPrev or item.start == at: taStart
-      elif not hasNext or item.stop == at: taEnd
-      else: taCenter
-    transitions.add Transition(kind: item.transition, at: at, dur: dur,
-      alignment: alignment)
+    if item.kind == skTransition:
+      let hasPrev = k > 0 and story[k - 1].kind == skClip
+      let hasNext = k + 1 < story.len and story[k + 1].kind == skClip
+      let dur = item.stop - item.start
+      if dur <= 0 or not (hasPrev or hasNext):
+        r.dropped.inc "transition"
+      else:
+        let at = (if hasNext: story[k + 1].start else: story[k - 1].stop)
+        let alignment =
+          if not hasPrev or item.start == at: taStart
+          elif not hasNext or item.stop == at: taEnd
+          else: taCenter
+        transitions.add Transition(kind: item.transition, at: at, dur: dur,
+          alignment: alignment)
 
   result.tb = r.tb
   result.res = (int32(w), int32(h))
@@ -444,11 +446,11 @@ proc fcp11ReadXml*(path: string, interner: var StringInterner): v3 =
   laneKeys.sort()
   # Above the storyline, each lane is a video layer over the last.
   for lane in laneKeys:
-    if lane < 0: continue
-    var laneVideo: seq[Clip]
-    for p in r.lanes[lane]:
-      if p.video: laneVideo.add p.clip
-    for layer in layered(laneVideo): result.v.add layer
+    if lane >= 0:
+      var laneVideo: seq[Clip]
+      for p in r.lanes[lane]:
+        if p.video: laneVideo.add p.clip
+      for layer in layered(laneVideo): result.v.add layer
   # Every lane's audio mixes in; nearest the storyline first.
   for lane in laneKeys.sortedByIt(abs(it)):
     var laneAudio: seq[Clip]

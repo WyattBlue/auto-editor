@@ -250,35 +250,32 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
     let codec = av_codec_iterate(addr opaque)
     if codec == nil: break
 
-    case kind
-    of clkEncoders:
-      if av_codec_is_encoder(codec) == 0: continue
-      if not hwEncoderUsable(codec): continue
-    of clkDecoders:
-      if av_codec_is_decoder(codec) == 0: continue
-    of clkCodecs:
-      if codec.id in seen: continue
-      if avcodec_find_encoder(codec.id) == nil: continue
+    # Whether this codec belongs in the listing `kind` asked for.
+    let passesKind =
+      case kind
+      of clkEncoders: av_codec_is_encoder(codec) != 0 and hwEncoderUsable(codec)
+      of clkDecoders: av_codec_is_decoder(codec) != 0
+      of clkCodecs: codec.id notin seen and avcodec_find_encoder(codec.id) != nil
 
-    if avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_EXPERIMENTAL) <= 0:
-      continue
-    if kind == clkCodecs:
-      seen.incl(codec.id)
+    if passesKind and
+        avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_EXPERIMENTAL) > 0:
+      if kind == clkCodecs:
+        seen.incl(codec.id)
 
-    var name = if kind == clkCodecs: $avcodec_get_name(codec.id) else: $codec.name
-    if not noColor and
-        avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) <= 0:
-      name = "\e[31m" & name & "\e[0m"
+      var name = if kind == clkCodecs: $avcodec_get_name(codec.id) else: $codec.name
+      if not noColor and
+          avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) <= 0:
+        name = "\e[31m" & name & "\e[0m"
 
-    template bucket(list, best) =
-      if kind in {clkCodecs, clkEncoders} and codec.id == best: list.insert(name, 0)
-      else: list.add name
+      template bucket(list, best) =
+        if kind in {clkCodecs, clkEncoders} and codec.id == best: list.insert(name, 0)
+        else: list.add name
 
-    case codec.`type`
-    of AVMEDIA_TYPE_VIDEO: bucket(videos, bestVideo)
-    of AVMEDIA_TYPE_AUDIO: bucket(audios, bestAudio)
-    of AVMEDIA_TYPE_SUBTITLE: bucket(subs, bestSubtitle)
-    else: others.add name
+      case codec.`type`
+      of AVMEDIA_TYPE_VIDEO: bucket(videos, bestVideo)
+      of AVMEDIA_TYPE_AUDIO: bucket(audios, bestAudio)
+      of AVMEDIA_TYPE_SUBTITLE: bucket(subs, bestSubtitle)
+      else: others.add name
 
   echo "v: " & videos.join(",")
   echo "a: " & audios.join(",")

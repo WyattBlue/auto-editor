@@ -35,34 +35,32 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
 
     if packet.stream_index == s:
       # Duration 0 means unknown; an empty span can't mark a frame anyway.
-      if packet.pts == AV_NOPTS_VALUE or packet.duration <= 0:
-        continue
+      if not (packet.pts == AV_NOPTS_VALUE or packet.duration <= 0):
+        let
+          startFloat = float((packet.pts - container.startPts(addr subtitleStream)) *
+            subtitleStream.time_base)
+          durFloat = float(packet.duration * subtitleStream.time_base)
+          # A subtitle is active for any frame it overlaps, so snap outward:
+          # floor the start, ceil the end. round() could clip a frame the
+          # subtitle actually touches. Edit lists and hand-written srt/ass can
+          # start a cue before 0.
+          start = max(0, floor(startFloat * tb).int)
+          `end` = ceil((startFloat + durFloat) * tb).int
 
-      let
-        startFloat = float((packet.pts - container.startPts(addr subtitleStream)) *
-          subtitleStream.time_base)
-        durFloat = float(packet.duration * subtitleStream.time_base)
-        # A subtitle is active for any frame it overlaps, so snap outward:
-        # floor the start, ceil the end. round() could clip a frame the
-        # subtitle actually touches. Edit lists and hand-written srt/ass can
-        # start a cue before 0.
-        start = max(0, floor(startFloat * tb).int)
-        `end` = ceil((startFloat + durFloat) * tb).int
+        var gotSubtitle: cint = 0
+        let ret = avcodec_decode_subtitle2(codecCtx, addr subtitle,
+          addr gotSubtitle, packet)
 
-      var gotSubtitle: cint = 0
-      let ret = avcodec_decode_subtitle2(codecCtx, addr subtitle,
-        addr gotSubtitle, packet)
+        if ret >= 0 and gotSubtitle != 0:
+          defer: avsubtitle_free(addr subtitle)
 
-      if ret >= 0 and gotSubtitle != 0:
-        defer: avsubtitle_free(addr subtitle)
-
-        length = max(length, `end`)
-        for i in 0..<subtitle.num_rects:
-          let rect = subtitle.rects[i]
-          if rect.`type` == SUBTITLE_ASS and rect.ass != nil:
-            var assText: string = $rect.ass
-            if match(assText.dialogue, pattern).len > 0:
-              spans.add((start, `end`))
+          length = max(length, `end`)
+          for i in 0..<subtitle.num_rects:
+            let rect = subtitle.rects[i]
+            if rect.`type` == SUBTITLE_ASS and rect.ass != nil:
+              var assText: string = $rect.ass
+              if match(assText.dialogue, pattern).len > 0:
+                spans.add((start, `end`))
 
   var val = newSeq[bool](length)
   for span in spans:

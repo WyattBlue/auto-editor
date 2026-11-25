@@ -37,37 +37,36 @@ func wrapText*(text: string, width, indent: int): string =
   for line in text.split("\n"):
     if line.len == 0:
       outLines.add("")
-      continue
+    else:
+      # Detect leading whitespace
+      var leadingSpaces = 0
+      for c in line:
+        if c == ' ':
+          leadingSpaces += 1
+        else:
+          break
+      let lineIndent = " ".repeat(leadingSpaces)
+      let content = line[leadingSpaces .. ^1]
 
-    # Detect leading whitespace
-    var leadingSpaces = 0
-    for c in line:
-      if c == ' ':
-        leadingSpaces += 1
-      else:
-        break
-    let lineIndent = " ".repeat(leadingSpaces)
-    let content = line[leadingSpaces .. ^1]
-
-    var currentLine = ""
-    for word in content.splitWhitespace():
-      if currentLine.len == 0:
-        currentLine = word
-      elif leadingSpaces + visibleLen(currentLine) + 1 + visibleLen(word) <= width:
-        currentLine &= " " & word
-      else:
+      var currentLine = ""
+      for word in content.splitWhitespace():
+        if currentLine.len == 0:
+          currentLine = word
+        elif leadingSpaces + visibleLen(currentLine) + 1 + visibleLen(word) <= width:
+          currentLine &= " " & word
+        else:
+          if isFirst:
+            outLines.add(lineIndent & currentLine)
+            isFirst = false
+          else:
+            outLines.add(indentStr & lineIndent & currentLine)
+          currentLine = word
+      if currentLine.len > 0:
         if isFirst:
           outLines.add(lineIndent & currentLine)
           isFirst = false
         else:
           outLines.add(indentStr & lineIndent & currentLine)
-        currentLine = word
-    if currentLine.len > 0:
-      if isFirst:
-        outLines.add(lineIndent & currentLine)
-        isFirst = false
-      else:
-        outLines.add(indentStr & lineIndent & currentLine)
 
   result = outLines.join("\n")
 

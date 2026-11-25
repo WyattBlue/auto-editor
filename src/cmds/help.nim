@@ -11,24 +11,23 @@ proc printHelp*(usage: string, opts: seq[OptDef]) {.noreturn.} =
   echo "Options:"
 
   for opt in opts:
-    if opt.hidden:
-      continue
-    var optStr = "    " & opt.names
-    if opt.metavar != "":
-      optStr &= " " & opt.metavar
+    if not opt.hidden:
+      var optStr = "    " & opt.names
+      if opt.metavar != "":
+        optStr &= " " & opt.metavar
 
-    if optStr.len >= optWidth:
-      echo optStr
-      let wrapped = wrapText(opt.help, helpWidth, 0)
-      for line in wrapped.split("\n"):
-        echo " ".repeat(optWidth) & line
-    else:
-      let padding = optWidth - optStr.len
-      let wrapped = wrapText(opt.help, helpWidth, optWidth)
-      let helpLines = wrapped.split("\n")
-      echo optStr & " ".repeat(padding) & helpLines[0]
-      for i in 1 ..< helpLines.len:
-        echo helpLines[i]
+      if optStr.len >= optWidth:
+        echo optStr
+        let wrapped = wrapText(opt.help, helpWidth, 0)
+        for line in wrapped.split("\n"):
+          echo " ".repeat(optWidth) & line
+      else:
+        let padding = optWidth - optStr.len
+        let wrapped = wrapText(opt.help, helpWidth, optWidth)
+        let helpLines = wrapped.split("\n")
+        echo optStr & " ".repeat(padding) & helpLines[0]
+        for i in 1 ..< helpLines.len:
+          echo helpLines[i]
 
   echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
     wrapText("Show info about this program then exit", helpWidth, optWidth)
@@ -48,13 +47,12 @@ template parseArgs*(args: seq[string], opts: seq[OptDef], usage: string,
   for key {.inject.} in args:
     if parseOptions and expecting == coNone and key == "--":
       parseOptions = false
-      continue
-    if parseOptions:
-      if genCliMacro(key, args, opts):
-        expectingKey = key
-        continue
-      if key in ["-h", "--help"]:
-        printHelp(usage, opts)
-      if key.startsWith(prefix):
-        error "Unknown option: " & key & optionDidYouMean(key, opts)
-    body
+    elif parseOptions and genCliMacro(key, args, opts):
+      expectingKey = key
+    else:
+      if parseOptions:
+        if key in ["-h", "--help"]:
+          printHelp(usage, opts)
+        if key.startsWith(prefix):
+          error "Unknown option: " & key & optionDidYouMean(key, opts)
+      body

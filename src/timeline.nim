@@ -154,14 +154,14 @@ proc rescale*(self: var v3, tb: AVRational) {.raises: [ActionParseError].} =
   var repacked: seq[(int, Actions)]
   try:
     for i, e in self.effects:
-      if e.isCut or e.isEmpty: continue
-      var list: seq[Action]
-      var changed = false
-      for a in e:
-        var a = a
-        changed = rescaleAction(a, k) or changed
-        list.add a
-      if changed: repacked.add (i, newActions(list))
+      if not (e.isCut or e.isEmpty):
+        var list: seq[Action]
+        var changed = false
+        for a in e:
+          var a = a
+          changed = rescaleAction(a, k) or changed
+          list.add a
+        if changed: repacked.add (i, newActions(list))
   except ActionParseError as err:
     for (_, e) in repacked: free(e)
     raise err
@@ -289,12 +289,10 @@ proc linearClips(src: ptr string, effects: seq[Actions], actionIndex: seq[int],
 
     if speed != 99999.0:
       let (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
-      if dur == 0:
-        continue
-
-      result.add Clip(src: src, start: timelineStart, dur: dur,
-        offset: offset, effects: e)
-      timelineStart += dur
+      if dur != 0:
+        result.add Clip(src: src, start: timelineStart, dur: dur,
+          offset: offset, effects: e)
+        timelineStart += dur
 
 proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor,
     mi: MediaInfo, effects: seq[Actions], actionIndex: seq[int]): v3 =
@@ -377,14 +375,14 @@ proc mapMarkers*(tl: var v3, markers: openArray[SourceMarker]) =
   # nothing is kept from there on. `moved` tells which.
   proc place(u: int64, moved: var bool): int64 =
     for k, sp in spans:
-      if u >= sp.hi: continue
-      if sp.kept and u >= sp.lo:
-        let f = sp.clip.clipFrameAt(sp.map, float64(u - sp.inputStart))
-        return clamp(f, sp.clip.start, sp.clip.start + sp.clip.dur - 1)
-      moved = true
-      for later in spans.toOpenArray(k, spans.high):
-        if later.kept: return later.clip.start
-      return -1
+      if u < sp.hi:
+        if sp.kept and u >= sp.lo:
+          let f = sp.clip.clipFrameAt(sp.map, float64(u - sp.inputStart))
+          return clamp(f, sp.clip.start, sp.clip.start + sp.clip.dur - 1)
+        moved = true
+        for later in spans.toOpenArray(k, spans.high):
+          if later.kept: return later.clip.start
+        return -1
     moved = true
     -1
 
@@ -397,17 +395,17 @@ proc mapMarkers*(tl: var v3, markers: openArray[SourceMarker]) =
     let at = place(start, moved)
     if at < 0:
       inc leftOut
-      continue
-    if moved: inc movedCount
-    var dur = 0'i64
-    if stop > start:
-      # Its end point, the frame after it: in a cut, that's the cut's place
-      # on the timeline; past every kept frame, the timeline's end.
-      var endMoved = false
-      let endAt = place(stop, endMoved)
-      dur = (if endAt >= 0: endAt else: timelineStart) - at
-    tl.markers.add Marker(start: at, dur: max(0'i64, dur), name: m.name,
-      note: m.note, color: m.color)
+    else:
+      if moved: inc movedCount
+      var dur = 0'i64
+      if stop > start:
+        # Its end point, the frame after it: in a cut, that's the cut's place
+        # on the timeline; past every kept frame, the timeline's end.
+        var endMoved = false
+        let endAt = place(stop, endMoved)
+        dur = (if endAt >= 0: endAt else: timelineStart) - at
+      tl.markers.add Marker(start: at, dur: max(0'i64, dur), name: m.name,
+        note: m.note, color: m.color)
   if movedCount > 0:
     warning &"{movedCount} marker(s) in cut-out sections moved to the next kept frame"
   if leftOut > 0:
@@ -420,21 +418,18 @@ proc initNonLinear(src: ptr string, tb: AVRational, mi: MediaInfo,
 
   for clip2 in clips2:
     let effectGroup = effects[clip2.effect]
-    if effectGroup.isCut:
-      continue
-    var speed = 1.0
-    for effect in effectGroup:
-      if effect.kind == actSpeed:
-        speed *= effect.val
+    if not effectGroup.isCut:
+      var speed = 1.0
+      for effect in effectGroup:
+        if effect.kind == actSpeed:
+          speed *= effect.val
 
-    let (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
-    if dur == 0:
-      continue
+      let (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
+      if dur != 0:
+        clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
+            effects: clip2.effect))
 
-    clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
-        effects: clip2.effect))
-
-    start += dur
+        start += dur
 
   result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
   result.res = mi.getRes()
@@ -474,19 +469,17 @@ proc toNonLinear*(src: ptr string, tb: AVRational, mi: MediaInfo,
     # Check the float32 that gets stored: a tiny float64 underflows to 0.
     if chunk[2].float32 > 0.0 and chunk[2].float32 < 99999.0:
       let (offset, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
-      if dur == 0:
-        continue
-
-      let action =
-        if chunk[2] == 1.0:
-          aNil
-        else:
-          try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
-          except ActionParseError: error "Too many actions"
-      let e = effectIndex.intern(effects, action)
-      clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
-      clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
-      start += dur
+      if dur != 0:
+        let action =
+          if chunk[2] == 1.0:
+            aNil
+          else:
+            try: newActions([Action(kind: actSpeed, val: chunk[2].float32)])
+            except ActionParseError: error "Too many actions"
+        let e = effectIndex.intern(effects, action)
+        clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
+        clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+        start += dur
 
   result = v3(tb: tb, effects: effects, clips2: clips2, templateFile: src)
   result.res = mi.getRes()
@@ -567,23 +560,22 @@ proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
     for i in 0 ..< clips.len - 1:
       let left = clips[i]
       let right = clips[i + 1]
-      if left.start + left.dur != right.start: continue
-      let leftSpeed = speeds[i]
-      let rightSpeed = speeds[i + 1]
-      let leftSourceEnd = int64(round((left.offset + left.dur).float64 * leftSpeed))
-      let rightSourceStart = int64(round(right.offset.float64 * rightSpeed))
-      let cutDur = max(0'i64, rightSourceStart - leftSourceEnd)
-      if left.src == right.src and cutDur < minCut:
-        continue
-      var half = min(requested div 2, min(left.dur, right.dur))
-      # Incoming preroll is explicit in offset. For cuts within one source, the
-      # removed source interval also bounds the outgoing postroll.
-      half = min(half, int64(rightSourceStart.float64 / rightSpeed))
-      if left.src != nil and right.src == left.src:
-        half = min(half, int64(cutDur.float64 / max(leftSpeed, rightSpeed)))
-      if half > 0:
-        centers.add Transition(kind: kind, at: right.start,
-          dur: half * 2, alignment: taCenter)
+      if left.start + left.dur == right.start:
+        let leftSpeed = speeds[i]
+        let rightSpeed = speeds[i + 1]
+        let leftSourceEnd = int64(round((left.offset + left.dur).float64 * leftSpeed))
+        let rightSourceStart = int64(round(right.offset.float64 * rightSpeed))
+        let cutDur = max(0'i64, rightSourceStart - leftSourceEnd)
+        if not (left.src == right.src and cutDur < minCut):
+          var half = min(requested div 2, min(left.dur, right.dur))
+          # Incoming preroll is explicit in offset. For cuts within one source, the
+          # removed source interval also bounds the outgoing postroll.
+          half = min(half, int64(rightSourceStart.float64 / rightSpeed))
+          if left.src != nil and right.src == left.src:
+            half = min(half, int64(cutDur.float64 / max(leftSpeed, rightSpeed)))
+          if half > 0:
+            centers.add Transition(kind: kind, at: right.start,
+              dur: half * 2, alignment: taCenter)
 
     var firstDur = min(requested, clips[0].dur)
     if centers.len > 0:
@@ -689,31 +681,30 @@ proc placeTransitions*(tl: var v3, placed: seq[PlacedTransition]) =
           of taStart: c.start
           of taEnd: c.start + c.dur
           of taCenter: c.start
-        if align == taCenter and (i == 0 or
-            clips[i - 1].start + clips[i - 1].dur != c.start):
-          continue
-        if abs(edge - p.at) < bestDist:
-          bestDist = abs(edge - p.at)
-          best = i
-      if best < 0: continue
-      let c = clips[best]
-      let fits = p.kind in (if video: videoKinds else: audioKinds)
-      var t = Transition(kind: (if fits: p.kind else: tkDissolve),
-        alignment: align, dur: p.dur, easeIn: p.easeIn, easeOut: p.easeOut)
-      case align
-      of taStart:
-        t.at = c.start
-        t.dur = min(t.dur, c.dur)
-      of taEnd:
-        t.at = c.start + c.dur
-        t.dur = min(t.dur, c.dur)
-      of taCenter:
-        t.at = c.start
-        let room = 2 * min(c.dur, clips[best - 1].dur)
-        t.dur = min(t.dur, room) div 2 * 2
-      if t.dur <= 0 or t.spanStart < priorEnd: continue
-      priorEnd = t.spanStart + t.dur
-      result.add t
+        if not (align == taCenter and (i == 0 or
+            clips[i - 1].start + clips[i - 1].dur != c.start)):
+          if abs(edge - p.at) < bestDist:
+            bestDist = abs(edge - p.at)
+            best = i
+      if best >= 0:
+        let c = clips[best]
+        let fits = p.kind in (if video: videoKinds else: audioKinds)
+        var t = Transition(kind: (if fits: p.kind else: tkDissolve),
+          alignment: align, dur: p.dur, easeIn: p.easeIn, easeOut: p.easeOut)
+        case align
+        of taStart:
+          t.at = c.start
+          t.dur = min(t.dur, c.dur)
+        of taEnd:
+          t.at = c.start + c.dur
+          t.dur = min(t.dur, c.dur)
+        of taCenter:
+          t.at = c.start
+          let room = 2 * min(c.dur, clips[best - 1].dur)
+          t.dur = min(t.dur, room) div 2 * 2
+        if not (t.dur <= 0 or t.spanStart < priorEnd):
+          priorEnd = t.spanStart + t.dur
+          result.add t
 
   tl.vt = newSeq[seq[Transition]](tl.v.len)
   if tl.v.len > 0: tl.vt[0] = place(tl.v[0], true)

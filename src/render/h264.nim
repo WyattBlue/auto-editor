@@ -43,11 +43,11 @@ func h264IsCopyBoundary*(data: ptr uint8, size: int): bool =
       let codeLen = startCodeLen(bytes, size, pos)
       if codeLen == 0:
         inc pos
-        continue
-      let nal = pos + codeLen
-      if nal < size and (bytes[nal] and 0x1f) == 5:
-        return true
-      pos = nal + 1
+      else:
+        let nal = pos + codeLen
+        if nal < size and (bytes[nal] and 0x1f) == 5:
+          return true
+        pos = nal + 1
     else:
       if pos + 4 > size:
         break

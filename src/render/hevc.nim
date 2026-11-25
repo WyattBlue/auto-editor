@@ -12,14 +12,14 @@ proc annexBParameterSets(data: ptr uint8, size: int): seq[uint8] =
     let codeLen = startCodeLen(bytes, size, pos)
     if codeLen == 0:
       inc pos
-      continue
-    let nalStart = pos + codeLen
-    var next = nalStart
-    while next < size and startCodeLen(bytes, size, next) == 0:
-      inc next
-    if bytes.nalType(nalStart, size) in 32..34:
-      result.appendNal(bytes, nalStart, next)
-    pos = next
+    else:
+      let nalStart = pos + codeLen
+      var next = nalStart
+      while next < size and startCodeLen(bytes, size, next) == 0:
+        inc next
+      if bytes.nalType(nalStart, size) in 32..34:
+        result.appendNal(bytes, nalStart, next)
+      pos = next
 
 proc parameterSetsToHvcc*(data: ptr uint8, size: int): seq[uint8] =
   ## Return VPS/SPS/PPS NAL units with four-byte lengths. Encoder extradata is
@@ -129,9 +129,9 @@ proc annexBToHvcC*(data: ptr uint8, size: int): seq[uint8] =
   for b in sps[2 .. ^1]: # drop emulation prevention bytes
     if zeros >= 2 and b == 3:
       zeros = 0
-      continue
-    zeros = (if b == 0: zeros + 1 else: 0)
-    r.data.add b
+    else:
+      zeros = (if b == 0: zeros + 1 else: 0)
+      r.data.add b
   if r.data.len < 13:
     return
   try:
@@ -190,12 +190,12 @@ func hevcIsCopyBoundary*(data: ptr uint8, size: int): bool =
       let codeLen = startCodeLen(bytes, size, pos)
       if codeLen == 0:
         inc pos
-        continue
-      let nal = pos + codeLen
-      let typ = bytes.nalType(nal, size)
-      if typ.hevcNalIsCopyBoundary:
-        return true
-      pos = nal + 1
+      else:
+        let nal = pos + codeLen
+        let typ = bytes.nalType(nal, size)
+        if typ.hevcNalIsCopyBoundary:
+          return true
+        pos = nal + 1
     else:
       if pos + 4 > size:
         break

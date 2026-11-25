@@ -127,14 +127,14 @@ proc toInt16(frame: ptr AVFrame, srcStart, count: int, dst: var seq[int16],
   template convert(T: typedesc, sample: untyped) =
     for ch in 0 ..< min(frameChannels, dstChannels):
       let plane = (if planar: ch else: 0)
-      if frame.data[plane] == nil: continue
-      let src = frame.planeAs(plane, T)
-      let (first, step) =
-        if planar: (srcStart, 1)
-        else: (srcStart * frameChannels + ch, frameChannels)
-      for i in 0 ..< count:
-        let x {.inject.} = src[first + i * step]
-        dst[(dstStart + i) * dstChannels + ch] = sample
+      if frame.data[plane] != nil:
+        let src = frame.planeAs(plane, T)
+        let (first, step) =
+          if planar: (srcStart, 1)
+          else: (srcStart * frameChannels + ch, frameChannels)
+        for i in 0 ..< count:
+          let x {.inject.} = src[first + i * step]
+          dst[(dstStart + i) * dstChannels + ch] = sample
   if fmt == AV_SAMPLE_FMT_S16.cint and frameChannels == dstChannels:
     if count > 0:
       copyMem(addr dst[dstStart * dstChannels],
@@ -180,9 +180,9 @@ func toneTable(wave: Waveform, freq: float, sr: cint): seq[float32] =
       of wTriangle:
         if k mod 2 == 0: 0.0
         else: (if (k div 2) mod 2 == 0: 1.0 else: -1.0) / (k * k).float
-    if amp == 0.0: continue
-    for i in 0 ..< toneTableLen:
-      acc[i] += amp * sin(2.0 * PI * k.float * i.float / toneTableLen.float)
+    if amp != 0.0:
+      for i in 0 ..< toneTableLen:
+        acc[i] += amp * sin(2.0 * PI * k.float * i.float / toneTableLen.float)
   var peak = 0.0
   for v in acc:
     peak = max(peak, abs(v))
@@ -328,30 +328,29 @@ proc get(getter: Getter, start, endSample: int, sequential = false): seq[int16] 
     # is already in place, and takes every frame whole.
     if not sequential and frameSamplePos + samples.int64 <= start.int64:
       samplesProcessed += samples
-      continue
+    else:
+      # Calculate how many samples to skip in this frame
+      let samplesSkippedInFrame =
+        if sequential: 0 else: max(0, start - frameSamplePos.int)
+      let samplesInFrame = samples - samplesSkippedInFrame
+      let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
 
-    # Calculate how many samples to skip in this frame
-    let samplesSkippedInFrame =
-      if sequential: 0 else: max(0, start - frameSamplePos.int)
-    let samplesInFrame = samples - samplesSkippedInFrame
-    let samplesToProcess = min(samplesInFrame, targetSamples - totalSamples)
+      if not frame.toInt16(samplesSkippedInFrame, samplesToProcess, result,
+          totalSamples, channels):
+        error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
 
-    if not frame.toInt16(samplesSkippedInFrame, samplesToProcess, result,
-        totalSamples, channels):
-      error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
+      let left = samplesInFrame - samplesToProcess
+      if left > 0:
+        let at = getter.carry.len div channels
+        getter.carry.setLen((at + left) * channels)
+        discard frame.toInt16(samplesSkippedInFrame + samplesToProcess, left,
+          getter.carry, at, channels)
 
-    let left = samplesInFrame - samplesToProcess
-    if left > 0:
-      let at = getter.carry.len div channels
-      getter.carry.setLen((at + left) * channels)
-      discard frame.toInt16(samplesSkippedInFrame + samplesToProcess, left,
-        getter.carry, at, channels)
-
-    totalSamples += samplesToProcess
-    samplesProcessed += samples
+      totalSamples += samplesToProcess
+      samplesProcessed += samples
 
   template processDecoded() =
-    # `processFrame` may `continue` the loop, so free after it.
+    # Every converted frame is freed in its own pass below, after processing.
     let converted = getter.resampler.resample(frame)
     for f in converted:
       processFrame(f)
@@ -515,11 +514,10 @@ proc applyVolume(data: var seq[int16], act: Action, channels: int, sr: cint,
     perFrame: sr.float64 / fps))
   for i in 0 ..< frames:
     let gain = ramp.at(i)
-    if gain == 1.0'f32:
-      continue
-    for ch in 0 ..< channels:
-      let idx = i * channels + ch
-      data[idx] = clamp16(int32(round(data[idx].float32 * gain)))
+    if gain != 1.0'f32:
+      for ch in 0 ..< channels:
+        let idx = i * channels + ch
+        data[idx] = clamp16(int32(round(data[idx].float32 * gain)))
 
 const rampBlock = 1024 # input samples between tempo changes in a ramp
 
@@ -839,9 +837,9 @@ proc mixClipPart(acc: var seq[int32], data: openArray[int16],
       let dg = (if duckEnv.len > 0: duckEnv[i] else: 1.0'f32)
       for ch in 0 ..< targetChannels:
         let sc = sourceChannel(sourceChannels, ch)
-        if sc < 0: continue
-        acc[baseIndex + ch] += int32(round(data[
-            (i - first) * sourceChannels + sc].float32 * gain * dg))
+        if sc >= 0:
+          acc[baseIndex + ch] += int32(round(data[
+              (i - first) * sourceChannels + sc].float32 * gain * dg))
 
   if duckEnv.len > 0:
     for i in lo ..< hi:
@@ -970,11 +968,10 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       for clip in tl.a[layerIndex]:
-        if clip.src == nil:
-          continue
-        let key = (clip.src, clip.stream)
-        if key notin samples:
-          samples[key] = newGetter(clip.src[], clip.stream, sr)
+        if clip.src != nil:
+          let key = (clip.src, clip.stream)
+          if key notin samples:
+            samples[key] = newGetter(clip.src[], clip.stream, sr)
 
   # A low note sums thousands of harmonics per table point, and a timeline can
   # hold hundreds of tone clips (one per kept section), so build each table once.

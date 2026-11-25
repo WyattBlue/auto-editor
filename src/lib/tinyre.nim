@@ -337,12 +337,12 @@ func addFoldImage(pairs: var seq[int], lo, hi: int, utf8: bool) =
     image.add c + 32
   if utf8:
     for run in foldRuns:
-      if run.hi < lo or run.lo > hi: continue
-      var c = int(run.lo)
-      if c < lo: c += (lo - c + run.step - 1) div run.step * run.step
-      while c <= min(hi, run.hi):
-        image.add c + run.delta
-        c += run.step
+      if not (run.hi < lo or run.lo > hi):
+        var c = int(run.lo)
+        if c < lo: c += (lo - c + run.step - 1) div run.step * run.step
+        while c <= min(hi, run.hi):
+          image.add c + run.delta
+          c += run.step
   image.sort
   var k = 0
   while k < image.len:
@@ -530,18 +530,18 @@ func compileCode(re: string, prog: var Prog, utf8, icase: bool,
         if tok < 0: # \d\D\s\S\w\W
           emit -1; emit -tok
           inc cnt
-          continue
-        emit tok
-        if re.at(i) == ord('-') and re.at(i+1) != ord(']'):
-          inc i
-          tok = token(re, i, forward, utf8)
-          if tok < 0: # a class can't end a range
-            if re.at(i) == 0 or (re.at(i) == ord('\\') and re.at(i+1) == 0):
-              fail(reeUnclosedSet, setStart)
-            fail(if tok == -1: reeBadEscape else: reeBadRange, i)
-          i += forward
-        emit tok
-        inc cnt
+        else:
+          emit tok
+          if re.at(i) == ord('-') and re.at(i+1) != ord(']'):
+            inc i
+            tok = token(re, i, forward, utf8)
+            if tok < 0: # a class can't end a range
+              if re.at(i) == 0 or (re.at(i) == ord('\\') and re.at(i+1) == 0):
+                fail(reeUnclosedSet, setStart)
+              fail(if tok == -1: reeBadEscape else: reeBadRange, i)
+            i += forward
+          emit tok
+          inc cnt
       if icase:
         var images: seq[int]
         var k = term + 3
@@ -817,7 +817,7 @@ func pikevm(re: Re, s: string, start: int, caps: var seq[int], cont: int,
         if op >= 0 and op < opWbeg:
           push(list, count, Thread(pc: pc, sub: sub))
           break
-        if op > opJmp or op < 0:
+        elif op > opJmp or op < 0:
           let id = abs(op)
           if sc.seen[id] == sc.step:
             decref(sub)
@@ -831,8 +831,7 @@ func pikevm(re: Re, s: string, start: int, caps: var seq[int], cont: int,
           else:
             pushAlt((pc + 2, sub))
             pc = target
-          continue
-        if op == opSave:
+        elif op == opSave:
           if sc.refs[sub] > 1:
             dec sc.refs[sub]
             let copy = newSub()
@@ -840,25 +839,24 @@ func pikevm(re: Re, s: string, start: int, caps: var seq[int], cont: int,
             sub = copy
           sc.pool[sub * nslots + code[pc + 1]] = pos
           pc += 2
-          continue
-        if op == opJmp:
+        elif op == opJmp:
           pc += 2 + code[pc + 1]
-          continue
-        template wordBefore: bool =
-          if first: cont >= 0 and isWordAt(s, cont) else: isWordAt(s, prev)
-        let pass =
-          case op
-          of opWb: wordBefore != isWordAt(s, pos)
-          of opNotb: wordBefore == isWordAt(s, pos)
-          of opWbeg: not wordBefore and isWordAt(s, pos)
-          of opWend: wordBefore and not isWordAt(s, pos)
-          of opBol: first and pos == start and cont < 0
-          of opEol: pos >= s.len
-          else: false
-        if not pass:
-          decref(sub)
-          break
-        inc pc
+        else:
+          template wordBefore: bool =
+            if first: cont >= 0 and isWordAt(s, cont) else: isWordAt(s, prev)
+          let pass =
+            case op
+            of opWb: wordBefore != isWordAt(s, pos)
+            of opNotb: wordBefore == isWordAt(s, pos)
+            of opWbeg: not wordBefore and isWordAt(s, pos)
+            of opWend: wordBefore and not isWordAt(s, pos)
+            of opBol: first and pos == start and cont < 0
+            of opEol: pos >= s.len
+            else: false
+          if not pass:
+            decref(sub)
+            break
+          inc pc
 
   var sp = start
   inc sc.step

@@ -548,38 +548,36 @@ proc otioWrite*(name, output: string, tl: v3) =
       # An audio-only timeline that gained `add:` overlays has a synthesized base
       # track with no source file; it exists only as a render canvas, so there is
       # nothing to reference here. Skip it (and any track left empty).
-      if clip.src == nil:
-        continue
-      if transitionLinks[j].incoming >= 0:
-        let t = transitions[transitionLinks[j].incoming]
-        if t.alignment == taStart:
-          clipArr.add gapNode(rate, 0)
+      if clip.src != nil:
+        if transitionLinks[j].incoming >= 0:
+          let t = transitions[transitionLinks[j].incoming]
+          if t.alignment == taStart:
+            clipArr.add gapNode(rate, 0)
+            clipArr.add transitionNode(rate, t, true)
+        if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
+        let actions = tl.effects[clip.effects]
+        clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
+          rate, tb = tl.tb, isVideo = true, linkId = linkIdFor(clip), nbCh = nbCh,
+          res = tl.res)
+        cursor = clip.start + clip.dur
+        if transitionLinks[j].outgoing >= 0:
+          let t = transitions[transitionLinks[j].outgoing]
           clipArr.add transitionNode(rate, t, true)
-      if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
-      let actions = tl.effects[clip.effects]
-      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
-        rate, tb = tl.tb, isVideo = true, linkId = linkIdFor(clip), nbCh = nbCh,
-        res = tl.res)
-      cursor = clip.start + clip.dur
-      if transitionLinks[j].outgoing >= 0:
-        let t = transitions[transitionLinks[j].outgoing]
-        clipArr.add transitionNode(rate, t, true)
-        if t.alignment == taEnd:
-          clipArr.add gapNode(rate, 0)
-    if clipArr.len == 0:
-      continue
-    videoTrackNum += 1
-    children.add %*{
-      "OTIO_SCHEMA": "Track.1",
-      "metadata": newJObject(),
-      "name": "Video " & $videoTrackNum,
-      "source_range": nil,
-      "effects": newJArray(),
-      "markers": newJArray(),
-      "enabled": true,
-      "children": clipArr,
-      "kind": "Video"
-    }
+          if t.alignment == taEnd:
+            clipArr.add gapNode(rate, 0)
+    if clipArr.len != 0:
+      videoTrackNum += 1
+      children.add %*{
+        "OTIO_SCHEMA": "Track.1",
+        "metadata": newJObject(),
+        "name": "Video " & $videoTrackNum,
+        "source_range": nil,
+        "effects": newJArray(),
+        "markers": newJArray(),
+        "enabled": true,
+        "children": clipArr,
+        "kind": "Video"
+      }
 
   for i, track in tl.a:
     let clipArr = newJArray()
@@ -587,24 +585,23 @@ proc otioWrite*(name, output: string, tl: v3) =
     let transitionLinks = transitionPlan(track, transitions)
     var cursor = 0'i64
     for j, clip in track:
-      if clip.src == nil:
-        continue
-      if transitionLinks[j].incoming >= 0:
-        let t = transitions[transitionLinks[j].incoming]
-        if t.alignment == taStart:
-          clipArr.add gapNode(rate, 0)
+      if clip.src != nil:
+        if transitionLinks[j].incoming >= 0:
+          let t = transitions[transitionLinks[j].incoming]
+          if t.alignment == taStart:
+            clipArr.add gapNode(rate, 0)
+            clipArr.add transitionNode(rate, t, false)
+        if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
+        let actions = tl.effects[clip.effects]
+        clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
+          rate, tb = tl.tb, isVideo = false, linkId = linkIdFor(clip), nbCh = nbCh,
+          res = tl.res)
+        cursor = clip.start + clip.dur
+        if transitionLinks[j].outgoing >= 0:
+          let t = transitions[transitionLinks[j].outgoing]
           clipArr.add transitionNode(rate, t, false)
-      if clip.start > cursor: clipArr.add gapNode(rate, clip.start - cursor)
-      let actions = tl.effects[clip.effects]
-      clipArr.add buildClip(clip, actions, ptrToMi[clip.src], urls[clip.src],
-        rate, tb = tl.tb, isVideo = false, linkId = linkIdFor(clip), nbCh = nbCh,
-        res = tl.res)
-      cursor = clip.start + clip.dur
-      if transitionLinks[j].outgoing >= 0:
-        let t = transitions[transitionLinks[j].outgoing]
-        clipArr.add transitionNode(rate, t, false)
-        if t.alignment == taEnd:
-          clipArr.add gapNode(rate, 0)
+          if t.alignment == taEnd:
+            clipArr.add gapNode(rate, 0)
     children.add %*{
       "OTIO_SCHEMA": "Track.1",
       "metadata": {"PremierePro_OTIO": {"AudioChannels": {

@@ -733,21 +733,20 @@ proc fillChip(frame: ptr AVFrame, poly: Chip, color: RGBColor) =
         else:
           row[x] = uint8(float32(row[x]) * (1.0'f32 - c) +
             float32(yv) * c + 0.5'f32)
-    if rgba or not hit:
-      continue
-    # Chroma is half resolution, so one sample stands for a 2x2 luma block. Take
-    # the block's strongest coverage, or a thin sliver would lose its color.
-    let uRow = frame.planeRow(1, cy)
-    let vRow = frame.planeRow(2, cy)
-    for cx in (x0 div 2) .. ((x1 - 1) div 2):
-      var c = 0.0'f32
-      for k in (cx * 2 - x0) .. (cx * 2 + 1 - x0):
-        if k >= 0 and k < n:
-          c = max(c, max(cov[0][k], cov[1][k]))
-      if c <= 0.002'f32:
-        continue
-      uRow[cx] = uint8(float32(uRow[cx]) * (1.0'f32 - c) + float32(uv) * c + 0.5'f32)
-      vRow[cx] = uint8(float32(vRow[cx]) * (1.0'f32 - c) + float32(vv) * c + 0.5'f32)
+    if not rgba and hit:
+      # Chroma is half resolution, so one sample stands for a 2x2 luma block. Take
+      # the block's strongest coverage, or a thin sliver would lose its color.
+      let uRow = frame.planeRow(1, cy)
+      let vRow = frame.planeRow(2, cy)
+      for cx in (x0 div 2) .. ((x1 - 1) div 2):
+        var c = 0.0'f32
+        for k in (cx * 2 - x0) .. (cx * 2 + 1 - x0):
+          if k >= 0 and k < n:
+            c = max(c, max(cov[0][k], cov[1][k]))
+        if c <= 0.002'f32:
+          continue
+        uRow[cx] = uint8(float32(uRow[cx]) * (1.0'f32 - c) + float32(uv) * c + 0.5'f32)
+        vRow[cx] = uint8(float32(vRow[cx]) * (1.0'f32 - c) + float32(vv) * c + 0.5'f32)
 
 proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
   ## One frame of the confetti animation.
@@ -824,54 +823,50 @@ proc drawConfetti(frame: ptr AVFrame, act: Action, local: int, fps: float) =
     # Fired once per section, nothing replaced after it falls out. The stagger is
     # short against the whole burst, so it rips out but still reads as one pop.
     let t = t0 - uWhen * 0.4'f32
-    if t <= 0.0'f32:
-      continue
+    if t > 0.0'f32:
+      let decay = (1.0'f32 - exp(-k * t)) / k
+      let sway = h * (0.010'f32 + 0.020'f32 * uSway)
+      let freq = 0.5'f32 + uSpin
+      let px = x0 + vx0 * decay * h + sway * sin(tau * freq * t + uSway * tau)
+      let py = y0 + (vt * t + (vy0 - vt) * decay) * h
 
-    let decay = (1.0'f32 - exp(-k * t)) / k
-    let sway = h * (0.010'f32 + 0.020'f32 * uSway)
-    let freq = 0.5'f32 + uSpin
-    let px = x0 + vx0 * decay * h + sway * sin(tau * freq * t + uSway * tau)
-    let py = y0 + (vt * t + (vy0 - vt) * decay) * h
+      let size = h * (0.024'f32 + 0.024'f32 * uSize)
 
-    let size = h * (0.024'f32 + 0.024'f32 * uSize)
+      # Phrased positively so a non-finite piece is dropped rather than reaching
+      # an unchecked float -> int conversion. `size` bounds the outline.
+      if px + size >= 0.0'f32 and px - size <= w and
+          py + size >= 0.0'f32 and py - size <= h:
+        # Spin in-plane (Rz) while tumbling end over end (Rx) and edge to edge (Ry).
+        # The chip is flat, so local z = 0 collapses the three matrices to this;
+        # dropping z projects it, foreshortening a chip that turns away.
+        let spinZ = (1.5'f32 + 4.0'f32 * uSpin) * t + uPhase * tau
+        let turnX = (2.0'f32 + 5.0'f32 * uTumble) * t + uSize * tau
+        let turnY = (1.5'f32 + 4.0'f32 * uRoll) * t + uAim * tau
+        let ca = cos(spinZ)
+        let sa = sin(spinZ)
+        let cb = cos(turnX)
+        let sb = sin(turnX)
+        let cc = cos(turnY)
+        let sc = sin(turnY)
 
-    # Phrased positively so a non-finite piece is dropped rather than reaching
-    # an unchecked float -> int conversion. `size` bounds the outline.
-    if not (px + size >= 0.0'f32 and px - size <= w and
-            py + size >= 0.0'f32 and py - size <= h):
-      continue
+        var poly: Chip   # uShape sets the proportions: narrow strip to near-square
+        chipOutline(n, size * 0.5'f32, size * (0.22'f32 + 0.28'f32 * uShape), poly)
+        for j in 0 ..< 4:
+          let lx = poly[j].x * ca - poly[j].y * sa
+          let ly = poly[j].x * sa + poly[j].y * ca
+          poly[j] = (px + lx * cc + ly * sb * sc, py + ly * cb)
 
-    # Spin in-plane (Rz) while tumbling end over end (Rx) and edge to edge (Ry).
-    # The chip is flat, so local z = 0 collapses the three matrices to this;
-    # dropping z projects it, foreshortening a chip that turns away.
-    let spinZ = (1.5'f32 + 4.0'f32 * uSpin) * t + uPhase * tau
-    let turnX = (2.0'f32 + 5.0'f32 * uTumble) * t + uSize * tau
-    let turnY = (1.5'f32 + 4.0'f32 * uRoll) * t + uAim * tau
-    let ca = cos(spinZ)
-    let sa = sin(spinZ)
-    let cb = cos(turnX)
-    let sb = sin(turnX)
-    let cc = cos(turnY)
-    let sc = sin(turnY)
-
-    var poly: Chip   # uShape sets the proportions: narrow strip to near-square
-    chipOutline(n, size * 0.5'f32, size * (0.22'f32 + 0.28'f32 * uShape), poly)
-    for j in 0 ..< 4:
-      let lx = poly[j].x * ca - poly[j].y * sa
-      let ly = poly[j].x * sa + poly[j].y * ca
-      poly[j] = (px + lx * cc + ly * sb * sc, py + ly * cb)
-
-    let idx = min(palette.len - 1, int(hashUnit(n, 8) * float32(palette.len)))
-    var color = unpackRGB(palette[idx])
-    if act.cShimmer:
-      # cb*cc is how square-on the chip is to the viewer, so near 0 is edge-on:
-      # the angle that catches a light off to the side. Ramped, so the glint
-      # rolls through the turn.
-      const glintBelow = 0.25'f32
-      let facing = abs(cb * cc)
-      if facing < glintBelow:
-        color = towardWhite(color, (glintBelow - facing) / glintBelow)
-    fillChip(frame, poly, color)
+        let idx = min(palette.len - 1, int(hashUnit(n, 8) * float32(palette.len)))
+        var color = unpackRGB(palette[idx])
+        if act.cShimmer:
+          # cb*cc is how square-on the chip is to the viewer, so near 0 is edge-on:
+          # the angle that catches a light off to the side. Ramped, so the glint
+          # rolls through the turn.
+          const glintBelow = 0.25'f32
+          let facing = abs(cb * cc)
+          if facing < glintBelow:
+            color = towardWhite(color, (glintBelow - facing) / glintBelow)
+        fillChip(frame, poly, color)
 
 proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32,
     bg: RGBColor, tag: YuvTag, swsCtx: var ptr SwsContext): ptr AVFrame =
@@ -986,22 +981,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     # Audio-only sources (e.g. the .mp3 behind a synthesized video canvas) have
     # no video stream to decode.
-    if myCache.cns[src].video.len == 0:
-      continue
+    if myCache.cns[src].video.len > 0:
+      let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
+      decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+      srcs[src].decoders.add newDecState(myCache.cns[src], decoderCtx, false)
 
-    let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
-    decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
-    srcs[src].decoders.add newDecState(myCache.cns[src], decoderCtx, false)
-
-    # An image source is a single still: an image codec read by an image
-    # demuxer, or a stream that reports exactly one frame. The demuxer check
-    # matters because these codecs also carry real video (MJPEG in avi/mov).
-    let vstream = myCache.cns[src].video[0]
-    let imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
-    let demuxer = $myCache.cns[src].formatContext.iformat.name
-    srcs[src].isStill = vstream.nb_frames == 1 or
-      (vstream.codecpar.codec_id in imageCodecs and
-      (demuxer == "image2" or demuxer.endsWith("_pipe")))
+      # An image source is a single still: an image codec read by an image
+      # demuxer, or a stream that reports exactly one frame. The demuxer check
+      # matters because these codecs also carry real video (MJPEG in avi/mov).
+      let vstream = myCache.cns[src].video[0]
+      let imageCodecs = [ID_PNG, ID_JPEG, ID_WEBP, ID_BMP, ID_TIFF]
+      let demuxer = $myCache.cns[src].formatContext.iformat.name
+      srcs[src].isStill = vstream.nb_frames == 1 or
+        (vstream.codecpar.codec_id in imageCodecs and
+        (demuxer == "image2" or demuxer.endsWith("_pipe")))
 
   let (targetWidth, targetHeight) = scaledVideoResolution(tl.res, video.scale)
   var fxGraph: Graph = nil
@@ -1462,22 +1455,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           actHighpass, actLowpass, actDehum, actPos, actRotate, actLoop: discard
       of actScale, actTurn:
         # An overlay is scaled and turned where it's placed, about its center.
-        if isOverlay or placeDone: continue
-        placeDone = true
-        let (sx, sy, deg) = scaleTurnOf(effects)
-        if sx == 1.0'f32 and sy == 1.0'f32 and mod360(deg) == 0: continue
-        let w = frame.width
-        let h = frame.height
-        let sw = max(2.cint, cint(round(w.float32 * sx))) and not 1.cint
-        let sh = max(2.cint, cint(round(h.float32 * sy))) and not 1.cint
-        runFx(fxId(actScale, frame, f0 = sx, f1 = deg, f2 = sy)):
-          # rotate turns about the center of a frame of the canvas's size,
-          # cropping what's past it and filling what's uncovered with bg.
-          let nodes = @[fxGraph.add("buffer", bufArgsOf(frame)),
-            fxGraph.add("scale", &"{sw}:{sh}"),
-            fxGraph.add("rotate", &"a={deg}*PI/180:ow={w}:oh={h}:c={bg}"),
-            fxGraph.add("buffersink")]
-          fxGraph.linkNodes(nodes).configure()
+        if not (isOverlay or placeDone):
+          placeDone = true
+          let (sx, sy, deg) = scaleTurnOf(effects)
+          if not (sx == 1.0'f32 and sy == 1.0'f32 and mod360(deg) == 0):
+            let w = frame.width
+            let h = frame.height
+            let sw = max(2.cint, cint(round(w.float32 * sx))) and not 1.cint
+            let sh = max(2.cint, cint(round(h.float32 * sy))) and not 1.cint
+            runFx(fxId(actScale, frame, f0 = sx, f1 = deg, f2 = sy)):
+              # rotate turns about the center of a frame of the canvas's size,
+              # cropping what's past it and filling what's uncovered with bg.
+              let nodes = @[fxGraph.add("buffer", bufArgsOf(frame)),
+                fxGraph.add("scale", &"{sw}:{sh}"),
+                fxGraph.add("rotate", &"a={deg}*PI/180:ow={w}:oh={h}:c={bg}"),
+                fxGraph.add("buffersink")]
+              fxGraph.linkNodes(nodes).configure()
       of actSpin:
         let rate = effect.sRate
         let startDeg = rotDeg(effect.sStart)
@@ -1510,56 +1503,55 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             frame = fitted
       of actZoom:
         let z = sample(effect, effect.kf, effect.kt)
-        if z == 1.0'f32:
-          continue
-        let origW = frame.width
-        let origH = frame.height
-        if zoomCtx == nil:
-          zoomCtx = sws_alloc_context()
+        if z != 1.0'f32:
+          let origW = frame.width
+          let origH = frame.height
           if zoomCtx == nil:
-            error "Failed to allocate zoom sws context"
-          zoomCtx.setOpt("threads", 0)
-        let scaledW = max(cint(float(origW) * z), 2)
-        let scaledH = max(cint(float(origH) * z), 2)
-        if z > 1.0:
-          # Scale only the source region that stays visible instead of the whole
-          # frame, which at z=3 is 9x the pixels. The window is then placed
-          # where the full-frame scale would have put it, in output pixels, so
-          # an animated zoom doesn't step by whole source pixels.
-          if AVPixelFormat(frame.format).isBitstream:
-            # Cropping moves data pointers, which can't land mid-byte, so
-            # FFmpeg skips the left and top crop for 1-bit formats.
-            let gray = frame.reformat(AV_PIX_FMT_GRAY8)
-            av_frame_free(addr frame)
-            frame = gray
-          let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
-          let hstep = 1.cint shl d.log2_chroma_w
-          let vstep = 1.cint shl d.log2_chroma_h
-          let x = zoomSpan(origW, scaledW, hstep)
-          let y = zoomSpan(origH, scaledH, vstep)
-          cropView(frame, x.start, y.start, origW - x.start - x.len,
-            origH - y.start - y.len)
-          let scaledFrame = frame.reformat(AVPixelFormat(frame.format),
-            x.scaledLen, y.scaledLen, zoomCtx)
-          if scaledFrame != frame:
-            av_frame_free(addr frame)
-            frame = scaledFrame
-          let cx = clamp(cint(round(x.offset / float(hstep))) * hstep, 0,
-            (x.scaledLen - origW) div hstep * hstep)
-          let cy = clamp(cint(round(y.offset / float(vstep))) * vstep, 0,
-            (y.scaledLen - origH) div vstep * vstep)
-          cropView(frame, cx, cy, x.scaledLen - origW - cx, y.scaledLen - origH - cy)
-        else:
-          let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW,
-            scaledH, zoomCtx)
-          if scaledFrame != frame:
-            av_frame_free(addr frame)
-            frame = scaledFrame
-          runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32)):
-            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-            let pad = fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
-            let bufferSink = fxGraph.add("buffersink")
-            fxGraph.linkNodes(bufferSrc, pad, bufferSink).configure()
+            zoomCtx = sws_alloc_context()
+            if zoomCtx == nil:
+              error "Failed to allocate zoom sws context"
+            zoomCtx.setOpt("threads", 0)
+          let scaledW = max(cint(float(origW) * z), 2)
+          let scaledH = max(cint(float(origH) * z), 2)
+          if z > 1.0:
+            # Scale only the source region that stays visible instead of the whole
+            # frame, which at z=3 is 9x the pixels. The window is then placed
+            # where the full-frame scale would have put it, in output pixels, so
+            # an animated zoom doesn't step by whole source pixels.
+            if AVPixelFormat(frame.format).isBitstream:
+              # Cropping moves data pointers, which can't land mid-byte, so
+              # FFmpeg skips the left and top crop for 1-bit formats.
+              let gray = frame.reformat(AV_PIX_FMT_GRAY8)
+              av_frame_free(addr frame)
+              frame = gray
+            let d = av_pix_fmt_desc_get(AVPixelFormat(frame.format))
+            let hstep = 1.cint shl d.log2_chroma_w
+            let vstep = 1.cint shl d.log2_chroma_h
+            let x = zoomSpan(origW, scaledW, hstep)
+            let y = zoomSpan(origH, scaledH, vstep)
+            cropView(frame, x.start, y.start, origW - x.start - x.len,
+              origH - y.start - y.len)
+            let scaledFrame = frame.reformat(AVPixelFormat(frame.format),
+              x.scaledLen, y.scaledLen, zoomCtx)
+            if scaledFrame != frame:
+              av_frame_free(addr frame)
+              frame = scaledFrame
+            let cx = clamp(cint(round(x.offset / float(hstep))) * hstep, 0,
+              (x.scaledLen - origW) div hstep * hstep)
+            let cy = clamp(cint(round(y.offset / float(vstep))) * vstep, 0,
+              (y.scaledLen - origH) div vstep * vstep)
+            cropView(frame, cx, cy, x.scaledLen - origW - cx, y.scaledLen - origH - cy)
+          else:
+            let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW,
+              scaledH, zoomCtx)
+            if scaledFrame != frame:
+              av_frame_free(addr frame)
+              frame = scaledFrame
+            runFx(fxId(actZoom, frame, i0 = origW.int32, i1 = origH.int32)):
+              let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+              let pad = fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(bufferSrc, pad, bufferSink).configure()
       of actHflip, actVflip, actInvert, actErosion:
         runFx(fxId(effect.kind, frame)):
           let filterName = case effect.kind
@@ -1573,134 +1565,127 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actBlur:
         let sigma = sample(effect, effect.kf, effect.kt)
-        if sigma <= 0.0'f32:
-          continue
-        runFx(fxId(actBlur, frame, f0 = sigma)):
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let filt = fxGraph.add("gblur", &"sigma={sigma}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
+        if sigma > 0.0'f32:
+          runFx(fxId(actBlur, frame, f0 = sigma)):
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let filt = fxGraph.add("gblur", &"sigma={sigma}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actBrightness:
         let b = sample(effect, effect.kf, effect.kt)
-        if b == 0.0'f32:
-          continue
-        let shift = b * 255.0'f32
-        runFx(fxId(actBrightness, frame, f0 = shift)):
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-          let expr = brightnessLutExpr(b)
-          let lut = fxGraph.add("lutrgb", &"r={expr}:g={expr}:b={expr}")
-          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, toRgb, lut, toOrig, bufferSink).configure()
-      of actLuv:
-        if (effect.brighthue == luvBrighthueId and
-            effect.contrast == luvContrastId and
-            effect.saturation == luvSaturationId):
-          continue
-
-        let b = effect.brighthue
-        let c = effect.contrast
-        let s = effect.saturation
-        runFx(fxId(actLuv, frame, f0 = b, f1 = c, f2 = s)):
-          let expr = luvLutExprs(b, c, s)
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
-          let lut = fxGraph.add("lutyuv", &"y={expr.y}:u={expr.u}:v={expr.v}")
-          let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, toYuv, lut, toOrig, bufferSink).configure()
-      of actOpacity:
-        let o = sample(effect, effect.kf, effect.kt)
-        if o >= 1.0'f32:
-          continue
-        if isOverlay:
-          runFx(fxId(actOpacity, frame, overlay = true, f0 = o)):
-            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-            let toRgba = fxGraph.add("format", "pix_fmts=rgba")
-            let lut = fxGraph.add("lutrgb", &"a=val*{o}")
-            let bufferSink = fxGraph.add("buffersink")
-            fxGraph.linkNodes(bufferSrc, toRgba, lut, bufferSink).configure()
-        else:
-          runFx(fxId(actOpacity, frame, f0 = o)):
-            let bgR = (1.0'f32 - o) * float32(bgRgb.red)
-            let bgG = (1.0'f32 - o) * float32(bgRgb.green)
-            let bgB = (1.0'f32 - o) * float32(bgRgb.blue)
+        if b != 0.0'f32:
+          let shift = b * 255.0'f32
+          runFx(fxId(actBrightness, frame, f0 = shift)):
             let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
             let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
-            let lut = fxGraph.add("lutrgb",
-              &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
-            let toOrig = fxGraph.add("format",
-                &"pix_fmts={$AVPixelFormat(frame.format)}")
+            let expr = brightnessLutExpr(b)
+            let lut = fxGraph.add("lutrgb", &"r={expr}:g={expr}:b={expr}")
+            let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
             let bufferSink = fxGraph.add("buffersink")
             fxGraph.linkNodes(bufferSrc, toRgb, lut, toOrig, bufferSink).configure()
+      of actLuv:
+        if not (effect.brighthue == luvBrighthueId and
+            effect.contrast == luvContrastId and
+            effect.saturation == luvSaturationId):
+          let b = effect.brighthue
+          let c = effect.contrast
+          let s = effect.saturation
+          runFx(fxId(actLuv, frame, f0 = b, f1 = c, f2 = s)):
+            let expr = luvLutExprs(b, c, s)
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let toYuv = fxGraph.add("format", "pix_fmts=yuv444p")
+            let lut = fxGraph.add("lutyuv", &"y={expr.y}:u={expr.u}:v={expr.v}")
+            let toOrig = fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, toYuv, lut, toOrig, bufferSink).configure()
+      of actOpacity:
+        let o = sample(effect, effect.kf, effect.kt)
+        if o < 1.0'f32:
+          if isOverlay:
+            runFx(fxId(actOpacity, frame, overlay = true, f0 = o)):
+              let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+              let toRgba = fxGraph.add("format", "pix_fmts=rgba")
+              let lut = fxGraph.add("lutrgb", &"a=val*{o}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(bufferSrc, toRgba, lut, bufferSink).configure()
+          else:
+            runFx(fxId(actOpacity, frame, f0 = o)):
+              let bgR = (1.0'f32 - o) * float32(bgRgb.red)
+              let bgG = (1.0'f32 - o) * float32(bgRgb.green)
+              let bgB = (1.0'f32 - o) * float32(bgRgb.blue)
+              let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+              let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
+              let lut = fxGraph.add("lutrgb",
+                &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
+              let toOrig = fxGraph.add("format",
+                  &"pix_fmts={$AVPixelFormat(frame.format)}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(bufferSrc, toRgb, lut, toOrig, bufferSink).configure()
       of actLens:
         let k1 = effect.k1
         let k2 = effect.k2
-        if k1 == 0.0'f32 and k2 == 0.0'f32:
-          continue
-        runFx(fxId(actLens, frame, f0 = k1, f1 = k2)):
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
+        if not (k1 == 0.0'f32 and k2 == 0.0'f32):
+          runFx(fxId(actLens, frame, f0 = k1, f1 = k2)):
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actDrawbox:
         if effect.dbColor.yuv and AVPixelFormat(frame.format) in
             [AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUVJ420P]:
           if av_frame_make_writable(frame) < 0:
             error "Can't make frame writable"
           fillBox(frame, effect.dbX, effect.dbY, effect.dbW, effect.dbH, effect.dbColor)
-          continue
-        runFx(fxId(actDrawbox, frame, i0 = effect.dbX, i1 = effect.dbY,
-            i2 = effect.dbW, i3 = effect.dbH, col = packRGB(effect.dbColor))):
-          let col = effect.dbColor.toRgb(frame.colorspace.int,
-            frame.color_range.int == 2).toString
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let filt = fxGraph.add("drawbox",
-            # replace=1: on a generator/keyed layer the canvas alpha is 0, and
-            # compositing an opaque box over it would leave it invisible.
-            &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}" &
-              &":color={col}:t=fill:replace=1")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
+        else:
+          runFx(fxId(actDrawbox, frame, i0 = effect.dbX, i1 = effect.dbY,
+              i2 = effect.dbW, i3 = effect.dbH, col = packRGB(effect.dbColor))):
+            let col = effect.dbColor.toRgb(frame.colorspace.int,
+              frame.color_range.int == 2).toString
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let filt = fxGraph.add("drawbox",
+              # replace=1: on a generator/keyed layer the canvas alpha is 0, and
+              # compositing an opaque box over it would leave it invisible.
+              &"x={effect.dbX}:y={effect.dbY}:w={effect.dbW}:h={effect.dbH}" &
+                &":color={col}:t=fill:replace=1")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actColorKey, actChromaKey:
         if not isOverlay:
           # Base layer: no lower track to reveal, so replace the keyed color with
           # the timeline background instead of making it transparent.
           frame = keyOverBg(frame, effect)
-          continue
-        runFx(fxId(effect.kind, frame, f0 = effect.similar, f1 = effect.blend,
-            col = packRGB(effect.color))):
-          let col = keyColor(effect, frame)
-          var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
-          if effect.kind == actChromaKey:
-            # chromakey keys in YUV-with-alpha; convert in, then back to rgba so
-            # the composited overlay keeps its alpha channel.
-            nodes.add fxGraph.add("format", "pix_fmts=yuva420p")
-            nodes.add fxGraph.add("chromakey", &"{col}:{effect.similar}:{effect.blend}")
-            nodes.add fxGraph.add("format", "pix_fmts=rgba")
-          else:
-            nodes.add fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
-          nodes.add fxGraph.add("buffersink")
-          fxGraph.linkNodes(nodes).configure()
+        else:
+          runFx(fxId(effect.kind, frame, f0 = effect.similar, f1 = effect.blend,
+              col = packRGB(effect.color))):
+            let col = keyColor(effect, frame)
+            var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
+            if effect.kind == actChromaKey:
+              # chromakey keys in YUV-with-alpha; convert in, then back to rgba so
+              # the composited overlay keeps its alpha channel.
+              nodes.add fxGraph.add("format", "pix_fmts=yuva420p")
+              nodes.add fxGraph.add("chromakey", &"{col}:{effect.similar}:{effect.blend}")
+              nodes.add fxGraph.add("format", "pix_fmts=rgba")
+            else:
+              nodes.add fxGraph.add("colorkey", &"{col}:{effect.similar}:{effect.blend}")
+            nodes.add fxGraph.add("buffersink")
+            fxGraph.linkNodes(nodes).configure()
       of actChoke:
         # Choke (shrink) the alpha matte a key produced, to cut off the spill
         # fringe. Only overlay layers carry alpha; the base track keys over bg
         # (no matte), so there is nothing to choke there.
-        if not isOverlay or not hasAlpha(AVPixelFormat(frame.format)):
-          continue
-        let n = max(1, int(effect.chokeN))
-        runFx(fxId(actChoke, frame, i0 = n.int32)):
-          var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
-          # Erode only the alpha plane: in gbrap the color planes are 0=G, 1=B,
-          # 2=R, so threshold0..2=0 freezes them and only plane 3 (alpha) erodes.
-          # Each pass pulls the matte edge inward by 1px.
-          nodes.add fxGraph.add("format", "pix_fmts=gbrap")
-          for _ in 0 ..< n:
-            nodes.add fxGraph.add("erosion", "threshold0=0:threshold1=0:threshold2=0")
-          nodes.add fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
-          nodes.add fxGraph.add("buffersink")
-          fxGraph.linkNodes(nodes).configure()
+        if isOverlay and hasAlpha(AVPixelFormat(frame.format)):
+          let n = max(1, int(effect.chokeN))
+          runFx(fxId(actChoke, frame, i0 = n.int32)):
+            var nodes = @[fxGraph.add("buffer", bufArgsOf(frame))]
+            # Erode only the alpha plane: in gbrap the color planes are 0=G, 1=B,
+            # 2=R, so threshold0..2=0 freezes them and only plane 3 (alpha) erodes.
+            # Each pass pulls the matte edge inward by 1px.
+            nodes.add fxGraph.add("format", "pix_fmts=gbrap")
+            for _ in 0 ..< n:
+              nodes.add fxGraph.add("erosion", "threshold0=0:threshold1=0:threshold2=0")
+            nodes.add fxGraph.add("format", &"pix_fmts={$AVPixelFormat(frame.format)}")
+            nodes.add fxGraph.add("buffersink")
+            fxGraph.linkNodes(nodes).configure()
       of actAberration:
         # Fake chromatic aberration: slide each color channel by its own offset,
         # so the gaps show up as colored fringing. Via rgba so an overlay layer's
@@ -1732,13 +1717,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # block larger than the plane; 1x1 blocks are a no-op.
         let w = min(int(round(sample(effect, effect.pixWKf, effect.pixWKt))), frame.width)
         let h = min(int(round(sample(effect, effect.pixHKf, effect.pixHKt))), frame.height)
-        if w <= 1 and h <= 1:
-          continue
-        runFx(fxId(actPixelate, frame, i0 = w.int32, i1 = h.int32)):
-          let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
-          let filt = fxGraph.add("pixelize", &"width={w}:height={h}")
-          let bufferSink = fxGraph.add("buffersink")
-          fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
+        if w > 1 or h > 1:
+          runFx(fxId(actPixelate, frame, i0 = w.int32, i1 = h.int32)):
+            let bufferSrc = fxGraph.add("buffer", bufArgsOf(frame))
+            let filt = fxGraph.add("pixelize", &"width={w}:height={h}")
+            let bufferSink = fxGraph.add("buffersink")
+            fxGraph.linkNodes(bufferSrc, filt, bufferSink).configure()
       of actConfetti:
         # In the layer's own format so an overlay's alpha survives; fillRect only
         # writes yuv420p and rgba, so convert anything else first.
@@ -1784,15 +1768,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     ## not yet used this timeline frame. When all are, opens another.
     var bestCost = high(int)
     for d in ss.decoders:
-      if d.usedAt == frameNo: continue
-      let pos = d.loopBase + d.frameIndex
-      let cost =
-        if d.held != nil and obj.index >= d.lastReqIndex and obj.index <= pos: 0
-        elif obj.index >= pos: obj.index - pos
-        else: high(int) div 2 # behind it: a backward seek
-      if cost < bestCost:
-        bestCost = cost
-        result = d
+      if d.usedAt != frameNo:
+        let pos = d.loopBase + d.frameIndex
+        let cost =
+          if d.held != nil and obj.index >= d.lastReqIndex and obj.index <= pos: 0
+          elif obj.index >= pos: obj.index - pos
+          else: high(int) div 2 # behind it: a backward seek
+        if cost < bestCost:
+          bestCost = cost
+          result = d
     if result == nil:
       if ss.decoders.len < maxDecoders:
         let cn = (try: av.open(src[]) except IOError as e: error e.msg)
@@ -1945,40 +1929,37 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if lastGood != nil: av_frame_free(addr lastGood)
         lastGood = av_frame_clone(frame)
 
-      if not foundFrame:
-        if looping and frameIndex >= 0:
-          loopBase += frameIndex + 1
-          target = obj.index - loopBase
-          st.cn.seek(0, stream = myStream)
-          avcodec_flush_buffers(st.decoder)
-          st.resetDeint()
-          st.lastSeekTarget = -1
-          frameIndex = -1
-          continue
+      if foundFrame:
+        didDecode = true
 
-        if holdPastEnd and (lastGood != nil or st.held != nil):
-          av_frame_free(addr frame)
-          if lastGood != nil:
-            frame = lastGood
-            lastGood = nil
-            didDecode = true
-          else:
-            frame = av_frame_clone(st.held)
-            fromHeld = true
-          break
-
+        if hasSeekFrame:
+          let framesAvoided = frameIndex - seekFrame
+          debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
+          framesSaved += framesAvoided
+          hasSeekFrame = false
+      elif looping and frameIndex >= 0:
+        loopBase += frameIndex + 1
+        target = obj.index - loopBase
+        st.cn.seek(0, stream = myStream)
+        avcodec_flush_buffers(st.decoder)
+        st.resetDeint()
+        st.lastSeekTarget = -1
+        frameIndex = -1
+      elif holdPastEnd and (lastGood != nil or st.held != nil):
+        av_frame_free(addr frame)
+        if lastGood != nil:
+          frame = lastGood
+          lastGood = nil
+          didDecode = true
+        else:
+          frame = av_frame_clone(st.held)
+          fromHeld = true
+        break
+      else:
         didDecode = false
         av_frame_free(addr frame)
         frame = av_frame_clone(nullFrame)
         break
-
-      didDecode = true
-
-      if hasSeekFrame:
-        let framesAvoided = frameIndex - seekFrame
-        debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
-        framesSaved += framesAvoided
-        hasSeekFrame = false
 
     if didDecode:
       # Another layer sharing this (src, index) reuses it this timeline frame.
@@ -2378,48 +2359,47 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 av_frame_free(addr acc)
                 acc = newAcc
             inc k
-            continue
-
-          # A transition: the picture with the clip going out, blended into
-          # the one with the clip coming in, both over what's below.
-          var j = k
-          while j < objList.len and objList[j].layer == o.layer and
-              objList[j].win == o.win:
-            inc j
-          let isBase = acc == nil
-          let below =
-            if isBase: makeSolid(tl.res[0], tl.res[1], tl.bg, solidTag) else: acc
-          var fromF, toF: ptr AVFrame = nil
-          for m in k ..< j:
-            var f =
-              if isBase: baseFrame(objList[m])
-              else: overlayObj(below, objList[m])
-            if f == nil: f = av_frame_clone(below)
-            if objList[m].incoming:
-              if toF != nil: av_frame_free(addr toF)
-              toF = f
-            else:
-              if fromF != nil: av_frame_free(addr fromF)
-              fromF = f
-          if fromF == nil: fromF = av_frame_clone(below)
-          if toF == nil: toF = av_frame_clone(below)
-          let w = tl.windows[o.layer][o.win]
-          let local = index - w.start
-          # As Premiere: the first frame is all the outgoing picture.
-          let p = float32(local.float / w.dur.float)
-          let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
-          let dip: tuple[r, g, b: float32] = (bgRgb.red.float32, bgRgb.green.float32,
-            bgRgb.blue.float32)
-          let toRgb = lazyCtx(toRgbCtx)
-          let img = render(w.kind, fromF.toImg(toRgb), toF.toImg(toRgb),
-            below.toImg(toRgb), p, local.int, w.dur.int, seed, dip, w.easeIn,
-            w.easeOut)
-          acc = img.fromImg(fromF, lazyCtx(fromRgbCtx))
-          av_frame_free(addr fromF)
-          av_frame_free(addr toF)
-          var b = below
-          av_frame_free(addr b)
-          k = j
+          else:
+            # A transition: the picture with the clip going out, blended into
+            # the one with the clip coming in, both over what's below.
+            var j = k
+            while j < objList.len and objList[j].layer == o.layer and
+                objList[j].win == o.win:
+              inc j
+            let isBase = acc == nil
+            let below =
+              if isBase: makeSolid(tl.res[0], tl.res[1], tl.bg, solidTag) else: acc
+            var fromF, toF: ptr AVFrame = nil
+            for m in k ..< j:
+              var f =
+                if isBase: baseFrame(objList[m])
+                else: overlayObj(below, objList[m])
+              if f == nil: f = av_frame_clone(below)
+              if objList[m].incoming:
+                if toF != nil: av_frame_free(addr toF)
+                toF = f
+              else:
+                if fromF != nil: av_frame_free(addr fromF)
+                fromF = f
+            if fromF == nil: fromF = av_frame_clone(below)
+            if toF == nil: toF = av_frame_clone(below)
+            let w = tl.windows[o.layer][o.win]
+            let local = index - w.start
+            # As Premiere: the first frame is all the outgoing picture.
+            let p = float32(local.float / w.dur.float)
+            let seed = uint32(w.start and 0xffffffff) xor (uint32(o.layer) * 2654435761'u32)
+            let dip: tuple[r, g, b: float32] = (bgRgb.red.float32, bgRgb.green.float32,
+              bgRgb.blue.float32)
+            let toRgb = lazyCtx(toRgbCtx)
+            let img = render(w.kind, fromF.toImg(toRgb), toF.toImg(toRgb),
+              below.toImg(toRgb), p, local.int, w.dur.int, seed, dip, w.easeIn,
+              w.easeOut)
+            acc = img.fromImg(fromF, lazyCtx(fromRgbCtx))
+            av_frame_free(addr fromF)
+            av_frame_free(addr toF)
+            var b = below
+            av_frame_free(addr b)
+            k = j
 
         let scaledAcc = scaleProxyFrame(acc)
         if scaledAcc != acc:
@@ -2452,23 +2432,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             lastProcessedFrame != nil:
           av_frame_free(addr frame)
           frame = av_frame_clone(lastProcessedFrame)
-          continue
-
-        var (decoded, didDecode) = decodeClipFrame(obj)
-        if didDecode:
-          av_frame_free(addr frame)
-          frame = decoded
-          # decodeClipFrame returns native resolution; scale the final frame to
-          # the canvas (intermediate seek frames never reach here, so the resize
-          # costs one sws_scale rather than one per decoded frame).
-          if (frame.width.int32, frame.height.int32) != tl.res:
-            let oldFrame = frame
-            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
-            av_frame_free(addr oldFrame)
         else:
-          # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or
-          # the last frame for RGB8 palette persistence) and drop the fallback.
-          av_frame_free(addr decoded)
+          var (decoded, didDecode) = decodeClipFrame(obj)
+          if didDecode:
+            av_frame_free(addr frame)
+            frame = decoded
+            # decodeClipFrame returns native resolution; scale the final frame to
+            # the canvas (intermediate seek frames never reach here, so the resize
+            # costs one sws_scale rather than one per decoded frame).
+            if (frame.width.int32, frame.height.int32) != tl.res:
+              let oldFrame = frame
+              frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
+              av_frame_free(addr oldFrame)
+          else:
+            # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or
+            # the last frame for RGB8 palette persistence) and drop the fallback.
+            av_frame_free(addr decoded)
 
       # Effects take canvas pixels, so they run at the canvas size and the
       # proxy scale comes after, as when compositing. A clip with no frame

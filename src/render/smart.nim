@@ -44,11 +44,11 @@ func smartRenderPlan*(clips: openArray[Clip], keyframes: openArray[int64],
       let finalGopNeedsHold = i + 1 == keyframes.len and clipSrcEnd > sourceEnd
       if gopEnd > clipSrcEnd or gopEnd <= keyframe or finalGopNeedsHold:
         inc i
-        continue
-      result.addSpan(ssEncode, cursor, keyframe, clip.start + cursor - clip.offset)
-      result.addSpan(ssCopy, keyframe, gopEnd, clip.start + keyframe - clip.offset)
-      cursor = gopEnd
-      inc i
+      else:
+        result.addSpan(ssEncode, cursor, keyframe, clip.start + cursor - clip.offset)
+        result.addSpan(ssCopy, keyframe, gopEnd, clip.start + keyframe - clip.offset)
+        cursor = gopEnd
+        inc i
     result.addSpan(ssEncode, cursor, clipSrcEnd, clip.start + cursor - clip.offset)
 
 func smartPlanStats*(spans: openArray[SmartSpan]): SmartPlanStats =
@@ -152,13 +152,13 @@ proc annexBToLengthPrefixed*(data: ptr uint8, size: int): seq[uint8] =
     let codeLen = startCodeLen(bytes, size, pos)
     if codeLen == 0:
       inc pos
-      continue
-    let nalStart = pos + codeLen
-    var next = nalStart
-    while next < size and startCodeLen(bytes, size, next) == 0:
-      inc next
-    result.appendNal(bytes, nalStart, next)
-    pos = next
+    else:
+      let nalStart = pos + codeLen
+      var next = nalStart
+      while next < size and startCodeLen(bytes, size, next) == 0:
+        inc next
+      result.appendNal(bytes, nalStart, next)
+      pos = next
 
 proc normalizeLengthPrefixed*(packet: ptr AVPacket,
     parameterSets: openArray[uint8], label: string, annexB: bool) =

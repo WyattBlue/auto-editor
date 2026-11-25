@@ -21,33 +21,32 @@ iterator subtitleEvents(container: InputContainer, stream: cint):
   while av_read_frame(formatCtx, container.packet) >= 0:
     defer: av_packet_unref(container.packet)
     let pkt = container.packet
-    if pkt.stream_index != stream: continue
-    var gotSubtitle: cint = 0
-    if avcodec_decode_subtitle2(codecCtx, addr subtitle, addr gotSubtitle, pkt) < 0 or
-        gotSubtitle == 0:
-      continue
-    defer: avsubtitle_free(addr subtitle)
-    # AVSubtitle.pts is in AV_TIME_BASE when set; otherwise fall back to the
-    # packet pts in the stream time_base. Display times are ms relative to
-    # that base; some codecs (e.g. mov_text) instead carry the duration on
-    # the packet.
-    let base =
-      if subtitle.pts != AV_NOPTS_VALUE:
-        float(subtitle.pts - startUs) / AV_TIME_BASE.float
-      elif pkt.pts != AV_NOPTS_VALUE: float(pkt.pts - startPts) * tbSeconds
-      else: 0.0
-    let start = base + subtitle.start_display_time.float / 1000.0
-    let finish =
-      if subtitle.end_display_time > subtitle.start_display_time:
-        base + subtitle.end_display_time.float / 1000.0
-      elif pkt.duration > 0:
-        base + pkt.duration.float * tbSeconds
-      else:
-        start
-    for r in 0 ..< subtitle.num_rects:
-      let rect = subtitle.rects[r]
-      if rect.`type` == SUBTITLE_ASS and rect.ass != nil:
-        yield (start, finish, $rect.ass)
+    if pkt.stream_index == stream:
+      var gotSubtitle: cint = 0
+      if avcodec_decode_subtitle2(codecCtx, addr subtitle, addr gotSubtitle, pkt) >= 0 and
+          gotSubtitle != 0:
+        defer: avsubtitle_free(addr subtitle)
+        # AVSubtitle.pts is in AV_TIME_BASE when set; otherwise fall back to the
+        # packet pts in the stream time_base. Display times are ms relative to
+        # that base; some codecs (e.g. mov_text) instead carry the duration on
+        # the packet.
+        let base =
+          if subtitle.pts != AV_NOPTS_VALUE:
+            float(subtitle.pts - startUs) / AV_TIME_BASE.float
+          elif pkt.pts != AV_NOPTS_VALUE: float(pkt.pts - startPts) * tbSeconds
+          else: 0.0
+        let start = base + subtitle.start_display_time.float / 1000.0
+        let finish =
+          if subtitle.end_display_time > subtitle.start_display_time:
+            base + subtitle.end_display_time.float / 1000.0
+          elif pkt.duration > 0:
+            base + pkt.duration.float * tbSeconds
+          else:
+            start
+        for r in 0 ..< subtitle.num_rects:
+          let rect = subtitle.rects[r]
+          if rect.`type` == SUBTITLE_ASS and rect.ass != nil:
+            yield (start, finish, $rect.ass)
 
 type SubtitleCue* = tuple[start, stop: float64, text: string] ## seconds
 

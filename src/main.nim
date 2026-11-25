@@ -50,33 +50,31 @@ proc printHelp() {.noreturn.} =
   var first = true
 
   for opt in mainOptions:
-    if opt.hidden:
-      continue
+    if not opt.hidden:
+      if opt.c != currentCat or first:
+        currentCat = opt.c
+        if first:
+          first = false
+        else:
+          echo ""
+        echo "  " & categoryName(currentCat) & ":"
 
-    if opt.c != currentCat or first:
-      currentCat = opt.c
-      if first:
-        first = false
+      var optStr = "    " & opt.names
+      if opt.metavar != "":
+        optStr &= " " & opt.metavar
+
+      if optStr.len >= optWidth:
+        echo optStr
+        let wrapped = wrapText(opt.help, helpWidth, 0)
+        for line in wrapped.split("\n"):
+          echo " ".repeat(optWidth) & line
       else:
-        echo ""
-      echo "  " & categoryName(currentCat) & ":"
-
-    var optStr = "    " & opt.names
-    if opt.metavar != "":
-      optStr &= " " & opt.metavar
-
-    if optStr.len >= optWidth:
-      echo optStr
-      let wrapped = wrapText(opt.help, helpWidth, 0)
-      for line in wrapped.split("\n"):
-        echo " ".repeat(optWidth) & line
-    else:
-      let padding = optWidth - optStr.len
-      let wrapped = wrapText(opt.help, helpWidth, optWidth)
-      let helpLines = wrapped.split("\n")
-      echo optStr & " ".repeat(padding) & helpLines[0]
-      for i in 1 ..< helpLines.len:
-        echo helpLines[i]
+        let padding = optWidth - optStr.len
+        let wrapped = wrapText(opt.help, helpWidth, optWidth)
+        let helpLines = wrapped.split("\n")
+        echo optStr & " ".repeat(padding) & helpLines[0]
+        for i in 1 ..< helpLines.len:
+          echo helpLines[i]
 
   echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
     wrapText("Show info about this program then exit", helpWidth, optWidth)
