@@ -2410,72 +2410,70 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
         lastDecoded[1] = -1 # compositing bypasses the single-layer reuse cache
-        yield (frame, index)
-        continue
-
-      if not isLinear:
-        # When there can be valid gaps in the timeline and no objects for this frame.
-        av_frame_free(addr frame)
-        frame = av_frame_clone(nullFrame)
       else:
-        # Always start with a fresh frame to avoid reusing encoder-unref'd frames
-        av_frame_free(addr frame)
-        if pix_fmt == AV_PIX_FMT_RGB8 and lastProcessedFrame != nil:
-          frame = av_frame_clone(lastProcessedFrame)
-        else:
-          frame = av_frame_clone(nullFrame)
-
-      for obj in objList:
-        # Reuse the decoded frame from the previous timeline iteration when
-        # this frame maps to the same source frame.
-        if (obj.src, obj.index, staticRotDeg(obj.effects)) == lastDecoded and
-            lastProcessedFrame != nil:
+        if not isLinear:
+          # When there can be valid gaps in the timeline and no objects for this frame.
           av_frame_free(addr frame)
-          frame = av_frame_clone(lastProcessedFrame)
+          frame = av_frame_clone(nullFrame)
         else:
-          var (decoded, didDecode) = decodeClipFrame(obj)
-          if didDecode:
-            av_frame_free(addr frame)
-            frame = decoded
-            # decodeClipFrame returns native resolution; scale the final frame to
-            # the canvas (intermediate seek frames never reach here, so the resize
-            # costs one sws_scale rather than one per decoded frame).
-            if (frame.width.int32, frame.height.int32) != tl.res:
-              let oldFrame = frame
-              frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
-              av_frame_free(addr oldFrame)
+          # Always start with a fresh frame to avoid reusing encoder-unref'd frames
+          av_frame_free(addr frame)
+          if pix_fmt == AV_PIX_FMT_RGB8 and lastProcessedFrame != nil:
+            frame = av_frame_clone(lastProcessedFrame)
           else:
-            # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or
-            # the last frame for RGB8 palette persistence) and drop the fallback.
-            av_frame_free(addr decoded)
+            frame = av_frame_clone(nullFrame)
 
-      # Effects take canvas pixels, so they run at the canvas size and the
-      # proxy scale comes after, as when compositing. A clip with no frame
-      # here leaves the proxy-sized nullFrame.
-      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0 and
-          (frame.width.int32, frame.height.int32) != tl.res:
-        let oldFrame = frame
-        frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
-        av_frame_free(addr oldFrame)
+        for obj in objList:
+          # Reuse the decoded frame from the previous timeline iteration when
+          # this frame maps to the same source frame.
+          if (obj.src, obj.index, staticRotDeg(obj.effects)) == lastDecoded and
+              lastProcessedFrame != nil:
+            av_frame_free(addr frame)
+            frame = av_frame_clone(lastProcessedFrame)
+          else:
+            var (decoded, didDecode) = decodeClipFrame(obj)
+            if didDecode:
+              av_frame_free(addr frame)
+              frame = decoded
+              # decodeClipFrame returns native resolution; scale the final frame to
+              # the canvas (intermediate seek frames never reach here, so the resize
+              # costs one sws_scale rather than one per decoded frame).
+              if (frame.width.int32, frame.height.int32) != tl.res:
+                let oldFrame = frame
+                frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
+                av_frame_free(addr oldFrame)
+            else:
+              # No new frame decoded: keep the pre-initialized `frame` (nullFrame, or
+              # the last frame for RGB8 palette persistence) and drop the fallback.
+              av_frame_free(addr decoded)
 
-      # Cache the pre-effects frame: effects are per-timeline-frame (animated
-      # via `local`) and would compound when a source frame repeats.
-      if objList.len > 0:
-        av_frame_free(addr lastProcessedFrame)
-        lastProcessedFrame = av_frame_clone(frame)
-        let o = objList[0]
-        lastDecoded = (o.src, o.index, staticRotDeg(o.effects))
+        # Effects take canvas pixels, so they run at the canvas size and the
+        # proxy scale comes after, as when compositing. A clip with no frame
+        # here leaves the proxy-sized nullFrame.
+        if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0 and
+            (frame.width.int32, frame.height.int32) != tl.res:
+          let oldFrame = frame
+          frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg, solidTag, padCtx)
+          av_frame_free(addr oldFrame)
 
-      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
-        frame = applyEffects(frame, objList[0].effects, objList[0].local,
-          objList[0].dur, src = objList[0].src, srcSecs = objList[0].srcSecs)
+        # Cache the pre-effects frame: effects are per-timeline-frame (animated
+        # via `local`) and would compound when a source frame repeats.
+        if objList.len > 0:
+          av_frame_free(addr lastProcessedFrame)
+          lastProcessedFrame = av_frame_clone(frame)
+          let o = objList[0]
+          lastDecoded = (o.src, o.index, staticRotDeg(o.effects))
 
-      let scaledFrame = scaleProxyFrame(frame)
-      if scaledFrame != frame:
-        av_frame_free(addr frame)
-        frame = scaledFrame
+        if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
+          frame = applyEffects(frame, objList[0].effects, objList[0].local,
+            objList[0].dur, src = objList[0].src, srcSecs = objList[0].srcSecs)
 
-      frame = finalizeFrame(frame, index)
+        let scaledFrame = scaleProxyFrame(frame)
+        if scaledFrame != frame:
+          av_frame_free(addr frame)
+          frame = scaledFrame
+
+        frame = finalizeFrame(frame, index)
 
       yield (frame, index)
 
