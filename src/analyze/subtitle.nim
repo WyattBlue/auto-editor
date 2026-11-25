@@ -26,6 +26,9 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
   # failure: sidecar subtitle demuxers (e.g. srt) can't seek, but those
   # containers are freshly opened and already at the start.
   discard av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
+  # Cues are a sliver of the file: let the demuxer skip the video and audio.
+  let levels = container.setActiveStream(s)
+  defer: container.restoreDiscards(levels)
 
   var length = 0
   var spans: seq[(int, int)] = @[]

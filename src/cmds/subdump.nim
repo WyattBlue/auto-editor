@@ -18,6 +18,9 @@ iterator subtitleEvents(container: InputContainer, stream: cint):
   var codecCtx = initDecoder(formatCtx.streams[stream].codecpar)
   defer: avcodec_free_context(addr codecCtx)
   var subtitle: AVSubtitle
+  # Cues are a sliver of the file: let the demuxer skip the video and audio.
+  let levels = container.setActiveStream(stream)
+  defer: container.restoreDiscards(levels)
   while av_read_frame(formatCtx, container.packet) >= 0:
     defer: av_packet_unref(container.packet)
     let pkt = container.packet

@@ -85,6 +85,9 @@ proc remuxSubtitles*(layer: seq[Clip], effects: seq[Actions],
         stream = srcContainer.formatContext.streams[streamIndex]
         srcTb = stream.time_base
 
+    # Cues are a sliver of the file: let the demuxer skip the video and audio.
+    srcContainer.setActiveStream(streamIndex)
+
     var packet = av_packet_alloc()
     if packet == nil:
       error "Could not allocate subtitle packet"

@@ -344,6 +344,8 @@ when defined(libass):
         dec.subtitle_header_size)
     let packet = container.packet
     var seen: set[Script]
+    # Cues are a sliver of the file: let the demuxer skip the video and audio.
+    container.setActiveStream(st.index)
     while av_read_frame(fmt, packet) >= 0:
       defer: av_packet_unref(packet)
       if packet.stream_index != st.index: continue

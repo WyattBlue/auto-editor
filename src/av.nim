@@ -381,18 +381,25 @@ proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRa
       den: video.avg_frame_rate.num)
   AVRational(num: 0, den: 1)
 
-proc setActiveStream*(container: InputContainer, index: cint) =
+proc setActiveStream*(container: InputContainer,
+    index: cint): seq[AVDiscard] {.discardable.} =
   ## Tell the demuxer to discard packets for every stream except `index`, so
   ## av_read_frame skips demuxing streams we don't decode (e.g. video while
-  ## analyzing audio). Call resetDiscards() when finished to restore the
-  ## container for callers that read every stream.
-  for i in 0 ..< container.formatContext.nb_streams.int:
+  ## analyzing audio). Returns the levels the streams had, for
+  ## restoreDiscards() to put back when the container is read again.
+  let n = container.formatContext.nb_streams.int
+  result = newSeq[AVDiscard](n)
+  for i in 0 ..< n:
     let s = container.formatContext.streams[i]
+    result[i] = s.discardLevel
     s.discardLevel = (if s.index == index: AVDISCARD_DEFAULT else: AVDISCARD_ALL)
 
-proc resetDiscards*(container: InputContainer) =
-  for i in 0 ..< container.formatContext.nb_streams.int:
-    container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
+proc restoreDiscards*(container: InputContainer, levels: seq[AVDiscard]) =
+  ## A demuxer discards some streams by its own choice (mov, a data stream
+  ## of zero-length samples), so the levels are put back, not cleared.
+  # A demuxer can add streams as it reads (MPEG-TS); those keep their level.
+  for i in 0 ..< min(levels.len, container.formatContext.nb_streams.int):
+    container.formatContext.streams[i].discardLevel = levels[i]
 
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
@@ -403,8 +410,8 @@ proc mediaLength*(container: InputContainer): AVRational =
     let audio = container.audio[0]
     # Only the audio's packets count: let the demuxer skip the rest instead
     # of reading every video frame off the disk.
-    container.setActiveStream(audio.index)
-    defer: container.resetDiscards()
+    let levels = container.setActiveStream(audio.index)
+    defer: container.restoreDiscards(levels)
     let endPts = scanPackets(formatCtx, audio, 0).endPts
     return (if endPts > 0: endPts - formatCtx.startPts(audio) else: 0) *
       audio.time_base
@@ -433,6 +440,7 @@ type FrameReader* = object
   codecCtx: ptr AVCodecContext
   frame*: ptr AVFrame
   index: cint
+  levels: seq[AVDiscard]
   receiving, flushing: bool
 
 proc initFrameReader*(container: InputContainer, index: cint,
@@ -440,12 +448,11 @@ proc initFrameReader*(container: InputContainer, index: cint,
   # We decode a single stream to EOF here, so let the demuxer skip every other
   # stream instead of reading packets we'd only throw away (big win when
   # analyzing audio in a high-bitrate video file).
-  container.setActiveStream(index)
   FrameReader(container: container, codecCtx: codecCtx, frame: frame,
-    index: index)
+    index: index, levels: container.setActiveStream(index))
 
 proc close*(r: FrameReader) =
-  r.container.resetDiscards()
+  r.container.restoreDiscards(r.levels)
 
 proc next*(r: var FrameReader): bool =
   ## Decode the next frame into `r.frame`; false once the stream is drained.
