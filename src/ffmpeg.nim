@@ -439,6 +439,19 @@ proc av_channel_layout_compare*(chl, chl1: ptr AVChannelLayout): cint {.importc,
 proc av_channel_layout_uninit(channel_layout: ptr AVChannelLayout) {.importc,
     header: "<libavutil/channel_layout.h>".}
 
+# A custom-order layout owns its channel map, so a layout is moved, never
+# copied: copy one with av_channel_layout_copy, which can fail.
+proc `=destroy`*(layout: AVChannelLayout) =
+  # uninit frees the map and zeroes what it's given, here the dead layout.
+  av_channel_layout_uninit(addr layout)
+
+proc `=wasMoved`*(layout: var AVChannelLayout) =
+  # All zero is AV_CHANNEL_ORDER_UNSPEC with no map, which uninit leaves be.
+  zeroMem(addr layout, sizeof(AVChannelLayout))
+
+proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error.}
+proc `=dup`*(src: AVChannelLayout): AVChannelLayout {.error.}
+
 func `$`*(layout: ptr AVChannelLayout): string =
   const bufSize: csize_t = 256
   var buffer = newString(bufSize)
@@ -455,18 +468,6 @@ func `$`*(layout: ptr AVChannelLayout): string =
 template `$`*(layout: AVChannelLayout): string = $(addr layout)
 func `$`*(layout: ref AVChannelLayout): string = $(addr layout[])
 
-proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
-    "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
-
-proc `=destroy`*(layout: var AVChannelLayout) =
-  av_channel_layout_uninit(addr layout)
-
-proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
-  # Take ownership of src's bits: Nim won't destroy a moved-from src, so a
-  # deep copy here would leak a custom-order layout's heap map (and its
-  # ENOMEM result would go unchecked). uninit frees dest's old map first.
-  av_channel_layout_uninit(addr dest)
-  copyMem(addr dest, addr src, sizeof(AVChannelLayout))
 
 type
   # https://ffmpeg.org/doxygen/8.0/structAVFrame.html

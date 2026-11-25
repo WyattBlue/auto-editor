@@ -15,6 +15,20 @@ type AudioResampler* = object
   rate: cint
   isPassthrough: bool
 
+proc `=destroy`*(resampler: AudioResampler) =
+  # A custom destroy hook skips field destruction, so release fields here.
+  if resampler.graph != nil:
+    var graph = resampler.graph
+    avfilter_graph_free(addr graph)
+  `=destroy`(resampler.layout)
+  `=destroy`(resampler.templateLayout)
+
+proc `=wasMoved`*(resampler: var AudioResampler) =
+  # A nil graph and zeroed layouts own nothing.
+  zeroMem(addr resampler, sizeof(AudioResampler))
+
+proc `=copy`*(dest: var AudioResampler, src: AudioResampler) {.error.}
+proc `=dup`*(src: AudioResampler): AudioResampler {.error.}
 
 func getFormatName(format: cint): string =
   let name = av_get_sample_fmt_name(format)
@@ -30,15 +44,6 @@ proc newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rat
   result.format = format.cint
   result.rate = rate
   result.isPassthrough = false
-
-proc `=destroy`*(resampler: var AudioResampler) =
-  # A custom destroy hook skips field destruction, so release fields here.
-  if resampler.graph != nil:
-    avfilter_graph_free(addr resampler.graph)
-  `=destroy`(resampler.layout)
-  `=destroy`(resampler.templateLayout)
-
-proc `=copy`*(dest: var AudioResampler, src: AudioResampler) {.error.}
 
 proc collect(resampler: var AudioResampler, into: var seq[ptr AVFrame]) =
   while true:
