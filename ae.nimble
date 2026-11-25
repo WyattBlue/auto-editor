@@ -229,8 +229,8 @@ let whisper = Package(
 )
 let x264 = Package(
   name: "x264",
-  sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2",
-  sha256: "6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224",
+  sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee/x264-0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee.tar.bz2",
+  sha256: "f05c59f2e83d494c36307025dca2d3afc6b4d185f3a3453d06cc4fecd7094057",
   buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --disable-opencl --enable-strip".split(" "),
   ffFlag: "--enable-libx264",
 )
