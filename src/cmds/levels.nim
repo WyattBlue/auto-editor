@@ -151,7 +151,7 @@ proc openLevels(inputFile: string, m: EditMethod, tb: AVRational): LevelsJob =
     of ekMotion: &"{userStream},{m.width},{m.blur},{result.rect}"
     else: ""
 
-proc close(job: var LevelsJob) = job.container.close()
+proc close(job: var LevelsJob) {.inline.} = job.container.close()
 
 proc computeLevels(job: var LevelsJob): tuple[data: seq[Unorm16], decodeErrors: int] =
   ## Levels for audio, motion and blackdetect, via the analysis cache. The

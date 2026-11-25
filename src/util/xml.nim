@@ -25,30 +25,30 @@ type
     attrs*: XmlAttributes
     children: seq[XmlNode]
 
-func newElement*(tag: string): XmlNode =
+func newElement*(tag: string): XmlNode {.inline.} =
   XmlNode(str: tag)
 
-func newText*(text: string): XmlNode =
+func newText*(text: string): XmlNode {.inline.} =
   XmlNode(kind: xnText, str: text)
 
-func newVerbatimText*(text: string): XmlNode =
+func newVerbatimText*(text: string): XmlNode {.inline.} =
   XmlNode(kind: xnVerbatimText, str: text)
 
 func newXmlTree*(tag: string, children: openArray[XmlNode],
-    attrs: XmlAttributes = @[]): XmlNode =
+    attrs: XmlAttributes = @[]): XmlNode {.inline.} =
   XmlNode(str: tag, attrs: attrs, children: @children)
 
-func toXmlAttributes*(pairs: varargs[(string, string)]): XmlAttributes =
+func toXmlAttributes*(pairs: varargs[(string, string)]): XmlAttributes {.inline.} =
   @pairs
 
-func add*(parent, child: XmlNode) =
+func add*(parent, child: XmlNode) {.inline.} =
   parent.children.add child
 
-func len*(n: XmlNode): int =
+func len*(n: XmlNode): int {.inline.} =
   ## The number of children.
   n.children.len
 
-func tag*(n: XmlNode): string =
+func tag*(n: XmlNode): string {.inline.} =
   n.str
 
 iterator items*(n: XmlNode): XmlNode =

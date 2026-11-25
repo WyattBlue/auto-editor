@@ -10,11 +10,11 @@ type Timecode* = object
   h*, m*, s*, f*: int64
   drop*: bool ## written with a `;`, `.` or `,` separator
 
-func timecodeBase*(tb: AVRational): int64 =
+func timecodeBase*(tb: AVRational): int64 {.inline.} =
   ## The frames a second holds in timecode: 30 for 29.97, 24 for 23.976.
   max(1'i64, int64(ceil(tb.float64 - 1e-9)))
 
-func dropPerMinute(base: int64): int64 =
+func dropPerMinute(base: int64): int64 {.inline.} =
   ## 29.97 skips two numbers a minute, 59.94 four.
   base div 15
 

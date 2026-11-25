@@ -233,7 +233,7 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]
   var seen: HashSet[AVCodecID]
 
-  var bestVideo = ofmt.video_codec
+  let bestVideo = ofmt.video_codec
   var bestAudio = ofmt.audio_codec
   var bestSubtitle = ofmt.subtitle_codec
   if kind in {clkCodecs, clkEncoders}:

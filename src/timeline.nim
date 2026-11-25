@@ -71,7 +71,7 @@ type v3* = object
   s*: seq[seq[Clip]] # Sources' subtitle streams carried through the cuts.
   c*: seq[CaptionTrack] # Inline captions, rendered as a subtitle stream each.
   markers*: seq[Marker]
-  langs*: seq[Lang]   # Video, Audio (flattened).
+  langs*: seq[Lang] # Video, Audio (flattened).
   effects*: seq[Actions]
   numberOfSrc*: int
   clips2*: seq[Clip2] # Empty when the timeline is non-linear.

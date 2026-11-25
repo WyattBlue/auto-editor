@@ -78,8 +78,10 @@ proc addActionFilters(parent: XmlNode, effects: Actions, clipDur: int,
         ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
     of actPixelate:
       parent.addFilter("avfilter.pixelize", [
-        ("av.width", mltAnimValue(effect, effect.pixWKf, effect.pixWKt, clipDur, fps, asInt = true)),
-        ("av.height", mltAnimValue(effect, effect.pixHKf, effect.pixHKt, clipDur, fps, asInt = true)),
+        ("av.width",
+          mltAnimValue(effect, effect.pixWKf, effect.pixWKt, clipDur, fps, asInt = true)),
+        ("av.height",
+          mltAnimValue(effect, effect.pixHKf, effect.pixHKt, clipDur, fps, asInt = true)),
         ("av.mode", "avg"), ("av.planes", "7")], "", anim(effect))
     of actAberration:
       parent.addFilter("avfilter.rgbashift", [
@@ -89,8 +91,8 @@ proc addActionFilters(parent: XmlNode, effects: Actions, clipDur: int,
         ("av.edge", if effect.abWrap: "wrap" else: "smear")])
     else: discard
 
-func tc(f: int64, tb: AVRational): string =
-  toTimecode(float(f / tb), Code.standard)
+func tc(f: int64, tb: AVRational): string {.inline.} =
+  toTimecode(float(f / tb), standard)
 
 proc addFadeFilters(parent: XmlNode, tl: v3, clip: Clip,
     fadeInDur, fadeOutDur: int64) =
@@ -195,8 +197,8 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   playlistBin.addProp("xml_retain", "1")
   mlt.add(playlistBin)
 
-  let global_out = toTimecode(float(tl.len / tl.tb), Code.standard)
-  let global_last = toTimecode(float((tl.len - 1) / tl.tb), Code.standard)
+  let global_out = toTimecode(float(tl.len / tl.tb), standard)
+  let global_last = toTimecode(float((tl.len - 1) / tl.tb), standard)
 
   let producer = newElement("producer")
   producer.attrs = {"id": "bg"}.toXmlAttributes()
@@ -243,9 +245,9 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
   # dissolves become fade filters on the clip itself.
   type ClipPlan = object
     entryIn, entryOut: int64 # source frames the plain entry still covers
-    postroll: int64          # extra source frames the chain must expose
+    postroll: int64 # extra source frames the chain must expose
     fadeInDur, fadeOutDur: int64
-    outCenter: int           # centered transition leaving this clip, or -1
+    outCenter: int # centered transition leaving this clip, or -1
 
   var plans = newSeq[ClipPlan](layer.len)
   for i, clip in layer:

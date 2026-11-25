@@ -126,7 +126,7 @@ proc h264SupportsPartialLossless*(format: cint, header: seq[uint8]): bool =
   ## it has none (MPEG-TS).
   if format != AV_PIX_FMT_YUV420P.cint or header.len == 0:
     return false
-  let extra = unsafeAddr header[0]
+  let extra = addr header[0]
   # Annex B sources get their samples and an avcC rewritten as they copy.
   if isAnnexB(extra, header.len):
     return annexBToAvcC(extra, header.len).len > 0

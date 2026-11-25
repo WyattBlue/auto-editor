@@ -188,11 +188,11 @@ func recommendedTimebase*(mi: MediaInfo): AVRational {.raises: [].} =
   if mi.v.len > 0: makeSaneTimebase(mi.v[0].avg_rate)
   else: AVRational(num: 30, den: 1)
 
-proc codecName*(id: AVCodecID): string = $avcodec_get_name(id)
+proc codecName*(id: AVCodecID): string {.inline.} = $avcodec_get_name(id)
 
 proc mediaFrames*(path: string, tb: AVRational): int =
   ## How many frames auto-editor gives `path` on a timeline at `tb`: the
   ## audio's last packet, else the video's duration.
-  var container = (try: av.open(path) except IOError as e: error e.msg)
+  let container = (try: av.open(path) except IOError as e: error e.msg)
   defer: container.close()
   int(round((mediaLength(container) * tb).float64))

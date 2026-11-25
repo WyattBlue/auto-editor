@@ -161,7 +161,7 @@ proc writeCaptions*(track: CaptionTrack, ctx: ptr AVCodecContext,
     var rect: AVSubtitleRect
     rect.`type` = SUBTITLE_ASS
     rect.ass = line.cstring
-    var rectPtr = addr rect
+    let rectPtr = addr rect
     var sub: AVSubtitle
     sub.format = 1 # text
     sub.end_display_time = uint32(dur) # ctx.time_base is milliseconds

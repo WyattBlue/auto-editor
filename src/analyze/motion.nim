@@ -83,7 +83,8 @@ proc createFilterGraph(timeBase: AVRational, pixFmtName: string,
 
   # Create buffer source with proper arguments
   let bufferArgs = cstring(
-    &"video_size={width}x{height}:pix_fmt={pixFmtName}:time_base={timeBase.num}/{timeBase.den}:pixel_aspect=1/1"
+    &"video_size={width}x{height}:pix_fmt={pixFmtName}:" &
+      &"time_base={timeBase.num}/{timeBase.den}:pixel_aspect=1/1"
   )
 
   var ret = avfilter_graph_create_filter(addr bufferSrc,
@@ -341,7 +342,7 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32,
     prevIndex = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-  stream, width, blur: int32, rect: Unorm24x4): seq[Unorm16] =
+    stream, width, blur: int32, rect: Unorm24x4): seq[Unorm16] =
   let cacheArgs = &"{stream},{width},{blur},{rect}"
   if not noCache:
     let cacheData = readCache[Unorm16](path, tb, "motion", cacheArgs)

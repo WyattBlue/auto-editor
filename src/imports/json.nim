@@ -51,7 +51,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner,
 
   result.effects = index.intern(effects, group)
 
-func clampEase(v: float): float32 =
+func clampEase(v: float): float32 {.inline.} =
   if v != v: defaultEase else: float32(clamp(v, 0.0, 100.0))
 
 proc parseTransition(node: JsonNode): Transition {.raises: [AutoEditorError].} =

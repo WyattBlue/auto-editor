@@ -32,7 +32,7 @@ const actionsRef = Link(href: "https://auto-editor.com/ref/actions",
 
 type OptKind* = enum
   Regular # expecting = $datum
-  Flag    # $datum = true
+  Flag # $datum = true
   Special # args.`export` = parseExportString("$datum")
 
 type CliOption* = enum
@@ -45,8 +45,8 @@ type CliOption* = enum
     coOutputFormat, coYtDlpExtras, coProgress, coQuiet, coPreview, coVn, coAn, coSn,
     coDn, coFaststart, coNoFaststart, coFragmented, coNoFragmented, coChapters,
     coNoChapters, coVcodec, coVideoBitrate, coCrf, coGop, coVprofile, coPreset, coPixFmt,
-    coScale, coFont, coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate, coMixAudioStreams,
-    coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
+    coScale, coFont, coNoSeek, coNoPartialLossless, coAcodec, coLayout, coAudioBitrate,
+    coMixAudioStreams, coAudioNormalize, coOpen, coNoOpen, coKey, coShowVersion, coWebCodecs, coWhen
 
 type OptDef* = object
   names*: string

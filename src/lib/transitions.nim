@@ -47,8 +47,8 @@ type
     tkConstantPower, tkExponentialFade
 
   TransitionInfo* = object
-    id*: string        # the name in v3 files and on the command line
-    name*: string      # Premiere's name
+    id*: string # the name in v3 files and on the command line
+    name*: string # Premiere's name
     matchName*: string # Premiere's internal name, as its OTIO files carry it;
                        # empty for those Premiere no longer reads
 

@@ -9,10 +9,10 @@ from std/math import round
 import ../action
 
 type SpeedMap* = object
-  mean*: float64     # the clip's speed as its length and offset reckon it
-  ramp*: bool        # whether any of its speed actions is a ramp
-  tau: seq[float64]  # time fraction reached at media fraction i / speedSteps
-  scale: float64     # media fraction per time fraction, over the speed
+  mean*: float64 # the clip's speed as its length and offset reckon it
+  ramp*: bool # whether any of its speed actions is a ramp
+  tau: seq[float64] # time fraction reached at media fraction i / speedSteps
+  scale: float64 # media fraction per time fraction, over the speed
   first, last: float64 # the speed at either end, past which it holds
 
 func speedOf*(effects: Actions, u: float64, varispeed: set[bool] = {false, true}):

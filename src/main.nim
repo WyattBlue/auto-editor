@@ -118,7 +118,7 @@ proc parseTransition(val: string): (TransitionKind, TimeSpec, TimeSpec) =
       error "--transition minimum cut duration cannot be negative"
 
 proc parseTimeRange(val, opt: string): (TimeSpec, TimeSpec) =
-  var vals = val.strip().split(",")
+  let vals = val.strip().split(",")
   if vals.len < 2:
     error &"{opt} has too few arguments"
   if vals.len > 2:

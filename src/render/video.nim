@@ -440,7 +440,7 @@ proc fromImg(im: Img, like: ptr AVFrame, ctx: ptr SwsContext): ptr AVFrame =
   if av_frame_get_buffer(rgb, 32) < 0: error "Could not allocate a transition frame"
   for y in 0 ..< im.h:
     copyMem(cast[pointer](cast[int](rgb.data[0]) + y * rgb.linesize[0].int),
-      unsafeAddr im.px[y * im.w * 3], im.w * 3)
+      addr im.px[y * im.w * 3], im.w * 3)
   if AVPixelFormat(like.format).isRgb:
     rgb.colorspace = like.colorspace
     rgb.color_range = like.color_range
@@ -476,7 +476,7 @@ type YuvTag = tuple[space, range: cint]
 
 const untagged: YuvTag = (2.cint, 0.cint)
 
-func tagOf(frame: ptr AVFrame): YuvTag = (frame.colorspace, frame.color_range)
+func tagOf(frame: ptr AVFrame): YuvTag {.inline.} = (frame.colorspace, frame.color_range)
 
 func toYuv(color: RGBColor, tag: YuvTag): tuple[y, u, v: uint8] =
   ## RGB -> YUV in `tag`'s matrix and range, shared by every solid-color write
@@ -1106,9 +1106,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         st.kfInterval = kf.avgInterval
         st.hasKfIndex = kf.hasIndex
         if kf.hasIndex:
-          debug &"Source {src[]}: {kf.frames.len} keyframes indexed, avg interval: {kf.avgInterval} frames"
+          debug &"Source {src[]}: {kf.frames.len} keyframes indexed, " &
+            &"avg interval: {kf.avgInterval} frames"
         else:
-          debug &"Source {src[]}: no index entries, using estimated interval: {kf.avgInterval} frames"
+          debug &"Source {src[]}: no index entries, using estimated " &
+            &"interval: {kf.avgInterval} frames"
 
       if src == firstSrc and not st.isStill and
           encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
@@ -1204,7 +1206,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   proc bufArgsOf(frame: ptr AVFrame): string =
     ## Buffer-source args for feeding `frame` into a graph; only built when a
     ## graph is actually (re)configured, never on the per-frame reuse path.
-    &"video_size={frame.width}x{frame.height}:pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1"
+    &"video_size={frame.width}x{frame.height}:" &
+      &"pix_fmt={$AVPixelFormat(frame.format)}:time_base={graphTb}:pixel_aspect=1/1"
 
   # Scaling has stable input/output geometry, so keep one libswscale
   # context instead of sending every frame through a filter graph.
@@ -1853,7 +1856,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return (av_frame_clone(st.held), true)
 
     var frame = av_frame_clone(nullFrame)
-    var myStream: ptr AVStream = st.cn.video[0]
+    let myStream: ptr AVStream = st.cn.video[0]
     var frameIndex = st.frameIndex
     var seekThreshold = st.seekThreshold
     var seekFrame = st.seekFrame
@@ -1874,7 +1877,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       let seekTarget = if idx >= 0: ss.observedKeyframes[idx] else: 0
       if seekTarget < 0 or seekTarget > target:
         let indexInfo = if ss.hasKfIndex: &"{ss.kfFrames.len} indexed" else: "no index"
-        error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
+        error &"Cannot seek backward: no suitable keyframe found " &
+          &"(frameIndex: {frameIndex}, target: {target}, seekTarget: {seekTarget}, {indexInfo})"
       debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {target})"
       st.cn.seek(
         videoFrameToTimestamp(seekTarget, ss.frameRate, myStream.time_base) +

@@ -18,7 +18,7 @@ proc main*(args: seq[string]) =
     except IOError:
       continue
 
-    var entry = av_dict_get(formatContext.metadata, "description", nil, 0)
+    let entry = av_dict_get(formatContext.metadata, "description", nil, 0)
     try:
       if entry != nil:
         stdout.write("\n" & $entry.value & "\n\n")

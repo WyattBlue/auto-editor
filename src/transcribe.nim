@@ -208,11 +208,11 @@ else:
   proc ae_speech_free(ctx: WhisperCtx) = discard
 
 const
-  Rate = 16000            # whisper's sample rate; the graph resamples to it
-  WinSize = 480           # 30ms analysis window, matching auto-editor's chunking
+  Rate = 16000 # whisper's sample rate; the graph resamples to it
+  WinSize = 480 # 30ms analysis window, matching auto-editor's chunking
   SilenceGap = Rate div 2 # 0.5s of trailing silence ends an utterance
   PrerollMax = Rate div 5 # keep 0.2s of pre-speech audio so onsets aren't clipped
-  MinSpeech = Rate div 5  # ignore <0.2s blips (clicks, coughs)
+  MinSpeech = Rate div 5 # ignore <0.2s blips (clicks, coughs)
 
 type OutCtx = object
   f: File
@@ -360,7 +360,8 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
     discard av_channel_layout_copy(addr inLayout, layout)
     let fmtName = av_get_sample_fmt_name(fmt)
     let tb = audioStream.time_base
-    let bufferArgs = &"sample_rate={rate}:sample_fmt={fmtName}:channel_layout={layout[]}:time_base={tb.num}/{tb.den}"
+    let bufferArgs = &"sample_rate={rate}:sample_fmt={fmtName}:channel_layout={layout[]}:" &
+      &"time_base={tb.num}/{tb.den}"
 
     graph = avfilter_graph_alloc()
     if graph == nil: error "out of memory"
@@ -529,7 +530,7 @@ proc transcribeFile*(input, model, language: string, threads: int,
   ## Write `input`'s first audio stream to `output` as an .srt with a cue per
   ## word: `whisper --format srt --split-words`. `model` is a whisper or
   ## parakeet file, or "apple"; parakeet ignores `language`.
-  var container = (try: av.open(input) except IOError: error "Could not open " &
+  let container = (try: av.open(input) except IOError: error "Could not open " &
     input.extractFilename)
   defer: container.close()
   if container.audio.len == 0: error "No audio stream found"

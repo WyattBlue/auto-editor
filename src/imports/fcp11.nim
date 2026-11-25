@@ -70,7 +70,7 @@ proc attrSeconds(n: XmlNode, name: string, default = 0.0): float64 =
   let s = n.attr(name)
   if s == "": default else: seconds(s, name)
 
-func frames(r: Reader, secs: float64): int64 =
+func frames(r: Reader, secs: float64): int64 {.inline.} =
   int64(round(secs * r.tb.num.float64 / r.tb.den.float64))
 
 proc speedOf(r: var Reader, timeMap: XmlNode, inSecs: float64, dur: int64,

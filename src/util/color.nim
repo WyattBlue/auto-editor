@@ -51,7 +51,7 @@ func toRgb*(color: RGBColor, colorspace = 1, fullRange = false): RGBColor =
     return color
   let (r, g, b) = yuvToRgb(color.red.float, color.green.float, color.blue.float,
     yuvMatrix(colorspace), fullRange)
-  func toByte(v: float): uint8 = uint8(round(clamp(v, 0.0, 1.0) * 255))
+  func toByte(v: float): uint8 {.inline.} = uint8(round(clamp(v, 0.0, 1.0) * 255))
   RGBColor(red: toByte(r), green: toByte(g), blue: toByte(b))
 
 func findColor(name: string): RGBColor {.raises: [ValueError].} =
@@ -100,4 +100,5 @@ func parseColor*(hexString: string): RGBColor {.raises: [ValueError].} =
         parseHex[uint8](hexValue[4..5], result.blue) != 2:
       raise newException(ValueError, &"Invalid 6-digit hex color format: {hexString}")
   else:
-    raise newException(ValueError, &"Invalid hex color string length: {hexString}. Expected #RGB or #RRGGBB format.")
+    raise newException(ValueError,
+      &"Invalid hex color string length: {hexString}. Expected #RGB or #RRGGBB format.")

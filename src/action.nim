@@ -30,20 +30,20 @@ type
     coBottom, coTop, coCenter, coSides
 
   BurnPart* = enum  # what a burn's colors override; the order is part of atf-8
-    bpColor,   # the text
+    bpColor, # the text
     bpOutline, # its outline
-    bpBg       # a box behind each subtitle
+    bpBg # a box behind each subtitle
 
   DurUnit* = enum  # how an ease duration is measured
-    duClip,    # the whole clip/section (the default)
-    duSec,     # seconds
-    duFrames   # timeline frames
+    duClip, # the whole clip/section (the default)
+    duSec, # seconds
+    duFrames # timeline frames
 
   KfUnit* = enum  # where a timed keyframe sits; the order is part of atf-8
-    kuAuto,    # between its timed neighbors (the first and last: the section's ends)
+    kuAuto, # between its timed neighbors (the first and last: the section's ends)
     kuPercent, # percent of the section
-    kuSec,     # seconds from the section's start
-    kuFrames   # timeline frames from the section's start
+    kuSec, # seconds from the section's start
+    kuFrames # timeline frames from the section's start
   KfTime* = object
     at*: float32
     unit*: KfUnit
@@ -55,7 +55,7 @@ type
     # Easing envelope shared by every animatable action (zoom/blur/opacity/
     # brightness/volume/pos). Defaults (off, linear, whole-clip) make a static
     # action sample trivially, so non-animated actions just ignore these.
-    easeDur*: float32        # magnitude in easeDurUnit (ignored for duClip)
+    easeDur*: float32 # magnitude in easeDurUnit (ignored for duClip)
     hasEase*: bool
     easeCurve*: Easing
     easeDurUnit*: DurUnit
@@ -63,51 +63,51 @@ type
     of actInvert, actHflip, actVflip, actLoop, actErosion:
       discard
     of actChoke:
-      chokeN*: uint8         # matte-erosion passes (px to shrink the alpha matte)
+      chokeN*: uint8 # matte-erosion passes (px to shrink the alpha matte)
     of actRotate:
-      rStart*: Unorm16       # circular [0, 360) static angle (expands the canvas)
+      rStart*: Unorm16 # circular [0, 360) static angle (expands the canvas)
     of actScale:
       tScaleW*, tScaleH*: float32 # about the center
-      tUniform*: bool        # one value for both, as `scale:v` says
+      tUniform*: bool # one value for both, as `scale:v` says
     of actTurn:
-      tDeg*: float32         # clockwise about the center, without growing the frame
+      tDeg*: float32 # clockwise about the center, without growing the frame
     of actBurn, actText:
-      burnFile*: string      # the subtitles: an .srt, .ass, or a file with a text stream
-      burnFont*: string      # a font file to draw them with; "" keeps their own
-      burnSize*: float32     # text height, percent of the frame's; 0 keeps their own
+      burnFile*: string # the subtitles: an .srt, .ass, or a file with a text stream
+      burnFont*: string # a font file to draw them with; "" keeps their own
+      burnSize*: float32 # text height, percent of the frame's; 0 keeps their own
       burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
       burnAlign*: uint8
       burnVertical*: bool
       burnAss*: bool
     of actSpin:
-      sStart*: Unorm16       # circular [0, 360) start angle
-      sRate*: float32        # spin rate in degrees/second (continuous)
+      sStart*: Unorm16 # circular [0, 360) start angle
+      sRate*: float32 # spin rate in degrees/second (continuous)
     of actLens:
       k1*, k2*: Snorm16
     of actSpeed:
-      val*: float32          # the speed, or a ramp's mean speed over its media
+      val*: float32 # the speed, or a ramp's mean speed over its media
       varispeed*: bool
-      sKf*: seq[float32]     # a ramp's keyframes across its media; empty if constant
-      sKt*: seq[KfTime]      # their times (auto or percent), or empty: evenly
+      sKf*: seq[float32] # a ramp's keyframes across its media; empty if constant
+      sKt*: seq[KfTime] # their times (auto or percent), or empty: evenly
     of actZoom, actBlur, actOpacity, actBrightness, actVolume:
-      kf*: seq[float32]      # keyframes in native units; len >= 1
-      kt*: seq[KfTime]       # each keyframe's time, or empty: spread evenly
+      kf*: seq[float32] # keyframes in native units; len >= 1
+      kt*: seq[KfTime] # each keyframe's time, or empty: spread evenly
     of actDeesser:
       intensity*, maxd*, freq*: Unorm16
     of actHighpass, actLowpass:
-      cutoff*: uint16        # Hz
+      cutoff*: uint16 # Hz
     of actDehum:
-      humHz*: uint16         # the mains frequency
-      humHarmonics*: uint8   # notches at humHz and its multiples, this many
+      humHz*: uint16 # the mains frequency
+      humHarmonics*: uint8 # notches at humHz and its multiples, this many
     of actPitch:
       # Semitones x 100. Cent buckets round-trip as exact decimal semitones
       pCents*: int16
     of actTone:
-      note*: uint8           # MIDI note number; 69 = A4 = 440 Hz
-      wave*: Waveform        # timbre (sine unless given)
+      note*: uint8 # MIDI note number; 69 = A4 = 440 Hz
+      wave*: Waveform # timbre (sine unless given)
     of actConvolve:
-      irPath*: string        # impulse response file, or a folder of H_LL/H_LR/H_RL/H_RR.wav
+      irPath*: string # impulse response file, or a folder of H_LL/H_LR/H_RL/H_RR.wav
     of actDuck:
       # Cross-track sidechain: rendered at the mix stage, not in the clip chain.
       duckAmount*, duckThresh*: Unorm16  # 0..1; gain floor = 1 - amount
@@ -117,8 +117,8 @@ type
       saturation*: float32
       brighthue*: Snorm16
     of actDrawbox:
-      dbX*, dbY*, dbW*, dbH*: int32   # rectangle in pixels (x, y, width, height)
-      dbColor*: RGBColor              # outline color (RGB only)
+      dbX*, dbY*, dbW*, dbH*: int32 # rectangle in pixels (x, y, width, height)
+      dbColor*: RGBColor # outline color (RGB only)
     of actPos:
       # Overlay placement ramps: top-left x/y in canvas px and a size multiplier
       # (1.0 = native). Each is a keyframe seq (len 1 = static) like the scalars.
@@ -129,14 +129,14 @@ type
       similar*, blend*: Unorm16
     of actAberration:
       abRh*, abRv*, abGh*, abGv*, abBh*, abBv*: int8
-      abWrap*: bool          # edge: wrap around (true) vs smear the border (false)
+      abWrap*: bool # edge: wrap around (true) vs smear the border (false)
     of actMask, actConfine, actMaskPoly, actConfinePoly:
       # `mask` shapes the clip's alpha; `confine` restricts following effects to
       # this region. Shared geometry, in canvas pixels like drawbox.
-      mRadius*: int32        # corner radius px: 0=rect, >0=rounded rect, -1=ellipse
-      mReset*: bool          # confine bare: reset to full frame (region fields unused)
-      mInvert*: bool         # swap inside/outside
-      mFeather*: uint8       # soft-edge width in px (0 = hard edge)
+      mRadius*: int32 # corner radius px: 0=rect, >0=rounded rect, -1=ellipse
+      mReset*: bool # confine bare: reset to full frame (region fields unused)
+      mInvert*: bool # swap inside/outside
+      mFeather*: uint8 # soft-edge width in px (0 = hard edge)
       mX*, mY*, mW*, mH*: int32
       mPolyXs*, mPolyYs*: seq[int32]
     of actPixelate:
@@ -158,30 +158,30 @@ type
   # atf-8: store actions in as small a space as possible, inspirited by utf-8.
 
   ActionParseError* = object of CatchableError
-  ActionFlag* = enum   # capabilities of an action
+  ActionFlag* = enum # capabilities of an action
     afAudio,
     afVideo,
-    afAnimatable       # value can be a keyframe ramp (`a..b..c`) with easing
-    afGenerator        # may stand in for a file in `add:`, painting a clear canvas
+    afAnimatable # value can be a keyframe ramp (`a..b..c`) with easing
+    afGenerator # may stand in for a file in `add:`, painting a clear canvas
   ActionFlags* = set[ActionFlag]
 
   RangeDoc* = object
     ## An interval of allowed values.
     lo*, hi*: float
-    loIncl*, hiIncl*: bool  # closed (inclusive) bounds
-    each*: bool             # the interval applies to each positional arg
+    loIncl*, hiIncl*: bool # closed (inclusive) bounds
+    each*: bool # the interval applies to each positional arg
   ArgKind* = enum
     ## What an action argument is written as.
-    akNumber,    # a decimal number
-    akInteger,   # a whole number
-    akColor,     # a color name, #rgb, #rrggbb, #rrggbbaa, or yuv#YYUUVV where taken
-    akChoice,    # one of `choices`
-    akPath,      # a file or folder
-    akText,      # free text
+    akNumber, # a decimal number
+    akInteger, # a whole number
+    akColor, # a color name, #rgb, #rrggbb, #rrggbbaa, or yuv#YYUUVV where taken
+    akChoice, # one of `choices`
+    akPath, # a file or folder
+    akText, # free text
     akKeyframes, # a number or a ramp `a..b..c`, each optionally `@time`
-    akFlag,      # present or not, written as its bare name
-    akDuration,  # a time: a frame count, or with a unit like `2sec`
-    akPoints     # x/y pairs, `x1/y1/x2/y2/...`
+    akFlag, # present or not, written as its bare name
+    akDuration, # a time: a frame count, or with a unit like `2sec`
+    akPoints # x/y pairs, `x1/y1/x2/y2/...`
   ArgDef* = object
     ## One argument of an action. Positional arguments come in order;
     ## `keyword` ones are written `name=value`, anywhere after them.
@@ -189,7 +189,7 @@ type
     kind*: ArgKind
     range*: Option[RangeDoc] # every value, for keyframes; parseAction rejects others
     optional*: bool
-    default*: string         # as written, when leaving it out means a value
+    default*: string # as written, when leaving it out means a value
     keyword*: bool
     choices*: seq[string]
     unit*: string
@@ -873,19 +873,19 @@ type
     of akNumber, akInteger: num*: float64
     of akKeyframes:
       kf*: seq[float64]
-      kt*: seq[KfTime]     # each keyframe's time, or empty when none has one
+      kt*: seq[KfTime] # each keyframe's time, or empty when none has one
     of akColor, akChoice, akPath, akText:
-      str*: string         # as written, after it parses; text and paths unescaped
+      str*: string # as written, after it parses; text and paths unescaped
     of akDuration:
-      dur*: float64        # seconds for duSec, frames for duFrames
+      dur*: float64 # seconds for duSec, frames for duFrames
       durUnit*: DurUnit
-    of akFlag: on*: bool   # confetti's `shimmer` is a `no-shimmer` that's off
+    of akFlag: on*: bool # confetti's `shimmer` is a `no-shimmer` that's off
     of akPoints: pts*: seq[int32] # x1, y1, x2, y2, ...
   SpecEase* = object
     ## An animated action's `:ease=curve[:duration]`.
     curve*: Easing
-    dur*: float64          # in `unit`; 0 for duClip
-    unit*: DurUnit         # duClip when no duration is written
+    dur*: float64 # in `unit`; 0 for duClip
+    unit*: DurUnit # duClip when no duration is written
   ActionSpec* = object
     ## An action as written, before toAction packs it. `args` lines up with
     ## its ActionDef's, none where an argument isn't written. Numbers are
@@ -1067,10 +1067,10 @@ proc shapeSpec(parts: seq[string], name: string): ActionSpec {.
   ## Fields take positional or `key=value` form (freely mixed); `invert` is a
   ## bare flag. radius: 0 = rect, >0 = rounded-rect corner px, -1 = ellipse.
   const slots = ["x", "y", "w", "h", "radius", "feather"]  # positional order
-  var vals: array[6, int]            # x, y, w, h, radius, feather
+  var vals: array[6, int] # x, y, w, h, radius, feather
   var seen: array[6, bool]
   var inv = false
-  var nextPos = 0                    # next unfilled positional slot
+  var nextPos = 0 # next unfilled positional slot
 
   func slotOf(key: string): int =
     case key
@@ -2001,8 +2001,8 @@ when not defined(nimscript):
     CodecMode = enum cmSize, cmWrite, cmRead
     Codec[M: static CodecMode] = object
       base: ptr UncheckedArray[uint8]
-      head, pos: int            # the action's header byte, and the next field
-      tooMany, unpaired: bool   # ramps that can't be packed, found when sizing
+      head, pos: int # the action's header byte, and the next field
+      tooMany, unpaired: bool # ramps that can't be packed, found when sizing
     KfStore = enum ksF32, ksUnorm16, ksSnorm16, ksPixel
 
   proc raw[M, T](c: var Codec[M], v: var T) =
@@ -2285,7 +2285,7 @@ when not defined(nimscript):
     for a in list:
       # Sizing only reads the action, so it goes by address, not a copy.
       var c = Codec[cmSize](pos: 1)
-      c.code((unsafeAddr a)[])
+      c.code((addr a)[])
       # Keyframe counts are packed into one byte; a wrapped count would
       # misalign every later field on decode.
       if c.tooMany:
@@ -2303,7 +2303,7 @@ when not defined(nimscript):
     for a in list:
       base[i] = uint8(ord(a.kind))
       var c = Codec[cmWrite](base: base, head: i, pos: i + 1)
-      c.code((unsafeAddr a)[])
+      c.code((addr a)[])
       i = c.pos
     Actions(cast[int](p))
 

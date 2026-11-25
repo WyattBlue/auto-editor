@@ -232,7 +232,9 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   let averageGop = averageGopFrames(keyframes, sourceEnd)
   if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
     let label = codecId.codecLabel
-    debug &"Skipping {label} partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {plan.len} spans would not offset {stats.encodeRuns} encoder runs"
+    debug &"Skipping {label} partial-lossless rendering: copying " &
+      &"{stats.copiedFrames}/{tl.len} frames across {plan.len} spans " &
+      &"would not offset {stats.encodeRuns} encoder runs"
     return
   return plan
 
@@ -289,7 +291,7 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
       bytes
   let sourceParameterSets =
     if header.len == 0: newSeq[uint8]()
-    else: parameterSetsFor(codecId, unsafeAddr header[0], header.len)
+    else: parameterSetsFor(codecId, addr header[0], header.len)
 
   let stats = smartPlanStats(spans)
   if stats.copiedFrames == 0:
@@ -297,19 +299,19 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     error &"Partial-lossless {label} renderer selected without a complete GOP"
 
   let outputStream = output.addStreamFromTemplate(sourceStream)
-  let sourceAnnexB = header.len > 0 and isAnnexB(unsafeAddr header[0], header.len)
+  let sourceAnnexB = header.len > 0 and isAnnexB(addr header[0], header.len)
   if sourceAnnexB and isNal:
     # The muxer reads Annex B extradata as Annex B samples, but every sample
     # here is length-prefixed, so it gets an avcC or hvcC instead.
     let record =
-      if codecId == ID_H264: annexBToAvcC(unsafeAddr header[0], header.len)
-      else: annexBToHvcC(unsafeAddr header[0], header.len)
+      if codecId == ID_H264: annexBToAvcC(addr header[0], header.len)
+      else: annexBToHvcC(addr header[0], header.len)
     let par = outputStream.codecpar
     av_freep(addr par.extradata)
     par.extradata = cast[ptr uint8](av_mallocz(csize_t(record.len + 64)))
     if par.extradata == nil:
       error &"Could not allocate {label} header"
-    copyMem(par.extradata, unsafeAddr record[0], record.len)
+    copyMem(par.extradata, addr record[0], record.len)
     par.extradata_size = record.len.cint
   if sourceStream.metadata != nil:
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
@@ -331,7 +333,9 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
   let sourceDelay = max(sourceStream.codecpar.video_delay, 0).int64
   templateInput.close()
 
-  debug &"Using {label} partial-lossless rendering: copying {stats.copiedFrames}/{tl.len} frames across {spans.len} spans and {stats.encodeRuns} encoder runs"
+  debug &"Using {label} partial-lossless rendering: copying " &
+    &"{stats.copiedFrames}/{tl.len} frames across {spans.len} spans " &
+    &"and {stats.encodeRuns} encoder runs"
 
   return (outputStream, iterator(): (ptr AVPacket, int64) =
     let frameTb = av_inv_q(tl.tb)

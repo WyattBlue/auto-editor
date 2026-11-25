@@ -10,16 +10,16 @@ func allowsCodec*(self: Rules, codecId: AVCodecID): bool =
   var tag: cuint = 0
   return av_codec_get_tag2(self.ofmt.codec_tag, codecId, addr tag) > 0
 
-func format*(self: Rules): ptr AVOutputFormat =
+func format*(self: Rules): ptr AVOutputFormat {.inline.} =
   self.ofmt
 
-func defaultVid*(self: Rules): AVCodecID =
+func defaultVid*(self: Rules): AVCodecID {.inline.} =
   self.ofmt.video_codec
 
-func defaultAud*(self: Rules): AVCodecID =
+func defaultAud*(self: Rules): AVCodecID {.inline.} =
   self.ofmt.audio_codec
 
-proc defaultSub*(self: Rules): AVCodecID =
+proc defaultSub*(self: Rules): AVCodecID {.inline.} =
   if self.ofmt.name == "mp4": ID_MOV_TEXT else: self.ofmt.subtitle_codec
 
 func holdsVideo*(name: string): bool =

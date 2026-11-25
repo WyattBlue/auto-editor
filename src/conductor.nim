@@ -73,7 +73,7 @@ proc parseExportString*(exportStr: string): ExportSpec {.raises: [AutoEditorErro
     if i >= paramsStr.len:
       break
 
-    var paramStart = i
+    let paramStart = i
     while i < paramsStr.len and paramsStr[i] notin {'=', ','}:
       inc i
 
@@ -195,10 +195,10 @@ func exportExt(ext: string, myExport: ExportKind, hasVideo: bool): string =
     else: ext
 
 type OutputPlan* = object
-  path*: string       ## where to write
+  path*: string ## where to write
   kind*: ExportKind
   formatName*: string ## a name whose extension picks the container
-  dropsVideo*: bool   ## the named container can't hold the timeline's video
+  dropsVideo*: bool ## the named container can't hold the timeline's video
 
 func planOutput*(userOut: string, `export`: ExportKind, path: string,
     isUrl, hasVideo, device: bool): OutputPlan {.raises: [AutoEditorError].} =
@@ -258,7 +258,7 @@ func planOutput*(userOut: string, `export`: ExportKind, path: string,
     result.formatName = result.path
 
 type DeviceMux* = object
-  fragment*: bool  ## the container must be fragmented to be readable
+  fragment*: bool ## the container must be fragmented to be readable
   warning*: string ## an option that had to be dropped, or ""
 
 func deviceMux*(format: string, pipe, faststart, noFragmented: bool): DeviceMux
@@ -542,7 +542,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
       var appended: Table[(int, int), Actions]
 
       for i in 0 ..< args.inputs.len:
-        var container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
+        let container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
         defer: container.close()
 
         if i == 0 and args.frameRate == AVRational(num: 0, den: 0):
@@ -721,7 +721,7 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   defer: interner.cleanup()
   defer: freeActions(args, tlV3)
 
-  if args.progress == BarType.machine and args.output != "-":
+  if args.progress == machine and args.output != "-":
     conwrite "Starting"
 
   let bar = initBar(args.progress)
@@ -916,7 +916,7 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
   bar.destroy()
 
   let seconds = round(epochTime() - startTime, 2)
-  notice &"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})"
+  notice &"Finished. took {seconds} seconds ({toTimecode(seconds, display)})"
 
   if args.noOpen or device:
     discard

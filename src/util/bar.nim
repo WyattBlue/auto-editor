@@ -45,12 +45,12 @@ type
     progress: Atomic[float]
     total: Atomic[float]
     shouldStop: Atomic[bool]
-    paused: Atomic[bool]   # set by end() to halt writes
+    paused: Atomic[bool] # set by end() to halt writes
     sleeping: Atomic[bool] # set by worker to acknowledge it isn't writing
     title: string
     lenTitle: int
     begin: float
-    config: ptr BarConfig  # Share constant config via pointer
+    config: ptr BarConfig # Share constant config via pointer
 
   ProgressHook* = proc (title: string, current, total: float) {.nimcall, gcsafe, raises: [].}
 
@@ -75,10 +75,10 @@ proc createBarString(config: BarConfig, progress: float, width: int): string =
   let partCharFinal = if width - wholeWidth - 1 < 0: "" else: partChar
 
   result = config.brackets.left &
-           config.chars[^1].repeat(wholeWidth) &
-           partCharFinal &
-           config.chars[0].repeat(max(0, width - wholeWidth - 1)) &
-           config.brackets.right
+    config.chars[^1].repeat(wholeWidth) &
+    partCharFinal &
+    config.chars[0].repeat(max(0, width - wholeWidth - 1)) &
+    config.brackets.right
 
 proc formatProgressOutput(config: BarConfig, title: string, lenTitle, columns: int,
     progress, rate, begin, currentIndex, total: float): string =
@@ -163,17 +163,17 @@ proc initBar*(barType: BarType): Bar =
   var hide = false
 
   case barType:
-  of BarType.classic:
+  of classic:
     icon = "⏳"
     chars = @["░", "█"]
     brackets = (left: "[", right: "]")
-  of BarType.ascii:
+  of ascii:
     icon = "& "
     chars = @["-", "#"]
     brackets = (left: "[", right: "]")
   of BarType.machine:
     machine = true
-  of BarType.none:
+  of none:
     hide = true
   else:
     discard # Use default modern style

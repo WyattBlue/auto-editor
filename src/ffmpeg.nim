@@ -452,7 +452,7 @@ func `$`*(layout: ptr AVChannelLayout): string =
   else:
     result = "unknown"
 
-template `$`*(layout: AVChannelLayout): string = $(unsafeAddr layout)
+template `$`*(layout: AVChannelLayout): string = $(addr layout)
 func `$`*(layout: ref AVChannelLayout): string = $(addr layout[])
 
 proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
@@ -466,7 +466,7 @@ proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
   # deep copy here would leak a custom-order layout's heap map (and its
   # ENOMEM result would go unchecked). uninit frees dest's old map first.
   av_channel_layout_uninit(addr dest)
-  copyMem(addr dest, unsafeAddr src, sizeof(AVChannelLayout))
+  copyMem(addr dest, addr src, sizeof(AVChannelLayout))
 
 type
   # https://ffmpeg.org/doxygen/8.0/structAVFrame.html

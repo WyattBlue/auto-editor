@@ -1,6 +1,6 @@
 import std/[algorithm, heapqueue, options, sequtils, sets, strformat, strutils]
 from std/math import round
-import ../[action, av, ffmpeg, license, log, media, throttle, timeline]
+import ../[action, av, ffmpeg, license, log, media, timeline]
 import ../util/[bar, rational, rules]
 import ./[asyncenc, audio, partialplan, subtitle, video]
 
@@ -139,7 +139,6 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
   defer:
     for i in sourceEffectCount ..< renderTl.effects.len:
       renderTl.effects[i].free()
-  var throttle = initThrottle()
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
@@ -579,7 +578,6 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
             (outputStream == vOutStream or vOutStream == nil):
           let time = float(packet.pts) * float(packet.time_base)
           bar.tick(round(time * tl.tb))
-          throttle.checkpoint(time)
         output.mux(packet[])
         var ownedPacket = packet
         av_packet_free(addr ownedPacket)
@@ -604,7 +602,6 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
           let time = frame.time(encCtx.time_base)
           if time != -1.0:
             bar.tick(round(time * tl.tb))
-            throttle.checkpoint(time)
         output.mux(outPacket[])
         av_packet_unref(outPacket)
 

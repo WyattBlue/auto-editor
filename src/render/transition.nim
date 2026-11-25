@@ -106,13 +106,13 @@ func fbm(x, y: float32, seed: uint32): float32 =
     amp *= 0.5
   result /= 0.9375
 
-func newImg(w, h: int): Img = Img(w: w, h: h, px: newSeq[uint8](w * h * 3))
+func newImg(w, h: int): Img {.inline.} = Img(w: w, h: h, px: newSeq[uint8](w * h * 3))
 func newImgUninit(w, h: int): Img =
   ## For a picture whose every pixel is about to be written.
   Img(w: w, h: h, px: newSeqUninit[uint8](w * h * 3))
 
 template pixels(im: Img): ptr UncheckedArray[uint8] =
-  cast[ptr UncheckedArray[uint8]](im.px[0].unsafeAddr)
+  cast[ptr UncheckedArray[uint8]](im.px[0].addr)
 
 func get(im: Img, x, y: int): C {.inline.} =
   let x = max(0, min(x, im.w - 1))
@@ -239,8 +239,8 @@ proc mixImg(a, b: Img, t: float32): Img =
   if t == 0 or a.px.len == 0: return a
   if t == 1: return b
   result = Img(w: a.w, h: a.h, px: newSeqUninit[uint8](a.px.len))
-  let pa = cast[ptr UncheckedArray[uint8]](a.px[0].unsafeAddr)
-  let pb = cast[ptr UncheckedArray[uint8]](b.px[0].unsafeAddr)
+  let pa = cast[ptr UncheckedArray[uint8]](a.px[0].addr)
+  let pb = cast[ptr UncheckedArray[uint8]](b.px[0].addr)
   let pd = cast[ptr UncheckedArray[uint8]](result.px[0].addr)
   let rowBytes = a.w * 3
   # Byte by byte, as `mix` and `put` do per channel, in a flat loop the
@@ -279,7 +279,7 @@ proc boxBlur(im: Img, rx, ry: int): Img =
     return im
   let (w, h) = (im.w, im.h)
   var across: Img
-  var src = unsafeAddr im
+  var src = addr im
   if rx > 0:
     across = blurAcross(src, rx, 0, w - 1)
     src = addr across
@@ -358,7 +358,7 @@ proc grow(im: Img, w, h: int): Img =
     let ih = im.h
     eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
       let (sp, dp, sw, w, ih) = (sp, dp, sw, w, ih)
-      let cp = cast[ptr UncheckedArray[tuple[a, b, wa, wb: int]]](cols[0].unsafeAddr)
+      let cp = cast[ptr UncheckedArray[tuple[a, b, wa, wb: int]]](cols[0].addr)
       for y in y0 ..< y1:
         let t = growTaps(ih, y)
         let (ra, rb, o) = (t.a * sw, t.b * sw, y * w * 3)
@@ -702,7 +702,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       let row = min(rows - 1, int(y.float32 / bh))
       let delay = float32(col + row) / float32(cols + rows - 2) * 0.5'f32
       let t = easeInOut(clamp01((p - delay) / 0.5'f32))
-      let src = (if t < 0.5: a.unsafeAddr else: b.unsafeAddr)
+      let src = (if t < 0.5: a.addr else: b.addr)
       let s = (if t < 0.5: 1 - 2 * t else: 2 * t - 1)
       let ccx = (col.float32 + 0.5'f32) * bw
       let ccy = (row.float32 + 0.5'f32) * bh
@@ -718,7 +718,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let vertical = kind == tk3dSpinback
     let shrink = (if kind == tkFlipMotion: 0'f32 else: 0.25'f32 * bell(p))
     let first = angle < PI / 2
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     let ang = (if first: angle else: angle - PI.float32)
     result.eachPixel(w, h):
       let sx = (x.float32 + 0.5'f32 - fw / 2) / (1 - shrink) + fw / 2
@@ -745,7 +745,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkPopMotion:
     let first = p < 0.5'f32
     let s = (if first: 1 - easeInBack(2 * p) else: easeOutBack(2 * p - 1))
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     result.eachPixel(w, h):
       c = (if s > 1e-3: under.placeOver(src[], x, y, s, s, 0, 0, 0)
            else: under.get(x, y))
@@ -755,7 +755,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let grow = (if kind == tkPullMotion: 1.5'f32 else: 0.6'f32)
     let s = 1 + q * grow
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     var scaled: Img
     scaled.eachPixel(w, h):
       c = src[].sample((x.float32 + 0.5'f32 - fw / 2) / s + fw / 2,
@@ -770,7 +770,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
     let angle = (if first: q else: -q) * PI.float32
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     var turnedImg: Img
     turnedImg.eachPixel(w, h):
       c = under.placeOver(src[], x, y, 1 + 0.4'f32 * q, 1 + 0.4'f32 * q, angle, 0, 0)
@@ -817,8 +817,8 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         hi[ord(fromB)] = max(hi[ord(fromB)], c1)
       # Together the two pictures show one frame's width, so blur only the
       # columns each is read at.
-      if rx > 0 and lo[0] <= hi[0]: amOwn = blurAcross(a.unsafeAddr, rx, lo[0], hi[0])
-      if rx > 0 and lo[1] <= hi[1]: bmOwn = blurAcross(b.unsafeAddr, rx, lo[1], hi[1])
+      if rx > 0 and lo[0] <= hi[0]: amOwn = blurAcross(a.addr, rx, lo[0], hi[0])
+      if rx > 0 and lo[1] <= hi[1]: bmOwn = blurAcross(b.addr, rx, lo[1], hi[1])
       let pa = (if amOwn.px.len > 0: amOwn.pixels else: a.pixels)
       let pb = (if bmOwn.px.len > 0: bmOwn.pixels else: b.pixels)
       type Tap = tuple[src: ptr UncheckedArray[uint8], o0, o1: int, tx: float32]
@@ -831,7 +831,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       # Straight from the bytes, with `mix` and `put`'s steps in their order.
       eachRows(h, proc (y0, y1: int) {.closure, gcsafe.} =
         let (dp, w) = (dp, w)
-        let tp = cast[ptr UncheckedArray[Tap]](taps[0].unsafeAddr)
+        let tp = cast[ptr UncheckedArray[Tap]](taps[0].addr)
         for y in y0 ..< y1:
           let row = y * w * 3
           for x in 0 ..< w:
@@ -846,8 +846,8 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       if rx > 0:
         amOwn = a.motion(speed, 0)
         bmOwn = b.motion(speed, 0)
-      let am = (if rx > 0: addr amOwn else: a.unsafeAddr)
-      let bm = (if rx > 0: addr bmOwn else: b.unsafeAddr)
+      let am = (if rx > 0: addr amOwn else: a.addr)
+      let bm = (if rx > 0: addr bmOwn else: b.addr)
       result.eachPixel(w, h):
         let xx = (x.float32 + 0.5'f32 - fw / 2) / dip + fw / 2
         let yy = (y.float32 + 0.5'f32 - fh / 2) / dip + fh / 2
@@ -869,7 +869,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       if kind != tkVhsDamage and abs(p - 0.5'f32) < 0.3'f32 and
           hashi(band, step + 99, seed) < amp * 0.6'f32:
         useB = not useB
-      let src = (if useB: b.unsafeAddr else: a.unsafeAddr)
+      let src = (if useB: b.addr else: a.addr)
       var dx = 0'f32
       case kind
       of tkChaos:
@@ -907,7 +907,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     let r = hashi(frame, 0, seed)
     let showB = r < smooth(0.15, 0.85, p) or p > 0.85'f32
     let flash = 1 + bell(p) * (hashi(frame, 1, seed) - 0.3'f32) * 0.9'f32
-    let src = (if showB: b.unsafeAddr else: a.unsafeAddr)
+    let src = (if showB: b.addr else: a.addr)
     result.eachPixel(w, h):
       c = src[].get(x, y) * flash
 
@@ -977,7 +977,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         let phi = (k[2] - 180 * i.float32) * PI.float32 / 180 - turn
         instants[j].side[i] = KaleidoSide(mx: mx, my: my, f0x: f0x, f0y: f0y,
           r0: r0, cs: cos(phi), sn: sin(phi), scale: k[3 + i] / k[1] * fh)
-    let pics = [a.unsafeAddr, b.unsafeAddr]
+    let pics = [a.addr, b.addr]
     result.eachPixel(w, h):
       let qx = (x.float32 + 0.5'f32 - fw / 2) / fh
       let qy = (y.float32 + 0.5'f32 - fh / 2) / fh
@@ -1025,7 +1025,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkTvPower:
     let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     let sy = max(0.004'f32, 1 - clamp01(q / 0.6'f32))
     let sx = max(0.004'f32, 1 - clamp01((q - 0.6'f32) / 0.4'f32))
     let boost = 1 + q * 1.5'f32
@@ -1071,7 +1071,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkVrMobiusZoom:
     let k = bell(p)
     let mixed = mixImg(a, b, mid)
-    let src = mixed.unsafeAddr
+    let src = mixed.addr
     result.eachPixel(w, h):
       let dx = (u - 0.5'f32) * fw / fh
       let dy = v - 0.5'f32
@@ -1084,7 +1084,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkBurnChroma:
     let ex = bell(p) * 3
     let mixed = mixImg(a, b, mid)
-    let src = mixed.unsafeAddr
+    let src = mixed.addr
     result.eachPixel(w, h):
       let cc = src[].get(x, y)
       let gains = [1 + ex * 1.3'f32, 1 + ex, 1 + ex * 0.7'f32]
@@ -1230,7 +1230,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkMotionCamera:
     let first = p < 0.5'f32
     let q = (if first: easeIn(2 * p) else: 1 - easeOut(2 * p - 1))
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     let angle = (if first: 1'f32 else: -1'f32) * q * 0.12'f32
     var moved: Img
     moved.eachPixel(w, h):
@@ -1310,7 +1310,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         let hh = fh * scale / 2
         if abs(px) < hw + border and abs(py) < hh + border:
           if abs(px) < hw and abs(py) < hh:
-            let src = (if side == 0: unsafeAddr a else: unsafeAddr b)
+            let src = (if side == 0: addr a else: addr b)
             c = src[].sample(px / scale + fw / 2, py / scale + fh / 2)
           else:
             c = white
@@ -1323,7 +1323,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
       let t = clamp01((p * 1.4'f32 - i.float32 / n.float32 * 0.4'f32))
       let angle = PI.float32 * easeInOut(t)
       let first = angle < PI / 2
-      let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+      let src = (if first: a.addr else: b.addr)
       let k = abs(cos(angle))
       let cx = (i.float32 + 0.5'f32) * sw
       let off = (x.float32 + 0.5'f32 - cx) / max(k, 1e-3)
@@ -1483,7 +1483,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkDipToBlackLegacy, tkDipToWhiteLegacy:
     let dip = (if kind == tkDipToBlackLegacy: black else: white)
     let first = p < 0.5'f32
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     let k = (if first: 2 * p else: 2 - 2 * p)
     result.eachPixel(w, h):
       c = mix(src[].get(x, y), dip, k)
@@ -1571,7 +1571,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
   of tkCrossZoomLegacy:
     # Zooms into the outgoing picture, then out of the incoming one.
     let z = 1 + 3 * (1 - abs(2 * p - 1))
-    let src = (if p < 0.5'f32: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if p < 0.5'f32: a.addr else: b.addr)
     var zoomed: Img
     zoomed.eachPixel(w, h):
       c = src[].sample((x.float32 + 0.5'f32 - fw / 2) / z + fw / 2,
@@ -1614,7 +1614,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
     # its back.
     let angle = PI.float32 * p
     let first = angle < PI / 2
-    let src = (if first: a.unsafeAddr else: b.unsafeAddr)
+    let src = (if first: a.addr else: b.addr)
     let ang = (if first: angle else: angle - PI.float32)
     result.eachPixel(w, h):
       let (cc, cover) = src[].turned(x.float32 + 0.5'f32, y.float32 + 0.5'f32,
@@ -1664,7 +1664,7 @@ proc render*(kind: TransitionKind, a, b, under: Img, p: float32, frame,
         let fv = dy * t
         if abs(fu) > fw / 2 or abs(fv) > fh / 2: continue
         bestT = t
-        let src = (if face == 0: a.unsafeAddr else: b.unsafeAddr)
+        let src = (if face == 0: a.addr else: b.addr)
         c = src[].sample(fu + fw / 2, fv + fh / 2)
 
   of tkConstantPower, tkExponentialFade:

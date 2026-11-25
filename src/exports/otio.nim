@@ -90,12 +90,10 @@ proc speedEffect(scalar: float): JsonNode =
     "time_scalar": scalar
   }
 
-proc opacityEffect(rate: float, pct: float): JsonNode =
+proc opacityEffect(rate: float, pct: float): JsonNode {.inline.} =
   effectNode("AE.ADBE Opacity", "Opacity", "", true, jarr(
     startParam("Opacity", 1, %pct, rate),
-    startParam("Blend Mode", 2, %18, rate),
-    startParam("Blend Mode", 3, %0, rate),
-  ))
+    startParam("Blend Mode", 2, %18, rate), startParam("Blend Mode", 3, %0, rate)))
 
 proc rotationParam(actions: Actions, srcStart, srcDur: float, clipDur: int,
     rate: float): JsonNode =
@@ -258,41 +256,33 @@ proc opacityFor(actions: Actions, srcStart, srcDur: float, clipDur: int,
       return effectNode("AE.ADBE Opacity", "Opacity", "", true, jarr(
         %*{"DisplayName": "Opacity", "ID": 1,
            "Keyframes": opacityKeyframes(a, srcStart, srcDur, clipDur, rate)},
-        startParam("Blend Mode", 2, %18, rate),
-        startParam("Blend Mode", 3, %0, rate),
-      ))
+        startParam("Blend Mode", 2, %18, rate), startParam("Blend Mode", 3, %0, rate)))
   opacityEffect(rate, 100.0)
 
-proc invertEffect(rate: float): JsonNode =
+proc invertEffect(rate: float): JsonNode {.inline.} =
   effectNode("AE.ADBE Invert", "Invert", "", false, jarr(
-    startParam("Channel", 1, %0, rate),
-    startParam("Blend With Original", 2, %0.0, rate),
-  ))
+    startParam("Channel", 1, %0, rate), startParam("Blend With Original", 2, %0.0, rate)))
 
-proc hflipEffect(): JsonNode =
+proc hflipEffect(): JsonNode {.inline.} =
   effectNode("AE.ADBE Horizontal Flip", "Horizontal Flip", "", false, newJArray())
 
-proc vflipEffect(): JsonNode =
+proc vflipEffect(): JsonNode {.inline.} =
   effectNode("AE.ADBE Vertical Flip", "Vertical Flip", "", false, newJArray())
 
-proc volumeEffect(): JsonNode =
+proc volumeEffect(): JsonNode {.inline.} =
   effectNode("Internal Volume Stereo", "Volume", "", true, jarr(
-    keyframeParam("Mute", 0),
-    keyframeParam("Level", 1),
-  ))
+    keyframeParam("Mute", 0), keyframeParam("Level", 1)))
 
-proc clipPanner(rate: float): JsonNode =
+proc clipPanner(rate: float): JsonNode {.inline.} =
   effectNode("PanProcessor", "Panner", "Panner", false, jarr(
     startParam("Balance", 0, %0.5, rate),
   ))
 
-proc audioFaderEffect(): JsonNode =
+proc audioFaderEffect(): JsonNode {.inline.} =
   effectNode("AudioFader", "Track", "", false, jarr(
-    keyframeParam("Volume", 0),
-    keyframeParam("Mute", 1),
-  ))
+    keyframeParam("Volume", 0), keyframeParam("Mute", 1)))
 
-proc trackPanner(): JsonNode =
+proc trackPanner(): JsonNode {.inline.} =
   effectNode("PanProcessor", "Panner", "Panner", false, jarr(
     keyframeParam("Balance", 0),
   ))

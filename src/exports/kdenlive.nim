@@ -26,11 +26,11 @@ type Kdenlive = object
   tb: AVRational
   globalOut: string # the timeline's length as a timecode
   aChannels, vChannels: int
-  uniquePaths: seq[string]       # sources in order of first appearance
+  uniquePaths: seq[string] # sources in order of first appearance
   sourceIds: Table[string, string] # path -> kdenlive:id
   pathDuration: Table[string, float64]
   chains, playlists, filterId, transitionId: int
-  clipPlaylists: seq[XmlNode]    # two sub-playlists per track
+  clipPlaylists: seq[XmlNode] # two sub-playlists per track
   trackTractors: seq[XmlNode]
   # (track, source path) -> chain id, per track type
   audioChainOf, videoChainOf: Table[(int, string), int]
@@ -38,7 +38,7 @@ type Kdenlive = object
 
 const zeroTc = "00:00:00.000"
 
-func nch(k: Kdenlive): int = k.aChannels + k.vChannels
+func nch(k: Kdenlive): int {.inline.} = k.aChannels + k.vChannels
 
 func warpedProducerId(k: Kdenlive, w, channel: int): string =
   ## Producer ids for warped clips are a pure function of the clip's index in
@@ -46,7 +46,7 @@ func warpedProducerId(k: Kdenlive, w, channel: int): string =
   ## from entries cannot drift apart.
   &"producer{1 + w * k.nch + channel}"
 
-proc tcf(k: Kdenlive, f: int64): string = toTimecode(f.float / k.tb.float, standard)
+proc tcf(k: Kdenlive, f: int64): string {.inline.} = toTimecode(f.float / k.tb.float, standard)
 
 proc element(tag: string, attrs: openArray[(string, string)]): XmlNode =
   result = newElement(tag)
@@ -224,8 +224,10 @@ proc addVideoEffects(k: var Kdenlive, parent: XmlNode, effects: Actions,
         ("av.t", $max(effect.dbW, effect.dbH)), ("av.replace", "0")])
     of actPixelate:
       k.addFilter(parent, "avfilter.pixelize", [
-        ("av.width", mltAnimValue(effect, effect.pixWKf, effect.pixWKt, clipDur, fps, asInt = true)),
-        ("av.height", mltAnimValue(effect, effect.pixHKf, effect.pixHKt, clipDur, fps, asInt = true)),
+        ("av.width",
+          mltAnimValue(effect, effect.pixWKf, effect.pixWKt, clipDur, fps, asInt = true)),
+        ("av.height",
+          mltAnimValue(effect, effect.pixHKf, effect.pixHKt, clipDur, fps, asInt = true)),
         ("av.mode", "avg"), ("av.planes", "7")], anim(effect, inTc, outTc))
     of actAberration:
       k.addFilter(parent, "avfilter.rgbashift", [

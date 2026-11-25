@@ -6,11 +6,11 @@ import ../[action, log, timeline]
 
 type
   LayerRule = enum
-    lrAll        # every layer is written
-    lrBase       # only the base layer
+    lrAll # every layer is written
+    lrBase # only the base layer
     lrSameSource # the base, plus layers that only use the base's files: the
                  # editor reads those streams from the files it already has
-    lrFirst      # the first layer, when it only uses the base's files
+    lrFirst # the first layer, when it only uses the base's files
 
   Support = object
     actions: set[ActionKind]

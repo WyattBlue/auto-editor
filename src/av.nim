@@ -307,7 +307,7 @@ type InputContainer* = object
   subtitle*: seq[ptr AVStream]
 
 proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises: [IOError].} =
-  var ret = avformat_open_input(addr result, file, nil, nil)
+  let ret = avformat_open_input(addr result, file, nil, nil)
   if ret == AVERROR(ENOENT):
     raise newException(IOError, &"Input file doesn't exist: {file}")
   elif ret == AVERROR_INVALIDDATA:
@@ -383,7 +383,7 @@ proc scanVideoLength*(formatCtx: ptr AVFormatContext, video: ptr AVStream): AVRa
 
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
-  var formatCtx = container.formatContext
+  let formatCtx = container.formatContext
   discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
 
   if container.audio.len > 0:
@@ -482,7 +482,7 @@ iterator flushDecode*(container: InputContainer, index: cint,
   ## before sending more packets, so we never hit AVERROR(EAGAIN) on send, which would
   ## silently drop the packet.
   var ret: cint
-  var packet = container.packet
+  let packet = container.packet
   var flushed = false
 
   while true:
@@ -511,8 +511,8 @@ proc startPts*(container: InputContainer, stream: ptr AVStream): int64 =
   container.formatContext.startPts(stream)
 
 proc seek*(container: InputContainer, offset: int64, stream: ptr AVStream = nil) =
-  var flags: cint = AVSEEK_FLAG_BACKWARD
-  var streamIndex: cint = (if stream == nil: -1 else: stream.index)
+  let flags: cint = AVSEEK_FLAG_BACKWARD
+  let streamIndex: cint = (if stream == nil: -1 else: stream.index)
   if av_seek_frame(container.formatContext, streamIndex, offset, flags) < 0:
     error "Error seeking frame"
   # Callers need to call `avcodec_flush_buffers()` after.
@@ -785,7 +785,7 @@ proc startEncoding*(self: var OutputContainer) =
     let option = self.options.items[i]
     discard av_dict_set(addr options, option.key.cstring, option.value.cstring, 0)
 
-  var ret = avformat_write_header(outputCtx, addr options)
+  let ret = avformat_write_header(outputCtx, addr options)
   if ret < 0:
     error &"Write header: {av_err2str(ret)}"
 
@@ -873,7 +873,7 @@ iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame,
     packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
 
-  var ret = avcodec_send_frame(encoderCtx, frame)
+  let ret = avcodec_send_frame(encoderCtx, frame)
   if ret < 0:
     error &"Error sending frame to encoder: {ret}"
 

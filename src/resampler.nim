@@ -122,7 +122,8 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     let extraArgs =
       if frame.pts != AV_NOPTS_VALUE: ":time_base=" & $frame.time_base
       else: ""
-    let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={frame.ch_layout}{extraArgs}"
+    let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:" &
+      &"channel_layout={frame.ch_layout}{extraArgs}"
 
     var ret = avfilter_graph_create_filter(addr resampler.abuffer, abuffer, nil,
         abufferArgs.cstring, nil, resampler.graph)
@@ -130,7 +131,8 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       error "Could not create abuffer"
 
     let outputFormatName = getFormatName(resampler.format)
-    let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={resampler.layout}"
+    let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:" &
+      &"channel_layouts={resampler.layout}"
 
     var aformatCtx: ptr AVFilterContext = nil
     ret = avfilter_graph_create_filter(addr aformatCtx, aformat, nil,

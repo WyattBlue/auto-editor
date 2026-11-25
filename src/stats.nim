@@ -9,7 +9,7 @@ type f64 = float64
 
 func timeFrame[T: int64 | f64](title: string, ticks: T, tb: f64,
     per: string = ""): string =
-  let tc = toTimecode(ticks.f64 / tb, Code.ass)
+  let tc = toTimecode(ticks.f64 / tb, ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
   let endStr = (if per == "": "" else: " " & alignLeft(per, 7))

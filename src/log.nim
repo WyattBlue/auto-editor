@@ -24,8 +24,8 @@ type
     version*: uint8
 
   TimeKind* = enum
-    tkFrames   ## whole frames at the timeline's rate
-    tkMillis   ## milliseconds
+    tkFrames ## whole frames at the timeline's rate
+    tkMillis ## milliseconds
     tkTimecode ## SMPTE timecode, counted at the timeline's rate
   TimeSpec* = object
     ## A time as written, made into frames once the timeline's rate is known.
@@ -74,12 +74,12 @@ type
     of nkNull:
       discard
     of nkEbu:
-      i*: float32    # -70.0 to 5.0, default -24.0
-      lra*: float32  # 1.0 to 50.0, default 7.0
-      tp*: float32   # -9.0 to 0.0, default -2.0
+      i*: float32 # -70.0 to 5.0, default -24.0
+      lra*: float32 # 1.0 to 50.0, default 7.0
+      tp*: float32 # -9.0 to 0.0, default -2.0
       gain*: float32 # -99.0 to 99.0, default 0.0
     of nkPeak:
-      t*: float32    # -99.0 to 0.0, default -8.0
+      t*: float32 # -99.0 to 0.0, default -8.0
 
 func `==`*(a, b: Norm): bool {.raises: [].} =
   if a.kind != b.kind: return false
@@ -205,8 +205,8 @@ type mainArgs* = object
   output*: string = ""
   setAction*: seq[(Actions, TimeSpec, TimeSpec)]
   markers*: seq[SourceMarker] # in the inputs' frames end to end, like setActionConcat
-  adds*: seq[AddSpec]                             # `add:` overlays (see AddSpec)
-  layers*: seq[LayerSpec]                         # library-only overlays
+  adds*: seq[AddSpec] # `add:` overlays (see AddSpec)
+  layers*: seq[LayerSpec] # library-only overlays
   transition*: TimeSpec = frames(0) # 0 disables; otherwise its duration
   transitionMinCut*: TimeSpec = millis(1000)
   placedTransitions*: seq[PlacedTransition] # library-only: chosen in an editor

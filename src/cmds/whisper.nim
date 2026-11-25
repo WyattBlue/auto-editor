@@ -116,7 +116,7 @@ proc main*(cArgs: seq[string]) =
   if isMic:
     when defined(macosx) or defined(windows) or
         (defined(linux) and not defined(emscripten)):
-      var micInput = openMic()
+      let micInput = openMic()
       fmtCtx = micInput.formatContext
       audioStream = micInput.audioStream
       # Capture buffers from here on, so speech during the (seconds-long) model

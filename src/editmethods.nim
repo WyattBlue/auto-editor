@@ -10,13 +10,13 @@ type
     emVideo, emAudio, emSubtitle
 
   EditParam* = object
-    name*: string    ## positional argument name, e.g. "threshold"
-    typ*: string     ## doc type, e.g. "(U Natural 'all)"
+    name*: string ## positional argument name, e.g. "threshold"
+    typ*: string ## doc type, e.g. "(U Natural 'all)"
     default*: string ## doc default; "" means the argument is required
 
   EditMethodDef* = object
     names*: seq[string] ## canonical name first, then aliases (share parsing)
-    media*: EditMedia   ## which stream the method analyzes
+    media*: EditMedia ## which stream the method analyzes
     params*: seq[EditParam]
     help*: string
 

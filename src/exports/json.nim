@@ -63,7 +63,7 @@ func transitionsToJson(tracks: seq[seq[Transition]]): JsonNode {.raises: [].} =
     result.add arr
 
 func `%`(self: v1): JsonNode {.raises: [].} =
-  var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
+  let jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
   return %* {
     "version": "1",
     "source": self.source,

@@ -32,7 +32,7 @@ proc openPreview*(args: sink mainArgs, startSeconds, scale: float64,
   ## `scale` of the timeline's frame size. Audio comes stereo at the
   ## timeline's rate, without normalization (which measures the whole
   ## timeline first). Owns `args` (its actions are freed on `close`).
-  var r = PreviewRender(args: args)
+  let r = PreviewRender(args: args)
   # ffv1 never encodes; it only settles the pixel format.
   let video = VideoSettings(codec: "ffv1", scale: scale)
   let built = buildTimeline(r.args, AudioSettings(layout: "stereo"), r.interner,

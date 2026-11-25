@@ -38,7 +38,7 @@ proc saveCache[T](filename: string, data: seq[T]) =
     fs.write(uint8(codecOf(T)))
     fs.write(data.len.int32)
     if data.len > 0:
-      fs.writeData(unsafeAddr data[0], data.len * sizeof(T))
+      fs.writeData(addr data[0], data.len * sizeof(T))
     fs.close()
     # close ignores fclose's result, so the last buffered chunk can be lost
     # to a full disk without an error; only the size shows it.
@@ -78,7 +78,7 @@ proc loadCache[T](filename: string): seq[T] =
 
 # Non-generic so `version` (referenced via the `&` macro) binds; it won't
 # inside a generic proc body.
-proc cacheDir(): string = getTempDir() / &"ae-{version}"
+proc cacheDir(): string {.inline.} = getTempDir() / &"ae-{version}"
 proc cacheFilePath(path: AbsPath, tb: AVRational, kind, args: string): string =
   cacheDir() / &"{procTag(path, tb, kind, args)}.bin"
 

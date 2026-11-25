@@ -187,10 +187,10 @@ proc normalizeLengthPrefixed*(packet: ptr AVPacket,
   if av_new_packet(packet, total.cint) < 0:
     error "Could not allocate normalized " & label & " packet"
   if parameterSets.len > 0:
-    copyMem(packet.data, unsafeAddr parameterSets[0], parameterSets.len)
+    copyMem(packet.data, addr parameterSets[0], parameterSets.len)
   if payload.len > 0:
     copyMem(cast[pointer](cast[int](packet.data) + parameterSets.len),
-      unsafeAddr payload[0], payload.len)
+      addr payload[0], payload.len)
   packet.pts = pts
   packet.dts = dts
   packet.duration = duration

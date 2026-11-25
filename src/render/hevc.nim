@@ -216,7 +216,7 @@ proc hevcSupportsPartialLossless*(format: cint, encoder: ptr AVCodec,
   ## it has none (MPEG-TS).
   if not encoder.encoderSupports(AVPixelFormat(format)) or header.len == 0:
     return false
-  let extra = unsafeAddr header[0]
+  let extra = addr header[0]
   # Annex B sources get their samples and an hvcC rewritten as they copy.
   if startCodeLen(cast[ptr UncheckedArray[uint8]](extra), header.len, 0) > 0:
     return annexBToHvcC(extra, header.len).len > 0

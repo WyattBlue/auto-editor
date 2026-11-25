@@ -49,7 +49,7 @@ func initLexer*(filename, text: string): Lexer =
   result.pos = 0
   result.`char` = (if text.len == 0: '\0' else: text[0])
 
-func sourceText*(self: Lexer): lent string =
+func sourceText*(self: Lexer): lent string {.inline.} =
   self.text
 
 func sourceText*(expr: Expr, text: string): string =
@@ -141,7 +141,7 @@ proc eat(self: var Parser) {.raises: [ValueError].} =
   self.currentToken = self.nextToken
   self.nextToken = self.lexer.getNextToken()
 
-func peek(self: Parser): Token =
+func peek(self: Parser): Token {.inline.} =
   self.nextToken
 
 func atomText*(expr: Expr, text: string): string {.raises: [ValueError].} =

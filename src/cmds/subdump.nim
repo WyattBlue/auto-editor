@@ -54,7 +54,7 @@ type SubtitleCue* = tuple[start, stop: float64, text: string] ## seconds
 proc readCues(path: string): seq[SubtitleCue] =
   ## The cues of the first subtitle stream in `path` that has any text; empty
   ## when it has none or can't be read.
-  var container = (try: av.open(path) except IOError: return)
+  let container = (try: av.open(path) except IOError: return)
   defer: container.close()
   for i, st in container.subtitle:
     # The previous stream left the demuxer at EOF. Some demuxers (srt) can't

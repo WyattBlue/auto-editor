@@ -222,7 +222,7 @@ proc initGapFiller*(stream: ptr AVStream): GapFiller =
     bytesPerFrame = (bits div 8) * par.ch_layout.nb_channels
   initGapFiller(stream.time_base, par.sample_rate, bytesPerFrame)
 
-proc hasPending*(g: GapFiller): bool = g.pending != nil
+proc hasPending*(g: GapFiller): bool {.inline.} = g.pending != nil
 
 proc feed*(g: var GapFiller, src: ptr AVPacket) =
   ## Take ownership of the next captured packet; `emit` hands it back, after

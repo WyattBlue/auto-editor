@@ -310,10 +310,10 @@ type Importer = object
   audioStreams: Table[ptr string, int] # probed audio stream counts
   dropped: CountTable[string]
 
-func frames(im: Importer, tc: Timecode, drop: bool): int64 =
+func frames(im: Importer, tc: Timecode, drop: bool): int64 {.inline.} =
   toFrames(tc, im.base, tc.drop or drop)
 
-func rec(im: Importer, tc: Timecode, drop: bool): int64 =
+func rec(im: Importer, tc: Timecode, drop: bool): int64 {.inline.} =
   im.frames(tc, drop) - im.startFrames
 
 proc speedOf(im: var Importer, ev: Event, reel: string): float64 =
@@ -327,7 +327,8 @@ proc speedOf(im: var Importer, ev: Event, reel: string): float64 =
       return
     let speed = abs(fps) / im.base.float64
     if speed != speed or speed < 0.0001 or speed > 1000.0:
-      warning &"EDL motion line for reel {reel} has an unusable speed ({fps}); the clip keeps normal speed"
+      warning &"EDL motion line for reel {reel} has an unusable speed ({fps}); " &
+        "the clip keeps normal speed"
       return
     if fps < 0: im.dropped.inc "reversed clip"
     return speed
@@ -448,7 +449,7 @@ proc importEvent(im: var Importer, ev: Event) =
     im.lay(line, t0, t1 - t0, im.frames(line.tcs[0], drop), speed,
       im.effectsFor(speed))
 
-proc resolvePath(name, edlDir: string): string =
+proc resolvePath(name, edlDir: string): string {.inline.} =
   if name.isAbsolute: name else: edlDir / name
 
 proc resolveSources(p: var Parsed, edlDir: string, interner: var StringInterner) =

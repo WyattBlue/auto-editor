@@ -260,7 +260,7 @@ proc makeFiledef(files: var FileDefs, clipitem: XmlNode, mi: MediaInfo,
 proc dissolveItem(t: Transition, mediaType: string, timebase: int64,
     ntsc: string): XmlNode
 
-func channelsOf(mi: MediaInfo, stream: int16): int =
+func channelsOf(mi: MediaInfo, stream: int16): int {.inline.} =
   if stream >= 0 and stream.int < mi.a.len: max(1, mi.a[stream].channels.int) else: 1
 
 type ResolveAudioIds = seq[seq[seq[int]]] # [layer][channel][clip] -> clipitem id; 0 if none

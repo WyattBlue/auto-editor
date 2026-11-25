@@ -113,7 +113,7 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
   # @ 48kHz read 1602 samples into a 1601-sample buffer).
   result.maxBufferSize = int(ceil(result.exactSize))
   let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount,
-                             result.maxBufferSize.cint, result.targetFormat, 0)
+      result.maxBufferSize.cint, result.targetFormat, 0)
   if ret < 0:
     error "Could not allocate read buffer"
 
@@ -262,10 +262,7 @@ proc readChannelPeaks(iter: AudioIterator,
       if v < minV: minV = v
       if v > maxV: maxV = v
       i += iter.channelCount
-    result[outputIndex] = (
-      float32(minV) / 32768.0'f32,
-      float32(maxV) / 32768.0'f32,
-    )
+    result[outputIndex] = (float32(minV) / 32768.0'f32, float32(maxV) / 32768.0'f32)
 
 proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
@@ -273,7 +270,7 @@ proc flushResampler(iter: AudioIterator) =
 
   for flushedFrame in flushedFrames:
     let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr flushedFrame.data[0]),
-                                flushedFrame.nb_samples)
+        flushedFrame.nb_samples)
     if ret < flushedFrame.nb_samples:
       error "Could not write flushed data to FIFO"
     av_frame_free(addr flushedFrame)

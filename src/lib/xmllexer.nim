@@ -149,7 +149,7 @@ proc addRun(dest: var string, buf: string, first, last: int) {.inline.} =
   if n > 0:
     let old = dest.len
     dest.setLen(old + n)
-    copyMem(addr dest[old], unsafeAddr buf[first], n)
+    copyMem(addr dest[old], addr buf[first], n)
 
 func skipNewline(L: XmlLexer, pos: int): int {.inline.} =
   ## Past the newline at `pos`, CR LF counting as one.

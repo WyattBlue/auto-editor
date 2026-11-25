@@ -112,8 +112,8 @@ func clamp16(v: int32): int16 {.inline.} =
   int16(max(-32768'i32, min(32767'i32, v)))
 
 const
-  toneTableLen = 2048  # one cycle; lerp error at this size is below -110 dBFS
-  tonePeak = 8191.0    # -12 dBFS, so four stacked layers sum without clipping
+  toneTableLen = 2048 # one cycle; lerp error at this size is below -110 dBFS
+  tonePeak = 8191.0 # -12 dBFS, so four stacked layers sum without clipping
 
 proc toInt16(frame: ptr AVFrame, srcStart, count: int, dst: var seq[int16],
     dstStart, dstChannels: int): bool =
@@ -411,7 +411,7 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
   let bufferArgs = &"sample_rate={sr}:sample_fmt=s16p:channel_layout={layout}:time_base=1/{sr}"
   var bufferSrc: ptr AVFilterContext = nil
   var ret = avfilter_graph_create_filter(addr bufferSrc, abuffer, nil,
-                                         bufferArgs.cstring, nil, filterGraph)
+      bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
     error &"Cannot create audio buffer source: {ret}"
 
@@ -421,9 +421,9 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
     error &"Cannot create audio buffer sink: {ret}"
 
   var filters: seq[string] = @[]
-  var rate = 1.0   # asetrate
-  var tempo = 1.0  # atempo
-  var at = -1      # track asetrate/atempo's position
+  var rate = 1.0 # asetrate
+  var tempo = 1.0 # atempo
+  var at = -1 # track asetrate/atempo's position
   for effect in effects:
     case effect.kind
     of actSpeed:
@@ -442,7 +442,7 @@ proc createFilterGraph(effects: openArray[Action], sr: cint,
   var speedFx: seq[string] = @[]
   if rate != 1.0:
     speedFx.add &"asetrate={sr}*{rate}"
-    speedFx.add &"aresample={sr}"  # asetrate leaves the rate changed
+    speedFx.add &"aresample={sr}" # asetrate leaves the rate changed
   speedFx.add atempoChain(tempo)
   if speedFx.len > 0:
     let i = max(at, 0)
@@ -1352,7 +1352,8 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
 
     of nkEbu:
       let layoutDesc = $tl.layout
-      let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout={layoutDesc}:time_base=1/{sr}"
+      let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout={layoutDesc}:" &
+        &"time_base=1/{sr}"
 
       # First pass: stream chunks through loudnorm to measure loudness.
       let capture = beginLoudnormCapture()
@@ -1393,14 +1394,17 @@ proc makeAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices:
           measuredLRA = parseLoudnormValue(jsonData, "input_lra")
           measuredTP = parseLoudnormValue(jsonData, "input_tp")
           measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
-          debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
+          debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} " &
+            &"tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
         except JsonParsingError, KeyError, ValueError:
           error "Error processing loudnorm output"
       else:
         error "Error processing loudnorm output"
 
       # Second pass: stream chunks through loudnorm applying the measured gain.
-      let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
+      let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:" &
+        &"measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:" &
+        &"measured_thresh={measuredThresh}:print_format=none"
       debug &"EBU norm: {secondPass}"
       var loudnormGraph = newGraph()
       let bufferSrc = loudnormGraph.add("abuffer", bufferArgs)

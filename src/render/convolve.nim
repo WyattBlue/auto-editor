@@ -8,7 +8,7 @@ type
     taps: seq[seq[seq[float32]]]
 
   Spectra = ref object # shared with the cache, which every clip reads
-    n: int     # FFT size
+    n: int # FFT size
     blockLen: int # input samples per FFT, so a block plus the IR tail fits in n
     h: seq[seq[seq[AVComplexFloat]]]
 
@@ -117,7 +117,7 @@ proc loadIR(path: string, sr: cint, channels: int): IRMatrix =
   if channels == 2: stereo else: fold(stereo, channels)
 
 proc newTx(inv: bool, n: int, scale: float32): (ptr AVTXContext, av_tx_fn) =
-  var s = scale
+  let s = scale
   if av_tx_init(addr result[0], addr result[1], AV_TX_FLOAT_RDFT, cint(inv),
       n.cint, addr s, AV_TX_UNALIGNED) < 0:
     error "Could not set up the FFT"

@@ -8,12 +8,12 @@ type
   EditMethodKind* = enum
     ekAudio, ekMotion, ekBlackdetect,
     ekSubtitle ## a regex over subtitle lines (`subtitle`, `regex`)
-    ekWord     ## a whole word in subtitle lines
-    ekNone     ## every frame active
-    ekAll      ## no frame active
+    ekWord ## a whole word in subtitle lines
+    ekNone ## every frame active
+    ekAll ## no frame active
 
   EditMethod* = object
-    stream*: int        ## -1 is every audio stream (audio only)
+    stream*: int ## -1 is every audio stream (audio only)
     threshold*: Unorm16 ## audio, motion, blackdetect
     case kind*: EditMethodKind
     of ekAudio:
