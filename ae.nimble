@@ -8,7 +8,6 @@ bin = @["main=auto-editor"]
 
 # Dependencies
 requires "nim >= 2.2.2"
-requires "nimcrypto == 0.7.3"
 
 # Tasks
 import std/[os, strutils, strformat, sequtils]

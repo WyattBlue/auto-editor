@@ -9,11 +9,8 @@
 
 import ./constants
 
-import nimcrypto/[hash, sha2]
-import nimcrypto/utils as ncrutils
-
-# This workaround needed because of some bugs in Nim Static[T].
-export hash, sha2
+from std/strutils import parseHexStr
+import ../../lib/sha
 
 proc safeConvert*[T: SomeInteger](value: SomeOrdinal): T =
   type S = typeof(value)
@@ -1597,7 +1594,10 @@ proc init*(key: var EdPublicKey, data: string): bool =
   ## representation ``data``.
   ##
   ## Procedure returns ``true`` on success.
-  init(key, ncrutils.fromHex(data))
+  let bytes =
+    try: parseHexStr(data)
+    except ValueError: return false
+  init(key, bytes.toOpenArrayByte(0, bytes.high))
 
 
 proc verify*[T: byte | char](
@@ -1608,7 +1608,6 @@ proc verify*[T: byte | char](
   ##
   ## Return ``true`` if message verification succeeded, ``false`` if
   ## verification failed.
-  var ctx: sha512
   var rcheck: array[32, byte]
   var a: GeP3
   var r: GeP2
@@ -1620,15 +1619,15 @@ proc verify*[T: byte | char](
   if geFromBytesNegateVartime(a, key.data.toOpenArray(0, 31)) != 0:
     return false
 
-  ctx.init()
+  var ctx = initSha512()
   ctx.update(sig.data.toOpenArray(0, 31))
   ctx.update(key.data.toOpenArray(0, 31))
   ctx.update(message)
   var hash = ctx.finish()
-  scReduce(hash.data)
+  scReduce(hash)
 
   geDoubleScalarMultVartime(
-    r, hash.data.toOpenArray(0, 31), a, sig.data.toOpenArray(32, 63)
+    r, hash.toOpenArray(0, 31), a, sig.data.toOpenArray(32, 63)
   )
   geToBytes(rcheck, r)
 

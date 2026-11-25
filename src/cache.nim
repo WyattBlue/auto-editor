@@ -1,7 +1,6 @@
 import std/[algorithm, options, os, streams, strformat, strutils, times]
-import nimcrypto/sha
 import ./[about, ffmpeg, log]
-import ./lib/dnorm16
+import ./lib/[dnorm16, sha]
 import ./util/[fun, rational]
 
 type CacheCodec = enum
@@ -20,10 +19,11 @@ proc procTag(path: AbsPath, tb: AVRational, kind, args: string): string =
   let mtime = info.lastWriteTime
   let key = &"{$path}:{mtime.toUnix():x}.{mtime.nanosecond:x}:" &
     &"{info.size:x}:{tb}:{args}"
-  var ctx: sha1
-  ctx.init()
+  var ctx = initSha1()
   ctx.update(key)
-  return ($ctx.finish())[0..<16].toLowerAscii() & kind
+  let digest = ctx.finish()
+  for i in 0 ..< 8: result.add toHex(digest[i], 2)
+  result = result.toLowerAscii() & kind
 
 # Levels are cached in their in-memory form (Unorm16 / Snorm16 / float32) and
 # blasted to/from disk in bulk. A leading codec byte makes each file self-
