@@ -431,9 +431,10 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
       av_packet_unref(encodedPacket)
 
     template send(f: ptr AVFrame) =
-      for encodedPacket in encoder.encode(f, packet):
+      let sentFrame: ptr AVFrame = f
+      for encodedPacket in encoder.encode(sentFrame, packet):
         receive(encodedPacket)
-      if f != nil: inc sent
+      if sentFrame != nil: inc sent
 
     # The frames to encode for run `genRun`, one at a time.
     var genRun = 0
