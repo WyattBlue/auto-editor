@@ -602,13 +602,14 @@ proc addTransitions*(tl: var v3, kind: TransitionKind, requested: int64,
   for i in 0 ..< tl.a.len: tl.at[i] = build(tl.a[i], audioKind)
   tl.validateTransitions()
 
-proc sliceClip*(tl: var v3, index: var EffectIndex, clip: Clip, lo, hi: int64): Clip =
+proc sliceClip*(tl: var v3, index: var EffectIndex, map: SpeedMap, clip: Clip,
+    lo, hi: int64): Clip =
   ## The part of `clip` from timeline frame `lo` to `hi`, which may reach past
-  ## its ends. A speed ramp is cut down to the media that part covers.
+  ## its ends. A speed ramp is cut down to the media that part covers. `map`
+  ## is the clip's own, for a caller that slices it more than once.
   result = clip
   result.start = lo
   result.dur = hi - lo
-  let map = initSpeedMap(tl.effects[clip.effects])
   if not map.ramp:
     result.offset = clip.offset + (lo - clip.start)
     return
@@ -633,6 +634,9 @@ proc sliceClip*(tl: var v3, index: var EffectIndex, clip: Clip, lo, hi: int64): 
   let media = map.mean * (clip.offset.float + clip.dur.float * u0)
   result.offset = int64(round(media / mean))
   result.effects = index.intern(tl.effects, newActions(actions))
+
+proc sliceClip*(tl: var v3, index: var EffectIndex, clip: Clip, lo, hi: int64): Clip =
+  tl.sliceClip(index, initSpeedMap(tl.effects[clip.effects]), clip, lo, hi)
 
 func spanStart*(t: Transition): int64 =
   ## First timeline frame of the transition's span.
@@ -836,11 +840,13 @@ proc bakeTransitions*(source: v3): v3 =
       else:
         fadeOutStart = clipEnd
 
+      # Once per clip, not per part: a ramp's map takes 512 speed lookups.
+      let speedMap = initSpeedMap(tl.effects[original.effects])
       template addPart(lo, hi: int64, fadeIn, fadeOut: bool) =
         if hi > lo:
           var part = clip
-          if initSpeedMap(tl.effects[original.effects]).ramp:
-            part = tl.sliceClip(effectIndex, original, lo, hi)
+          if speedMap.ramp:
+            part = tl.sliceClip(effectIndex, speedMap, original, lo, hi)
           else:
             part.start = lo
             part.offset = clip.offset + (lo - clip.start)
