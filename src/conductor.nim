@@ -493,6 +493,7 @@ type BuiltTimeline* = object
   tl*: v3
   usePath*: string ## the media input to name outputs after, if any
   mi*: MediaInfo
+  lengths*: MediaLengths ## of the inputs whose length the edit had to find
 
 proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
     interner: var StringInterner, bar: Bar): BuiltTimeline =
@@ -501,6 +502,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
   var tlV3: v3
   var usePath = ""
   var mi: MediaInfo
+  var lengths: MediaLengths
   var markersPlaced = false
   if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
@@ -550,7 +552,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
             if avgFr.isValid:
               tb = makeSaneTimebase(avgFr)
 
-        var labels = interpretEdit(args, container, args.inputs[i], tb, bar)
+        var labels = interpretEdit(args, container, args.inputs[i], tb, bar, lengths)
         let tbf = tb.float64
         let startMargin = toTb(args.margin[0], tbf)
         let endMargin = toTb(args.margin[1], tbf)
@@ -590,10 +592,8 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
           actionMap[lw.label] = lw.action
         var actionIndex: seq[int] = labels.map(proc(x: uint8): int = int(x))
 
-        var conLen = 0
-        proc getConLen(): int =
-          if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
-          conLen
+        template conLen(): int =
+          int(round((lengths.mediaLength(container, args.inputs[i]) * tb).float64))
 
         for sIdx in 0 ..< args.setAction.len:
           let actionRange = args.setAction[sIdx]
@@ -605,9 +605,9 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
               let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
               if hi > lo:
                 remapRange(actionIndex, (frames(lo), frames(hi)), tbf, remap,
-                  getConLen())
+                  conLen)
             else:
-              remapRange(actionIndex, span, tbf, remap, getConLen())
+              remapRange(actionIndex, span, tbf, remap, conLen)
           else:
             # A set-action range is an explicit override, conceptually distinct
             # from the `-w:0`/`-w:1` (silent/normal) sections. Give it a unique
@@ -624,9 +624,9 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
               let hi = min(toTb(span[1], tbf) - concatOffset, labels.len)
               if hi > lo:
                 applyToRange(actionIndex, (frames(lo), frames(hi)), tbf, aIdx,
-                  getConLen())
+                  conLen)
             else:
-              applyToRange(actionIndex, span, tbf, aIdx, getConLen())
+              applyToRange(actionIndex, span, tbf, aIdx, conLen)
             if i == 0:
               for a in args.adds.mitems:
                 if a.setActionRef == sIdx:
@@ -659,7 +659,7 @@ proc buildTimeline*(args: var mainArgs, audio: AudioSettings,
 
   if args.markers.len > 0 and not markersPlaced:
     warning "Markers in source time only apply to media inputs; left out"
-  BuiltTimeline(tl: tlV3, usePath: usePath, mi: mi)
+  BuiltTimeline(tl: tlV3, usePath: usePath, mi: mi, lengths: lengths)
 
 type EditPlan* = object
   ## Every cut of an edit, without rendering it.
@@ -751,7 +751,7 @@ proc editMedia*(args: var mainArgs, inputVideo: VideoSettings, audio: AudioSetti
     (output, formatName) = (plan.path, plan.formatName)
 
   if args.preview:
-    preview(tlV3)
+    preview(tlV3, built.lengths)
     return
 
   # Writing over a file while it's still being read loses it.

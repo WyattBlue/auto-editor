@@ -319,27 +319,28 @@ proc parseEdit*(source: string, filename = "--edit"): EditExpr =
     error "Should never happen"
   toExpr(expr, parser.lexer.sourceText)
 
-func frameCount(container: InputContainer, tb: AVRational): int =
-  round((mediaLength(container) * tb).float64).int
+proc frameCount(lengths: var MediaLengths, container: InputContainer,
+    input: string, tb: AVRational): int =
+  round((lengths.mediaLength(container, input) * tb).float64).int
 
 proc evalEdit(e: EditExpr, container: InputContainer, input: string,
-    tb: AVRational, bar: Bar): seq[bool] =
+    tb: AVRational, bar: Bar, lengths: var MediaLengths): seq[bool] =
   ## Which frames of `input` at `tb` `e` marks active.
   case e.op
   of eoOr:
-    result = evalEdit(e.operands[0], container, input, tb, bar)
+    result = evalEdit(e.operands[0], container, input, tb, bar, lengths)
     for i in 1 ..< e.operands.len:
-      result = result or evalEdit(e.operands[i], container, input, tb, bar)
+      result = result or evalEdit(e.operands[i], container, input, tb, bar, lengths)
   of eoAnd:
-    result = evalEdit(e.operands[0], container, input, tb, bar)
+    result = evalEdit(e.operands[0], container, input, tb, bar, lengths)
     for i in 1 ..< e.operands.len:
-      result = result and evalEdit(e.operands[i], container, input, tb, bar)
+      result = result and evalEdit(e.operands[i], container, input, tb, bar, lengths)
   of eoXor:
-    result = evalEdit(e.operands[0], container, input, tb, bar)
+    result = evalEdit(e.operands[0], container, input, tb, bar, lengths)
     for i in 1 ..< e.operands.len:
-      result = result xor evalEdit(e.operands[i], container, input, tb, bar)
+      result = result xor evalEdit(e.operands[i], container, input, tb, bar, lengths)
   of eoNot:
-    return not evalEdit(e.operands[0], container, input, tb, bar)
+    return not evalEdit(e.operands[0], container, input, tb, bar, lengths)
   of eoMethod:
     let m = e.m
     case m.kind
@@ -352,7 +353,7 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
         # A file with no audio, like a still image, is as quiet as silent
         # footage, so it follows the same cut or keep rules.
         debug &"audio: {input} has no audio stream, treating it as silent"
-        return newSeq[bool](frameCount(container, tb))
+        return newSeq[bool](lengths.frameCount(container, input, tb))
       if m.stream == -1:
         var matched = false
         var undecodable = 0
@@ -410,14 +411,15 @@ proc evalEdit(e: EditExpr, container: InputContainer, input: string,
         return val2
       return val
     of ekNone:
-      return newSeqWith(frameCount(container, tb), true)
+      return newSeqWith(lengths.frameCount(container, input, tb), true)
     of ekAll:
-      return newSeq[bool](frameCount(container, tb))
+      return newSeq[bool](lengths.frameCount(container, input, tb))
 
 proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
-    tb: AVRational, bar: Bar): seq[uint8] =
+    tb: AVRational, bar: Bar, lengths: var MediaLengths): seq[uint8] =
+  ## `lengths` takes the input's length if the edit had to find it.
   # Label 1: the default `--edit` method. Maps the boolean mask onto 0/1.
-  let base = evalEdit(args.edit, container, input, tb, bar)
+  let base = evalEdit(args.edit, container, input, tb, bar, lengths)
   result = newSeq[uint8](base.len)
   for i in 0 ..< base.len:
     if base[i]:
@@ -427,10 +429,15 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
   # be longer than the running result (e.g. differing stream lengths); extend
   # with 0 (silent) so the merge covers every sample.
   for le in args.labeledEdits:
-    let mask = evalEdit(le.expr, container, input, tb, bar)
+    let mask = evalEdit(le.expr, container, input, tb, bar, lengths)
     if mask.len > result.len:
       result.setLen(mask.len)
     let lbl = uint8(le.label)
     for i in 0 ..< mask.len:
       if mask[i] and lbl > result[i]:
         result[i] = lbl
+
+proc interpretEdit*(args: mainArgs, container: InputContainer, input: string,
+    tb: AVRational, bar: Bar): seq[uint8] =
+  var lengths: MediaLengths
+  interpretEdit(args, container, input, tb, bar, lengths)

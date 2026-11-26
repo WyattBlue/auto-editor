@@ -1,4 +1,4 @@
-import std/[sets, strformat, strutils]
+import std/[sets, strformat, strutils, tables]
 from std/math import round
 import ./[action, av, ffmpeg, log, timeline]
 import ./lib/cliputil
@@ -66,14 +66,20 @@ func allCuts(tl: v3, inLen: int64): seq[int64] =
   cutLengths(clipSpans, inLen)
 
 
-proc preview*(tl: var v3) =
+proc preview*(tl: var v3, lengths: MediaLengths) =
+  ## `lengths` are those the edit already found, which spares reading those
+  ## sources again.
   conwrite ""
 
   var inputLength: int64 = 0
   for src in tl.uniqueSources:
-    let container = (try: av.open(src[]) except IOError as e: error e.msg)
-    defer: container.close()
-    let mediaLength: AVRational = container.mediaLength()
+    var mediaLength: AVRational
+    if src[] in lengths:
+      mediaLength = lengths[src[]]
+    else:
+      let container = (try: av.open(src[]) except IOError as e: error e.msg)
+      defer: container.close()
+      mediaLength = container.mediaLength()
     inputLength += round((mediaLength * tl.tb).f64).int64
 
   let outputLength = tl.len

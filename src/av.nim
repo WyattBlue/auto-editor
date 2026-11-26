@@ -427,6 +427,16 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   error "No audio or video stream found"
 
+type MediaLengths* = Table[string, AVRational]
+  ## Lengths in seconds by path, for one edit: finding one reads the file.
+
+proc mediaLength*(lengths: var MediaLengths, container: InputContainer,
+    path: string): AVRational =
+  ## `container`'s length, it being the file at `path`, read once per path.
+  if path notin lengths:
+    lengths[path] = container.mediaLength()
+  lengths[path]
+
 var decodeErrors* {.threadvar.}: int ## per thread, as a job's hooks are
 
 proc noteDecodeError*(msg: string) {.raises: [].} =
