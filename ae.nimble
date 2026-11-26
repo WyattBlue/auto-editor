@@ -18,6 +18,8 @@ let disableHevc = getEnv("DISABLE_HEVC").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0
 let enableLibass = getEnv("DISABLE_LIBASS").len == 0
+# Off unless asked for: only the GUI app writes WebP.
+let enableWebp = getEnv("ENABLE_WEBP").len > 0
 
 let
   nativeBuildPath = absolutePath("build")
@@ -287,6 +289,19 @@ let libass = Package(
     "-Dcompare=disabled", "-Dprofile=disabled", "-Dfuzz=disabled",
     "-Dcheckasm=disabled", "-Dlibunibreak=enabled"],
 )
+let webp = Package(
+  name: "libwebp",
+  sourceUrl: "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz",
+  sha256: "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564",
+  buildSystem: "cmake",
+  # The libraries alone: libwebpmux is what encodes an animation.
+  buildArguments: @["-DWEBP_BUILD_ANIM_UTILS=OFF", "-DWEBP_BUILD_CWEBP=OFF",
+    "-DWEBP_BUILD_DWEBP=OFF", "-DWEBP_BUILD_GIF2WEBP=OFF",
+    "-DWEBP_BUILD_IMG2WEBP=OFF", "-DWEBP_BUILD_VWEBP=OFF",
+    "-DWEBP_BUILD_WEBPINFO=OFF", "-DWEBP_BUILD_WEBPMUX=OFF",
+    "-DWEBP_BUILD_EXTRAS=OFF", "-DWEBP_BUILD_LIBWEBPMUX=ON"],
+  ffFlag: "--enable-libwebp",
+)
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-9.1.tar.xz",
@@ -318,6 +333,8 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
     result.add svtav1
   if not disableHevc and not isWasm:
     result.add x265
+  if enableWebp and not isWasm:
+    result.add webp
   return result
 
 func location(package: Package): string =
@@ -1055,6 +1072,9 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       enableEncoders.add "libsvtav1"
     if package.name == "amf-headers" and not isCrossWasm:
       enableEncoders &= ["h264_amf", "hevc_amf", "av1_amf"]
+    if package.name == "libwebp":
+      enableEncoders &= ["libwebp", "libwebp_anim"]
+      enableMuxers.add "webp"
 
   let isMacNative = defined(macosx) and kind == native
   let isWindows = kind in [winX64, winArm] or (defined(windows) and kind == native)
@@ -1141,7 +1161,9 @@ proc setupDeps =
     exec "pip install " & toInstall.join(" ")
 
 task downloaddeps, "Download and Extract Cxx Dependencies":
-  let allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, bwlame, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libunibreak, libass]
+  var allPackages = @[ffmpeg, nvheaders, amfheaders, alsa, libvpl, whisper, bwlame, opus, dav1d, x264, zlib, vpx, svtav1, x265, freetype, fribidi, harfbuzz, libunibreak, libass]
+  if enableWebp:
+    allPackages.add webp
   mkDir "ffmpeg_sources"
   withDir "ffmpeg_sources":
     for package in allPackages:

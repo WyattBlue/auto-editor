@@ -6,6 +6,7 @@ var enableHevc = getEnv("DISABLE_HEVC").len == 0 and not defined(emscripten)
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 var enableLibass = getEnv("DISABLE_LIBASS").len == 0
+var enableWebp = getEnv("ENABLE_WEBP").len > 0 and not defined(emscripten)
 
 when defined(danger) or defined(release):
   switch("panics", "on")
@@ -121,6 +122,8 @@ if not defined(dynamic):
     switch("passL", "-lSvtAv1Enc")
   if enableHevc:
     switch("passL", "-lx265")
+  if enableWebp:
+    switch("passL", "-lwebpmux -lwebp -lsharpyuv")
   when not defined(emscripten):
     if enableVpl and not (hostCPU == "arm64" and hostOS == "windows") and
         not (hostCPU == "arm" and hostOS == "linux"):

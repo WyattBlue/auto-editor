@@ -170,6 +170,10 @@ proc makeMedia*(args: mainArgs, inputVideo: VideoSettings, audio: AudioSettings,
       warning "Fragmented is enabled, will not apply faststart."
   elif not args.noFaststart:
     options.add("movflags", "faststart")
+  if rules.format.name == "webp":
+    # The muxer's own default plays an animation once and stops; a GIF's
+    # repeats forever.
+    options.add("loop", "0")
 
   var output = openWrite(outputPath, rules.format)
   output.options = options
