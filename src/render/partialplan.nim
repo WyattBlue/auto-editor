@@ -274,6 +274,11 @@ proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
   encoder.open()
   return encoder
 
+func holdsFrames(tb, frameTb: AVRational): bool =
+  ## Whether a time base counts whole frames exactly. Matroska's milliseconds
+  ## don't for 30 fps: a frame is 33 or 34 of them.
+  (frameTb.num.int64 * tb.den.int64) mod (frameTb.den.int64 * tb.num.int64) == 0
+
 proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSettings,
     spans: seq[SmartSpan], codecId: AVCodecID):
     (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
@@ -315,7 +320,12 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     par.extradata_size = record.len.cint
   if sourceStream.metadata != nil:
     discard av_dict_copy(addr outputStream.metadata, sourceStream.metadata, 0)
-  outputStream.time_base = sourceStream.time_base
+  # Copied packets carry the source's timestamps. Where those can't land on
+  # whole frames, the packets are retimed to frames, or the output's frame
+  # rate would only come near the timeline's.
+  let retime = not holdsFrames(sourceStream.time_base, av_inv_q(tl.tb))
+  outputStream.time_base =
+    if retime: av_inv_q(tl.tb) else: sourceStream.time_base
   outputStream.avg_frame_rate = tl.tb
   # A SAR the container sets over the bitstream's goes with the copy.
   let sar = av_guess_sample_aspect_ratio(templateInput.formatContext, sourceStream, nil)
@@ -559,6 +569,12 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
     let reorderDelay = max(stream.codecpar.video_delay.int64, 0)
 
     template queueCopied(p: ptr AVPacket) =
+      if retime and p.time_base != frameTb:
+        # Each is within a rounding of a whole frame, the nearest one.
+        if p.pts != AV_NOPTS_VALUE: p.pts = av_rescale_q(p.pts, p.time_base, frameTb)
+        if p.dts != AV_NOPTS_VALUE: p.dts = av_rescale_q(p.dts, p.time_base, frameTb)
+        p.duration = 1
+        p.time_base = frameTb
       let orderTs = if p.dts != AV_NOPTS_VALUE: p.dts else: p.pts
       # In the packet's time base: HEVC's are retimed to frames by now.
       ready.addLast (p, max(0'i64, frameAt(orderTs, p.time_base, tl.tb)))
