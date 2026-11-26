@@ -401,10 +401,33 @@ proc restoreDiscards*(container: InputContainer, levels: seq[AVDiscard]) =
   for i in 0 ..< min(levels.len, container.formatContext.nb_streams.int):
     container.formatContext.streams[i].discardLevel = levels[i]
 
+const tailScan = 10 * AV_TIME_BASE
+  ## How far before a container's stated end the scan for the audio's end
+  ## starts.
+
+proc audioEnd(formatCtx: ptr AVFormatContext, audio: ptr AVStream): int64 =
+  ## The furthest end of `audio`'s packets, or 0 with none.
+  # The last packets alone tell it, so read only the file's tail when the
+  # demuxer can seek there: reading a whole file grows with its length.
+  if formatCtx.duration != AV_NOPTS_VALUE and formatCtx.duration > tailScan:
+    let start = (if formatCtx.start_time == AV_NOPTS_VALUE: 0'i64 else: formatCtx.start_time)
+    let target = start + formatCtx.duration - tailScan
+    if ffmpeg.av_seek_frame(formatCtx, -1, target, AVSEEK_FLAG_BACKWARD) >= 0:
+      let targetPts = av_rescale_q(target, AVRational(num: 1, den: AV_TIME_BASE),
+        audio.time_base)
+      let endPts = scanPackets(formatCtx, audio, 0).endPts
+      # Nothing past the seek's target means the tail isn't where the audio
+      # ends: it stops sooner, the stated duration is too long, or the
+      # timestamps jump back. Only the whole file tells then.
+      if endPts > targetPts:
+        result = endPts
+  if result == 0:
+    discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
+    result = scanPackets(formatCtx, audio, 0).endPts
+
 proc mediaLength*(container: InputContainer): AVRational =
   # Result is in seconds.
   let formatCtx = container.formatContext
-  discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
 
   if container.audio.len > 0:
     let audio = container.audio[0]
@@ -412,7 +435,7 @@ proc mediaLength*(container: InputContainer): AVRational =
     # of reading every video frame off the disk.
     let levels = container.setActiveStream(audio.index)
     defer: container.restoreDiscards(levels)
-    let endPts = scanPackets(formatCtx, audio, 0).endPts
+    let endPts = audioEnd(formatCtx, audio)
     return (if endPts > 0: endPts - formatCtx.startPts(audio) else: 0) *
       audio.time_base
 
@@ -423,6 +446,7 @@ proc mediaLength*(container: InputContainer): AVRational =
     if video.duration != AV_NOPTS_VALUE:
       return video.duration * video.time_base
     # Matroska, WebP and AVIF give streams no duration of their own.
+    discard ffmpeg.av_seek_frame(formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
     return scanVideoLength(formatCtx, video)
 
   error "No audio or video stream found"
