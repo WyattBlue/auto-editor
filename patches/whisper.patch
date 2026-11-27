@@ -22,7 +22,7 @@
 --- a/ggml/src/ggml-metal/ggml-metal-device.m
 +++ b/ggml/src/ggml-metal/ggml-metal-device.m
 @@ -485,10 +485,16 @@
- 
+
      const bool ok = ggml_metal_library_compile_all(res, device, prep,
          ^NSString * (int kind, NSError ** err) {
 -            (void) err;
@@ -40,5 +40,297 @@
 +            }
 +            return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
          }, "embedded data");
- 
+
      if (!ok) {
+--- a/models/convert-parakeet-to-ggml.py
++++ b/models/convert-parakeet-to-ggml.py
+@@ -276,9 +276,23 @@
+                 if f'{lstm_prefix}.bias_ih_l' in key:
+                     layer_idx = int(key.rsplit('bias_ih_l', 1)[1])
+                     pred_bias_ih[layer_idx] = t.squeeze().numpy().astype(np.float32)
++
++            # xscaling multiplies the pre-encode output by sqrt(d_model), which
++            # is the same as scaling the output projection.
++            xscale = 1.0
++            if config['encoder'].get('xscaling', False):
++                xscale = float(np.sqrt(config['encoder']['d_model']))
+
+             print("\nConverting model weights...")
+             for name, tensor in state_dict.items():
++                # The auxiliary CTC head of hybrid TDT-CTC models is not used
++                if name.startswith('ctc_decoder.'):
++                    continue
++
++                # Folded into the batch norm running mean below
++                if name.endswith('conv.depthwise_conv.bias'):
++                    continue
++
+                 # Skip the filterbank and window - already written in preprocessing section
+                 if name == fb_key:
+                     continue
+@@ -295,6 +309,16 @@
+                 else:
+                     data = tensor.squeeze().numpy()
+
++                if name.startswith('encoder.pre_encode.out.'):
++                    data = data.astype(np.float32) * xscale
++
++                # The batch norm follows the depthwise conv directly, so a conv
++                # bias only shifts the mean it subtracts.
++                if name.endswith('conv.batch_norm.running_mean'):
++                    dw_bias = state_dict.get(name.replace('batch_norm.running_mean', 'depthwise_conv.bias'))
++                    if dw_bias is not None:
++                        data = data.astype(np.float32) - dw_bias.numpy().astype(np.float32)
++
+                 # For prediction LSTM weights/biases:
+                 # Fold bias_ih into bias_hh (bias_ih already skipped above).
+                 # Reorder gates (input, forget, cell, output) from PyTorch layout
+--- a/src/parakeet-arch.h
++++ b/src/parakeet-arch.h
+@@ -50,6 +50,18 @@
+     PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT,
+     PARAKEET_TENSOR_ENC_NORM_OUT_BIAS,
+
++    // Encoder layer biases, present only in models trained with use_bias
++    PARAKEET_TENSOR_ENC_FF1_LINEAR1_BIAS,
++    PARAKEET_TENSOR_ENC_FF1_LINEAR2_BIAS,
++    PARAKEET_TENSOR_ENC_CONV_PW1_BIAS,
++    PARAKEET_TENSOR_ENC_CONV_PW2_BIAS,
++    PARAKEET_TENSOR_ENC_ATTN_Q_BIAS,
++    PARAKEET_TENSOR_ENC_ATTN_K_BIAS,
++    PARAKEET_TENSOR_ENC_ATTN_V_BIAS,
++    PARAKEET_TENSOR_ENC_ATTN_OUT_BIAS,
++    PARAKEET_TENSOR_ENC_FF2_LINEAR1_BIAS,
++    PARAKEET_TENSOR_ENC_FF2_LINEAR2_BIAS,
++
+     // Prediction network
+     PARAKEET_TENSOR_PRED_EMBED_WEIGHT,
+     PARAKEET_TENSOR_PRED_LSTM_WEIGHT_IH,
+@@ -127,6 +139,16 @@
+     {PARAKEET_TENSOR_ENC_FF2_LINEAR2_WEIGHT,      "encoder.layers.%d.feed_forward2.linear2.weight"},
+     {PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT,         "encoder.layers.%d.norm_out.weight"},
+     {PARAKEET_TENSOR_ENC_NORM_OUT_BIAS,           "encoder.layers.%d.norm_out.bias"},
++    {PARAKEET_TENSOR_ENC_FF1_LINEAR1_BIAS,        "encoder.layers.%d.feed_forward1.linear1.bias"},
++    {PARAKEET_TENSOR_ENC_FF1_LINEAR2_BIAS,        "encoder.layers.%d.feed_forward1.linear2.bias"},
++    {PARAKEET_TENSOR_ENC_CONV_PW1_BIAS,           "encoder.layers.%d.conv.pointwise_conv1.bias"},
++    {PARAKEET_TENSOR_ENC_CONV_PW2_BIAS,           "encoder.layers.%d.conv.pointwise_conv2.bias"},
++    {PARAKEET_TENSOR_ENC_ATTN_Q_BIAS,             "encoder.layers.%d.self_attn.linear_q.bias"},
++    {PARAKEET_TENSOR_ENC_ATTN_K_BIAS,             "encoder.layers.%d.self_attn.linear_k.bias"},
++    {PARAKEET_TENSOR_ENC_ATTN_V_BIAS,             "encoder.layers.%d.self_attn.linear_v.bias"},
++    {PARAKEET_TENSOR_ENC_ATTN_OUT_BIAS,           "encoder.layers.%d.self_attn.linear_out.bias"},
++    {PARAKEET_TENSOR_ENC_FF2_LINEAR1_BIAS,        "encoder.layers.%d.feed_forward2.linear1.bias"},
++    {PARAKEET_TENSOR_ENC_FF2_LINEAR2_BIAS,        "encoder.layers.%d.feed_forward2.linear2.bias"},
+
+     // Prediction network
+     {PARAKEET_TENSOR_PRED_EMBED_WEIGHT,            "decoder.prediction.embed.weight"},
+@@ -188,6 +210,16 @@
+     {PARAKEET_TENSOR_ENC_FF2_LINEAR2_WEIGHT,      GGML_OP_MUL_MAT},
+     {PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT,         GGML_OP_MUL},
+     {PARAKEET_TENSOR_ENC_NORM_OUT_BIAS,           GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_FF1_LINEAR1_BIAS,        GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_FF1_LINEAR2_BIAS,        GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_CONV_PW1_BIAS,           GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_CONV_PW2_BIAS,           GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_ATTN_Q_BIAS,             GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_ATTN_K_BIAS,             GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_ATTN_V_BIAS,             GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_ATTN_OUT_BIAS,           GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_FF2_LINEAR1_BIAS,        GGML_OP_ADD},
++    {PARAKEET_TENSOR_ENC_FF2_LINEAR2_BIAS,        GGML_OP_ADD},
+
+     // Prediction network
+     {PARAKEET_TENSOR_PRED_EMBED_WEIGHT,            GGML_OP_GET_ROWS},
+--- a/src/parakeet.cpp
++++ b/src/parakeet.cpp
+@@ -291,6 +291,9 @@
+     int32_t n_pred_layers          = 2;
+     int32_t n_tdt_durations        = 5;
+     int32_t n_max_tokens           = 10;
++
++    // Whether the encoder's linear and pointwise conv layers carry a bias
++    bool    use_bias               = false;
+
+     parakeet_arch arch     = PARAKEET_ARCH_TDT;
+ };
+@@ -333,6 +336,18 @@
+
+     struct ggml_tensor * norm_out_w = nullptr;
+     struct ggml_tensor * norm_out_b = nullptr;
++
++    // Loaded only when the model was trained with use_bias
++    struct ggml_tensor * ff1_linear1_b = nullptr;
++    struct ggml_tensor * ff1_linear2_b = nullptr;
++    struct ggml_tensor * conv_pw1_b = nullptr;
++    struct ggml_tensor * conv_pw2_b = nullptr;
++    struct ggml_tensor * attn_q_b = nullptr;
++    struct ggml_tensor * attn_k_b = nullptr;
++    struct ggml_tensor * attn_v_b = nullptr;
++    struct ggml_tensor * attn_out_b = nullptr;
++    struct ggml_tensor * ff2_linear1_b = nullptr;
++    struct ggml_tensor * ff2_linear2_b = nullptr;
+ };
+
+ struct parakeet_lsmt_layer {
+@@ -1205,8 +1220,8 @@
+
+     const int n_audio_layer = hparams.n_audio_layer;
+
+-    // Calculate tensor count: pre_encode (12) + encoder layers (29 per layer) + prediction (9) + joint (6)
+-    size_t n_tensors = 12 + (29 * n_audio_layer) + 9 + 6;
++    // Calculate tensor count: pre_encode (12) + encoder layers (29 + 10 optional biases per layer) + prediction (9) + joint (6)
++    size_t n_tensors = 12 + (39 * n_audio_layer) + 9 + 6;
+
+     std::map<ggml_backend_buffer_type_t, ggml_context *> ctx_map;
+     auto get_ctx = [&](ggml_backend_buffer_type_t buft) -> ggml_context * {
+@@ -1270,6 +1285,14 @@
+
+     const int n_audio_state = hparams.n_audio_state;
+
++    // The file format has no flag for use_bias, so the bias tensors are always
++    // declared and the model is biased only if the file provides them.
++    std::set<std::string> bias_names;
++    auto create_bias = [&](parakeet_tensor type, int n, int layer) -> ggml_tensor * {
++        bias_names.insert(format(PARAKEET_TENSOR_NAMES.at(type), layer));
++        return create_tensor(type, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n), layer);
++    };
++
+     model.layers.resize(n_audio_layer);
+
+     // Encoder pre_encode
+@@ -1358,6 +1381,17 @@
+         // Output norm
+         layer.norm_out_w = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+         layer.norm_out_b = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
++
++        layer.ff1_linear1_b = create_bias(PARAKEET_TENSOR_ENC_FF1_LINEAR1_BIAS, 4*n_audio_state, i);
++        layer.ff1_linear2_b = create_bias(PARAKEET_TENSOR_ENC_FF1_LINEAR2_BIAS, n_audio_state, i);
++        layer.conv_pw1_b    = create_bias(PARAKEET_TENSOR_ENC_CONV_PW1_BIAS, 2*n_audio_state, i);
++        layer.conv_pw2_b    = create_bias(PARAKEET_TENSOR_ENC_CONV_PW2_BIAS, n_audio_state, i);
++        layer.attn_q_b      = create_bias(PARAKEET_TENSOR_ENC_ATTN_Q_BIAS, n_audio_state, i);
++        layer.attn_k_b      = create_bias(PARAKEET_TENSOR_ENC_ATTN_K_BIAS, n_audio_state, i);
++        layer.attn_v_b      = create_bias(PARAKEET_TENSOR_ENC_ATTN_V_BIAS, n_audio_state, i);
++        layer.attn_out_b    = create_bias(PARAKEET_TENSOR_ENC_ATTN_OUT_BIAS, n_audio_state, i);
++        layer.ff2_linear1_b = create_bias(PARAKEET_TENSOR_ENC_FF2_LINEAR1_BIAS, 4*n_audio_state, i);
++        layer.ff2_linear2_b = create_bias(PARAKEET_TENSOR_ENC_FF2_LINEAR2_BIAS, n_audio_state, i);
+     }
+
+     // Prediction network (decoder)
+@@ -1423,6 +1457,7 @@
+         int & n_loaded = wctx.model.n_loaded;
+
+         n_loaded = 0;
++        size_t n_bias_loaded = 0;
+
+         std::vector<char> read_buf;
+
+@@ -1504,16 +1539,22 @@
+
+             total_size += ggml_nbytes(tensor);
+             n_loaded++;
++            n_bias_loaded += bias_names.count(name);
+         }
+
+         PARAKEET_LOG_INFO("%s: model size    = %7.2f MB\n", __func__, total_size/1e6);
+
+         if (n_loaded == 0) {
+             PARAKEET_LOG_WARN("%s: WARN no tensors loaded from model file - assuming empty model for testing\n", __func__);
+-        } else if (n_loaded != (int) tensors_map.size()) {
+-            PARAKEET_LOG_ERROR("%s: ERROR not all tensors loaded from model file - expected %zu, got %d\n", __func__, tensors_map.size(), n_loaded);
++        } else if (n_bias_loaded != 0 && n_bias_loaded != bias_names.size()) {
++            PARAKEET_LOG_ERROR("%s: ERROR model file has %zu of %zu encoder bias tensors\n", __func__, n_bias_loaded, bias_names.size());
+             return false;
++        } else if (n_loaded - n_bias_loaded != tensors_map.size() - bias_names.size()) {
++            PARAKEET_LOG_ERROR("%s: ERROR not all tensors loaded from model file - expected %zu, got %zu\n", __func__, tensors_map.size() - bias_names.size(), n_loaded - n_bias_loaded);
++            return false;
+         }
++
++        wctx.model.hparams.use_bias = n_bias_loaded != 0;
+     }
+
+     auto & buffers = wctx.model.buffers;
+@@ -1536,6 +1577,10 @@
+     const int n_state     = hparams.n_audio_state;
+     const float fc_factor = 0.5f;
+
++    auto add_bias = [&](struct ggml_context * ctx, struct ggml_tensor * x, struct ggml_tensor * b) {
++        return hparams.use_bias ? ggml_add(ctx, x, b) : x;
++    };
++
+     struct ggml_init_params params = {
+         /*.mem_size   =*/ pstate.sched_encode.meta.size(),
+         /*.mem_buffer =*/ pstate.sched_encode.meta.data(),
+@@ -1659,11 +1704,11 @@
+             ggml_format_name(cur, "enc_%d_ffn_norm_1", il);
+
+             // ffn_1
+-            cur = ggml_mul_mat(ctx0, layer.ff1_linear1_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.ff1_linear1_w, cur), layer.ff1_linear1_b);
+             cur = ggml_silu(ctx0, cur);
+             ggml_format_name(cur, "enc_%d_silu", il);
+
+-            cur = ggml_mul_mat(ctx0, layer.ff1_linear2_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.ff1_linear2_w, cur), layer.ff1_linear2_b);
+             ggml_format_name(cur, "enc_%d_ffn_1", il);
+
+             cur = ggml_add(ctx0, residual, ggml_scale(ctx0, cur, fc_factor));
+@@ -1683,9 +1728,9 @@
+             const int d_head = n_state / n_head;
+
+             // [feat, time_frames, 1, 1]
+-            struct ggml_tensor * Q_cur = ggml_mul_mat(ctx0, layer.attn_q_w, cur);
+-            struct ggml_tensor * K_cur = ggml_mul_mat(ctx0, layer.attn_k_w, cur);
+-            struct ggml_tensor * V_cur = ggml_mul_mat(ctx0, layer.attn_v_w, cur);
++            struct ggml_tensor * Q_cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.attn_q_w, cur), layer.attn_q_b);
++            struct ggml_tensor * K_cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.attn_k_w, cur), layer.attn_k_b);
++            struct ggml_tensor * V_cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.attn_v_w, cur), layer.attn_v_b);
+
+             Q_cur = ggml_reshape_3d(ctx0, Q_cur, d_head, n_head, n_time);
+             K_cur = ggml_reshape_3d(ctx0, K_cur, d_head, n_head, n_time);
+@@ -1817,7 +1862,7 @@
+
+                 cur = ggml_cont(ctx0, ggml_permute(ctx0, cur, 0, 2, 1, 3));
+                 cur = ggml_reshape_2d(ctx0, cur, n_state, n_time);
+-                cur = ggml_mul_mat(ctx0, layer.attn_out_w, cur);
++                cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.attn_out_w, cur), layer.attn_out_b);
+             } else {
+                 struct ggml_tensor * Q_u = ggml_add(ctx0, Q_cur, layer.attn_pos_bias_u);
+                 ggml_format_name(Q_u, "enc_%d_attn_q_u", il);
+@@ -1889,7 +1934,7 @@
+
+                 cur = ggml_permute(ctx0, cur, 2, 0, 1, 3);
+                 cur = ggml_cont_2d(ctx0, cur, n_state, n_time);
+-                cur = ggml_mul_mat(ctx0, layer.attn_out_w, cur);
++                cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.attn_out_w, cur), layer.attn_out_b);
+             }
+             ggml_format_name(cur, "enc_%d_attn_out", il);
+
+@@ -1907,7 +1952,7 @@
+             ggml_format_name(cur, "enc_%d_norm_conv", il);
+
+             // pointwise 1d convolution: [1024, 138] -> [2048, 138]
+-            cur = ggml_mul_mat(ctx0, layer.conv_pw1_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.conv_pw1_w, cur), layer.conv_pw1_b);
+             ggml_format_name(cur, "enc_%d_conv_pw1", il);
+
+             {
+@@ -1940,7 +1985,7 @@
+             cur = ggml_silu(ctx0, cur);
+             ggml_format_name(cur, "enc_%d_conv_silu", il);
+
+-            cur = ggml_mul_mat(ctx0, layer.conv_pw2_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.conv_pw2_w, cur), layer.conv_pw2_b);
+             ggml_format_name(cur, "enc_%d_conv_pw2", il);
+
+             cur = ggml_add(ctx0, residual, cur);
+@@ -1954,9 +1999,9 @@
+             cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_ff2_w), layer.norm_ff2_b);
+             ggml_format_name(cur, "enc_%d_ffn_norm_2", il);
+
+-            cur = ggml_mul_mat(ctx0, layer.ff2_linear1_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.ff2_linear1_w, cur), layer.ff2_linear1_b);
+             cur = ggml_silu(ctx0, cur);
+-            cur = ggml_mul_mat(ctx0, layer.ff2_linear2_w, cur);
++            cur = add_bias(ctx0, ggml_mul_mat(ctx0, layer.ff2_linear2_w, cur), layer.ff2_linear2_b);
+             cur = ggml_add(ctx0, residual, ggml_scale(ctx0, cur, 0.5));
+             ggml_format_name(cur, "enc_%d_ffn_res", il);
+         }
