@@ -2234,6 +2234,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     result = overlayFrame(acc, top, ox, oy, oscale)
     av_frame_free(addr top)
 
+  func placed(o: VideoFrame): bool =
+    ## A clip with a `pos` goes where it says even with nothing under it,
+    ## over the background, rather than filling the canvas as a base.
+    not o.fit
+
   # Each layer's clips by start, and those started but not yet ended, so a
   # frame looks only at the clips under it instead of every clip in the layer.
   var byStart = newSeq[seq[int]](tl.v.len)
@@ -2340,9 +2345,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let fps = (if rate.isValid: rate.float / tl.tb.float else: 1.0)
             let last = int(ceil(float(obj.offset + obj.dur) * speed * fps - 1e-3)) - 1
             i = min(i, max(last, 0))
-          # nil src: the `-bg` canvas on the base track, a generator above it.
+          # nil src: the `-bg` canvas on the base track, a generator above it
+          # or where a `pos` places it.
           objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup,
-            gen: obj.src == nil and layerIdx > 0,
+            gen: obj.src == nil and (layerIdx > 0 or hasPos),
             local: int(index - obj.start), dur: int(obj.dur),
             srcSecs: timelinePos * speed / tl.tb.float,
             x: ox, y: oy, scale: oscale, fit: not hasPos, layer: layerIdx)
@@ -2367,16 +2373,18 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       var inWindow = false
       for o in objList:
         if o.win >= 0: inWindow = true
-      if objList.len > 1 or inWindow:
+      if objList.len > 1 or inWindow or (objList.len == 1 and placed(objList[0])):
         av_frame_free(addr frame)
         var acc: ptr AVFrame = nil
         var k = 0
         while k < objList.len:
           let o = objList[k]
           if o.win < 0:
-            if acc == nil:
+            if acc == nil and not placed(o):
               acc = baseFrame(o)
             else:
+              if acc == nil:
+                acc = makeSolid(tl.res[0], tl.res[1], tl.bg, solidTag)
               let newAcc = overlayObj(acc, o)
               if newAcc != nil:
                 av_frame_free(addr acc)
@@ -2395,7 +2403,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             var fromF, toF: ptr AVFrame = nil
             for m in k ..< j:
               var f =
-                if isBase: baseFrame(objList[m])
+                if isBase and not placed(objList[m]): baseFrame(objList[m])
                 else: overlayObj(below, objList[m])
               if f == nil: f = av_frame_clone(below)
               if objList[m].incoming:

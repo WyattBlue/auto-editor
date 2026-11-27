@@ -344,14 +344,15 @@ auto-editor video.mp4 -w:1 confine:400:300:200:80,blur:30
 
 ### pos
 
-Place this clip as an overlay when it is composited over a lower video track,
+Place this clip as an overlay, composited over the video tracks below it,
 `pos:x:y[:scale]`:
 
 - **x**, **y** — the overlay's top-left corner, in canvas pixels.
 - **scale** — optional size multiplier of the source's native size (default
   `1.0`).
 
-`pos` has no effect on the base (bottom) track. It is mainly used inside a v3
+A clip with nothing under it is placed over the background color. Without a
+`pos`, the bottom clip fills the canvas instead. It is mainly used inside a v3
 timeline's effects array (see [The v3 format](./v3)) or attached automatically by
 the `add` action below.
 
