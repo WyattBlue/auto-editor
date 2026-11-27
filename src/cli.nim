@@ -115,7 +115,7 @@ const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "-tr, --translate", kind: Flag, datum: coTranslate,
     help: "Translate from source language to english"),
   OptDef(names: "--queue", datum: coQueue, metavar: "SECS",
-    help: "The maximum size in seconds of a single transcribed segment (default 30)"),
+    help: "The maximum size in seconds of a single transcribed segment (default 30, or 120 with parakeet models)"),
   OptDef(names: "--prompt", datum: coPrompt, metavar: "TEXT",
     help: "Bias transcription toward given vocabulary/spelling (e.g. names, jargon)"),
   OptDef(names: "--threads", datum: coThreads, metavar: "N",

@@ -1,6 +1,6 @@
 import std/[json, os, strformat, strutils, typedthreads]
 import ./[av, ffmpeg, log]
-import ./lib/[lang, srttime]
+import ./lib/[lang, pausecut, srttime]
 
 type
   WhisperCtx = pointer
@@ -195,6 +195,12 @@ proc whisperLanguage*(language: string): string =
 func isParakeetModel*(model: string): bool =
   "parakeet" in model.extractFilename.toLowerAscii
 
+func defaultQueue*(model: string): int =
+  ## The longest segment, in seconds, to hand `model` at once. Whisper reads
+  ## 30 second windows; parakeet's encoder takes the whole segment, and fewer
+  ## segments mean fewer cuts through running speech.
+  if isParakeetModel(model): 120 else: 30
+
 # Apple SpeechAnalyzer backend (src/ae_speech.swift), selected with model "apple".
 when defined(appleSpeech):
   proc ae_speech_init(locale: cstring): WhisperCtx {.importc, cdecl.}
@@ -213,6 +219,7 @@ const
   SilenceGap = Rate div 2 # 0.5s of trailing silence ends an utterance
   PrerollMax = Rate div 5 # keep 0.2s of pre-speech audio so onsets aren't clipped
   MinSpeech = Rate div 5 # ignore <0.2s blips (clicks, coughs)
+  CutSearch = Rate * 5 # how far back a full segment looks for a pause to end on
 
 type OutCtx = object
   f: File
@@ -415,6 +422,28 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
     silenceRun = 0
     speechSamples = 0
 
+  proc cutSeg() =
+    # A segment that fills up mid-speech ends at its last pause, not its last
+    # sample: a model given half a word invents the rest. The audio after the
+    # pause opens the next segment.
+    let spanStart = seg.len - min(CutSearch, maxSeg div 2)
+    let cut = spanStart + quietestCut(seg.toOpenArray(spanStart, seg.high),
+      WinSize, threshold)
+    let rest = seg[cut .. ^1]
+    let restSpeech = loudSamples(rest, WinSize, threshold)
+    let restStart = segStartSample + cut
+    let restSilence = min(silenceRun, rest.len)
+
+    seg.setLen(cut)
+    speechSamples = max(speechSamples - restSpeech, 0)
+    flushSeg()
+
+    seg.add(rest)
+    inSpeech = true
+    segStartSample = restStart
+    speechSamples = restSpeech
+    silenceRun = restSilence
+
   proc gateWindow(w: ptr UncheckedArray[float32], L: int) =
     var peak: float32 = 0
     for i in 0 ..< L:
@@ -445,7 +474,7 @@ proc run*(readPacket: PacketSource, audioStream: ptr AVStream,
         preroll = preroll[preroll.len - PrerollMax .. ^1]
 
     if inSpeech and seg.len >= maxSeg:
-      flushSeg()
+      cutSeg()
 
   proc gateFrame(fr: ptr AVFrame) =
     let n = fr.nb_samples.int
@@ -536,6 +565,7 @@ proc transcribeFile*(input, model, language: string, threads: int,
   if container.audio.len == 0: error "No audio stream found"
   let lang = if model != "apple" and isParakeetModel(model): "auto" else: language
   run(fileSource(container.formatContext, stop), container.audio[0], model, lang,
-    translate = false, format = "srt", output = output, queue = 30,
+    translate = false, format = "srt", output = output,
+    queue = defaultQueue(model),
     threshold = 0.04, prompt = "", threads = threads.cint, splitWords = true,
     debug = false, heardMs = heardMs)

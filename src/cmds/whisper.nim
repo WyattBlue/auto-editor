@@ -27,7 +27,8 @@ proc main*(cArgs: seq[string]) =
   var format = "text"
   var formatExplicit = false
   var output = "-"
-  var queue: int = 30
+  var queue: int = 0
+  var queueExplicit = false
   var prompt: string = ""
   var threads: cint = 4
   var threshold: float32 = 0.04
@@ -53,6 +54,7 @@ proc main*(cArgs: seq[string]) =
         try: parseInt(key)
         except ValueError: error &"Invalid --queue: {key}"
       )
+      queueExplicit = true
     of coPrompt:
       prompt = key
     of coThreads:
@@ -92,6 +94,8 @@ proc main*(cArgs: seq[string]) =
   # Install early so Ctrl-C is graceful even during the (slow) model load.
   setControlCHook(onCtrlC)
 
+  if not queueExplicit:
+    queue = defaultQueue(model)
   if queue < 1 or queue > 86400:
     error &"Invalid queue value: {queue}"
   if output != "-" and not formatExplicit:
