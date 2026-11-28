@@ -74,6 +74,8 @@ type
     of actBurn, actText:
       burnFile*: string # the subtitles: an .srt, .ass, or a file with a text stream
       burnFont*: string # a font file to draw them with; "" keeps their own
+      burnFace*: string # which face of the font file: its style or full name, or its index; "" leaves it to the weight
+      burnWeight*: uint16 # the weight to draw at, 400 regular and 700 bold; 0 keeps their own
       burnSize*: float32 # text height, percent of the frame's; 0 keeps their own
       burnSet*: set[BurnPart] # which of burnColors replace the subtitles' own
       burnColors*: array[BurnPart, uint32] # 0xRRGGBBAA
@@ -288,7 +290,9 @@ func subsArgs(size: string): seq[ArgDef] =
     colorArg("color", optional = true, keyword = true),
     colorArg("outline", optional = true, keyword = true),
     colorArg("bg", optional = true, keyword = true),
-    choiceArg("align", alignNames, optional = true, keyword = true)]
+    choiceArg("align", alignNames, optional = true, keyword = true),
+    arg("face", akText, NaN, NaN, true, true, "", optional = true, keyword = true),
+    numArg("weight", 100, 1000, optional = true, keyword = true)]
 
 func `$`*(r: RangeDoc): string =
   ## e.g. "(0.0, 99999.0)", "each [-1.0, 1.0]"
@@ -400,11 +404,11 @@ IRs are resampled to the audio's rate and used at their own level, so a normaliz
     args: @[numArg("deg", unit = "degrees")],
     help: "Turn the picture clockwise by `deg` about its center without growing the frame, e.g. `turn:15`. On the base (bottom) track the corners are cut off and the uncovered area shows the background; an overlay turns about the center of where it's placed, its uncovered area transparent. For a turn that grows the frame to fit, use `rotate`; to keep turning, use `spin`."),
   ActionDef(name: "burn", flags: {afVideo, afGenerator},
-    argSpec: "[file][:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a]",
+    argSpec: "[file][:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:face=f][:weight=w]",
     args: @[pathArg("file", optional = true)] & subsArgs(""),
-    help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
+    help: "Draw a subtitle file with libass: an .srt or .ass, or a file's first text subtitle stream, timed from the start of the layer or section it draws on and styled as it says. Without a file it draws the subtitles of the media under it, timed by that media's own clock so they stay on their words through cuts and speed changes: its first text subtitle stream, else the .srt or .ass beside it with its name, e.g. `--when-active burn:size=6`. As a generator it takes a file's place in `add:`, the subtitles on their own overlay layer, e.g. `add:burn:talk.srt`; as an action it draws over a section's picture. Each override replaces that part of every subtitle's style: `font` is a font file (.ttf, .otf, or .ttc) to draw with, `size` the text's height as a percent of the frame's, `color` the text's color, `outline` its outline's, `bg` a box behind each subtitle, and `align` where they sit (as `text` takes it). A font file can hold several faces: `weight` draws with the one of that weight, 400 regular and 700 bold, e.g. `font=Futura.ttc:weight=700`, and `face` names one outright, by its style (`face=Condensed ExtraBold`), its full name, or its index in the file from 0. Colors are names, `#rgb`, `#rrggbb`, or `#rrggbbaa` with transparency. E.g. `add:burn:talk.srt:size=6:color=yellow:bg=#00000099`. Paths can't contain a comma."),
   ActionDef(name: "text", flags: {afVideo, afGenerator},
-    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:vertical][:ass]",
+    argSpec: "text[:font=f][:size=pct][:color=c][:outline=c][:bg=c][:align=a][:face=f][:weight=w][:vertical][:ass]",
     args: @[arg("text", akText, NaN, NaN, loIncl = true, hiIncl = true,
       default = "", optional = false, keyword = false)] & subsArgs("8") &
       @[flagArg("vertical"), flagArg("ass")],
@@ -858,7 +862,8 @@ func rgbaStr*(c: uint32): string =
   result = "#" & toHex(int(c shr 8), 6).toLowerAscii
   if (c and 0xff) != 0xff: result &= toHex(int(c and 0xff), 2).toLowerAscii
 
-const subsKeys = ["file", "font", "size", "color", "outline", "bg", "align"]
+const subsKeys = ["file", "font", "size", "color", "outline", "bg", "align", "face",
+  "weight"]
 
 func textPart(text: string): string =
   result = escapeText(text)
@@ -1058,6 +1063,15 @@ proc subsSpec(parts: seq[string], text: bool): ActionSpec {.raises: [ActionParse
     if alignNames.find(given[6]) < 0:
       raise newException(ActionParseError, &"{name}: unknown align: {given[6]}")
     result.args[ix("burn", "align")] = strV(akChoice, given[6])
+  if seen[7]:
+    if given[7].len == 0 or given[7].len > 255:
+      raise newException(ActionParseError, &"{name}: face needs a face's name or index")
+    result.args[ix("burn", "face")] = strV(akText, given[7])
+  if seen[8]:
+    let weight = pNum(given[8])
+    if text: checkArg("text", "weight", float32(weight))
+    else: checkArg("burn", "weight", float32(weight))
+    result.args[ix("burn", "weight")] = numV(weight)
   if vertical: result.args[ix("text", "vertical")] = flagV()
   if ass: result.args[ix("text", "ass")] = flagV()
 
@@ -1737,6 +1751,8 @@ proc toAction*(s: ActionSpec): Action {.raises: [ActionParseError].} =
     a.burnFile = s.str(0)
     a.burnFont = s.str(ix("burn", "font"))
     a.burnSize = float32(s.num(ix("burn", "size"), 0))
+    a.burnFace = s.str(ix("burn", "face"))
+    a.burnWeight = uint16(s.num(ix("burn", "weight"), 0))
     for (k, part) in [(3, bpColor), (4, bpOutline), (5, bpBg)]:
       if s.has(k):
         a.burnSet.incl part
@@ -1935,6 +1951,8 @@ when not defined(nimscript):
       for (part, key) in [(bpColor, "color"), (bpOutline, "outline"), (bpBg, "bg")]:
         if part in act.burnSet: s &= &":{key}={rgbaStr(act.burnColors[part])}"
       if act.burnAlign in 1'u8 .. 9'u8: s &= ":align=" & alignNames[act.burnAlign]
+      if act.burnFace.len > 0: s &= ":face=" & act.burnFace
+      if act.burnWeight > 0: s &= &":weight={act.burnWeight}"
       if act.burnVertical: s &= ":vertical"
       if act.burnAss: s &= ":ass"
       s
@@ -2147,6 +2165,8 @@ when not defined(nimscript):
       c.bit(c.head, a.burnVertical, verticalFlag)
       c.str16(a.burnFile)
       c.str16(a.burnFont)
+      c.str16(a.burnFace)
+      c.raw(a.burnWeight)
       c.raw(a.burnSize)
       c.raw(a.burnSet)
       let alignAt = c.pos

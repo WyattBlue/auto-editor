@@ -7,7 +7,7 @@
 import std/[strformat, strutils, unicode]
 import ../[action, ffmpeg, log]
 when defined(libass):
-  import std/[math, os, tables]
+  import std/[hashes, math, os, tables]
   import ../[av, libass]
   import ../util/rational
   proc c_strdup(s: cstring): cstring {.importc: "strdup", header: "<string.h>".}
@@ -51,40 +51,121 @@ proc u16(data: string, at: int): int =
 
 proc u32(data: string, at: int): int = (data.u16(at) shl 16) or data.u16(at + 2)
 
+proc faceOffsets(data: string): seq[int] =
+  ## Where each face's table directory starts: a collection has several.
+  if data.startsWith("ttcf"):
+    for i in 0 ..< min(data.u32(8), 4096): result.add data.u32(12 + 4 * i)
+  else:
+    result.add 0
+
+proc fontName(data: string, face, id: int): string =
+  ## Name `id` in the `name` table of the face at `face`; "" if it has none.
+  var table = -1
+  for i in 0 ..< data.u16(face + 4):
+    let rec = face + 12 + 16 * i
+    if rec + 4 <= data.len and data[rec ..< rec + 4] == "name":
+      table = data.u32(rec + 8)
+  if table < 0: return ""
+  let strings = table + data.u16(table + 4)
+  # English before another language's, as a font can name itself in several,
+  # and a Unicode encoding before Mac Roman, the one Mac encoding read here.
+  var best = (rank: 99, text: "")
+  for i in 0 ..< data.u16(table + 2):
+    let rec = table + 6 + 12 * i
+    if data.u16(rec + 6) != id: continue
+    let (encoding, language) = (data.u16(rec + 2), data.u16(rec + 4))
+    let rank = case data.u16(rec)
+      of 3: (if (language and 0x3ff) == 9: 0 else: 3)
+      of 0: 1
+      of 1: (if encoding == 0 and language == 0: 2 else: 99)
+      else: 99
+    let (len, at) = (data.u16(rec + 8), strings + data.u16(rec + 10))
+    if rank >= best.rank or at + len > data.len: continue
+    var text = ""
+    if rank == 2:
+      text = data[at ..< at + len]
+    else:
+      var k = at
+      while k + 1 < at + len:
+        text.add Rune(data.u16(k)).toUTF8
+        k += 2
+    best = (rank, text)
+  best.text
+
 proc fontFamily*(data: string): string =
   ## The family name in a TrueType/OpenType font's `name` table (the first
   ## face of a collection), as libass matches fonts by; "" if it has none.
   try:
-    let face = if data.startsWith("ttcf"): data.u32(12) else: 0
-    var table = -1
-    for i in 0 ..< data.u16(face + 4):
-      let rec = face + 12 + 16 * i
-      if rec + 4 <= data.len and data[rec ..< rec + 4] == "name":
-        table = data.u32(rec + 8)
-    if table < 0: return ""
-    let strings = table + data.u16(table + 4)
-    # The family (name 1), in a Unicode encoding before Mac Roman.
-    var best = (rank: 99, text: "")
-    for i in 0 ..< data.u16(table + 2):
-      let rec = table + 6 + 12 * i
-      if data.u16(rec + 6) != 1: continue
-      let rank = case data.u16(rec)
-        of 3: 0
-        of 0: 1
-        of 1: 2
-        else: 99
-      let (len, at) = (data.u16(rec + 8), strings + data.u16(rec + 10))
-      if rank >= best.rank or at + len > data.len: continue
-      var text = ""
-      if rank == 2:
-        text = data[at ..< at + len]
-      else:
-        var k = at
-        while k + 1 < at + len:
-          text.add Rune(data.u16(k)).toUTF8
-          k += 2
-      best = (rank, text)
-    best.text
+    fontName(data, faceOffsets(data)[0], 1)
+  except ValueError:
+    ""
+
+proc fontFaces*(data: string): seq[string] =
+  ## Each face's style, as `face=` takes it: "Bold", "Condensed Medium".
+  try:
+    for at in faceOffsets(data):
+      let style = fontName(data, at, 17)
+      result.add (if style.len > 0: style else: fontName(data, at, 2))
+  except ValueError:
+    result = @[]
+
+proc findFace*(data, face: string): int =
+  ## The index of the face `face` names, by its place in the file from 0, its
+  ## style, its full name, or its PostScript name; -1 if the font has none.
+  try:
+    let faces = faceOffsets(data)
+    if face.allCharsInSet(Digits):
+      let index = (if face.len <= 4: parseInt(face) else: faces.len)
+      return (if index < faces.len: index else: -1)
+    for i, at in faces:
+      for id in [17, 2, 4, 6]:
+        if cmpIgnoreCase(fontName(data, at, id), face) == 0: return i
+  except ValueError:
+    discard
+  -1
+
+proc be(v: uint32, bytes: int): string =
+  for i in countdown(bytes - 1, 0): result.add chr((v shr (8 * i)) and 0xff)
+
+proc be(v: int, bytes: int): string = be(uint32(v), bytes)
+
+proc extractFace*(data: string, face: int, family: string): string =
+  ## The face at `face` as a font file of its own, the one face of `family`.
+  ## libass picks among a family's faces by weight and slant alone, so one
+  ## that differs in width, or shares both with another, is only reached as
+  ## a family of its own. "" if the font can't be read.
+  try:
+    let at = faceOffsets(data)[face]
+    let count = data.u16(at + 4)
+    var names = ""
+    var strings = ""
+    for id in [1, 2, 4, 6]:
+      let text = (if id == 2: "Regular" else: family)
+      var utf16 = ""
+      for r in text.runes: utf16.add be(min(r.int, 0xffff), 2)
+      names.add be(3, 2) & be(1, 2) & be(0x409, 2) & be(id, 2) &
+        be(utf16.len, 2) & be(strings.len, 2)
+      strings.add utf16
+    let name = be(0, 2) & be(4, 2) & be(6 + names.len, 2) & names & strings
+    var dir = data[at ..< at + 12]
+    var body = ""
+    let start = 12 + 16 * count
+    for i in 0 ..< count:
+      let rec = at + 12 + 16 * i
+      let tag = data[rec ..< rec + 4]
+      let (offset, len) = (data.u32(rec + 8), data.u32(rec + 12))
+      if tag != "name" and offset + len > data.len: return ""
+      let table = (if tag == "name": name else: data[offset ..< offset + len])
+      let padded = table & repeat('\0', (4 - table.len mod 4) mod 4)
+      var sum = data[rec + 4 ..< rec + 8]
+      if tag == "name":
+        var total = 0'u32
+        for k in countup(0, padded.len - 4, 4):
+          total += uint32(padded.u16(k)) shl 16 or uint32(padded.u16(k + 2))
+        sum = be(total, 4)
+      dir.add tag & sum & be(start + body.len, 4) & be(table.len, 4)
+      body.add padded
+    dir & body
   except ValueError:
     ""
 
@@ -262,16 +343,30 @@ when defined(libass):
       ass_set_extract_fonts(b.lib, 1)
     b.lib
 
-  proc family(b: var SubBurner, font, name: string): string =
-    ## `font`'s family, which libass finds it by once it holds its data.
-    if font notin b.families:
+  proc family(b: var SubBurner, font, face, name: string): string =
+    ## The family libass finds `font` by once it holds its data: the font's
+    ## own, or one made for `face` alone.
+    let key = font & "\0" & face
+    if key notin b.families:
       let data = try: readFile(font) except IOError:
         error &"{name}: can't read the font {font}"
-      let family = fontFamily(data)
+      var family = fontFamily(data)
       if family.len == 0: error &"{name}: {font} has no font family name"
-      ass_add_font(b.library, extractFilename(font).cstring, data.cstring, data.len.cint)
-      b.families[font] = family
-    b.families[font]
+      if face.len == 0:
+        ass_add_font(b.library, extractFilename(font).cstring, data.cstring, data.len.cint)
+      else:
+        let index = findFace(data, face)
+        if index < 0:
+          var has: seq[string]
+          for i, style in fontFaces(data): has.add &"{i} {style}"
+          error &"{name}: {font} has no face {face}; it has " & has.join(", ")
+        family = &"{family} face {index} {toHex(hash(font) and 0xffffff, 6)}"
+        let one = extractFace(data, index, family)
+        if one.len == 0: error &"{name}: can't read face {face} of {font}"
+        ass_add_font(b.library, (extractFilename(font) & "#" & $index).cstring,
+          one.cstring, one.len.cint)
+      b.families[key] = family
+    b.families[key]
 
   proc renderer(b: var SubBurner, w, h: cint): ptr ASS_Renderer =
     # One for each size, since resizing a renderer empties its caches.
@@ -281,7 +376,7 @@ when defined(libass):
       if result == nil: error "Could not initialize libass's renderer"
       ass_set_frame_size(result, w, h)
       ass_set_storage_size(result, w, h)
-      let family = if fallbackFont.len > 0: b.family(fallbackFont, "--font") else: ""
+      let family = if fallbackFont.len > 0: b.family(fallbackFont, "", "--font") else: ""
       ass_set_fonts(result, nil, (if family.len > 0: family.cstring else: nil),
         ASS_FONTPROVIDER_AUTODETECT, nil, 1)
       b.renderers[(w, h)] = result
@@ -415,7 +510,11 @@ when defined(libass):
         error &"{name}: no font to draw with, give one with font= or --font"
     var style: seq[string]
     if burn.burnFont.len > 0:
-      style.add "FontName=" & b.family(burn.burnFont, name)
+      style.add "FontName=" & b.family(burn.burnFont, burn.burnFace, name)
+    elif burn.burnFace.len > 0:
+      error &"{name}: face needs a font file, give one with font="
+    if burn.burnWeight > 0:
+      style.add &"Bold={burn.burnWeight}"
     if burn.burnSize > 0:
       # A percent of the frame, in the script's own coordinates.
       style.add &"Fontsize={burn.burnSize.float * result.playResY / 100:.2f}"
