@@ -47,7 +47,6 @@ type GraphKey = tuple
   col: uint32
 
 type MatteKey = tuple
-  valid: bool
   w, h: cint
   kind: ActionKind
   x, y, wd, ht, radius: int32
@@ -78,40 +77,6 @@ func packRGB(c: RGBColor): uint32 =
 # effects like zoom/rotate/pos are intentionally left full-frame).
 const confinable = {actBlur, actBrightness, actLuv, actInvert, actErosion,
   actAberration, actPixelate}
-
-func maskGray(a: Action): string =
-  ## geq luma expression (0..255) for the matte: opaque inside the shape, black
-  ## outside, with an optional `feather`-pixel soft edge; `invert` flips it.
-  ## Shape from `mRadius`: -1 = ellipse, 0 = sharp rect, >0 = rounded-rect px.
-  let f = a.mFeather.float
-  let cx = a.mX.float + a.mW.float / 2
-  let cy = a.mY.float + a.mH.float / 2
-  var cover: string # 0..1 coverage, 1 = fully inside
-  if a.mRadius < 0: # ellipse
-    let rx = a.mW.float / 2
-    let ry = a.mH.float / 2
-    let rr2 = &"pow((X-{cx})/{rx},2)+pow((Y-{cy})/{ry},2)"
-    if f <= 0:
-      cover = &"lte({rr2},1)"
-    else:
-      # Feather (px) -> a normalized-radius band centered on the edge (r=1).
-      let nf = f / ((rx + ry) / 2)
-      cover = &"clip(0.5+(1-sqrt({rr2}))/{nf},0,1)"
-  else:
-    # Rounded-box signed distance (>0 outside, 0 on edge). r=0 is a sharp rect;
-    # r is clamped to the half-extent so corners can't over-round.
-    let hx = a.mW.float / 2
-    let hy = a.mH.float / 2
-    let r = min(a.mRadius.float, min(hx, hy))
-    let qx = &"(abs(X-{cx})-{hx - r})"
-    let qy = &"(abs(Y-{cy})-{hy - r})"
-    let sdf = &"(hypot(max({qx},0),max({qy},0))+min(max({qx},{qy}),0)-{r})"
-    if f <= 0:
-      cover = &"lte({sdf},0)"
-    else:
-      # Ramp coverage across the f-px band centered on the edge (sdf=0).
-      cover = &"clip(0.5-({sdf})/{f},0,1)"
-  if a.mInvert: &"255*(1-({cover}))" else: &"255*({cover})"
 
 func isLeft(ax, ay, bx, by, px, py: float): float =
   (bx - ax) * (py - ay) - (px - ax) * (by - ay)
@@ -186,6 +151,50 @@ proc buildPolyMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
           clamp(0.5 - sdf / feather, 0.0, 1.0)
       let g = (if effect.mInvert: 255.0 * (1.0 - cover) else: 255.0 * cover)
       r[x] = uint8(clamp(round(g), 0.0, 255.0))
+  frame
+
+proc buildMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
+  ## A gray8 matte: white where the mask/effect applies, black elsewhere, with
+  ## an optional `feather`-pixel soft edge; `invert` flips it. Shape from
+  ## `mRadius`: -1 = ellipse, 0 = sharp rect, >0 = rounded-rect px.
+  let frame = av_frame_alloc()
+  if frame == nil: error "Bad buffer"
+  frame.format = AV_PIX_FMT_GRAY8.cint
+  frame.width = w
+  frame.height = h
+  if av_frame_get_buffer(frame, 32) < 0: error "Bad buffer"
+  let f = effect.mFeather.float
+  let cx = effect.mX.float + effect.mW.float / 2
+  let cy = effect.mY.float + effect.mH.float / 2
+  let hx = effect.mW.float / 2
+  let hy = effect.mH.float / 2
+  let ellipse = effect.mRadius < 0
+  # Feather (px) -> a normalized-radius band centered on the ellipse's edge.
+  let nf = f / ((hx + hy) / 2)
+  # r is clamped to the half-extent so corners can't over-round.
+  let r = min(effect.mRadius.float, min(hx, hy))
+  for y in 0 ..< h.int:
+    let row = frame.planeRow(0, y)
+    let dy = y.float - cy
+    for x in 0 ..< w.int:
+      let dx = x.float - cx
+      var cover: float # 0..1 coverage, 1 = fully inside
+      if ellipse:
+        let rr2 = (dx / hx) * (dx / hx) + (dy / hy) * (dy / hy)
+        cover =
+          if f <= 0: (if rr2 <= 1: 1.0 else: 0.0)
+          else: clamp(0.5 + (1 - sqrt(rr2)) / nf, 0.0, 1.0)
+      else:
+        # Rounded-box signed distance (>0 outside, 0 on edge).
+        let qx = abs(dx) - (hx - r)
+        let qy = abs(dy) - (hy - r)
+        let sdf = hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - r
+        cover =
+          if f <= 0: (if sdf <= 0: 1.0 else: 0.0)
+          else: clamp(0.5 - sdf / f, 0.0, 1.0)
+      # A zero-sized shape divides by zero; its matte covers nothing.
+      if cover != cover: cover = 0
+      row[x] = uint8(round(if effect.mInvert: 255 * (1 - cover) else: 255 * cover))
   frame
 
 # Keyframe index built from AVIndexEntry for efficient seeking
@@ -1004,12 +1013,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # animated effect, whose key changes every frame, holds at most two.
   var fxGraphs: seq[tuple[key: GraphKey, graph: Graph, usedAt: int64]] = @[]
   var fxGraph: Graph = nil # the one `withFxGraph` last selected
-  # Cached mask/confine mattes (gray8), rebuilt only when the region/size changes
-  # so the per-pixel shape math runs once, not every frame.
-  var maskMatte: ptr AVFrame = nil
-  var maskMatteKey: MatteKey
-  var confineMatte: ptr AVFrame = nil
-  var confineMatteKey: MatteKey
+  # Mask/confine mattes (gray8), one per shape and size so the per-pixel shape
+  # math runs once, not every frame, however many layers are masked. Freed
+  # like the graphs, once a whole frame passes without it.
+  var mattes: seq[tuple[key: MatteKey, matte: ptr AVFrame, usedAt: int64]] = @[]
   let needsScaling = video.scale != 1.0
 
   debug &"Creating video stream with codec: {video.codec}"
@@ -1281,6 +1288,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         fxGraphs[i].graph.cleanup()
     fxGraphs.setLen(kept)
 
+  proc dropIdleMattes() =
+    ## Free the mattes the previous frame didn't use.
+    var kept = 0
+    for i in 0 ..< mattes.len:
+      if mattes[i].usedAt >= frameNo - 1:
+        mattes[kept] = mattes[i]
+        inc kept
+      else:
+        av_frame_free(addr mattes[i].matte)
+    mattes.setLen(kept)
+
   proc keyOverBg(frame0: ptr AVFrame, effect: Action): ptr AVFrame =
     var frame = frame0
     let w = frame.width
@@ -1311,38 +1329,23 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     av_frame_free(addr bgFrame)
     av_frame_free(addr frame)
 
-  proc buildMaskMatte(w, h: cint, effect: Action): ptr AVFrame =
-    ## A gray8 matte: white where the mask/effect applies, black elsewhere, with
-    ## a feathered ramp between. Built once per (region, size) and cached.
-    var black = makeSolid(w, h, RGBColor(red: 0, green: 0, blue: 0))
-    black.pts = 0
-    let g = newGraph()
-    let src = g.add("buffer", bufArgsOf(black))
-    let geq = g.add("geq", &"lum={maskGray(effect)}")
-    let toGray = g.add("format", "pix_fmts=gray8")
-    let sink = g.add("buffersink")
-    g.linkNodes(src, geq, toGray, sink).configure()
-    g.push(black)
-    result = g.pull()
-    g.cleanup()
-    av_frame_free(addr black)
-
-  proc cachedMatte(cache: var ptr AVFrame, key: var MatteKey,
-      frame: ptr AVFrame, effect: Action): ptr AVFrame =
-    ## Return the cached matte for `effect` at `frame`'s size, rebuilding only
-    ## when the region/feather/size/points change. Caller must NOT free the
-    ## result.
-    let k: MatteKey = (valid: true, w: frame.width, h: frame.height,
+  proc cachedMatte(frame: ptr AVFrame, effect: Action): ptr AVFrame =
+    ## The matte for `effect` at `frame`'s size, built when there is none yet.
+    ## Caller must NOT free the result.
+    let k: MatteKey = (w: frame.width, h: frame.height,
       kind: effect.kind, x: effect.mX, y: effect.mY, wd: effect.mW, ht: effect.mH,
       radius: effect.mRadius, feather: effect.mFeather, invert: effect.mInvert,
       polyXs: effect.mPolyXs, polyYs: effect.mPolyYs)
-    if cache == nil or key != k:
-      if cache != nil: av_frame_free(addr cache)
-      cache = (if effect.kind in {actMaskPoly, actConfinePoly}:
-          buildPolyMaskMatte(frame.width, frame.height, effect)
-        else: buildMaskMatte(frame.width, frame.height, effect))
-      key = k
-    cache
+    for e in mattes.mitems:
+      if e.key == k:
+        e.usedAt = frameNo
+        return e.matte
+    let matte =
+      if effect.kind in {actMaskPoly, actConfinePoly}:
+        buildPolyMaskMatte(frame.width, frame.height, effect)
+      else: buildMaskMatte(frame.width, frame.height, effect)
+    mattes.add (k, matte, frameNo)
+    matte
 
   proc alphamergeOnto(frame0, matte: ptr AVFrame): ptr AVFrame =
     ## Set `frame`'s alpha from the gray matte (cheap; no per-pixel geq).
@@ -1461,7 +1464,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     template runFx(key: GraphKey, build: untyped) =
       withFxGraph(key, build)
       if confineThis:
-        let matte = cachedMatte(confineMatte, confineMatteKey, frame, confineEffect)
+        let matte = cachedMatte(frame, confineEffect)
         let saved = av_frame_clone(frame)
         fxGraph.push(frame)
         av_frame_free(addr frame)
@@ -1732,7 +1735,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           fxGraph.linkNodes(bufferSrc, toRgba, shift, toOrig, bufferSink).configure()
       of actMask, actMaskPoly:
         # Shape the alpha from a cached matte via alphamerge (cheap per frame).
-        let matte = cachedMatte(maskMatte, maskMatteKey, frame, effect)
+        let matte = cachedMatte(frame, effect)
         frame = alphamergeOnto(frame, matte)
         if not isOverlay:
           # Base layer: nothing below to reveal, so flatten the masked-out area
@@ -2264,6 +2267,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         av_frame_free(addr df)
       decodedCache.clear()
       dropIdleFxGraphs()
+      dropIdleMattes()
 
       for layerIdx in 0 ..< tl.v.len:
         # An alias: a loop variable here would copy the layer every frame, as
@@ -2518,8 +2522,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       e.graph.cleanup()
     fxGraphs.setLen(0)
     burner.close()
-    if maskMatte != nil: av_frame_free(addr maskMatte)
-    if confineMatte != nil: av_frame_free(addr confineMatte)
+    for e in mattes.mitems:
+      av_frame_free(addr e.matte)
+    mattes.setLen(0)
     sws_free_context(addr scaleCtx)
     sws_free_context(addr padCtx)
     sws_free_context(addr reformatCtx)
