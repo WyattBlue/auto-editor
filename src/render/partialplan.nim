@@ -271,6 +271,11 @@ proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
   encoder.color_trc = par.color_trc
   encoder.colorspace = par.color_space
   encoder.profile = par.profile
+  # FFmpeg's default is one thread, which only encoders with their own
+  # default (libx264) override. The web build's workers come from a fixed
+  # pool, so it keeps the default.
+  when not defined(emscripten):
+    encoder.thread_count = 0
   # A little over the source's rate holds re-encoded frames up beside copied
   # ones. A low or unknown rate is left to the encoder's own quality target,
   # as a full render's is: a run is short and opens on an I frame, which a
