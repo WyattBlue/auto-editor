@@ -78,15 +78,29 @@ func averageGopFrames*(keyframes: openArray[int64], sourceEnd: int64): int64 =
     return max(sourceEnd, 1)
   return max(frames div count, 1)
 
+func restartFrames(encoder: string, averageGop: int64): int64 =
+  ## What starting an encode run costs, in frames of a full render. Timed at
+  ## 720p: libx264, which stays open between runs, takes 3 ms, and libsvtav1
+  ## and libx265, opened again for each, 40 ms and up to 55 ms. A run also
+  ## decodes from the keyframe before it, half a GOP on average, at a tenth
+  ## of what a frame costs to encode. Other encoders keep a whole GOP's
+  ## worth, a guess on the safe side.
+  let opening =
+    case encoder
+    of "libx264": 6'i64
+    of "libx265": 16
+    of "libsvtav1": 24
+    else: return max(averageGop, 1)
+  opening + averageGop div 20
+
 func smartPlanIsWorthwhile*(stats: SmartPlanStats, timelineFrames,
-    sourceFrames, averageGop: int64): bool =
+    sourceFrames, averageGop: int64, encoder: string): bool =
   ## Estimate work in full-render frame equivalents. Demuxing the source is
-  ## substantially cheaper than decoding and encoding it, while restarting an
-  ## encoder costs about one GOP of useful work.
+  ## substantially cheaper than decoding and encoding it.
   if stats.copiedFrames <= 0 or timelineFrames <= 0:
     return false
   let scanCost = max(sourceFrames, 0) div 32
-  let restartCost = int64(stats.encodeRuns) * max(averageGop, 1)
+  let restartCost = int64(stats.encodeRuns) * restartFrames(encoder, averageGop)
   return stats.encodedFrames + scanCost + restartCost < timelineFrames
 
 proc applyPartialEncoderArgs*(encoder: ptr AVCodecContext, video: VideoSettings) =

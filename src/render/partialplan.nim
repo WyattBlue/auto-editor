@@ -249,7 +249,8 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
   let stats = smartPlanStats(plan)
   let averageGop = averageGopFrames(keyframes, sourceEnd)
-  if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop):
+  if not smartPlanIsWorthwhile(stats, tl.len, sourceEnd, averageGop,
+      $encoder.name):
     let label = codecId.codecLabel
     debug &"Skipping {label} partial-lossless rendering: copying " &
       &"{stats.copiedFrames}/{tl.len} frames across {plan.len} spans " &
