@@ -95,12 +95,12 @@ proc makePartialLosslessVideo(output: var OutputContainer, tl: v3, args: mainArg
   if encoder == nil:
     return
 
-  let plan = output.partialLosslessPlan(tl, args, video, encoder.id)
-  if plan.len == 0:
+  let (spans, keyframes) = output.partialLosslessPlan(tl, args, video, encoder.id)
+  if spans.len == 0:
     return
 
   (result.stream, result.packets) =
-    makePartialLossless(output, tl, video, plan, encoder.id)
+    makePartialLossless(output, tl, video, spans, keyframes, encoder.id)
 
 proc dropUndecodableAudio*(tl: var v3, cache: MediaCache) =
   ## A timeline can name an audio stream this build has no decoder for: the

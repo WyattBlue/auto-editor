@@ -172,7 +172,10 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
   result.keyframes.setLen(write)
 
 proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
-    video: VideoSettings, codecId: AVCodecID): seq[SmartSpan] =
+    video: VideoSettings, codecId: AVCodecID):
+    tuple[spans: seq[SmartSpan], keyframes: seq[int64]] =
+  ## The spans to copy and to encode, with the source's keyframes, or no spans
+  ## when the render has to encode every frame.
   if args.noPartialLossless:
     return
 
@@ -252,7 +255,7 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
       &"{stats.copiedFrames}/{tl.len} frames across {plan.len} spans " &
       &"would not offset {stats.encodeRuns} encoder runs"
     return
-  return plan
+  return (plan, keyframes)
 
 proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
     frameTb, fps: AVRational, codecId: AVCodecID): ptr AVCodecContext =
@@ -302,7 +305,7 @@ func holdsFrames(tb, frameTb: AVRational): bool =
   (frameTb.num.int64 * tb.den.int64) mod (frameTb.den.int64 * tb.num.int64) == 0
 
 proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSettings,
-    spans: seq[SmartSpan], codecId: AVCodecID):
+    spans: seq[SmartSpan], keyframes: seq[int64], codecId: AVCodecID):
     (ptr AVStream, iterator(): (ptr AVPacket, int64)) =
   let label = codecId.codecLabel
   let isNal = codecId.isNalCodec
@@ -472,6 +475,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
         receive(encodedPacket)
       if sentFrame != nil: inc sent
 
+    # The last source frame the decoder gave, or -1 when it has to seek.
+    var decodedTo = -1'i64
     # The frames to encode for run `genRun`, one at a time.
     var genRun = 0
     var gen: iterator(): ptr AVFrame = nil
@@ -481,10 +486,15 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
         var firstFrameInRun = true
         for fedSpan in runFirst[genRun] .. runLast[genRun]:
           let span = spans[fedSpan]
-          encInput.seekToKeyBefore(encStream,
-            av_rescale_q(span.srcStart, frameTb, encStream.time_base) +
-            encInput.startPts(encStream))
-          avcodec_flush_buffers(decoder)
+          # A seek decodes again from the keyframe before the span. A decoder
+          # already past that keyframe, as after a cut within one GOP, has
+          # only the frames between left to go through.
+          let key = keyframes[max(upperBound(keyframes, span.srcStart) - 1, 0)]
+          if decodedTo < 0 or decodedTo >= span.srcStart or key > decodedTo + 1:
+            encInput.seekToKeyBefore(encStream,
+              av_rescale_q(span.srcStart, frameTb, encStream.time_base) +
+              encInput.startPts(encStream))
+            avcodec_flush_buffers(decoder)
           var count = 0'i64
           var lastDecoded: ptr AVFrame = nil
           var flushed = false
@@ -497,6 +507,7 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
               let sourceFrame = int64(round((frame.time(encStream.time_base) -
                 float(encInput.startPts(encStream) * encStream.time_base)) *
                 float(tl.tb)))
+              decodedTo = sourceFrame
               if sourceFrame < span.srcStart:
                 continue
               # A WebCodecs decoder hands over whatever layout the browser
@@ -543,6 +554,8 @@ proc makePartialLossless*(output: var OutputContainer, tl: v3, video: VideoSetti
               av_frame_free(addr src)
           if lastDecoded != nil:
             av_frame_free(addr lastDecoded)
+          # A drained decoder gives nothing more until it's flushed.
+          if flushed: decodedTo = -1
 
     # Send one more frame to the encoder, starting the next run if none is
     # under way, and finishing the run when it has no frames left.
