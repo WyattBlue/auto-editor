@@ -173,9 +173,17 @@ proc scanGops(input: InputContainer, stream: ptr AVStream, fps: AVRational,
 
 proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
     video: VideoSettings, codecId: AVCodecID): seq[SmartSpan] =
-  if args.noPartialLossless or video.scale != 1.0 or video.pixFmt != "" or
-      video.profile != "":
+  if args.noPartialLossless:
     return
+
+  # A render that could have copied and didn't is otherwise only slower.
+  template skip(reason: string) =
+    debug "Skipping " & codecId.codecLabel & " partial-lossless rendering: " & reason
+    return
+
+  if video.scale != 1.0: skip "the output is scaled"
+  if video.pixFmt != "": skip "a pixel format was asked for"
+  if video.profile != "": skip "a profile was asked for"
 
   let encoder = initCodec(video.codec)
   if encoder == nil or encoder.id != codecId:
@@ -183,24 +191,27 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
   # The web build's WebCodecs encoders (h264_web and the like) don't splice
   # into copied packets: their output decodes as garbage between copied spans.
   if ($encoder.name).endsWith("_web"):
-    return
+    skip &"{encoder.name} can't splice into copied packets"
   let formatName = $output.formatCtx.oformat.name
   if not codecId.supportsContainer(formatName):
-    return
+    skip &"{formatName} can't hold a mix of copied and encoded packets"
   if tl.v.len != 1 or tl.v[0].len == 0:
-    return
+    skip "the timeline isn't a single video layer"
 
   let source = tl.v[0][0].src
   if source == nil:
-    return
+    skip "the first clip has no source"
   var expectedStart = 0'i64
   for clip in tl.v[0]:
-    if clip.src != source or clip.stream != 0 or clip.start != expectedStart or
-        not tl.effects[clip.effects].isEmpty:
-      return
+    if clip.src != source or clip.stream != 0:
+      skip "the clips aren't all of one source's first video stream"
+    if clip.start != expectedStart:
+      skip "the clips leave a gap or overlap"
+    if not tl.effects[clip.effects].isEmpty:
+      skip "a clip has effects"
     expectedStart = clip.start + clip.dur
   if expectedStart != tl.len:
-    return
+    skip "the clips end before the timeline does"
 
   var input = try: av.open(source[])
               except IOError: return
@@ -209,23 +220,28 @@ proc partialLosslessPlan*(output: OutputContainer, tl: v3, args: mainArgs,
     return
 
   let stream = input.video[0]
-  if stream.codecpar.codec_id != codecId or
-      stream.codecpar.width != tl.res[0] or
-      stream.codecpar.height != tl.res[1] or
-      not input.supportsStream(stream, encoder, codecId) or
-      not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
-    return
+  if stream.codecpar.codec_id != codecId:
+    skip "the source is " & $avcodec_get_name(stream.codecpar.codec_id)
+  if stream.codecpar.width != tl.res[0] or stream.codecpar.height != tl.res[1]:
+    skip &"the source is {stream.codecpar.width}x{stream.codecpar.height}, " &
+      &"the timeline {tl.res[0]}x{tl.res[1]}"
+  if not input.supportsStream(stream, encoder, codecId):
+    skip "the source's pixel format or headers can't be matched by the encoder"
+  # Packets are placed by rounding their time to a timeline frame, which only
+  # gives each its own frame when the two rates are the same.
+  if not stream.avg_frame_rate.isValid or stream.avg_frame_rate != tl.tb:
+    skip &"the source averages {stream.avg_frame_rate} fps, the timeline is {tl.tb}"
 
   # Re-encoded frames are deinterlaced, so copying an interlaced source's GOPs
   # would leave its output interlaced or not depending on where cuts fall.
   if stream.codecpar.field_order notin [0.cint, 1]:
-    return
+    skip "the source is interlaced"
 
   let (keyframes, sourceEnd) = scanGops(input, stream, tl.tb, codecId)
   for clip in tl.v[0]:
     if clip.offset < 0 or clip.offset >= sourceEnd or
         clip.offset + clip.dur > sourceEnd + 1:
-      return
+      skip "a clip reaches outside the source's frames"
 
   let plan = smartRenderPlan(tl.v[0], keyframes, sourceEnd)
   let stats = smartPlanStats(plan)
