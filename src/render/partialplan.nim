@@ -268,7 +268,13 @@ proc initPartialEncoder(video: VideoSettings, par: ptr AVCodecParameters,
   encoder.color_trc = par.color_trc
   encoder.colorspace = par.color_space
   encoder.profile = par.profile
-  encoder.bit_rate = max(par.bit_rate * 6 div 5, 1_000_000)
+  # A little over the source's rate holds re-encoded frames up beside copied
+  # ones. A low or unknown rate is left to the encoder's own quality target,
+  # as a full render's is: a run is short and opens on an I frame, which a
+  # small average starves, and a fixed rate in its place gives a screen
+  # recording many times the bits it had.
+  let matched = par.bit_rate * 6 div 5
+  encoder.bit_rate = (if matched >= 1_000_000: matched else: 0)
   if codecId.isNalCodec:
     # VideoToolbox reorders a B-pyramid two deep whatever it's asked for, and
     # FFmpeg's wrapper shifts its DTS by one, so a B-frame lands with its DTS
